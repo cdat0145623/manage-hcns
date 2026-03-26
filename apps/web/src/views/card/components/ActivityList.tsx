@@ -18,6 +18,7 @@ import {
 } from "react-icons/hi2";
 
 import type {
+  ActivityType,
   GetCardActivitiesOutput,
   GetCardByIdOutput,
 } from "@kan/api/types";
@@ -29,8 +30,6 @@ import { api } from "~/utils/api";
 import { getAvatarUrl } from "~/utils/helpers";
 import Comment from "./Comment";
 
-type ActivityType =
-  NonNullable<GetCardByIdOutput>["activities"][number]["type"];
 
 type ActivityWithMergedLabels =
   GetCardActivitiesOutput["activities"][number] & {
@@ -47,7 +46,7 @@ const truncate = (value: string | null, maxLength = 50) => {
   return value.length > maxLength ? `${value.slice(0, maxLength - 1)}…` : value;
 };
 
-const getUserDisplayName = (
+export const getUserDisplayName = (
   user: { name?: string | null; email?: string | null } | null | undefined,
 ): string => {
   if (user?.name?.trim()) return user.name;
@@ -55,7 +54,7 @@ const getUserDisplayName = (
   return t`Member`;
 };
 
-const getActivityText = ({
+export const getActivityText = ({
   type,
   toTitle,
   fromList,
@@ -351,7 +350,7 @@ const ACTIVITY_ICON_MAP: Partial<Record<ActivityType, React.ReactNode | null>> =
     "card.updated.dueDate.removed": <HiOutlineClock />,
   } as const;
 
-const getActivityIcon = (
+export const getActivityIcon = (
   type: ActivityType,
   fromIndex?: number | null,
   toIndex?: number | null,
@@ -525,7 +524,6 @@ const ActivityList = ({
               comment={activity.comment?.comment}
               isEdited={!!activity.comment?.updatedAt}
               isAuthor={activity.comment?.createdBy === sessionData?.user.id}
-              isAdmin={isAdmin ?? false}
               isViewOnly={!!isViewOnly}
             />
           );

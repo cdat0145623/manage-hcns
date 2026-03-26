@@ -35,6 +35,7 @@ import { useWorkspace } from "~/providers/workspace";
 import { api } from "~/utils/api";
 import { formatToArray } from "~/utils/helpers";
 import BoardDropdown from "./components/BoardDropdown";
+import BoardActivitySidebar from "./components/BoardActivitySidebar";
 import Card from "./components/Card";
 import { DeleteBoardConfirmation } from "./components/DeleteBoardConfirmation";
 import { DeleteListConfirmation } from "./components/DeleteListConfirmation";
@@ -58,6 +59,7 @@ export default function BoardPage({ isTemplate }: { isTemplate?: boolean }) {
   const { openModal, modalContentType, entityId, isOpen } = useModal();
   const [selectedPublicListId, setSelectedPublicListId] =
     useState<PublicListId>("");
+  const [isActivitySidebarOpen, setIsActivitySidebarOpen] = useState(false);
   const [isInitialLoading, setIsInitialLoading] = useState(true);
 
   const { ref: scrollRef, onMouseDown } = useDragToScroll({
@@ -510,6 +512,7 @@ export default function BoardPage({ isTemplate }: { isTemplate?: boolean }) {
               isArchived={boardData?.isArchived ?? false}
               isFavorite={boardData?.favorite}
               boardName={boardData?.name}
+              onShowActivity={() => setIsActivitySidebarOpen(true)}
             />
           </div>
         </div>
@@ -654,6 +657,11 @@ export default function BoardPage({ isTemplate }: { isTemplate?: boolean }) {
           ) : null}
         </div>
         {renderModalContent()}
+        <BoardActivitySidebar
+          isOpen={isActivitySidebarOpen}
+          onClose={() => setIsActivitySidebarOpen(false)}
+          boardPublicId={boardId ?? ""}
+        />
       </div>
     </>
   );

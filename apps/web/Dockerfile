@@ -66,7 +66,34 @@ ENV CI=true
 
 RUN VERSION="${APP_VERSION:-$(cat /tmp/AUTO_VERSION 2>/dev/null | tr -d '\n\r' || echo 'unknown')}" && \
     NEXT_PUBLIC_APP_VERSION="$VERSION" pnpm build --filter=@kan/web
+# ============================================
+# Stage 4.5: Development (hot reload enabled)
+# ============================================
+FROM alpine AS dev
+WORKDIR /app
 
+# Copy workspace configuration files
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY turbo.json ./
+
+# Copy ALL workspace packages (quan trọng!)
+COPY packages/ ./packages/
+COPY apps/ ./apps/
+COPY tooling/ ./tooling/
+
+# Install ALL dependencies (including devDependencies)
+RUN --mount=type=cache,id=pnpm,target=~/.pnpm-store pnpm install
+
+# Set development environment variables
+ENV NODE_ENV=development
+ENV CHOKIDAR_USEPOLLING=true
+ENV WATCHPACK_POLLING=true
+ENV PORT=3000
+
+EXPOSE 3000
+
+# Default command (can be overridden in docker-compose)
+CMD ["pnpm", "dev"]
 # ============================================
 # Stage 5: Migration image (run-once container)
 # ============================================

@@ -21,6 +21,7 @@ export default function BoardDropdown({
   boardPublicId,
   isFavorite,
   boardName,
+  onShowActivity,
 }: {
   isTemplate: boolean;
   isLoading: boolean;
@@ -28,6 +29,7 @@ export default function BoardDropdown({
   isArchived?: boolean;
   isFavorite?: boolean;
   boardName?: string;
+  onShowActivity?: () => void;
 }) {
   const { openModal } = useModal();
   const { showPopup } = usePopup();
@@ -127,6 +129,15 @@ export default function BoardDropdown({
         <HiOutlineStar className="h-[16px] w-[16px] text-dark-900" />
       ),
     },
+    ...(onShowActivity
+      ? [
+        {
+          label: t`Show menu`,
+          action: onShowActivity,
+          icon: <HiEllipsisHorizontal className="h-[16px] w-[16px] text-dark-900" />,
+        },
+      ]
+      : []),
     ...(canDeleteBoard
       ? [
         {

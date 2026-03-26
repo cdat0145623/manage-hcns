@@ -1,8 +1,17 @@
-import { and, asc, count, eq, gt, inArray, isNull, or } from "drizzle-orm";
+import { and, asc, count, desc, eq, gt, inArray, isNull, or } from "drizzle-orm";
 
 import type { dbClient } from "@kan/db/client";
 import type { ActivityType } from "@kan/db/schema";
-import { cardActivities, comments } from "@kan/db/schema";
+import {
+  cardActivities,
+  cardAttachments,
+  cards,
+  checklistItems,
+  checklists,
+  comments,
+  labels,
+  lists,
+} from "@kan/db/schema";
 import { generateUID } from "@kan/shared/utils";
 
 export const getCount = async (db: dbClient) => {
@@ -203,6 +212,124 @@ export const getPaginatedActivities = async (
       },
     },
     orderBy: asc(cardActivities.createdAt), // required for merging and pagination
+    limit: limit + 1, // fetch one extra to check if there are more
+  });
+
+  const hasMore = activities.length > limit;
+  const items = activities.slice(0, limit);
+  const nextCursor = hasMore ? items[items.length - 1]?.createdAt : undefined;
+
+  return {
+    activities: items,
+    hasMore,
+    nextCursor,
+  };
+};
+
+export const getPaginatedBoardActivities = async (
+  db: dbClient,
+  boardId: number,
+  options?: {
+    limit?: number;
+    cursor?: Date; // createdAt cursor for pagination
+  },
+) => {
+  const limit = options?.limit ?? 20;
+  const cursor = options?.cursor;
+
+  const activities = await db.query.cardActivities.findMany({
+    columns: {
+      publicId: true,
+      type: true,
+      createdAt: true,
+      fromIndex: true,
+      toIndex: true,
+      fromTitle: true,
+      toTitle: true,
+      fromDescription: true,
+      toDescription: true,
+      fromDueDate: true,
+      toDueDate: true,
+    },
+    where: and(
+      inArray(
+        cardActivities.cardId,
+        db
+          .select({ id: cards.id })
+          .from(cards)
+          .innerJoin(lists, eq(cards.listId, lists.id))
+          .where(eq(lists.boardId, boardId)),
+      ),
+      cursor ? gt(cardActivities.createdAt, cursor) : undefined,
+    ),
+    with: {
+      fromList: {
+        columns: {
+          publicId: true,
+          name: true,
+          index: true,
+        },
+      },
+      toList: {
+        columns: {
+          publicId: true,
+          name: true,
+          index: true,
+        },
+      },
+      label: {
+        columns: {
+          publicId: true,
+          name: true,
+        },
+      },
+      member: {
+        columns: {
+          publicId: true,
+        },
+        with: {
+          user: {
+            columns: {
+              id: true,
+              name: true,
+              email: true,
+              image: true,
+            },
+          },
+        },
+      },
+      user: {
+        columns: {
+          id: true,
+          name: true,
+          email: true,
+          image: true,
+        },
+      },
+      comment: {
+        columns: {
+          publicId: true,
+          comment: true,
+          createdBy: true,
+          updatedAt: true,
+          deletedAt: true,
+        },
+      },
+      attachment: {
+        columns: {
+          publicId: true,
+          filename: true,
+          originalFilename: true,
+        },
+      },
+      card: {
+        columns: {
+          publicId: true,
+          title: true,
+        },
+      },
+    },
+    orderBy: desc(cardActivities.createdAt),
     limit: limit + 1, // fetch one extra to check if there are more
   });
 

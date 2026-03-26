@@ -689,4 +689,89 @@ export const boardRouter = createTRPCRouter({
         isReserved: !isBoardSlugAvailable,
       };
     }),
+  getActivities: protectedProcedure
+    .meta({
+      openapi: {
+        method: "GET",
+        path: "/boards/{boardPublicId}/activities",
+        summary: "Get board activities",
+        description: "Retrieves activities for all cards in a board",
+        tags: ["Boards"],
+        protect: true,
+      },
+    })
+    .input(
+      z.object({
+        boardPublicId: z.string().min(12),
+        limit: z.number().min(1).max(100).nullish(),
+        cursor: z.date().nullish(),
+      }),
+    )
+    .query(async ({ ctx, input }) => {
+      const userId = ctx.user?.id;
+
+      if (!userId)
+        throw new TRPCError({
+          message: `User not authenticated`,
+          code: "UNAUTHORIZED",
+        });
+
+      const board = await boardRepo.getWorkspaceAndBoardIdByBoardPublicId(
+        ctx.db,
+        input.boardPublicId,
+      );
+
+      if (!board)
+        throw new TRPCError({
+          message: `Board with public ID ${input.boardPublicId} not found`,
+          code: "NOT_FOUND",
+        });
+
+      await assertPermission(ctx.db, userId, board.workspaceId, "board:view");
+
+      const result = await activityRepo.getPaginatedBoardActivities(
+        ctx.db,
+        board.id,
+        {
+          limit: input.limit ?? undefined,
+          cursor: input.cursor ?? undefined,
+        },
+      );
+
+      // Generate presigned URLs for user/member avatars
+      const activitiesWithAvatarUrls = await Promise.all(
+        result.activities.map(async (activity) => {
+          const user = activity.user;
+          const member = activity.member;
+
+          return {
+            ...activity,
+            user: user
+              ? {
+                ...user,
+                image: user.image ? await generateAvatarUrl(user.image) : null,
+              }
+              : null,
+            member: member
+              ? {
+                ...member,
+                user: member.user
+                  ? {
+                    ...member.user,
+                    image: member.user.image
+                      ? await generateAvatarUrl(member.user.image)
+                      : null,
+                  }
+                  : null,
+              }
+              : null,
+          };
+        }),
+      );
+
+      return {
+        ...result,
+        activities: activitiesWithAvatarUrls,
+      };
+    }),
 });

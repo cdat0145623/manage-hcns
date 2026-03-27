@@ -15,18 +15,3 @@ export * from "./workspaceInviteLinks";
 export * from "./permissions";
 export * from "./notifications";
 export * from "./webhooks";
-export {
-  taskMasters,
-  taskMastersRelations,
-  taskInstances,
-  taskInstancesRelations,
-  taskInstanceStatusEnum,
-  taskInstanceStatuses,
-} from "./task-masters";
-export type {
-  RecurrenceRule,
-  TaskInstanceStatus,
-  WeeklyRule,
-  MonthlyWeekdayRule,
-  MonthlyDateRule,
-} from "./task-masters";

@@ -13,7 +13,7 @@
       "default": "./src/client.ts"
     },
     "./schema": {
-      "types": "./dist/schema.d.ts",
+      "types": "./dist/schema/index.d.ts",
       "default": "./src/schema/index.ts"
     },
     "./types/*": {

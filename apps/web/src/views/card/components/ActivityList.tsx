@@ -20,7 +20,6 @@ import {
 import type {
   ActivityType,
   GetCardActivitiesOutput,
-  GetCardByIdOutput,
 } from "@kan/api/types";
 import { authClient } from "@kan/auth/client";
 
@@ -137,6 +136,7 @@ export const getActivityText = ({
     "card.updated.checklist.item.uncompleted": t`marked a checklist item as incomplete`,
     "card.updated.checklist.item.deleted": t`deleted a checklist item`,
     "card.updated.attachment.added": t`added an attachment`,
+    "card.updated.attachment.renamed": t`renamed an attachment`,
     "card.updated.attachment.removed": t`removed an attachment`,
     "card.updated.dueDate.added": t`set the due date`,
     "card.updated.dueDate.updated": t`updated the due date`,
@@ -280,6 +280,16 @@ export const getActivityText = ({
     );
   }
 
+  if (type === "card.updated.attachment.renamed" && fromTitle && toTitle) {
+    return (
+      <Trans>
+        renamed an attachment from{" "}
+        <TextHighlight>{truncate(fromTitle)}</TextHighlight> to{" "}
+        <TextHighlight>{truncate(toTitle)}</TextHighlight>
+      </Trans>
+    );
+  }
+
   if (type === "card.updated.attachment.removed") {
     const filename = attachmentName ?? fromTitle;
     if (!filename) return baseText;
@@ -344,6 +354,7 @@ const ACTIVITY_ICON_MAP: Partial<Record<ActivityType, React.ReactNode | null>> =
     "card.updated.checklist.item.uncompleted": <HiOutlineCheckCircle />,
     "card.updated.checklist.item.deleted": <HiOutlineTrash />,
     "card.updated.attachment.added": <HiOutlinePaperClip />,
+    "card.updated.attachment.renamed": <HiOutlinePaperClip />,
     "card.updated.attachment.removed": <HiOutlinePaperClip />,
     "card.updated.dueDate.added": <HiOutlineClock />,
     "card.updated.dueDate.updated": <HiOutlineClock />,
@@ -370,7 +381,7 @@ const ACTIVITIES_PAGE_SIZE = 20;
 const ActivityList = ({
   cardPublicId,
   isLoading: cardIsLoading,
-  isAdmin,
+  isAdmin: _isAdmin,
   isViewOnly,
 }: {
   cardPublicId: string;

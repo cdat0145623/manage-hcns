@@ -106,3 +106,19 @@ export const softDelete = async (
 
   return result;
 };
+
+export const updateOriginalFilename = async (
+  db: dbClient,
+  args: {
+    attachmentId: number;
+    originalFilename: string;
+  },
+) => {
+  const [result] = await db
+    .update(cardAttachments)
+    .set({ originalFilename: args.originalFilename })
+    .where(eq(cardAttachments.id, args.attachmentId))
+    .returning({ id: cardAttachments.id, originalFilename: cardAttachments.originalFilename });
+
+  return result;
+};

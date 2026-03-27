@@ -132,7 +132,8 @@
     "REDIS_URL",
     "LOG_LEVEL",
     "AXIOM_TOKEN",
-    "AXIOM_DATASET"
+    "AXIOM_DATASET",
+    "NEXT_PUBLIC_APP_URL"
   ],
   "globalPassThroughEnv": [
     "NODE_ENV",

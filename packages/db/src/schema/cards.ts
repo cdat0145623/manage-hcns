@@ -43,6 +43,7 @@ export const activityTypes = [
   "card.updated.checklist.item.uncompleted",
   "card.updated.checklist.item.deleted",
   "card.updated.attachment.added",
+  "card.updated.attachment.renamed",
   "card.updated.attachment.removed",
   "card.updated.dueDate.added",
   "card.updated.dueDate.updated",

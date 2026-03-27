@@ -16,22 +16,22 @@ import { getAvatarUrl } from "~/utils/helpers";
 
 const Card = ({
   title,
-  labels,
-  members,
-  checklists,
+  labels = [],
+  members = [],
+  checklists = [],
   description,
-  comments,
-  attachments,
+  comments = [],
+  attachments = [],
   dueDate,
 }: {
   title: string;
-  labels: { name: string; colourCode: string | null }[];
-  members: {
+  labels?: { name: string; colourCode: string | null }[];
+  members?: {
     publicId: string;
     email: string;
     user: { name: string | null; email: string; image: string | null } | null;
   }[];
-  checklists: {
+  checklists?: {
     publicId: string;
     name: string;
     items: {
@@ -42,7 +42,7 @@ const Card = ({
     }[];
   }[];
   description: string | null;
-  comments: { publicId: string }[];
+  comments?: { publicId: string }[];
   attachments?: { publicId: string }[];
   dueDate?: Date | null;
 }) => {
@@ -62,7 +62,7 @@ const Card = ({
 
   const hasDescription =
     description && description.replace(/<[^>]*>/g, "").trim().length > 0;
-  const hasAttachments = attachments && attachments.length > 0;
+  const hasAttachments = attachments.length > 0;
   const hasDueDate = !!dueDate;
 
   return (
@@ -91,7 +91,7 @@ const Card = ({
                   <HiBars3BottomLeft className="h-4 w-4" />
                 </div>
               )}
-              {hasDueDate && dueDate && (
+              {dueDate && (
                 <div
                   className={twMerge(
                     "flex items-center gap-1",

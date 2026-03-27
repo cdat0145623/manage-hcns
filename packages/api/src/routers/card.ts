@@ -653,6 +653,7 @@ export const cardRouter = createTRPCRouter({
             originalFilename: string | null;
             size?: number | null;
             url: string | null;
+            createdAt: Date;
           }[];
         }
       >(),
@@ -703,32 +704,31 @@ export const cardRouter = createTRPCRouter({
             originalFilename: attachment.originalFilename,
             size: attachment.size,
             url,
+            createdAt: (attachment as unknown as { createdAt: Date }).createdAt,
           };
         }),
       );
 
       // Generate presigned URLs for workspace member avatars
-      const workspaceWithAvatarUrls = result.list.board.workspace
-        ? {
-            ...result.list.board.workspace,
-            members: await Promise.all(
-              result.list.board.workspace.members.map(async (member) => {
-                if (!member.user?.image) {
-                  return member;
-                }
+      const workspaceWithAvatarUrls = {
+        ...result.list.board.workspace,
+        members: await Promise.all(
+          result.list.board.workspace.members.map(async (member) => {
+            if (!member.user?.image) {
+              return member;
+            }
 
-                const avatarUrl = await generateAvatarUrl(member.user.image);
-                return {
-                  ...member,
-                  user: {
-                    ...member.user,
-                    image: avatarUrl,
-                  },
-                };
-              }),
-            ),
-          }
-        : result.list.board.workspace;
+            const avatarUrl = await generateAvatarUrl(member.user.image);
+            return {
+              ...member,
+              user: {
+                ...member.user,
+                image: avatarUrl,
+              },
+            };
+          }),
+        ),
+      };
 
       return {
         ...result,

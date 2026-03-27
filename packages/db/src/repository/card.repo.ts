@@ -446,6 +446,7 @@ export const getWithListAndMembersByPublicId = async (
           s3Key: true,
           originalFilename: true,
           size: true,
+          createdAt: true,
         },
         where: isNull(cardAttachments.deletedAt),
         orderBy: asc(cardAttachments.createdAt),

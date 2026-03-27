@@ -136,8 +136,8 @@ export default function BoardPage({ isTemplate }: { isTemplate?: boolean }) {
   // Redirect to 404 if board doesn't exist
   useEffect(() => {
     if (router.isReady && boardId && !isQueryLoading) {
-      if (error?.data?.code === "NOT_FOUND" || (!boardData && !isQueryLoading)) {
-        router.replace("/404");
+      if (error?.data?.code === "NOT_FOUND" || !boardData) {
+        void router.replace("/404");
       }
     }
   }, [router, boardId, isQueryLoading, error, boardData]);
@@ -393,7 +393,7 @@ export default function BoardPage({ isTemplate }: { isTemplate?: boolean }) {
           isVisible={isOpen && modalContentType === "CREATE_TEMPLATE"}
         >
           <NewTemplateForm
-            workspacePublicId={workspace.publicId ?? ""}
+            workspacePublicId={workspace.publicId}
             sourceBoardPublicId={boardId ?? ""}
             sourceBoardName={boardData?.name ?? ""}
           />
@@ -412,7 +412,7 @@ export default function BoardPage({ isTemplate }: { isTemplate?: boolean }) {
   return (
     <>
       <PageHead
-        title={`${boardData?.name ?? (isTemplate ? t`Board` : t`Template`)} | ${workspace.name ?? t`Workspace`}`}
+        title={`${boardData?.name ?? (isTemplate ? t`Board` : t`Template`)} | ${workspace.name}`}
       />
       <div className="relative flex h-full flex-col">
         <PatternedBackground />
@@ -628,11 +628,11 @@ export default function BoardPage({ isTemplate }: { isTemplate?: boolean }) {
                                             title={card.title}
                                             labels={card.labels}
                                             members={card.members}
-                                            checklists={card.checklists ?? []}
+                                            checklists={card.checklists}
                                             description={
                                               card.description ?? null
                                             }
-                                            comments={card.comments ?? []}
+                                            comments={card.comments}
                                             attachments={card.attachments}
                                             dueDate={card.dueDate ?? null}
                                           />

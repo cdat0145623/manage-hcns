@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unnecessary-condition */
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 
@@ -16,7 +17,11 @@ import {
 } from "@kan/shared/utils";
 
 import { createTRPCRouter, protectedProcedure, publicProcedure } from "../trpc";
-import { assertCanDelete, assertCanEdit, assertPermission } from "../utils/permissions";
+import {
+  assertCanDelete,
+  assertCanEdit,
+  assertPermission,
+} from "../utils/permissions";
 
 export const boardRouter = createTRPCRouter({
   all: protectedProcedure
@@ -69,7 +74,7 @@ export const boardRouter = createTRPCRouter({
         {
           type: input.type,
           archived: input.archived ?? false,
-        }
+        },
       );
 
       return result;
@@ -157,24 +162,24 @@ export const boardRouter = createTRPCRouter({
       // Generate presigned URLs for workspace member avatars
       const workspaceWithAvatarUrls = result.workspace
         ? {
-          ...result.workspace,
-          members: await Promise.all(
-            result.workspace.members.map(async (member) => {
-              if (!member.user?.image) {
-                return member;
-              }
+            ...result.workspace,
+            members: await Promise.all(
+              result.workspace.members.map(async (member) => {
+                if (!member.user?.image) {
+                  return member;
+                }
 
-              const avatarUrl = await generateAvatarUrl(member.user.image);
-              return {
-                ...member,
-                user: {
-                  ...member.user,
-                  image: avatarUrl,
-                },
-              };
-            }),
-          ),
-        }
+                const avatarUrl = await generateAvatarUrl(member.user.image);
+                return {
+                  ...member,
+                  user: {
+                    ...member.user,
+                    image: avatarUrl,
+                  },
+                };
+              }),
+            ),
+          }
         : result.workspace;
 
       // Generate presigned URLs for card member avatars
@@ -469,7 +474,11 @@ export const boardRouter = createTRPCRouter({
         isArchived: z.boolean().optional(),
       }),
     )
-    .output(z.object({ success: z.boolean() }).or(z.custom<Awaited<ReturnType<typeof boardRepo.update>>>()))
+    .output(
+      z
+        .object({ success: z.boolean() })
+        .or(z.custom<Awaited<ReturnType<typeof boardRepo.update>>>()),
+    )
     .mutation(async ({ ctx, input }) => {
       const userId = ctx.user?.id;
 
@@ -508,7 +517,11 @@ export const boardRouter = createTRPCRouter({
       }
 
       // Handle other updates (name, slug, visibility)
-      const hasOtherUpdates = input.name || input.slug || input.visibility !== undefined || input.isArchived !== undefined;
+      const hasOtherUpdates =
+        input.name !== undefined ||
+        input.slug !== undefined ||
+        input.visibility !== undefined ||
+        input.isArchived !== undefined;
 
       if (!hasOtherUpdates) {
         // Only favorite was updated, return success
@@ -748,22 +761,24 @@ export const boardRouter = createTRPCRouter({
             ...activity,
             user: user
               ? {
-                ...user,
-                image: user.image ? await generateAvatarUrl(user.image) : null,
-              }
+                  ...user,
+                  image: user.image
+                    ? await generateAvatarUrl(user.image)
+                    : null,
+                }
               : null,
             member: member
               ? {
-                ...member,
-                user: member.user
-                  ? {
-                    ...member.user,
-                    image: member.user.image
-                      ? await generateAvatarUrl(member.user.image)
-                      : null,
-                  }
-                  : null,
-              }
+                  ...member,
+                  user: member.user
+                    ? {
+                        ...member.user,
+                        image: member.user.image
+                          ? await generateAvatarUrl(member.user.image)
+                          : null,
+                      }
+                    : null,
+                }
               : null,
           };
         }),

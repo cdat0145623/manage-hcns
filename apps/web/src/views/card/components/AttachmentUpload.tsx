@@ -7,7 +7,6 @@ import { twMerge } from "tailwind-merge";
 import Button from "~/components/Button";
 import { useModal } from "~/providers/modal";
 import { usePopup } from "~/providers/popup";
-import { env } from "next-runtime-env";
 import { api } from "~/utils/api";
 import { invalidateCard } from "~/utils/cardInvalidation";
 
@@ -15,48 +14,90 @@ export function AttachmentUpload({ cardPublicId }: { cardPublicId: string }) {
   const { openModal } = useModal();
   const { showPopup } = usePopup();
   const utils = api.useUtils();
+  const generateUrl = api.attachment.generateUploadUrl.useMutation();
+  const confirmUpload = api.attachment.confirm.useMutation();
   const [uploading, setUploading] = useState(false);
+  const [progress, setProgress] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
   const inputRef = useRef<HTMLInputElement | null>(null);
 
   const uploadFile = async (file: File) => {
-    setUploading(true);
-
-    try {
-      const baseUrl = env("NEXT_PUBLIC_BASE_URL") ?? "";
-      const response = await fetch(
-        `${baseUrl}/api/upload/attachment?cardPublicId=${encodeURIComponent(cardPublicId)}`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": file.type,
-            "x-original-filename": file.name,
-          },
-          body: file,
-        },
-      );
-
-      if (!response.ok) {
-        throw new Error("Upload failed");
-      }
-
-      await invalidateCard(utils, cardPublicId);
+    if (file.size > 50 * 1024 * 1024) {
       showPopup({
-        header: t`Attachment uploaded`,
-        message: t`Your file has been uploaded successfully.`,
-        icon: "success",
-      });
-    } catch {
-      showPopup({
-        header: t`Upload failed`,
-        message: t`Failed to upload attachment. Please try again.`,
+        header: t`File too large`,
+        message: t`Maximum file size is 50MB.`,
         icon: "error",
       });
+      return;
+    }
+
+    setUploading(true);
+    setProgress(0);
+
+    try {
+      // Step 1: Generate Presigned URL
+      const { url, key: s3Key } = await generateUrl.mutateAsync({
+        cardPublicId,
+        filename: file.name,
+        contentType: file.type || "application/octet-stream",
+        size: file.size,
+      });
+
+      // Step 2: Upload directly to S3 (proxied via middleware)
+      await new Promise<void>((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open("PUT", url);
+        xhr.setRequestHeader("Content-Type", file.type || "application/octet-stream");
+
+        xhr.upload.onprogress = (event) => {
+          if (event.lengthComputable) {
+            const percentComplete = Math.round((event.loaded / event.total) * 100);
+            setProgress(percentComplete);
+          }
+        };
+
+        xhr.onload = () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            resolve();
+          } else {
+            reject(new Error(`S3 Upload failed with status ${xhr.status}`));
+          }
+        };
+
+        xhr.onerror = () => reject(new Error("Network error during S3 upload"));
+        xhr.send(file);
+      });
+
+      // Step 3: Confirm upload in DB
+      await confirmUpload.mutateAsync({
+        cardPublicId,
+        s3Key,
+        filename: s3Key.split("/").pop() ?? file.name,
+        originalFilename: file.name,
+        contentType: file.type || "application/octet-stream",
+        size: file.size,
+      });
+
+      void invalidateCard(utils, cardPublicId);
+      showPopup({
+        header: t`Attachment uploaded`,
+        message: t`Your file has been uploaded to MinIO successfully.`,
+        icon: "success",
+      });
+    } catch (error) {
+      console.error("Upload failed", error);
+      showPopup({
+        header: t`Upload failed`,
+        message: t`Failed to upload attachment to MinIO. Please check your connection.`,
+        icon: "error",
+      });
+    } finally {
       setUploading(false);
+      setProgress(0);
     }
   };
 
-  const handleFileSelect = async (
+  const handleFileSelect = (
     event: React.ChangeEvent<HTMLInputElement>,
   ) => {
     const file = event.target.files?.[0];
@@ -65,7 +106,7 @@ export function AttachmentUpload({ cardPublicId }: { cardPublicId: string }) {
     // Reset input
     event.target.value = "";
 
-    await uploadFile(file);
+    void uploadFile(file);
   };
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -82,7 +123,7 @@ export function AttachmentUpload({ cardPublicId }: { cardPublicId: string }) {
     setIsDragging(false);
   };
 
-  const handleDrop = async (e: React.DragEvent) => {
+  const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
     setIsDragging(false);
@@ -93,7 +134,7 @@ export function AttachmentUpload({ cardPublicId }: { cardPublicId: string }) {
     if (files.length === 0) return;
 
     // Upload the first file (or could upload all files)
-    await uploadFile(files[0] ?? new File([], ""));
+    void uploadFile(files[0] ?? new File([], ""));
   };
 
   return (
@@ -111,36 +152,54 @@ export function AttachmentUpload({ cardPublicId }: { cardPublicId: string }) {
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
         className={twMerge(
-          "rounded-lg border-2 border-dashed transition-colors",
+          "relative flex flex-col items-center justify-center rounded-lg border-2 border-dashed p-6 transition-all duration-200 cursor-pointer overflow-hidden",
           isDragging
-            ? "border-light-300 bg-light-100 dark:border-dark-300 dark:bg-dark-100"
-            : "border-transparent",
+            ? "border-brand-500 bg-brand-50/50 dark:border-brand-400 dark:bg-brand-900/20 scale-[1.02]"
+            : "border-light-300 hover:border-light-400 bg-light-50 hover:bg-light-100 dark:border-dark-300 dark:bg-dark-50 dark:hover:border-dark-400 dark:hover:bg-dark-100/50"
         )}
+        onClick={() => !uploading && inputRef.current?.click()}
       >
-        <div className="flex items-center justify-between p-2">
-          <Button
-            type="button"
-            variant="ghost"
-            iconLeft={
-              <HiCheckBadge className="h-4 w-4 text-light-950 dark:text-dark-950" />
-            }
-            iconOnly
-            size="sm"
-            onClick={() => openModal("ADD_CHECKLIST")}
-          />
-          <Button
-            type="button"
-            variant="ghost"
-            iconLeft={
-              <HiOutlinePaperClip className="h-4 w-4 text-light-950 dark:text-dark-950" />
-            }
-            isLoading={uploading}
-            disabled={uploading}
-            iconOnly
-            size="sm"
-            onClick={() => inputRef.current?.click()}
-          />
+        <div className="flex flex-col items-center justify-center text-center gap-2 z-10">
+          <div className="rounded-full bg-light-200 dark:bg-dark-200 p-3 text-light-700 dark:text-dark-700">
+            <HiOutlinePaperClip className="h-6 w-6" />
+          </div>
+          <p className="text-sm font-medium text-light-1000 dark:text-dark-1000">
+            {t`Click or drag file to this area to upload`}
+          </p>
+          <p className="text-xs text-light-600 dark:text-dark-600">
+            {t`Support for a single or bulk upload. Maximum file size is 50MB.`}
+          </p>
         </div>
+
+        {uploading && (
+          <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-white/90 dark:bg-dark-50/90 backdrop-blur-sm p-6">
+            <div className="w-full max-w-[200px] flex flex-col gap-2">
+              <div className="flex justify-between text-xs font-medium text-light-800 dark:text-dark-800">
+                <span>{t`Uploading...`}</span>
+                <span>{progress}%</span>
+              </div>
+              <div className="h-1.5 w-full overflow-hidden rounded-full bg-light-200 dark:bg-dark-200">
+                <div 
+                  className="h-full bg-brand-500 transition-all duration-300 ease-out dark:bg-brand-400"
+                  style={{ width: `${progress}%` }}
+                />
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+      <div className="mt-3 flex justify-end">
+        <Button
+          type="button"
+          variant="secondary"
+          className="text-xs font-medium"
+          iconLeft={
+            <HiCheckBadge className="h-4 w-4" />
+          }
+          onClick={() => openModal("ADD_CHECKLIST")}
+        >
+          {t`Add Checklist`}
+        </Button>
       </div>
     </div>
   );

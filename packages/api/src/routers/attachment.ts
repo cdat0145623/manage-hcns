@@ -5,11 +5,14 @@ import * as cardRepo from "@kan/db/repository/card.repo";
 import * as cardActivityRepo from "@kan/db/repository/cardActivity.repo";
 import * as cardAttachmentRepo from "@kan/db/repository/cardAttachment.repo";
 import * as workspaceRepo from "@kan/db/repository/workspace.repo";
+import { createLogger } from "@kan/logger";
 import { generateUID } from "@kan/shared/utils";
+import { generateUploadUrl } from "@kan/shared/utils";
 
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import { assertPermission } from "../utils/permissions";
-import { deleteObject, generateUploadUrl } from "@kan/shared/utils";
+
+const logger = createLogger("attachment");
 
 export const attachmentRouter = createTRPCRouter({
   generateUploadUrl: protectedProcedure
@@ -29,10 +32,7 @@ export const attachmentRouter = createTRPCRouter({
         cardPublicId: z.string().min(12),
         filename: z.string().min(1).max(255),
         contentType: z.string(),
-        size: z
-          .number()
-          .positive()
-          .max(50 * 1024 * 1024), // 50MB max
+        size: z.number().positive().max(50 * 1024 * 1024),
       }),
     )
     .output(z.object({ url: z.string(), key: z.string() }))
@@ -79,12 +79,20 @@ export const attachmentRouter = createTRPCRouter({
 
       const s3Key = `${workspace.publicId}/${input.cardPublicId}/${generateUID()}-${sanitizedFilename}`;
 
-      const url = await generateUploadUrl(
+      let url = await generateUploadUrl(
         bucket,
         s3Key,
         input.contentType,
         3600, // 1 hour
       );
+
+      if (process.env.NEXT_PUBLIC_KAN_ENV !== "cloud") {
+        const endpoint = process.env.S3_ENDPOINT ?? "http://localhost:9000";
+        const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+        if (url.startsWith(endpoint)) {
+          url = url.replace(endpoint, `${appUrl}/api/minio`);
+        }
+      }
 
       return { url, key: s3Key };
     }),
@@ -159,13 +167,81 @@ export const attachmentRouter = createTRPCRouter({
 
       return attachment;
     }),
+  update: protectedProcedure
+    .meta({
+      openapi: {
+        summary: "Rename an attachment",
+        method: "PUT",
+        path: "/attachments/{attachmentPublicId}",
+        description: "Renames an attachment by its public ID",
+        tags: ["Attachments"],
+        protect: true,
+      },
+    })
+    .input(
+      z.object({
+        attachmentPublicId: z.string().min(12),
+        originalFilename: z.string().min(1).max(255),
+      }),
+    )
+    .output(z.object({ publicId: z.string(), originalFilename: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const userId = ctx.user?.id;
+
+      if (!userId)
+        throw new TRPCError({
+          message: `User not authenticated`,
+          code: "UNAUTHORIZED",
+        });
+
+      const attachment = await cardAttachmentRepo.getByPublicId(
+        ctx.db,
+        input.attachmentPublicId,
+      );
+
+      if (!attachment || attachment.deletedAt)
+        throw new TRPCError({
+          message: `Attachment with public ID ${input.attachmentPublicId} not found`,
+          code: "NOT_FOUND",
+        });
+
+      const workspaceId = attachment.card.list.board.workspaceId;
+      await assertPermission(ctx.db, userId, workspaceId, "card:edit");
+
+      const previousFilename = attachment.originalFilename;
+
+      const updated = await cardAttachmentRepo.updateOriginalFilename(ctx.db, {
+        attachmentId: attachment.id,
+        originalFilename: input.originalFilename,
+      });
+
+      if (!updated)
+        throw new TRPCError({
+          message: `Failed to rename attachment`,
+          code: "INTERNAL_SERVER_ERROR",
+        });
+
+      await cardActivityRepo.create(ctx.db, {
+        type: "card.updated.attachment.renamed",
+        cardId: attachment.cardId,
+        attachmentId: attachment.id,
+        toTitle: updated.originalFilename,
+        fromTitle: previousFilename,
+        createdBy: userId,
+      });
+
+      return {
+        publicId: input.attachmentPublicId,
+        originalFilename: updated.originalFilename,
+      };
+    }),
   delete: protectedProcedure
     .meta({
       openapi: {
         summary: "Delete an attachment",
         method: "DELETE",
         path: "/attachments/{attachmentPublicId}",
-        description: "Soft deletes an attachment",
+        description: "Soft deletes an attachment and removes the local file",
         tags: ["Attachments"],
         protect: true,
       },
@@ -195,14 +271,23 @@ export const attachmentRouter = createTRPCRouter({
       const workspaceId = attachment.card.list.board.workspaceId;
       await assertPermission(ctx.db, userId, workspaceId, "card:edit");
 
-      const bucket = process.env.NEXT_PUBLIC_ATTACHMENTS_BUCKET_NAME;
-      if (bucket) {
+      if (attachment.s3Key.startsWith("/attachments/")) {
+        const fs = await import("fs/promises");
+        const path = await import("path");
         try {
-          await deleteObject(bucket, attachment.s3Key);
+          const sanitizedPath = path
+            .normalize(attachment.s3Key)
+            .replace(/^(\.\.[/\\\\])+/, "");
+          if (sanitizedPath.startsWith("/attachments/")) {
+            const filePath = path.join(process.cwd(), "public", sanitizedPath);
+            await fs.unlink(filePath).catch((e: unknown) => {
+              logger.error({ err: e }, "Failed to delete local file");
+            });
+          }
         } catch (error) {
-          console.error(
-            `Failed to delete attachment from S3: ${attachment.s3Key}`,
-            error,
+          logger.error(
+            { err: error },
+            `Failed to delete local attachment: ${attachment.s3Key}`,
           );
         }
       }
@@ -221,5 +306,53 @@ export const attachmentRouter = createTRPCRouter({
       });
 
       return { success: true };
+    }),
+  getByCardId: protectedProcedure
+    .meta({
+      openapi: {
+        summary: "Get attachments by card ID",
+        method: "GET",
+        path: "/cards/{cardPublicId}/attachments",
+        description: "Fetch all attachments belonging to a specific card",
+        tags: ["Attachments"],
+        protect: true,
+      },
+    })
+    .input(z.object({ cardPublicId: z.string().min(12) }))
+    .output(z.array(z.custom<Awaited<ReturnType<typeof cardAttachmentRepo.getAllByCardId>>[0]>()))
+    .query(async ({ ctx, input }) => {
+      const userId = ctx.user?.id;
+
+      if (!userId)
+        throw new TRPCError({
+          message: `User not authenticated`,
+          code: "UNAUTHORIZED",
+        });
+
+      const card = await cardRepo.getWorkspaceAndCardIdByCardPublicId(
+        ctx.db,
+        input.cardPublicId,
+      );
+
+      if (!card)
+        throw new TRPCError({
+          message: `Card with public ID ${input.cardPublicId} not found`,
+          code: "NOT_FOUND",
+        });
+
+      const workspace = await workspaceRepo.getById(ctx.db, card.workspaceId);
+      if (!workspace)
+        throw new TRPCError({
+          message: `Workspace not found`,
+          code: "NOT_FOUND",
+        });
+
+      // Fetch all non-deleted attachments
+      const attachments = await cardAttachmentRepo.getAllByCardId(
+        ctx.db,
+        card.id,
+      );
+
+      return attachments;
     }),
 });

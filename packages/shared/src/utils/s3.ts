@@ -106,22 +106,63 @@ export async function generateAvatarUrl(
  */
 export async function generateAttachmentUrl(
   attachmentKey: string | null | undefined,
-  expiresIn = 86400, // 24 hours
+  expiresIn = 86400,
 ): Promise<string | null> {
   if (!attachmentKey) {
     return null;
   }
 
-  const bucket = env("NEXT_PUBLIC_ATTACHMENTS_BUCKET_NAME");
-  if (!bucket) {
+  if (attachmentKey.startsWith("/attachments/")) {
+    return attachmentKey;
+  }
+
+  const attachmentsBucket = env("NEXT_PUBLIC_ATTACHMENTS_BUCKET_NAME") ?? "attachments";
+  if (!attachmentsBucket) {
     return null;
   }
 
   try {
-    return await generateDownloadUrl(bucket, attachmentKey, expiresIn);
+    return await generateDownloadUrl(attachmentsBucket, attachmentKey, expiresIn);
   } catch {
     // If URL generation fails, return null
     return null;
   }
 }
 
+/**
+ * Utility to test S3/MinIO connection and URL generation.
+ * Run with: npx tsx packages/shared/src/utils/s3.ts
+ */
+export async function testS3() {
+  const bucket = process.env.NEXT_PUBLIC_ATTACHMENTS_BUCKET_NAME ?? "attachments";
+  const key = `test-${Date.now()}.txt`;
+
+  console.log("--- S3 Config ---");
+  console.log("Endpoint:", process.env.S3_ENDPOINT);
+  console.log("Bucket:", bucket);
+
+  try {
+    const url = await generateUploadUrl(bucket, key, "text/plain");
+    console.log("\n✅ Generated Upload URL:");
+    console.log(url);
+
+    if (process.env.NEXT_PUBLIC_KAN_ENV !== "cloud") {
+      const endpoint = process.env.S3_ENDPOINT ?? "http://localhost:9000";
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+      const proxiedUrl = url.replace(endpoint, `${appUrl}/api/minio`);
+      console.log("\n🔗 Proxied URL (via Middleware):");
+      console.log(proxiedUrl);
+    }
+  } catch (error) {
+    console.error("\n❌ Failed to generate URL:", error);
+  }
+}
+
+// Allow running this file directly with tsx to test configuration
+if (
+  process.argv[1]
+    ?.replace(/\\/g, "/")
+    .endsWith("packages/shared/src/utils/s3.ts")
+) {
+  void testS3().catch(console.error);
+}

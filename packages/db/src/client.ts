@@ -28,7 +28,7 @@ export const createDrizzleClient = (): dbClient => {
     });
     const db = drizzlePgLite(client, { schema });
 
-    migrate(db, { migrationsFolder: "../../packages/db/migrations" });
+    void migrate(db, { migrationsFolder: "./migrations" });
 
     return db as unknown as dbClient;
   }

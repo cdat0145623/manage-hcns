@@ -218,6 +218,20 @@
       "when": 1773212242728,
       "tag": "20260311065722_AddWeekStartDay",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1774575756676,
+      "tag": "20260327014236_AddAttachmentRenamedActivity",
+      "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1774580587990,
+      "tag": "20260327030307_AddTaskMasterInstance",
+      "breakpoints": true
     }
   ]
 }

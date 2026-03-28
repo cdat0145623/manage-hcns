@@ -46,21 +46,23 @@ export const allPermissions = [
 
 export type Permission = (typeof allPermissions)[number];
 
-export const roleHierarchy = {
-  admin: 100,
-  member: 50,
-  guest: 10,
+export const roles = ["ADMIN", "NVKT_MANAGER", "NVKD_MANAGER", "NVVP"] as const;
+export type Role = (typeof roles)[number];
+
+export const roleHierarchy: Record<Role, number> = {
+  ADMIN: 100,
+  NVKT_MANAGER: 80,
+  NVKD_MANAGER: 60,
+  NVVP: 40,
 } as const;
 
-export type Role = keyof typeof roleHierarchy;
-export const roles = Object.keys(roleHierarchy) as Role[];
-
 export const defaultRolePermissions: Record<Role, readonly Permission[]> = {
-  admin: allPermissions,
-  member: [
+  ADMIN: allPermissions,
+  NVKT_MANAGER: [
     "workspace:view",
     "board:view",
     "board:create",
+    "board:edit",
     "list:view",
     "list:create",
     "list:edit",
@@ -74,14 +76,31 @@ export const defaultRolePermissions: Record<Role, readonly Permission[]> = {
     "comment:edit",
     "comment:delete",
     "member:view",
+    "member:invite",
   ],
-
-  guest: [
+  NVKD_MANAGER: [
+    "workspace:view",
+    "board:view",
+    "board:create",
+    "list:view",
+    "list:create",
+    "list:edit",
+    "card:view",
+    "card:create",
+    "card:edit",
+    "comment:view",
+    "comment:create",
+    "comment:edit",
+    "member:view",
+  ],
+  NVVP: [
     "workspace:view",
     "board:view",
     "list:view",
     "card:view",
+    "card:create",
     "comment:view",
+    "comment:create",
     "member:view",
   ],
 } as const;

@@ -10,13 +10,13 @@ interface Activity extends ActivityBase {
 
 // types that can be merged with simple count
 const MERGEABLE_COUNT_TYPES: readonly ActivityType[] = [
-  "card.updated.description",
+  "updated_description",
 ];
 
 // types that merge with a list of items
 const MERGEABLE_LIST_TYPES: readonly ActivityType[] = [
-  "card.updated.label.added",
-  "card.updated.label.removed",
+  "updated_label_added",
+  "updated_label_removed",
 ];
 
 const MERGE_TIME_WINDOW_MS = 5 * 60 * 1000; // 5 minutes window for merging activities

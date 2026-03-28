@@ -42,7 +42,7 @@ describe("webhook router", () => {
     name: "My Webhook",
     url: "https://example.com/webhook",
     secret: "secret123",
-    events: ["card.created", "card.updated"] as const,
+    events: ["created", "card.updated"] as const,
     active: true,
     createdAt: new Date("2024-01-15"),
     updatedAt: null,
@@ -153,7 +153,7 @@ describe("webhook router", () => {
         publicId: "wh-new123456",
         name: "New Webhook",
         url: "https://example.com/new",
-        events: ["card.created"] as const,
+        events: ["created"] as const,
         active: true,
         createdAt: new Date(),
       };
@@ -170,7 +170,7 @@ describe("webhook router", () => {
         workspacePublicId: "ws-123456789",
         name: "New Webhook",
         url: "https://example.com/new",
-        events: ["card.created"],
+        events: ["created"],
       });
 
       expect(result.name).toBe("New Webhook");
@@ -179,7 +179,7 @@ describe("webhook router", () => {
         name: "New Webhook",
         url: "https://example.com/new",
         secret: undefined,
-        events: ["card.created"],
+        events: ["created"],
         createdBy: mockUser.id,
       });
     });
@@ -191,7 +191,7 @@ describe("webhook router", () => {
         publicId: "wh-new123456",
         name: "Secure Webhook",
         url: "https://example.com/secure",
-        events: ["card.created"] as const,
+        events: ["created"] as const,
         active: true,
         createdAt: new Date(),
       };
@@ -209,7 +209,7 @@ describe("webhook router", () => {
         name: "Secure Webhook",
         url: "https://example.com/secure",
         secret: "my-secret-key",
-        events: ["card.created"],
+        events: ["created"],
       });
 
       expect(mockCreate).toHaveBeenCalledWith(mockDb, expect.objectContaining({
@@ -233,7 +233,7 @@ describe("webhook router", () => {
           workspacePublicId: "ws-123456789",
           name: "New Webhook",
           url: "https://example.com/new",
-          events: ["card.created"],
+          events: ["created"],
         }),
       ).rejects.toThrow(TRPCError);
     });
@@ -388,7 +388,7 @@ describe("webhook router", () => {
           method: "POST",
           headers: expect.objectContaining({
             "Content-Type": "application/json",
-            "X-Webhook-Event": "card.created",
+            "X-Webhook-Event": "created",
           }),
         }),
       );

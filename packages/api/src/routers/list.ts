@@ -141,7 +141,7 @@ export const listRouter = createTRPCRouter({
         });
 
       const activities = deletedCards.map((card) => ({
-        type: "card.archived" as const,
+        type: "archived" as const,
         createdBy: userId,
         cardId: card.id,
       }));

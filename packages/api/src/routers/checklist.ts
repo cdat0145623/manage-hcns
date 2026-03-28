@@ -73,7 +73,7 @@ export const checklistRouter = createTRPCRouter({
         });
 
       await cardActivityRepo.create(ctx.db, {
-        type: "card.updated.checklist.added",
+        type: "updated_checklist_added",
         cardId: card.id,
         toTitle: newChecklist.name,
         createdBy: userId,
@@ -137,7 +137,7 @@ export const checklistRouter = createTRPCRouter({
         });
 
       await cardActivityRepo.create(ctx.db, {
-        type: "card.updated.checklist.renamed",
+        type: "updated_checklist_renamed",
         cardId: checklist.cardId,
         fromTitle: previousName,
         toTitle: updated.name,
@@ -202,7 +202,7 @@ export const checklistRouter = createTRPCRouter({
         });
 
       await cardActivityRepo.create(ctx.db, {
-        type: "card.updated.checklist.deleted",
+        type: "updated_checklist_deleted",
         cardId: checklist.cardId,
         fromTitle: checklist.name,
         createdBy: userId,
@@ -267,7 +267,7 @@ export const checklistRouter = createTRPCRouter({
         });
 
       await cardActivityRepo.create(ctx.db, {
-        type: "card.updated.checklist.item.added",
+        type: "updated_checklist_item_added",
         cardId: checklist.cardId,
         toTitle: newChecklistItem.title,
         createdBy: userId,
@@ -351,8 +351,8 @@ export const checklistRouter = createTRPCRouter({
       if (input.completed !== undefined) {
         await cardActivityRepo.create(ctx.db, {
           type: input.completed
-            ? "card.updated.checklist.item.completed"
-            : "card.updated.checklist.item.uncompleted",
+            ? "updated_checklist_item_completed"
+            : "updated_checklist_item_uncompleted",
           cardId: item.checklist.cardId,
           toTitle: updatedItem.title,
           createdBy: userId,
@@ -362,7 +362,7 @@ export const checklistRouter = createTRPCRouter({
       // Log title change
       if (input.title !== undefined && input.title !== previousTitle) {
         await cardActivityRepo.create(ctx.db, {
-          type: "card.updated.checklist.item.updated",
+          type: "updated_checklist_item_updated",
           cardId: item.checklist.cardId,
           fromTitle: previousTitle,
           toTitle: updatedItem.title,
@@ -422,7 +422,7 @@ export const checklistRouter = createTRPCRouter({
         });
 
       await cardActivityRepo.create(ctx.db, {
-        type: "card.updated.checklist.item.deleted",
+        type: "updated_checklist_item_deleted",
         cardId: item.checklist.cardId,
         fromTitle: item.title,
         createdBy: userId,

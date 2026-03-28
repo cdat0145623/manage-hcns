@@ -91,7 +91,7 @@ export const getActivityText = ({
   );
 
   if (
-    type === "card.updated.label.added" &&
+    type === "updated_label_added" &&
     mergedLabels &&
     mergedLabels.length > 1
   ) {
@@ -105,7 +105,7 @@ export const getActivityText = ({
   }
 
   if (
-    type === "card.updated.label.removed" &&
+    type === "updated_label_removed" &&
     mergedLabels &&
     mergedLabels.length > 1
   ) {
@@ -119,34 +119,38 @@ export const getActivityText = ({
   }
 
   const ACTIVITY_TYPE_MAP = {
-    "card.created": t`created the card`,
-    "card.updated.title": t`updated the title`,
-    "card.updated.description": t`updated the description`,
-    "card.updated.list": t`moved the card to another list`,
-    "card.updated.label.added": t`added a label to the card`,
-    "card.updated.label.removed": t`removed a label from the card`,
-    "card.updated.member.added": t`added a member to the card`,
-    "card.updated.member.removed": t`removed a member from the card`,
-    "card.updated.checklist.added": t`added a checklist`,
-    "card.updated.checklist.renamed": t`renamed a checklist`,
-    "card.updated.checklist.deleted": t`deleted a checklist`,
-    "card.updated.checklist.item.added": t`added a checklist item`,
-    "card.updated.checklist.item.updated": t`updated a checklist item`,
-    "card.updated.checklist.item.completed": t`completed a checklist item`,
-    "card.updated.checklist.item.uncompleted": t`marked a checklist item as incomplete`,
-    "card.updated.checklist.item.deleted": t`deleted a checklist item`,
-    "card.updated.attachment.added": t`added an attachment`,
-    "card.updated.attachment.renamed": t`renamed an attachment`,
-    "card.updated.attachment.removed": t`removed an attachment`,
-    "card.updated.dueDate.added": t`set the due date`,
-    "card.updated.dueDate.updated": t`updated the due date`,
-    "card.updated.dueDate.removed": t`removed the due date`,
+    "created": t`created the card`,
+    "updated_title": t`updated the title`,
+    "updated_description": t`updated the description`,
+    "updated_list": t`moved the card to another list`,
+    "updated_index": t`changed the card's position`,
+    "updated_label_added": t`added a label to the card`,
+    "updated_label_removed": t`removed a label from the card`,
+    "member_assigned": t`added a member to the card`,
+    "member_unassigned": t`removed a member from the card`,
+    "updated_comment_added": t`added a comment`,
+    "updated_comment_updated": t`updated a comment`,
+    "updated_comment_deleted": t`deleted a comment`,
+    "comment": t`added a comment`,
+    "updated_checklist_added": t`added a checklist`,
+    "updated_checklist_renamed": t`renamed a checklist`,
+    "updated_checklist_deleted": t`deleted a checklist`,
+    "updated_checklist_item_added": t`added a checklist item`,
+    "updated_checklist_item_updated": t`updated a checklist item`,
+    "updated_checklist_item_completed": t`completed a checklist item`,
+    "updated_checklist_item_uncompleted": t`marked a checklist item as incomplete`,
+    "updated_checklist_item_deleted": t`deleted a checklist item`,
+    "updated_attachment_added": t`added an attachment`,
+    "updated_attachment_renamed": t`renamed an attachment`,
+    "updated_attachment_removed": t`removed an attachment`,
+    "deadline_changed": t`changed the due date`,
+    "archived": t`archived the card`,
   } as const;
 
   if (!(type in ACTIVITY_TYPE_MAP)) return null;
   const baseText = ACTIVITY_TYPE_MAP[type as keyof typeof ACTIVITY_TYPE_MAP];
 
-  if (type === "card.updated.title" && toTitle) {
+  if (type === "updated_title" && toTitle) {
     return (
       <Trans>
         updated the title to <TextHighlight>{truncate(toTitle)}</TextHighlight>
@@ -154,7 +158,7 @@ export const getActivityText = ({
     );
   }
 
-  if (type === "card.updated.list" && fromList && toList) {
+  if (type === "updated_list" && fromList && toList) {
     return (
       <Trans>
         moved the card from <TextHighlight>{truncate(fromList)}</TextHighlight>{" "}
@@ -164,7 +168,7 @@ export const getActivityText = ({
     );
   }
 
-  if (type === "card.updated.member.added" && displayName) {
+  if (type === "member_assigned" && displayName) {
     if (isSelf) return <Trans>self-assigned the card</Trans>;
 
     return (
@@ -175,7 +179,7 @@ export const getActivityText = ({
     );
   }
 
-  if (type === "card.updated.member.removed" && displayName) {
+  if (type === "member_unassigned" && displayName) {
     if (isSelf) return <Trans>unassigned themselves from the card</Trans>;
 
     return (
@@ -186,7 +190,7 @@ export const getActivityText = ({
     );
   }
 
-  if (type === "card.updated.label.added" && label) {
+  if (type === "updated_label_added" && label) {
     return (
       <Trans>
         added label <TextHighlight>{truncate(label)}</TextHighlight>
@@ -194,7 +198,7 @@ export const getActivityText = ({
     );
   }
 
-  if (type === "card.updated.label.removed" && label) {
+  if (type === "updated_label_removed" && label) {
     return (
       <Trans>
         removed label <TextHighlight>{truncate(label)}</TextHighlight>
@@ -202,7 +206,7 @@ export const getActivityText = ({
     );
   }
 
-  if (type === "card.updated.checklist.added" && toTitle) {
+  if (type === "updated_checklist_added" && toTitle) {
     return (
       <Trans>
         added checklist <TextHighlight>{truncate(toTitle)}</TextHighlight>
@@ -210,7 +214,7 @@ export const getActivityText = ({
     );
   }
 
-  if (type === "card.updated.checklist.renamed" && toTitle) {
+  if (type === "updated_checklist_renamed" && toTitle) {
     return (
       <Trans>
         renamed checklist <TextHighlight>{truncate(toTitle)}</TextHighlight>
@@ -218,7 +222,7 @@ export const getActivityText = ({
     );
   }
 
-  if (type === "card.updated.checklist.deleted" && fromTitle) {
+  if (type === "updated_checklist_deleted" && fromTitle) {
     return (
       <Trans>
         deleted checklist <TextHighlight>{truncate(fromTitle)}</TextHighlight>
@@ -226,7 +230,7 @@ export const getActivityText = ({
     );
   }
 
-  if (type === "card.updated.checklist.item.added" && toTitle) {
+  if (type === "updated_checklist_item_added" && toTitle) {
     return (
       <Trans>
         added checklist item <TextHighlight>{truncate(toTitle)}</TextHighlight>
@@ -234,7 +238,7 @@ export const getActivityText = ({
     );
   }
 
-  if (type === "card.updated.checklist.item.updated" && toTitle) {
+  if (type === "updated_checklist_item_updated" && toTitle) {
     return (
       <Trans>
         renamed checklist item to{" "}
@@ -243,7 +247,7 @@ export const getActivityText = ({
     );
   }
 
-  if (type === "card.updated.checklist.item.completed" && toTitle) {
+  if (type === "updated_checklist_item_completed" && toTitle) {
     return (
       <Trans>
         completed checklist item{" "}
@@ -252,7 +256,7 @@ export const getActivityText = ({
     );
   }
 
-  if (type === "card.updated.checklist.item.uncompleted" && toTitle) {
+  if (type === "updated_checklist_item_uncompleted" && toTitle) {
     return (
       <Trans>
         marked checklist item <TextHighlight>{truncate(toTitle)}</TextHighlight>{" "}
@@ -261,7 +265,7 @@ export const getActivityText = ({
     );
   }
 
-  if (type === "card.updated.checklist.item.deleted" && fromTitle) {
+  if (type === "updated_checklist_item_deleted" && fromTitle) {
     return (
       <Trans>
         deleted checklist item{" "}
@@ -270,7 +274,7 @@ export const getActivityText = ({
     );
   }
 
-  if (type === "card.updated.attachment.added") {
+  if (type === "updated_attachment_added") {
     const filename = attachmentName ?? toTitle;
     if (!filename) return baseText;
     return (
@@ -280,7 +284,7 @@ export const getActivityText = ({
     );
   }
 
-  if (type === "card.updated.attachment.renamed" && fromTitle && toTitle) {
+  if (type === "updated_attachment_renamed" && fromTitle && toTitle) {
     return (
       <Trans>
         renamed an attachment from{" "}
@@ -290,7 +294,7 @@ export const getActivityText = ({
     );
   }
 
-  if (type === "card.updated.attachment.removed") {
+  if (type === "updated_attachment_removed") {
     const filename = attachmentName ?? fromTitle;
     if (!filename) return baseText;
     return (
@@ -301,7 +305,12 @@ export const getActivityText = ({
     );
   }
 
-  if (type === "card.updated.dueDate.added" && toDueDate) {
+  if (
+    (type === "deadline_added" ||
+      type === "deadline_changed" ||
+      type === "deadline_removed") &&
+    toDueDate
+  ) {
     const showYear = !isSameYear(toDueDate, new Date());
     const formattedDate = format(
       toDueDate,
@@ -315,21 +324,7 @@ export const getActivityText = ({
     );
   }
 
-  if (type === "card.updated.dueDate.updated" && toDueDate) {
-    const showYear = !isSameYear(toDueDate, new Date());
-    const formattedDate = format(
-      toDueDate,
-      showYear ? "do MMM yyyy" : "do MMM",
-      { locale: dateLocale },
-    );
-    return (
-      <Trans>
-        changed the due date to <TextHighlight>{formattedDate}</TextHighlight>
-      </Trans>
-    );
-  }
-
-  if (type === "card.updated.dueDate.removed") {
+  if (type === "deadline_removed") {
     return <Trans>removed the due date</Trans>;
   }
 
@@ -338,27 +333,25 @@ export const getActivityText = ({
 
 const ACTIVITY_ICON_MAP: Partial<Record<ActivityType, React.ReactNode | null>> =
   {
-    "card.created": <HiOutlinePlus />,
-    "card.updated.title": <HiOutlinePencil />,
-    "card.updated.description": <HiOutlinePencil />,
-    "card.updated.label.added": <HiOutlineTag />,
-    "card.updated.label.removed": <HiOutlineTag />,
-    "card.updated.member.added": <HiOutlineUserPlus />,
-    "card.updated.member.removed": <HiOutlineUserMinus />,
-    "card.updated.checklist.added": <HiOutlinePlus />,
-    "card.updated.checklist.renamed": <HiOutlinePencil />,
-    "card.updated.checklist.deleted": <HiOutlineTrash />,
-    "card.updated.checklist.item.added": <HiOutlinePlus />,
-    "card.updated.checklist.item.updated": <HiOutlinePencil />,
-    "card.updated.checklist.item.completed": <HiOutlineCheckCircle />,
-    "card.updated.checklist.item.uncompleted": <HiOutlineCheckCircle />,
-    "card.updated.checklist.item.deleted": <HiOutlineTrash />,
-    "card.updated.attachment.added": <HiOutlinePaperClip />,
-    "card.updated.attachment.renamed": <HiOutlinePaperClip />,
-    "card.updated.attachment.removed": <HiOutlinePaperClip />,
-    "card.updated.dueDate.added": <HiOutlineClock />,
-    "card.updated.dueDate.updated": <HiOutlineClock />,
-    "card.updated.dueDate.removed": <HiOutlineClock />,
+    "created": <HiOutlinePlus />,
+    "updated_title": <HiOutlinePencil />,
+    "updated_description": <HiOutlinePencil />,
+    "updated_label_added": <HiOutlineTag />,
+    "updated_label_removed": <HiOutlineTag />,
+    "member_assigned": <HiOutlineUserPlus />,
+    "member_unassigned": <HiOutlineUserMinus />,
+    "updated_checklist_added": <HiOutlinePlus />,
+    "updated_checklist_renamed": <HiOutlinePencil />,
+    "updated_checklist_deleted": <HiOutlineTrash />,
+    "updated_checklist_item_added": <HiOutlinePlus />,
+    "updated_checklist_item_updated": <HiOutlinePencil />,
+    "updated_checklist_item_completed": <HiOutlineCheckCircle />,
+    "updated_checklist_item_uncompleted": <HiOutlineCheckCircle />,
+    "updated_checklist_item_deleted": <HiOutlineTrash />,
+    "updated_attachment_added": <HiOutlinePaperClip />,
+    "updated_attachment_renamed": <HiOutlinePaperClip />,
+    "updated_attachment_removed": <HiOutlinePaperClip />,
+    "deadline_changed": <HiOutlineClock />,
   } as const;
 
 export const getActivityIcon = (
@@ -366,7 +359,7 @@ export const getActivityIcon = (
   fromIndex?: number | null,
   toIndex?: number | null,
 ): React.ReactNode | null => {
-  if (type === "card.updated.list" && fromIndex != null && toIndex != null) {
+  if (type === "updated_list" && fromIndex != null && toIndex != null) {
     return fromIndex > toIndex ? (
       <HiOutlineArrowLeft />
     ) : (
@@ -521,7 +514,7 @@ const ActivityList = ({
             null,
         });
 
-        if (activity.type === "card.updated.comment.added")
+        if (activity.type === "comment" || activity.type === "updated_comment_added")
           return (
             <Comment
               key={activity.publicId}

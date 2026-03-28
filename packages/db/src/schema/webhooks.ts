@@ -15,7 +15,7 @@ import { users } from "./users";
 import { workspaces } from "./workspaces";
 
 export const webhookEvents = [
-  "card.created",
+  "created",
   "card.updated",
   "card.moved",
   "card.deleted",

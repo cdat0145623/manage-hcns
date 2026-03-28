@@ -1,6 +1,6 @@
 {
-  "id": "205d0938-da8d-4fa3-8eab-bb777a01c0cf",
-  "prevId": "63715e6d-7373-4969-8d0f-7a8b711a192e",
+  "id": "b564f90e-0ab5-493f-ab30-3db46719c793",
+  "prevId": "4d269427-16f7-4eb1-a00a-57a9d4f39ab3",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -624,7 +624,31 @@
           "name": "cardId",
           "type": "bigint",
           "primaryKey": false,
-          "notNull": true
+          "notNull": false
+        },
+        "taskInstanceId": {
+          "name": "taskInstanceId",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "oldValue": {
+          "name": "oldValue",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "newValue": {
+          "name": "newValue",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "metadata": {
+          "name": "metadata",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
         },
         "fromIndex": {
           "name": "fromIndex",
@@ -757,6 +781,19 @@
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
+        "card_activity_taskInstanceId_taskInstances_id_fk": {
+          "name": "card_activity_taskInstanceId_taskInstances_id_fk",
+          "tableFrom": "card_activity",
+          "tableTo": "taskInstances",
+          "columnsFrom": [
+            "taskInstanceId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
         "card_activity_fromListId_list_id_fk": {
           "name": "card_activity_fromListId_list_id_fk",
           "tableFrom": "card_activity",
@@ -822,10 +859,10 @@
           "onDelete": "set null",
           "onUpdate": "no action"
         },
-        "card_activity_commentId_card_comments_id_fk": {
-          "name": "card_activity_commentId_card_comments_id_fk",
+        "card_activity_commentId_comments_id_fk": {
+          "name": "card_activity_commentId_comments_id_fk",
           "tableFrom": "card_activity",
-          "tableTo": "card_comments",
+          "tableTo": "comments",
           "columnsFrom": [
             "commentId"
           ],
@@ -1085,6 +1122,12 @@
           "primaryKey": false,
           "notNull": true
         },
+        "targetUser": {
+          "name": "targetUser",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
         "createdBy": {
           "name": "createdBy",
           "type": "uuid",
@@ -1137,6 +1180,19 @@
       },
       "indexes": {},
       "foreignKeys": {
+        "card_targetUser_user_id_fk": {
+          "name": "card_targetUser_user_id_fk",
+          "tableFrom": "card",
+          "tableTo": "user",
+          "columnsFrom": [
+            "targetUser"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
         "card_createdBy_user_id_fk": {
           "name": "card_createdBy_user_id_fk",
           "tableFrom": "card",
@@ -1264,8 +1320,8 @@
       "checkConstraints": {},
       "isRLSEnabled": true
     },
-    "public.card_comments": {
-      "name": "card_comments",
+    "public.comments": {
+      "name": "comments",
       "schema": "",
       "columns": {
         "id": {
@@ -1290,7 +1346,13 @@
           "name": "cardId",
           "type": "bigint",
           "primaryKey": false,
-          "notNull": true
+          "notNull": false
+        },
+        "taskInstanceId": {
+          "name": "taskInstanceId",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
         },
         "createdBy": {
           "name": "createdBy",
@@ -1326,9 +1388,9 @@
       },
       "indexes": {},
       "foreignKeys": {
-        "card_comments_cardId_card_id_fk": {
-          "name": "card_comments_cardId_card_id_fk",
-          "tableFrom": "card_comments",
+        "comments_cardId_card_id_fk": {
+          "name": "comments_cardId_card_id_fk",
+          "tableFrom": "comments",
           "tableTo": "card",
           "columnsFrom": [
             "cardId"
@@ -1339,9 +1401,22 @@
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
-        "card_comments_createdBy_user_id_fk": {
-          "name": "card_comments_createdBy_user_id_fk",
-          "tableFrom": "card_comments",
+        "comments_taskInstanceId_taskInstances_id_fk": {
+          "name": "comments_taskInstanceId_taskInstances_id_fk",
+          "tableFrom": "comments",
+          "tableTo": "taskInstances",
+          "columnsFrom": [
+            "taskInstanceId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "comments_createdBy_user_id_fk": {
+          "name": "comments_createdBy_user_id_fk",
+          "tableFrom": "comments",
           "tableTo": "user",
           "columnsFrom": [
             "createdBy"
@@ -1352,9 +1427,9 @@
           "onDelete": "set null",
           "onUpdate": "no action"
         },
-        "card_comments_deletedBy_user_id_fk": {
-          "name": "card_comments_deletedBy_user_id_fk",
-          "tableFrom": "card_comments",
+        "comments_deletedBy_user_id_fk": {
+          "name": "comments_deletedBy_user_id_fk",
+          "tableFrom": "comments",
           "tableTo": "user",
           "columnsFrom": [
             "deletedBy"
@@ -1368,8 +1443,8 @@
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
-        "card_comments_publicId_unique": {
-          "name": "card_comments_publicId_unique",
+        "comments_publicId_unique": {
+          "name": "comments_publicId_unique",
           "nullsNotDistinct": false,
           "columns": [
             "publicId"
@@ -2083,12 +2158,30 @@
         },
         "username": {
           "name": "username",
-          "type": "varchar(255)",
+          "type": "text",
           "primaryKey": false,
           "notNull": false
         },
         "password": {
           "name": "password",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "account_id": {
+          "name": "account_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "provider_id": {
+          "name": "provider_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "user_id": {
+          "name": "user_id",
           "type": "text",
           "primaryKey": false,
           "notNull": false
@@ -2125,6 +2218,33 @@
           "type": "varchar(255)",
           "primaryKey": false,
           "notNull": false
+        },
+        "role": {
+          "name": "role",
+          "type": "role",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'NVVP'"
+        },
+        "branchId": {
+          "name": "branchId",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "areaId": {
+          "name": "areaId",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "isActive": {
+          "name": "isActive",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
         }
       },
       "indexes": {},
@@ -2364,7 +2484,7 @@
           "name": "email",
           "type": "varchar(255)",
           "primaryKey": false,
-          "notNull": true
+          "notNull": false
         },
         "userId": {
           "name": "userId",
@@ -3426,10 +3546,10 @@
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
-        "notification_commentId_card_comments_id_fk": {
-          "name": "notification_commentId_card_comments_id_fk",
+        "notification_commentId_comments_id_fk": {
+          "name": "notification_commentId_comments_id_fk",
           "tableFrom": "notification",
-          "tableTo": "card_comments",
+          "tableTo": "comments",
           "columnsFrom": [
             "commentId"
           ],
@@ -3598,6 +3718,510 @@
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": true
+    },
+    "public.file_activity_log": {
+      "name": "file_activity_log",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "uuid_generate_v4()"
+        },
+        "taskInstanceId": {
+          "name": "taskInstanceId",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "cardId": {
+          "name": "cardId",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "activityType": {
+          "name": "activityType",
+          "type": "file_activity_type",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "fileName": {
+          "name": "fileName",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "oldFileUrl": {
+          "name": "oldFileUrl",
+          "type": "varchar(500)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "newFileUrl": {
+          "name": "newFileUrl",
+          "type": "varchar(500)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "fileSize": {
+          "name": "fileSize",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "mimeType": {
+          "name": "mimeType",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "metadata": {
+          "name": "metadata",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "createdBy": {
+          "name": "createdBy",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "createdAt": {
+          "name": "createdAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updatedAt": {
+          "name": "updatedAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "file_activity_task_instance_idx": {
+          "name": "file_activity_task_instance_idx",
+          "columns": [
+            {
+              "expression": "taskInstanceId",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "file_activity_card_idx": {
+          "name": "file_activity_card_idx",
+          "columns": [
+            {
+              "expression": "cardId",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "file_activity_type_idx": {
+          "name": "file_activity_type_idx",
+          "columns": [
+            {
+              "expression": "activityType",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "file_activity_created_at_idx": {
+          "name": "file_activity_created_at_idx",
+          "columns": [
+            {
+              "expression": "createdAt",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "file_activity_log_taskInstanceId_taskInstances_id_fk": {
+          "name": "file_activity_log_taskInstanceId_taskInstances_id_fk",
+          "tableFrom": "file_activity_log",
+          "tableTo": "taskInstances",
+          "columnsFrom": [
+            "taskInstanceId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "file_activity_log_cardId_card_id_fk": {
+          "name": "file_activity_log_cardId_card_id_fk",
+          "tableFrom": "file_activity_log",
+          "tableTo": "card",
+          "columnsFrom": [
+            "cardId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "file_activity_log_createdBy_user_id_fk": {
+          "name": "file_activity_log_createdBy_user_id_fk",
+          "tableFrom": "file_activity_log",
+          "tableTo": "user",
+          "columnsFrom": [
+            "createdBy"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.frequence": {
+      "name": "frequence",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "uuid_generate_v4()"
+        },
+        "name": {
+          "name": "name",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "rruleString": {
+          "name": "rruleString",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "dtStart": {
+          "name": "dtStart",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "createAt": {
+          "name": "createAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updateAt": {
+          "name": "updateAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.taskInstances": {
+      "name": "taskInstances",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "uuid_generate_v4()"
+        },
+        "userId": {
+          "name": "userId",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "taskMasterId": {
+          "name": "taskMasterId",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "targetDate": {
+          "name": "targetDate",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "actualDate": {
+          "name": "actualDate",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status": {
+          "name": "status",
+          "type": "statusType",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'pending'"
+        },
+        "createdAt": {
+          "name": "createdAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updatedAt": {
+          "name": "updatedAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "task_instances_user_target_idx": {
+          "name": "task_instances_user_target_idx",
+          "columns": [
+            {
+              "expression": "userId",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "targetDate",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "task_instances_master_idx": {
+          "name": "task_instances_master_idx",
+          "columns": [
+            {
+              "expression": "taskMasterId",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "taskInstances_userId_user_id_fk": {
+          "name": "taskInstances_userId_user_id_fk",
+          "tableFrom": "taskInstances",
+          "tableTo": "user",
+          "columnsFrom": [
+            "userId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "taskInstances_taskMasterId_taskMasters_id_fk": {
+          "name": "taskInstances_taskMasterId_taskMasters_id_fk",
+          "tableFrom": "taskInstances",
+          "tableTo": "taskMasters",
+          "columnsFrom": [
+            "taskMasterId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "taskInstances_userId_taskMasterId_targetDate_unique": {
+          "name": "taskInstances_userId_taskMasterId_targetDate_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "userId",
+            "taskMasterId",
+            "targetDate"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.taskMasters": {
+      "name": "taskMasters",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "uuid_generate_v4()"
+        },
+        "freqId": {
+          "name": "freqId",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "startDate": {
+          "name": "startDate",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "endDate": {
+          "name": "endDate",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "targetUser": {
+          "name": "targetUser",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "createdBy": {
+          "name": "createdBy",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "createdAt": {
+          "name": "createdAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updatedAt": {
+          "name": "updatedAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "taskMasters_freqId_frequence_id_fk": {
+          "name": "taskMasters_freqId_frequence_id_fk",
+          "tableFrom": "taskMasters",
+          "tableTo": "frequence",
+          "columnsFrom": [
+            "freqId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "taskMasters_targetUser_user_id_fk": {
+          "name": "taskMasters_targetUser_user_id_fk",
+          "tableFrom": "taskMasters",
+          "tableTo": "user",
+          "columnsFrom": [
+            "targetUser"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "taskMasters_createdBy_user_id_fk": {
+          "name": "taskMasters_createdBy_user_id_fk",
+          "tableFrom": "taskMasters",
+          "tableTo": "user",
+          "columnsFrom": [
+            "createdBy"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
     }
   },
   "enums": {
@@ -3621,32 +4245,35 @@
       "name": "card_activity_type",
       "schema": "public",
       "values": [
-        "card.created",
-        "card.updated.title",
-        "card.updated.description",
-        "card.updated.index",
-        "card.updated.list",
-        "card.updated.label.added",
-        "card.updated.label.removed",
-        "card.updated.member.added",
-        "card.updated.member.removed",
-        "card.updated.comment.added",
-        "card.updated.comment.updated",
-        "card.updated.comment.deleted",
-        "card.updated.checklist.added",
-        "card.updated.checklist.renamed",
-        "card.updated.checklist.deleted",
-        "card.updated.checklist.item.added",
-        "card.updated.checklist.item.updated",
-        "card.updated.checklist.item.completed",
-        "card.updated.checklist.item.uncompleted",
-        "card.updated.checklist.item.deleted",
-        "card.updated.attachment.added",
-        "card.updated.attachment.removed",
-        "card.updated.dueDate.added",
-        "card.updated.dueDate.updated",
-        "card.updated.dueDate.removed",
-        "card.archived"
+        "created",
+        "updated_title",
+        "updated_description",
+        "updated_list",
+        "updated_index",
+        "status_changed",
+        "member_assigned",
+        "member_unassigned",
+        "deadline_changed",
+        "comment",
+        "updated_comment_added",
+        "updated_comment_updated",
+        "updated_comment_deleted",
+        "updated_checklist_added",
+        "updated_checklist_renamed",
+        "updated_checklist_deleted",
+        "updated_checklist_item_added",
+        "updated_checklist_item_updated",
+        "updated_checklist_item_completed",
+        "updated_checklist_item_uncompleted",
+        "updated_checklist_item_deleted",
+        "updated_attachment_added",
+        "updated_attachment_removed",
+        "updated_label_added",
+        "updated_label_removed",
+        "archived",
+        "updated_attachment_renamed",
+        "deadline_added",
+        "deadline_removed"
       ]
     },
     "public.source": {
@@ -3670,9 +4297,10 @@
       "name": "role",
       "schema": "public",
       "values": [
-        "admin",
-        "member",
-        "guest"
+        "ADMIN",
+        "NVKT_MANAGER",
+        "NVKD_MANAGER",
+        "NVVP"
       ]
     },
     "public.member_status": {
@@ -3718,6 +4346,24 @@
         "workspace.member.added",
         "workspace.member.removed",
         "workspace.role.changed"
+      ]
+    },
+    "public.file_activity_type": {
+      "name": "file_activity_type",
+      "schema": "public",
+      "values": [
+        "file_uploaded",
+        "file_deleted",
+        "file_replaced"
+      ]
+    },
+    "public.statusType": {
+      "name": "statusType",
+      "schema": "public",
+      "values": [
+        "pending",
+        "done",
+        "missed"
       ]
     }
   },

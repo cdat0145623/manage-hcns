@@ -332,7 +332,7 @@ export const webhookRouter = createTRPCRouter({
           code: "NOT_FOUND",
         });
 
-      const testPayload = createCardWebhookPayload("card.created", {
+      const testPayload = createCardWebhookPayload("created", {
         id: "test-card-id",
         title: "Test Card",
         description: "This is a test webhook payload",

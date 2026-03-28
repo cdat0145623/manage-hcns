@@ -201,7 +201,7 @@ Use `assertUserInWorkspace` helper for workspace checks.
 ### Creating a Card
 
 1. Create card in repository with proper index management
-2. Create `card.created` activity
+2. Create `created` activity
 3. Handle label/member relationships if provided
 4. Return the created card
 

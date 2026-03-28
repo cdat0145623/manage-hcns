@@ -57,7 +57,7 @@ export function RolePermissions() {
     (roles).includes(role.name as Role),
   );
 
-  const orderedRoleNames: Role[] = ["admin", "member", "guest"].filter(
+  const orderedRoleNames: Role[] = ["ADMIN", "NVKT_MANAGER", "NVKD_MANAGER", "NVVP"].filter(
     (role) => systemRoles.some((r) => r.name === role),
   ) as Role[];
 
@@ -149,7 +149,7 @@ export function RolePermissions() {
                   {orderedRoleNames.map((roleName) => {
                     const role = systemRoles.find((r) => r.name === roleName);
                     const checked = role?.permissions.includes(permission);
-                    const isAdminRole = roleName === "admin";
+                    const isAdminRole = roleName === "ADMIN";
                     const isBillingOrDeletePermission =
                       permission === "workspace:manage" ||
                       permission === "workspace:delete";

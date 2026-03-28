@@ -110,7 +110,7 @@ export const cardRouter = createTRPCRouter({
           });
 
         const cardActivitesInsert = cardLabels.map((cardLabel) => ({
-          type: "card.updated.label.added" as const,
+          type: "updated_label_added" as const,
           cardId: cardLabel.cardId,
           labelId: cardLabel.labelId,
           createdBy: userId,
@@ -149,7 +149,7 @@ export const cardRouter = createTRPCRouter({
           });
 
         const cardActivitesInsert = cardMembers.map((cardMember) => ({
-          type: "card.updated.member.added" as const,
+          type: "member_assigned" as const,
           cardId: cardMember.cardId,
           workspaceMemberId: cardMember.workspaceMemberId,
           createdBy: userId,
@@ -174,7 +174,7 @@ export const cardRouter = createTRPCRouter({
         ctx.db,
         list.workspaceId,
         createCardWebhookPayload(
-          "card.created",
+          "created",
           {
             id: String(newCard.id),
             title: input.title,
@@ -250,7 +250,7 @@ export const cardRouter = createTRPCRouter({
         });
 
       await cardActivityRepo.create(ctx.db, {
-        type: "card.updated.comment.added" as const,
+        type: "updated_comment_added" as const,
         cardId: card.id,
         commentId: newComment.id,
         toComment: newComment.comment,
@@ -339,7 +339,7 @@ export const cardRouter = createTRPCRouter({
         });
 
       await cardActivityRepo.create(ctx.db, {
-        type: "card.updated.comment.updated" as const,
+        type: "updated_comment_updated" as const,
         cardId: card.id,
         commentId: updatedComment.id,
         fromComment: existingComment.comment,
@@ -428,7 +428,7 @@ export const cardRouter = createTRPCRouter({
         });
 
       await cardActivityRepo.create(ctx.db, {
-        type: "card.updated.comment.deleted" as const,
+        type: "updated_comment_deleted" as const,
         cardId: card.id,
         commentId: existingComment.id,
         createdBy: userId,
@@ -502,7 +502,7 @@ export const cardRouter = createTRPCRouter({
           });
 
         await cardActivityRepo.create(ctx.db, {
-          type: "card.updated.label.removed" as const,
+          type: "updated_label_removed" as const,
           cardId: card.id,
           labelId: label.id,
           createdBy: userId,
@@ -521,7 +521,7 @@ export const cardRouter = createTRPCRouter({
         });
 
       await cardActivityRepo.create(ctx.db, {
-        type: "card.updated.label.added" as const,
+        type: "updated_label_added" as const,
         cardId: card.id,
         labelId: label.id,
         createdBy: userId,
@@ -600,7 +600,7 @@ export const cardRouter = createTRPCRouter({
           });
 
         await cardActivityRepo.create(ctx.db, {
-          type: "card.updated.member.removed" as const,
+          type: "member_unassigned" as const,
           cardId: card.id,
           workspaceMemberId: member.id,
           createdBy: userId,
@@ -619,7 +619,7 @@ export const cardRouter = createTRPCRouter({
         });
 
       await cardActivityRepo.create(ctx.db, {
-        type: "card.updated.member.added" as const,
+        type: "member_assigned" as const,
         cardId: card.id,
         workspaceMemberId: member.id,
         createdBy: userId,
@@ -970,7 +970,7 @@ export const cardRouter = createTRPCRouter({
 
       if (input.title && existingCard.title !== input.title) {
         activities.push({
-          type: "card.updated.title" as const,
+          type: "updated_title" as const,
           cardId: result.id,
           createdBy: userId,
           fromTitle: existingCard.title,
@@ -980,7 +980,7 @@ export const cardRouter = createTRPCRouter({
 
       if (input.description && existingCard.description !== input.description) {
         activities.push({
-          type: "card.updated.description" as const,
+          type: "updated_description" as const,
           cardId: result.id,
           createdBy: userId,
           fromDescription: existingCard.description ?? undefined,
@@ -1002,16 +1002,16 @@ export const cardRouter = createTRPCRouter({
         previousDueDate?.getTime() !== input.dueDate?.getTime()
       ) {
         let activityType:
-          | "card.updated.dueDate.added"
-          | "card.updated.dueDate.updated"
-          | "card.updated.dueDate.removed";
+          | "deadline_added"
+          | "deadline_changed"
+          | "deadline_removed";
 
         if (!previousDueDate) {
-          activityType = "card.updated.dueDate.added";
+          activityType = "deadline_added";
         } else if (!input.dueDate) {
-          activityType = "card.updated.dueDate.removed";
+          activityType = "deadline_removed";
         } else {
-          activityType = "card.updated.dueDate.updated";
+          activityType = "deadline_changed";
         }
 
         activities.push({
@@ -1025,7 +1025,7 @@ export const cardRouter = createTRPCRouter({
 
       if (newListId && existingCard.listId !== newListId) {
         activities.push({
-          type: "card.updated.list" as const,
+          type: "updated_list" as const,
           cardId: result.id,
           createdBy: userId,
           fromListId: existingCard.listId,
@@ -1149,7 +1149,7 @@ export const cardRouter = createTRPCRouter({
       });
 
       await cardActivityRepo.create(ctx.db, {
-        type: "card.archived",
+        type: "archived",
         cardId: card.id,
         createdBy: userId,
       });

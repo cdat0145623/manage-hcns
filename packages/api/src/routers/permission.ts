@@ -674,7 +674,7 @@ export const permissionRouter = createTRPCRouter({
         });
       }
 
-      if (role.name === "admin" && role.isSystem) {
+      if (role.name === "ADMIN" && role.isSystem) {
         throw new TRPCError({
           message: "Admin role permissions cannot be modified",
           code: "FORBIDDEN",
@@ -685,7 +685,7 @@ export const permissionRouter = createTRPCRouter({
       if (
         (input.permission === "workspace:manage" ||
           input.permission === "workspace:delete") &&
-        role.name !== "admin"
+        role.name !== "ADMIN"
       ) {
         throw new TRPCError({
           message:
@@ -758,7 +758,7 @@ export const permissionRouter = createTRPCRouter({
         });
       }
 
-      if (role.name === "admin" && role.isSystem) {
+      if (role.name === "ADMIN" && role.isSystem) {
         throw new TRPCError({
           message: "Admin role permissions cannot be modified",
           code: "FORBIDDEN",

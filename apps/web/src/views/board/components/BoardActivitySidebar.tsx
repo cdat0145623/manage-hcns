@@ -130,12 +130,12 @@ export default function BoardActivitySidebar({
                   dateLocale: dateLocale,
                 });
 
-                if (activity.type === "card.updated.comment.added")
+                if (activity.type === "comment" || activity.type === "updated_comment_added")
                   return (
                     <Comment
                       key={activity.publicId}
                       publicId={activity.comment?.publicId}
-                      cardPublicId={activity.card?.publicId}
+                      cardPublicId={activity.card?.publicId ?? ""}
                       name={activity.user?.name ?? ""}
                       email={activity.user?.email ?? ""}
                       image={activity.user?.image ?? null}

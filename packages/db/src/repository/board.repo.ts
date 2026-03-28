@@ -867,10 +867,10 @@ export const createFromSnapshot = async (
 
         if (!createdCard) throw new Error("Failed to create card");
 
-        // Create card.created activity
+        // Create created activity
         await tx.insert(cardActivities).values({
           publicId: generateUID(),
-          type: "card.created",
+          type: "created",
           cardId: createdCard.id,
           createdBy: args.createdBy,
           sourceBoardId: args.sourceBoardId,
@@ -886,10 +886,10 @@ export const createFromSnapshot = async (
           if (cardLabels.length) {
             await tx.insert(cardsToLabels).values(cardLabels);
 
-            // Create card.updated.label.added activities for each label
+            // Create updated_label_added activities for each label
             const labelActivities = cardLabels.map((cardLabel) => ({
               publicId: generateUID(),
-              type: "card.updated.label.added" as const,
+              type: "updated_label_added" as const,
               cardId: cardLabel.cardId,
               labelId: cardLabel.labelId,
               createdBy: args.createdBy,
@@ -917,10 +917,10 @@ export const createFromSnapshot = async (
 
             if (!createdChecklist) continue;
 
-            // Create card.updated.checklist.added activity
+            // Create updated_checklist_added activity
             await tx.insert(cardActivities).values({
               publicId: generateUID(),
-              type: "card.updated.checklist.added",
+              type: "updated_checklist_added",
               cardId: createdCard.id,
               toTitle: checklist.name,
               createdBy: args.createdBy,
@@ -942,10 +942,10 @@ export const createFromSnapshot = async (
               if (itemValues.length) {
                 await tx.insert(checklistItems).values(itemValues);
 
-                // Create card.updated.checklist.item.added activities for each item
+                // Create updated_checklist_item_added activities for each item
                 const itemActivities = itemValues.map((item) => ({
                   publicId: generateUID(),
-                  type: "card.updated.checklist.item.added" as const,
+                  type: "updated_checklist_item_added" as const,
                   cardId: createdCard.id,
                   toTitle: item.title,
                   createdBy: args.createdBy,

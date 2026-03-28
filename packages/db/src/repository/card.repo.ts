@@ -100,7 +100,7 @@ export const create = async (
     await tx.insert(cardActivities).values({
       publicId: generateUID(),
       cardId: result[0].id,
-      type: "card.created",
+      type: "created",
       createdBy: cardInput.createdBy,
     });
 

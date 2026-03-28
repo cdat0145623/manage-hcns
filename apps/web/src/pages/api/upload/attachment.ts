@@ -119,7 +119,7 @@ export default withRateLimit(
       }
 
       await cardActivityRepo.create(db, {
-        type: "card.updated.attachment.added",
+        type: "updated_attachment_added",
         cardId: card.id,
         attachmentId: attachment.id,
         toTitle: originalFilename,

@@ -12,7 +12,9 @@ import {
   generateUID,
   getSubscriptionByPlan,
   hasUnlimitedSeats,
+  roles,
 } from "@kan/shared";
+import type { Role } from "@kan/shared";
 import { updateSubscriptionSeats } from "@kan/stripe";
 
 import { createTRPCRouter, protectedProcedure, publicProcedure } from "../trpc";
@@ -121,7 +123,7 @@ export const memberRouter = createTRPCRouter({
       const memberRole = await permissionRepo.getRoleByWorkspaceIdAndName(
         ctx.db,
         workspace.id,
-        "member",
+        "NVVP",
       );
 
       const invite = await memberRepo.create(ctx.db, {
@@ -129,7 +131,7 @@ export const memberRouter = createTRPCRouter({
         email: input.email,
         userId: existingUser?.id ?? null,
         createdBy: userId,
-        role: "member",
+        role: "NVVP",
         roleId: memberRole?.id ?? null,
         status: "invited",
       });
@@ -647,7 +649,7 @@ export const memberRouter = createTRPCRouter({
       const memberRole = await permissionRepo.getRoleByWorkspaceIdAndName(
         ctx.db,
         invite.workspaceId,
-        "member",
+        "NVVP",
       );
 
       await memberRepo.create(ctx.db, {
@@ -655,7 +657,7 @@ export const memberRouter = createTRPCRouter({
         email: user.email || null,
         userId: user.id,
         createdBy: user.id,
-        role: "member",
+        role: "NVVP",
         roleId: memberRole?.id ?? null,
         status: "active",
       });
@@ -681,7 +683,7 @@ export const memberRouter = createTRPCRouter({
       z.object({
         workspacePublicId: z.string().min(12),
         memberPublicId: z.string().min(12),
-        role: z.enum(["admin", "member", "guest"]),
+        role: z.enum(roles as unknown as [Role, ...Role[]]),
       }),
     )
     .output(
@@ -738,7 +740,7 @@ export const memberRouter = createTRPCRouter({
 
       await memberRepo.updateRole(ctx.db, {
         memberId: member.id,
-        role: input.role,
+        role: input.role as Role,
         roleId: workspaceRole?.id ?? null,
       });
 

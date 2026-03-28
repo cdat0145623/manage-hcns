@@ -229,54 +229,47 @@
     {
       "idx": 32,
       "version": "7",
-      "when": 1774580587990,
-      "tag": "20260327030307_AddTaskMasterInstance",
-      "breakpoints": true
-    },
-    {
-      "idx": 33,
-      "version": "7",
       "when": 1774595658293,
       "tag": "20260327071418_update_user_auth_fields",
       "breakpoints": true
     },
     {
-      "idx": 34,
+      "idx": 33,
       "version": "7",
       "when": 1774599810441,
       "tag": "20260327082330_AddAuthFieldsToUser",
       "breakpoints": true
     },
     {
-      "idx": 35,
+      "idx": 34,
       "version": "7",
       "when": 1774600598004,
       "tag": "20260327083638_MakeMemberEmailNullable",
       "breakpoints": true
     },
     {
-      "idx": 36,
+      "idx": 35,
       "version": "7",
       "when": 1774667048478,
       "tag": "20260328030408_UpdateSchemaForTasks",
       "breakpoints": true
     },
     {
-      "idx": 37,
+      "idx": 36,
       "version": "7",
       "when": 1774671493094,
       "tag": "20260328041813_AddMoreActivityTypes",
       "breakpoints": true
     },
     {
-      "idx": 38,
+      "idx": 37,
       "version": "7",
       "when": 1774672934662,
       "tag": "20260328044214_AddDeadlineActivities",
       "breakpoints": true
     },
     {
-      "idx": 39,
+      "idx": 38,
       "version": "7",
       "when": 1774673068646,
       "tag": "20260328044428_AddDeadlineActivities",

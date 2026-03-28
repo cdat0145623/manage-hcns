@@ -15,4 +15,4 @@ ALTER TYPE "public"."card_activity_type" ADD VALUE 'updated_attachment_removed';
 ALTER TYPE "public"."card_activity_type" ADD VALUE 'updated_label_added';--> statement-breakpoint
 ALTER TYPE "public"."card_activity_type" ADD VALUE 'updated_label_removed';--> statement-breakpoint
 ALTER TYPE "public"."card_activity_type" ADD VALUE 'archived';--> statement-breakpoint
-ALTER TYPE "public"."card_activity_type" ADD VALUE 'updated_attachment_removed';
+ALTER TYPE "public"."card_activity_type" ADD VALUE 'updated_attachment_renamed';

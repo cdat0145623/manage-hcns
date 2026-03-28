@@ -53,11 +53,10 @@ const createAuthWithHeaders = (
   return {
     api: {
       getSession: () => auth.api.getSession({ headers }),
-      signInMagicLink: (input: { email: string; callbackURL: string }) =>
-        auth.api.signInMagicLink({
-          headers,
-          body: { email: input.email, callbackURL: input.callbackURL },
-        }),
+      signInMagicLink: (input: { email: string; callbackURL: string }) => {
+        // Magic link disabled
+        return Promise.resolve({ status: true });
+      },
       listActiveSubscriptions: (input: { workspacePublicId: string }) =>
         auth.api.listActiveSubscriptions({
           headers,

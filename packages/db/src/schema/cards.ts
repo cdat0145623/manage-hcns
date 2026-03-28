@@ -3,6 +3,7 @@ import {
   bigint,
   bigserial,
   integer,
+  jsonb,
   pgEnum,
   pgTable,
   primaryKey,
@@ -19,36 +20,19 @@ import { labels } from "./labels";
 import { lists } from "./lists";
 import { users } from "./users";
 import { workspaceMembers } from "./workspaces";
+import { taskInstances, fileActivityLog } from "./tasks";
 
 export const activityTypes = [
-  "card.created",
-  "card.updated.title",
-  "card.updated.description",
-  "card.updated.index",
-  "card.updated.list",
-  "card.updated.label.added",
-  "card.updated.label.removed",
-  "card.updated.member.added",
-  "card.updated.member.removed",
-  "card.updated.comment.added",
-  "card.updated.comment.updated",
-  "card.updated.comment.deleted",
-  // Checklist activities
-  "card.updated.checklist.added",
-  "card.updated.checklist.renamed",
-  "card.updated.checklist.deleted",
-  "card.updated.checklist.item.added",
-  "card.updated.checklist.item.updated",
-  "card.updated.checklist.item.completed",
-  "card.updated.checklist.item.uncompleted",
-  "card.updated.checklist.item.deleted",
-  "card.updated.attachment.added",
-  "card.updated.attachment.renamed",
-  "card.updated.attachment.removed",
-  "card.updated.dueDate.added",
-  "card.updated.dueDate.updated",
-  "card.updated.dueDate.removed",
-  "card.archived",
+  "created",
+  "updated_title",
+  "updated_description",
+  "updated_list",
+  "status_changed",
+  "member_assigned",
+  "member_unassigned",
+  "deadline_changed",
+  "comment",
+   "card.updated.attachment.renamed",
 ] as const;
 
 export type ActivityType = (typeof activityTypes)[number];
@@ -61,6 +45,9 @@ export const cards = pgTable("card", {
   title: text("title").notNull(),
   description: text("description"),
   index: integer("index").notNull(),
+  targetUser: uuid("targetUser").references(() => users.id, {
+    onDelete: "set null",
+  }),
   createdBy: uuid("createdBy").references(() => users.id, {
     onDelete: "set null",
   }),
@@ -83,6 +70,11 @@ export const cardsRelations = relations(cards, ({ one, many }) => ({
     references: [users.id],
     relationName: "cardsCreatedByUser",
   }),
+  targetUser: one(users, {
+    fields: [cards.targetUser],
+    references: [users.id],
+    relationName: "cardsTargetUser",
+  }),
   list: one(lists, {
     fields: [cards.listId],
     references: [lists.id],
@@ -104,15 +96,20 @@ export const cardsRelations = relations(cards, ({ one, many }) => ({
   activities: many(cardActivities),
   checklists: many(checklists),
   attachments: many(cardAttachments),
+  fileActivities: many(fileActivityLog),
 }));
 
 export const cardActivities = pgTable("card_activity", {
   id: bigserial("id", { mode: "number" }).primaryKey(),
   publicId: varchar("publicId", { length: 12 }).notNull().unique(),
   type: activityTypeEnum("type").notNull(),
-  cardId: bigint("cardId", { mode: "number" })
-    .notNull()
-    .references(() => cards.id, { onDelete: "cascade" }),
+  cardId: bigint("cardId", { mode: "number" }).references(() => cards.id, {
+    onDelete: "cascade",
+  }),
+  taskInstanceId: uuid("taskInstanceId").references(() => taskInstances.id),
+  oldValue: text("oldValue"),
+  newValue: text("newValue"),
+  metadata: jsonb("metadata"),
   fromIndex: integer("fromIndex"),
   toIndex: integer("toIndex"),
   fromListId: bigint("fromListId", { mode: "number" }).references(
@@ -159,6 +156,11 @@ export const cardActivitiesRelations = relations(cardActivities, ({ one }) => ({
     fields: [cardActivities.cardId],
     references: [cards.id],
     relationName: "cardActivitiesCard",
+  }),
+  taskInstance: one(taskInstances, {
+    fields: [cardActivities.taskInstanceId],
+    references: [taskInstances.id],
+    relationName: "cardActivitiesTaskInstance",
   }),
   fromList: one(lists, {
     fields: [cardActivities.fromListId],
@@ -257,13 +259,14 @@ export const cardToWorkspaceMembersRelations = relations(
   }),
 );
 
-export const comments = pgTable("card_comments", {
+export const comments = pgTable("comments", {
   id: bigserial("id", { mode: "number" }).primaryKey(),
   publicId: varchar("publicId", { length: 12 }).notNull().unique(),
   comment: text("comment").notNull(),
-  cardId: bigint("cardId", { mode: "number" })
-    .notNull()
-    .references(() => cards.id, { onDelete: "cascade" }),
+  cardId: bigint("cardId", { mode: "number" }).references(() => cards.id, {
+    onDelete: "cascade",
+  }),
+  taskInstanceId: uuid("taskInstanceId").references(() => taskInstances.id),
   createdBy: uuid("createdBy").references(() => users.id, {
     onDelete: "set null",
   }),
@@ -280,6 +283,11 @@ export const commentsRelations = relations(comments, ({ one }) => ({
     fields: [comments.cardId],
     references: [cards.id],
     relationName: "commentsCard",
+  }),
+  taskInstance: one(taskInstances, {
+    fields: [comments.taskInstanceId],
+    references: [taskInstances.id],
+    relationName: "commentsTaskInstance",
   }),
   createdBy: one(users, {
     fields: [comments.createdBy],

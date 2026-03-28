@@ -16,6 +16,7 @@ export const getById = async (db: dbClient, userId: string) => {
       id: true,
       name: true,
       email: true,
+      username: true,
       image: true,
       stripeCustomerId: true,
     },
@@ -49,20 +50,41 @@ export const getByEmail = (db: dbClient, email: string) => {
       id: true,
       name: true,
       email: true,
+      username: true,
     },
     where: eq(users.email, email),
   });
 };
 
+export const getByUsername = (db: dbClient, username: string) => {
+  return db.query.users.findFirst({
+    columns: {
+      id: true,
+      name: true,
+      email: true,
+      username: true,
+    },
+    where: eq(users.username, username),
+  });
+};
+
 export const create = async (
   db: dbClient,
-  user: { id?: string; email: string; stripeCustomerId?: string },
+  user: {
+    id?: string;
+    email?: string | null;
+    username?: string | null;
+    password?: string | null;
+    stripeCustomerId?: string;
+  },
 ) => {
   const [result] = await db
     .insert(users)
     .values({
       id: user.id ?? uuidv4(),
       email: user.email,
+      username: user.username,
+      password: user.password,
       stripeCustomerId: user.stripeCustomerId,
       emailVerified: false,
     })
@@ -74,19 +96,28 @@ export const create = async (
 export const update = async (
   db: dbClient,
   userId: string,
-  updates: { image?: string; name?: string; stripeCustomerId?: string },
+  updates: {
+    image?: string;
+    name?: string;
+    username?: string;
+    password?: string;
+    stripeCustomerId?: string;
+  },
 ) => {
   const [result] = await db
     .update(users)
     .set({
       name: updates.name,
       image: updates.image,
+      username: updates.username,
+      password: updates.password,
       stripeCustomerId: updates.stripeCustomerId,
     })
     .where(eq(users.id, userId))
     .returning({
       name: users.name,
       image: users.image,
+      username: users.username,
       stripeCustomerId: users.stripeCustomerId,
     });
 

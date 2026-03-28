@@ -1,10 +1,8 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { t } from "@lingui/core/macro";
-import { Trans } from "@lingui/react/macro";
 import { env } from "next-runtime-env";
-import { useState } from "react";
-
+import { Trans } from "@lingui/react/macro";
 import { authClient } from "@kan/auth/client";
 
 import { Auth } from "~/components/AuthForm";
@@ -14,19 +12,12 @@ import PatternedBackground from "~/components/PatternedBackground";
 export default function SignUpPage() {
   const router = useRouter();
   const isSignUpDisabled = env("NEXT_PUBLIC_DISABLE_SIGN_UP") === "true";
-  const [isMagicLinkSent, setIsMagicLinkSent] = useState<boolean>(false);
-  const [magicLinkRecipient, setMagicLinkRecipient] = useState<string>("");
 
   const redirect = useSearchParams().get("next");
 
   const { data } = authClient.useSession();
 
   if (data?.user.id) router.push("/boards");
-
-  const handleMagicLinkSent = (value: boolean, recipient: string) => {
-    setIsMagicLinkSent(value);
-    setMagicLinkRecipient(recipient);
-  };
 
   const isInviteFlow = redirect?.startsWith("/invite/");
 
@@ -68,24 +59,13 @@ export default function SignUpPage() {
               </h1>
             </Link>
             <p className="mb-10 text-3xl font-bold tracking-tight text-light-1000 dark:text-dark-1000">
-              {isMagicLinkSent ? t`Check your inbox` : t`Get started`}
+              {t`Get started`}
             </p>
-            {isMagicLinkSent ? (
+            <div className="w-full rounded-lg border border-light-500 bg-light-300 px-4 py-10 dark:border-dark-400 dark:bg-dark-200 sm:max-w-md lg:px-10">
               <div className="sm:mx-auto sm:w-full sm:max-w-sm">
-                <p className="text-md mt-2 text-center text-light-1000 dark:text-dark-1000">
-                  <Trans>
-                    Click on the link we've sent to {magicLinkRecipient} to sign
-                    in.
-                  </Trans>
-                </p>
+                <Auth isSignUp />
               </div>
-            ) : (
-              <div className="w-full rounded-lg border border-light-500 bg-light-300 px-4 py-10 dark:border-dark-400 dark:bg-dark-200 sm:max-w-md lg:px-10">
-                <div className="sm:mx-auto sm:w-full sm:max-w-sm">
-                  <Auth setIsMagicLinkSent={handleMagicLinkSent} isSignUp />
-                </div>
-              </div>
-            )}
+            </div>
             <p className="mt-4 text-sm text-light-1000 dark:text-dark-1000">
               <Trans>
                 Already have an account?{" "}

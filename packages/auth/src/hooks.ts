@@ -30,7 +30,10 @@ export function createDatabaseHooks(db: dbClient) {
     user: {
       create: {
         async before(user: BetterAuthUser, _context: unknown) {
-          if (env("NEXT_PUBLIC_DISABLE_SIGN_UP")?.toLowerCase() === "true") {
+          if (
+            env("NEXT_PUBLIC_DISABLE_SIGN_UP")?.toLowerCase() === "true" &&
+            user.email
+          ) {
             const pendingInvitation = await memberRepo.getByEmailAndStatus(
               db,
               user.email,
@@ -47,7 +50,7 @@ export function createDatabaseHooks(db: dbClient) {
           const allowed = process.env.BETTER_AUTH_ALLOWED_DOMAINS?.split(",")
             .map((d) => d.trim().toLowerCase())
             .filter(Boolean);
-          if (allowed && allowed.length > 0) {
+          if (allowed && allowed.length > 0 && user.email) {
             const domain = user.email.split("@")[1]?.toLowerCase();
             if (!domain || !allowed.includes(domain)) {
               return Promise.resolve(false);
@@ -94,7 +97,7 @@ export function createDatabaseHooks(db: dbClient) {
             }
           }
 
-          if (notificationClient) {
+          if (notificationClient && user.email) {
             try {
               const [firstName, ...rest] = (user.name || "")
                 .split(" ")
@@ -106,7 +109,10 @@ export function createDatabaseHooks(db: dbClient) {
 
               const unsubscribeUrl = await createEmailUnsubscribeLink(user.id);
 
-              log.info({ workflowId: "user-signup", userId: user.id, email: user.email }, "Triggering Novu workflow");
+              log.info(
+                { workflowId: "user-signup", userId: user.id, email: user.email },
+                "Triggering Novu workflow",
+              );
               await notificationClient.trigger({
                 to: {
                   subscriberId: user.id,
@@ -126,7 +132,10 @@ export function createDatabaseHooks(db: dbClient) {
                 },
                 workflowId: "user-signup",
               });
-              log.info({ workflowId: "user-signup", userId: user.id }, "Novu workflow triggered");
+              log.info(
+                { workflowId: "user-signup", userId: user.id },
+                "Novu workflow triggered",
+              );
 
               await notificationClient.subscribers.credentials.update(
                 {
@@ -139,7 +148,10 @@ export function createDatabaseHooks(db: dbClient) {
                 user.id,
               );
             } catch (error) {
-              log.error({ err: error }, "Error adding user to notification client");
+              log.error(
+                { err: error },
+                "Error adding user to notification client",
+              );
             }
           }
         },
@@ -151,25 +163,7 @@ export function createDatabaseHooks(db: dbClient) {
 export function createMiddlewareHooks(db: dbClient) {
   return {
     after: createAuthMiddleware(async (ctx) => {
-      if (
-        ctx.path === "/magic-link/verify" &&
-        (ctx.query?.callbackURL as string | undefined)?.includes("type=invite")
-      ) {
-        const userId = ctx.context.newSession?.session.userId;
-        const callbackURL = ctx.query?.callbackURL as string | undefined;
-        const memberPublicId = callbackURL?.split("memberPublicId=")[1];
-
-        if (userId && memberPublicId) {
-          const member = await memberRepo.getByPublicId(db, memberPublicId);
-
-          if (member?.id) {
-            await memberRepo.acceptInvite(db, {
-              memberId: member.id,
-              userId,
-            });
-          }
-        }
-      }
+      // Middleware logic removed as magic links are disabled
     }),
   };
 }

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-misused-promises */
 import Link from "next/link";
 import { useRouter } from "next/router";
 import { Button } from "@headlessui/react";
@@ -16,6 +17,8 @@ import type { Subscription } from "@kan/shared/utils";
 import { hasActiveSubscription } from "@kan/shared/utils";
 
 import type { KeyboardShortcut } from "~/providers/keyboard-shortcuts";
+import activityLogsIconDark from "~/assets/activity-logs-dark.json";
+import activityLogsIconLight from "~/assets/activity-logs-light.json";
 import boardsIconDark from "~/assets/boards-dark.json";
 import boardsIconLight from "~/assets/boards-light.json";
 import membersIconDark from "~/assets/members-dark.json";
@@ -105,6 +108,18 @@ export default function SideNavigation({
         action: () => router.push("/boards"),
         group: "NAVIGATION",
         description: t`Go to boards`,
+      },
+    },
+    {
+      name: t`Calendar`,
+      href: "/calendar",
+      icon: isDarkMode ? activityLogsIconDark : activityLogsIconLight,
+      keyboardShortcut: {
+        type: "SEQUENCE",
+        strokes: [{ key: "G" }, { key: "C" }],
+        action: () => router.push("/calendar"),
+        group: "NAVIGATION",
+        description: t`Go to calendar`,
       },
     },
     {

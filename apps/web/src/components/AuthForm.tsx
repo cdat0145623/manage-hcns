@@ -22,11 +22,16 @@ interface AuthProps {
   isSignUp?: boolean;
 }
 
-const AuthSchema = z.object({
+const SignUpSchema = z.object({
   name: z.string().optional(),
   username: z.string().min(3, t`Username must be at least 3 characters`),
   password: z.string().min(6, t`Password must be at least 6 characters`),
-  email: z.string().email(),
+  email: z.string().email(t`Invalid email`),
+});
+
+const SignInSchema = z.object({
+  username: z.string().min(3, t`Username must be at least 3 characters`),
+  password: z.string().min(6, t`Password must be at least 6 characters`),
 });
 
 export function Auth({ isSignUp }: AuthProps) {
@@ -42,7 +47,7 @@ export function Auth({ isSignUp }: AuthProps) {
     handleSubmit,
     formState: { errors },
   } = useForm<FormValues>({
-    resolver: zodResolver(AuthSchema),
+    resolver: zodResolver(isSignUp ? SignUpSchema : SignInSchema),
   });
 
   const onSubmit = async (values: FormValues) => {
@@ -74,7 +79,7 @@ export function Auth({ isSignUp }: AuthProps) {
       if (error) setLoginError(error.message || t`An error occurred`);
     } else {
       // @ts-ignore - Better Auth plugin inference issue in monorepo
-      const { error } = await authClient.signIn.username(
+      const { error } = await authClient.signInUsername(
         {
           username: values.username,
           password: values.password!,

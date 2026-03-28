@@ -110,7 +110,7 @@ export function NewWorkspaceForm() {
           description: values.description,
           slug: values.slug,
           plan: values.plan,
-          role: "admin",
+          role: "ADMIN",
           weekStartDay: 1,
         });
 

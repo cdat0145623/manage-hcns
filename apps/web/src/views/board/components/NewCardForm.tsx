@@ -161,6 +161,9 @@ export function NewCardForm({
               _filteredLabels: labelPublicIds.map((id) => ({ publicId: id })),
               _filteredMembers: memberPublicIds.map((id) => ({ publicId: id })),
               index: position === "start" ? 0 : list.cards.length,
+              comments: [],
+              checklists: [],
+              attachments: [],
             };
 
             const updatedCards =
@@ -247,7 +250,7 @@ export function NewCardForm({
           imageUrl={
             member.user?.image ? getAvatarUrl(member.user.image) : undefined
           }
-          email={member.user?.email ?? member.email}
+          email={member.user?.email ?? member.email ?? ""}
         />
       ),
     })) ?? [];
@@ -340,7 +343,7 @@ export function NewCardForm({
                 boardData?.workspace.members.map(
                   (member): WorkspaceMember => ({
                     publicId: member.publicId,
-                    email: member.email,
+                    email: member.email ?? "",
                     user: member.user
                       ? {
                           id: member.publicId,

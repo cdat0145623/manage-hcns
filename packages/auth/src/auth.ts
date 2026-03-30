@@ -83,6 +83,68 @@ const signUpUsernamePlugin = () => ({
   },
 });
 
+const signInUsernamePlugin = () => ({
+  id: "sign-in-username",
+  endpoints: {
+    signInUsername: createAuthEndpoint(
+      "/sign-in-username",
+      {
+        method: "POST",
+        body: z.object({
+          username: z.string(),
+          password: z.string(),
+          callbackURL: z.string().optional(),
+        }),
+      },
+      async (ctx) => {
+        const { username, password } = ctx.body;
+
+        const user = await ctx.context.adapter.findOne<{
+          id: string;
+          password: string | null;
+          email: string;
+          name: string;
+          emailVerified: boolean;
+          image: string | null;
+          username: string;
+        }>({
+          model: "user",
+          where: [{ field: "username", value: username.toLowerCase() }],
+        });
+
+        if (!user || !user.password) {
+          throw new APIError("UNAUTHORIZED", {
+            message: "Invalid username or password",
+          });
+        }
+
+        // ctx.context.password.hash dùng bcrypt, verify dùng bcrypt.compare
+        const isValid = await ctx.context.password.verify({
+          hash: user.password,
+          password,
+        });
+
+        if (!isValid) {
+          throw new APIError("UNAUTHORIZED", {
+            message: "Invalid username or password",
+          });
+        }
+
+        const session = await ctx.context.internalAdapter.createSession(user.id);
+        if (!session) {
+          throw new APIError("INTERNAL_SERVER_ERROR", {
+            message: "Failed to create session",
+          });
+        }
+
+        await setSessionCookie(ctx, { session, user: user as any });
+
+        return ctx.json({ user, session });
+      },
+    ),
+  },
+});
+
 export const initAuth = (db: dbClient) => {
   const baseURL = env("NEXT_PUBLIC_BASE_URL") || env("BETTER_AUTH_URL");
   const authPath = "/api/auth";
@@ -145,6 +207,7 @@ export const initAuth = (db: dbClient) => {
     plugins: [
       username(),
       signUpUsernamePlugin(),
+      signInUsernamePlugin(),
       ...createPlugins(db),
     ],
     databaseHooks: createDatabaseHooks(db),

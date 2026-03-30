@@ -29,11 +29,15 @@ const Card = ({
   members?: {
     publicId: string;
     email: string | null;
+<<<<<<< HEAD
     user: {
       name: string | null;
       email: string | null;
       image: string | null;
     } | null;
+=======
+    user: { name: string | null; email: string | null; image: string | null } | null;
+>>>>>>> 10451b6309dee5f718ef7f8779612d511d468d7d
   }[];
   checklists?: {
     publicId: string;

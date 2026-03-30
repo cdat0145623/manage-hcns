@@ -13,7 +13,7 @@ import * as schema from "./schema";
 const log = createLogger("db");
 
 export type dbClient = NodePgDatabase<typeof schema> & {
-  $client: Pool;
+  $client?: Pool;
 };
 
 export const createDrizzleClient = (): dbClient => {

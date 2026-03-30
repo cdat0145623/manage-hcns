@@ -54,7 +54,6 @@ export function WeekView({
     clickedDate.setHours(hour, 0, 0, 0);
     onCellClick(clickedDate);
   };
-
   return (
     <div className="flex h-full flex-col overflow-hidden">
       <div className="flex border-b border-light-200 bg-light-100/50 pr-4 transition-all dark:border-dark-300 dark:bg-dark-200/50">

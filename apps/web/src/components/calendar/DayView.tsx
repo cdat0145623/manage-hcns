@@ -12,9 +12,7 @@ interface DayViewProps {
   onTaskClick: (entry: CalendarEntry) => void;
   onCellClick: (date: Date) => void;
 }
-
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
-
 export function DayView({
   currentDate,
   entries,

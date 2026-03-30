@@ -389,14 +389,18 @@ export default function BoardPage({ isTemplate }: { isTemplate?: boolean }) {
 
         <Modal
           modalSize="sm"
-          isVisible={isOpen && modalContentType === "NEW_LABEL" && !router.query.cardId}
+          isVisible={
+            isOpen && modalContentType === "NEW_LABEL" && !router.query.cardId
+          }
         >
           <LabelForm boardPublicId={boardId ?? ""} refetch={refetchBoard} />
         </Modal>
 
         <Modal
           modalSize="sm"
-          isVisible={isOpen && modalContentType === "EDIT_LABEL" && !router.query.cardId}
+          isVisible={
+            isOpen && modalContentType === "EDIT_LABEL" && !router.query.cardId
+          }
         >
           <LabelForm
             boardPublicId={boardId ?? ""}
@@ -407,7 +411,11 @@ export default function BoardPage({ isTemplate }: { isTemplate?: boolean }) {
 
         <Modal
           modalSize="sm"
-          isVisible={isOpen && modalContentType === "DELETE_LABEL" && !router.query.cardId}
+          isVisible={
+            isOpen &&
+            modalContentType === "DELETE_LABEL" &&
+            !router.query.cardId
+          }
         >
           <DeleteLabelConfirmation
             refetch={refetchBoard}
@@ -441,7 +449,11 @@ export default function BoardPage({ isTemplate }: { isTemplate?: boolean }) {
         <Modal
           modalSize="lg"
           centered
-          isVisible={isOpen && (modalContentType === "CARD_DETAILS" || childModalTypes.includes(modalContentType))}
+          isVisible={
+            isOpen &&
+            (modalContentType === "CARD_DETAILS" ||
+              childModalTypes.includes(modalContentType))
+          }
         >
           <CardDetailsModalContent
             cardId={(router.query.cardId as string) || entityId || undefined}
@@ -518,7 +530,7 @@ export default function BoardPage({ isTemplate }: { isTemplate?: boolean }) {
                   <Filters
                     labels={boardData.labels}
                     members={boardData.workspace.members
-<<<<<<< HEAD
+
                       .filter((member) => member.user !== null)
                       .map((member) => ({
                         ...member,
@@ -530,20 +542,6 @@ export default function BoardPage({ isTemplate }: { isTemplate?: boolean }) {
                             }
                           : null,
                       }))}
-=======
-  .filter((member) => member.user !== null)
-  .map((member) => ({
-    ...member,
-    email: member.email ?? "",
-    user: member.user
-      ? {
-          ...member.user,
-          email: member.user.email ?? "",
-        }
-      : null,
-  }))
-}
->>>>>>> 10451b6309dee5f718ef7f8779612d511d468d7d
                     lists={boardData.allLists}
                     position="left"
                     isLoading={!boardData}

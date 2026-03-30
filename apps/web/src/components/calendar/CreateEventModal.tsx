@@ -3,15 +3,18 @@ import { format, getDate, getDay } from "date-fns";
 import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useMemo, useRef, useState } from "react";
 
+import { authClient } from "@kan/auth/client";
+import { generateRRuleString } from "@kan/shared/utils";
+
+import { api } from "~/utils/api";
 import Modal from "../modal";
 
 export type RecurrenceType =
+  | "UNSELECTED"
   | "NONE"
-  | "DAILY"
   | "WEEKLY"
   | "MONTHLY_DATE"
-  | "MONTHLY_DAY"
-  | "ANNUALLY";
+  | "MONTHLY_DAY";
 
 export interface Attendee {
   id: string;
@@ -26,6 +29,7 @@ export interface EditableEntry {
   title: string;
   description?: string;
   date: Date | string;
+  endDate?: Date | string;
   startTime?: string;
   endTime?: string;
   color?: string;
@@ -37,9 +41,10 @@ export interface CreateEventInput {
   title: string;
   description: string;
   startDate: Date;
+  endDate: Date;
   startTime: string;
   endTime: string;
-  recurrence: RecurrenceType;
+  recurrence: string;
   attendees: Attendee[];
 }
 
@@ -131,14 +136,29 @@ export function CreateEventModal({
   editEntry,
 }: CreateEventModalProps) {
   const isEditMode = !!editEntry;
+  const { data: session } = authClient.useSession();
+
+  // const utils = api.useUtils();
+  // const createTask = api.taskMaster.create.useMutation({
+  //   onSuccess: () => {
+  //     // Refresh the queries
+  //     void utils.taskMaster.invalidate();
+  //     onClose();
+  //   },
+  //   onError: (err: { message?: string }) => {
+  //     alert(`Failed to save event: ${err.message ?? "Unknown error"}`);
+  //   },
+  // });
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [currentDate, setCurrentDate] = useState<Date>(selectedDate);
+  const [endDateVal, setEndDateVal] = useState<Date>(selectedDate);
   const [startTime, setStartTime] = useState("09:00");
   const [endTime, setEndTime] = useState("10:00");
-  const [recurrence, setRecurrence] = useState<RecurrenceType>("NONE");
+  const [recurrence, setRecurrence] = useState<RecurrenceType>("UNSELECTED");
   const [attendees, setAttendees] = useState<Attendee[]>([]);
+  const [hasAttemptedSave, setHasAttemptedSave] = useState(false);
 
   const [attendeeIdInput, setAttendeeIdInput] = useState("");
 
@@ -169,18 +189,13 @@ export function CreateEventModal({
   const startTimeOptions = useMemo(() => {
     const now = new Date();
     const currentMins = now.getHours() * 60 + now.getMinutes();
-    const options = [
-      {
-        value: minutesToTime(currentMins),
-        label: `Now (${minutesToTime(currentMins)})`,
-      },
-    ];
 
     let nextRounded = Math.ceil(currentMins / 30) * 30;
-    if (nextRounded === currentMins) nextRounded += 30;
+    if (nextRounded >= 24 * 60) nextRounded = 23 * 60 + 30;
 
-    for (let i = 0; i < 4; i++) {
-      const val = minutesToTime(nextRounded + i * 30);
+    const options = [];
+    for (let i = nextRounded; i < 24 * 60; i += 30) {
+      const val = minutesToTime(i);
       options.push({ value: val, label: val });
     }
     return options;
@@ -189,12 +204,20 @@ export function CreateEventModal({
   const endTimeOptionsList = useMemo(() => {
     const startMins = timeToMinutes(startTime);
     const options = [];
-    for (const add of [30, 60, 90, 120]) {
-      const val = minutesToTime(startMins + add);
-      let label = `${val} (+${add}m)`;
-      if (add === 60) label = `${val} (+1h)`;
-      else if (add === 90) label = `${val} (+1.5h)`;
-      else if (add === 120) label = `${val} (+2h)`;
+
+    let nextStart = startMins + 30;
+    if (nextStart >= 24 * 60) nextStart = 23 * 60 + 30;
+
+    for (let i = nextStart; i < 24 * 60; i += 30) {
+      const val = minutesToTime(i);
+      const diff = i - startMins;
+      const hrs = Math.floor(diff / 60);
+      const mns = diff % 60;
+      let diffStr = "";
+      if (hrs > 0) diffStr += `${hrs}h`;
+      if (mns > 0) diffStr += `${diffStr ? " " : ""}${mns}m`;
+
+      const label = `${val} (+${diffStr})`;
       options.push({ value: val, label });
     }
     return options;
@@ -206,6 +229,11 @@ export function CreateEventModal({
       setTitle(editEntry.title);
       setDescription(editEntry.description ?? "");
       setCurrentDate(new Date(editEntry.date));
+      setEndDateVal(
+        editEntry.endDate
+          ? new Date(editEntry.endDate)
+          : new Date(editEntry.date),
+      );
       setStartTime(editEntry.startTime ?? "09:00");
       setEndTime(editEntry.endTime ?? "10:00");
       setRecurrence(editEntry.recurrence ?? "NONE");
@@ -214,10 +242,19 @@ export function CreateEventModal({
       setTitle("");
       setDescription("");
       setCurrentDate(selectedDate);
-      setStartTime("09:00");
-      setEndTime("10:00");
-      setRecurrence("NONE");
+      setEndDateVal(selectedDate);
+
+      // Default to next rounded 30 minutes
+      const now = new Date();
+      const currentMins = now.getHours() * 60 + now.getMinutes();
+      let nextRounded = Math.ceil(currentMins / 30) * 30;
+      if (nextRounded >= 24 * 60) nextRounded = 23 * 60 + 30;
+
+      setStartTime(minutesToTime(nextRounded));
+      setEndTime(minutesToTime(Math.min(24 * 60 - 1, nextRounded + 60)));
+      setRecurrence("UNSELECTED");
       setAttendees([]);
+      setHasAttemptedSave(false);
     }
     setAttendeeIdInput("");
   }, [isVisible, editEntry, selectedDate]);
@@ -225,11 +262,9 @@ export function CreateEventModal({
   const recurrenceOptions = useMemo(() => {
     const dayName = DAY_NAMES[getDay(currentDate)] ?? "";
     const dateNum = getDate(currentDate);
-    const monthName = format(currentDate, "MMMM");
     const nthLabel = getNthWeekdayLabel(currentDate);
     return [
       { value: "NONE" as RecurrenceType, label: "Does not repeat", icon: "🚫" },
-      { value: "DAILY" as RecurrenceType, label: "Every day", icon: "📅" },
       {
         value: "WEEKLY" as RecurrenceType,
         label: `Weekly on ${dayName}`,
@@ -245,11 +280,6 @@ export function CreateEventModal({
         label: `Monthly on the ${nthLabel}`,
         icon: "🔄",
       },
-      {
-        value: "ANNUALLY" as RecurrenceType,
-        label: `Annually on ${monthName} ${dateNum}`,
-        icon: "🎯",
-      },
     ];
   }, [currentDate]);
 
@@ -259,13 +289,28 @@ export function CreateEventModal({
     return timeToMinutes(endTime) < timeToMinutes(startTime);
   }, [startTime, endTime]);
 
-  const endDateDisplay = useMemo(() => {
-    const { hours: eh, minutes: em } = parseTime(endTime);
-    const d = new Date(currentDate);
-    d.setHours(eh, em, 0);
-    if (isEndNextDay) d.setDate(d.getDate() + 1);
-    return d;
-  }, [currentDate, endTime, isEndNextDay]);
+  const showEndDate = true;
+
+  // Sync end date if it falls behind start date or if we revert to single day
+  useEffect(() => {
+    const start = new Date(currentDate);
+    start.setHours(0, 0, 0, 0);
+    const end = new Date(endDateVal);
+    end.setHours(0, 0, 0, 0);
+
+    if (isEndNextDay) {
+      if (end <= start) {
+        const nextDay = new Date(start);
+        nextDay.setDate(nextDay.getDate() + 1);
+        setEndDateVal(nextDay);
+      }
+    } else {
+      // If not spanning next day by time, and they want it hidden, we force it back to same day
+      if (end.getTime() !== start.getTime()) {
+        setEndDateVal(start);
+      }
+    }
+  }, [currentDate, endDateVal, isEndNextDay]);
 
   const handleAddGuestById = () => {
     const id = attendeeIdInput.trim();
@@ -288,14 +333,27 @@ export function CreateEventModal({
     setAttendees((prev) => prev.filter((a) => a.id !== id));
 
   const handleSave = () => {
+    setHasAttemptedSave(true);
     if (!title.trim()) return alert("Please enter a title");
+    if (recurrence === "UNSELECTED") {
+      return alert("Vui lòng chọn tùy chọn lặp lại (Repeat).");
+    }
+
+    // Setup precise dates
     const startDT = new Date(currentDate);
     const { hours: sh, minutes: sm } = parseTime(startTime);
     startDT.setHours(sh, sm, 0);
+
+    const endDT = new Date(endDateVal);
+    const { hours: eh, minutes: em } = parseTime(endTime);
+    endDT.setHours(eh, em, 0);
+
+    // Call external/previous handler just in case
     const payload: CreateEventInput = {
       title,
       description,
       startDate: startDT,
+      endDate: endDT,
       startTime,
       endTime,
       recurrence,
@@ -306,10 +364,52 @@ export function CreateEventModal({
     } else {
       onSave(payload);
     }
-    onClose();
+
+    // Connect to Backend API
+    let rruleString = "";
+    if (recurrence !== "NONE") {
+      try {
+        rruleString = generateRRuleString({
+          type:
+            recurrence === "WEEKLY"
+              ? "dayOfWeek"
+              : recurrence === "MONTHLY_DATE"
+                ? "monthlyDate"
+                : "monthlyDayRank",
+          days: recurrence === "WEEKLY" ? [startDT.getDay()] : undefined,
+          dates:
+            recurrence === "MONTHLY_DATE" ? [startDT.getDate()] : undefined,
+          rankDay: recurrence === "MONTHLY_DAY" ? startDT.getDay() : undefined,
+          rank:
+            recurrence === "MONTHLY_DAY"
+              ? Math.ceil(startDT.getDate() / 7)
+              : undefined,
+          startTime,
+          startDate: startDT,
+        });
+      } catch (e) {
+        console.error("Failed to parse recurrence:", e);
+      }
+    }
+
+    const currentUserId = session?.user?.id;
+    if (!currentUserId) {
+      alert("You must be logged in to save events");
+      return;
+    }
+
+    createTask.mutate({
+      name: title,
+      description,
+      startDate: startDT,
+      endDate: endDT,
+      selectedUserId: attendees.length > 0 ? attendees[0]?.id! : currentUserId,
+      rruleString,
+      createdBy: currentUserId,
+    });
   };
   return (
-    <Modal isVisible={isVisible} centered modalSize="md">
+    <Modal isVisible={isVisible} centered modalSize={showEndDate ? "lg" : "md"}>
       <motion.div
         initial={{ opacity: 0, scale: 0.96, y: 16 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -329,7 +429,7 @@ export function CreateEventModal({
               <span className="text-xl">{isEditMode ? "✏️" : "✨"}</span>
               <div>
                 <h2 className="text-lg font-black tracking-tight text-neutral-900 dark:text-white">
-                  {isEditMode ? "Edit Event" : "New Event"}
+                  {isEditMode ? "Edit" : "New"}
                 </h2>
                 {isEditMode && editEntry && (
                   <p className="text-[11px] text-neutral-400 dark:text-neutral-500">
@@ -408,10 +508,17 @@ export function CreateEventModal({
                   placeholder="HH:mm"
                   maxLength={5}
                   value={startTime}
-                  onFocus={(e) => { e.target.select(); setShowStartOptions(true); }}
+                  onFocus={(e) => {
+                    e.target.select();
+                    setShowStartOptions(true);
+                  }}
                   onChange={(e) => {
                     let val = e.target.value;
-                    if (val.length === 2 && startTime.length === 1 && !val.includes(":")) {
+                    if (
+                      val.length === 2 &&
+                      startTime.length === 1 &&
+                      !val.includes(":")
+                    ) {
                       val += ":";
                     }
                     setStartTime(val);
@@ -420,13 +527,17 @@ export function CreateEventModal({
                     }
                   }}
                   onBlur={() => {
-                    if (startTime && !startTime.includes(":") && startTime.length <= 2) {
+                    if (
+                      startTime &&
+                      !startTime.includes(":") &&
+                      startTime.length <= 2
+                    ) {
                       setStartTime(startTime.padStart(2, "0") + ":00");
                     }
                   }}
                   className="w-[84px] cursor-text appearance-none rounded-lg border-none bg-neutral-100 px-3 py-2 text-center text-sm font-medium text-neutral-700 shadow-none transition-colors hover:bg-neutral-200 focus:bg-neutral-200 focus:outline-none focus:ring-0 dark:bg-dark-300 dark:text-neutral-200 dark:hover:bg-dark-400 dark:focus:bg-dark-400"
                 />
-                
+
                 <AnimatePresence>
                   {showStartOptions && (
                     <motion.div
@@ -434,19 +545,21 @@ export function CreateEventModal({
                       animate={{ opacity: 1, scale: 1 }}
                       exit={{ opacity: 0, scale: 0.98 }}
                       transition={{ duration: 0.1 }}
-                      className="absolute left-0 top-full mt-1.5 w-36 z-50 overflow-hidden rounded-lg border border-neutral-200 bg-white py-1 shadow-lg dark:border-dark-300 dark:bg-dark-100"
+                      className="absolute left-0 top-full z-50 mt-1.5 max-h-60 w-36 overflow-hidden overflow-y-auto rounded-lg border border-neutral-200 bg-white py-1 shadow-lg dark:border-dark-300 dark:bg-dark-100"
                     >
                       {startTimeOptions.map((opt) => (
                         <button
                           key={opt.value}
                           onClick={() => {
                             setStartTime(opt.value);
-                            setEndTime(minutesToTime(timeToMinutes(opt.value) + 60));
+                            setEndTime(
+                              minutesToTime(timeToMinutes(opt.value) + 60),
+                            );
                             setShowStartOptions(false);
                           }}
                           className="flex w-full items-center px-4 py-2.5 text-left text-sm font-medium text-neutral-700 hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-dark-300"
                         >
-                          {opt.label.replace('Now', 'Hiện tại')}
+                          {opt.label.replace("Now", "Hiện tại")}
                         </button>
                       ))}
                     </motion.div>
@@ -463,22 +576,33 @@ export function CreateEventModal({
                   placeholder="HH:mm"
                   maxLength={5}
                   value={endTime}
-                  onFocus={(e) => { e.target.select(); setShowEndOptions(true); }}
+                  onFocus={(e) => {
+                    e.target.select();
+                    setShowEndOptions(true);
+                  }}
                   onChange={(e) => {
                     let val = e.target.value;
-                    if (val.length === 2 && endTime.length === 1 && !val.includes(":")) {
+                    if (
+                      val.length === 2 &&
+                      endTime.length === 1 &&
+                      !val.includes(":")
+                    ) {
                       val += ":";
                     }
                     setEndTime(val);
                   }}
                   onBlur={() => {
-                    if (endTime && !endTime.includes(":") && endTime.length <= 2) {
+                    if (
+                      endTime &&
+                      !endTime.includes(":") &&
+                      endTime.length <= 2
+                    ) {
                       setEndTime(endTime.padStart(2, "0") + ":00");
                     }
                   }}
                   className="w-[84px] cursor-text appearance-none rounded-lg border-none bg-neutral-100 px-3 py-2 text-center text-sm font-medium text-neutral-700 shadow-none transition-colors hover:bg-neutral-200 focus:bg-neutral-200 focus:outline-none focus:ring-0 dark:bg-dark-300 dark:text-neutral-200 dark:hover:bg-dark-400 dark:focus:bg-dark-400"
                 />
-                
+
                 <AnimatePresence>
                   {showEndOptions && (
                     <motion.div
@@ -486,7 +610,7 @@ export function CreateEventModal({
                       animate={{ opacity: 1, scale: 1 }}
                       exit={{ opacity: 0, scale: 0.98 }}
                       transition={{ duration: 0.1 }}
-                      className="absolute left-0 top-full mt-1.5 w-48 z-50 overflow-hidden rounded-lg border border-neutral-200 bg-white py-1 shadow-lg dark:border-dark-300 dark:bg-dark-100"
+                      className="absolute left-0 top-full z-50 mt-1.5 max-h-60 w-48 overflow-hidden overflow-y-auto rounded-lg border border-neutral-200 bg-white py-1 shadow-lg dark:border-dark-300 dark:bg-dark-100"
                     >
                       {endTimeOptionsList.map((opt) => (
                         <button
@@ -498,29 +622,37 @@ export function CreateEventModal({
                           className="flex w-full items-center justify-between px-4 py-2.5 text-left text-sm font-medium text-neutral-700 hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-dark-300"
                         >
                           <span>{opt.value}</span>
-                          <span className="text-xs text-neutral-400">{opt.label.replace(opt.value, '').replace('(', '').replace(')', '').trim()}</span>
+                          <span className="text-xs text-neutral-400">
+                            {opt.label
+                              .replace(opt.value, "")
+                              .replace("(", "")
+                              .replace(")", "")
+                              .trim()}
+                          </span>
                         </button>
                       ))}
                     </motion.div>
                   )}
                 </AnimatePresence>
               </div>
+
+              <AnimatePresence>
+                {showEndDate && (
+                  <motion.div className="relative overflow-hidden">
+                    <input
+                      type="date"
+                      value={format(endDateVal, "yyyy-MM-dd")}
+                      min={format(currentDate, "yyyy-MM-dd")}
+                      onChange={(e) => {
+                        const d = new Date(e.target.value);
+                        if (!isNaN(d.getTime())) setEndDateVal(d);
+                      }}
+                      className="w-[125px] cursor-pointer appearance-none rounded-lg border-none bg-neutral-100 px-3 py-2 text-sm font-medium text-neutral-700 shadow-none transition-colors hover:bg-neutral-200 focus:bg-blue-50 focus:text-blue-700 focus:outline-none focus:ring-0 dark:bg-dark-300 dark:text-neutral-200 dark:hover:bg-dark-400 dark:focus:bg-blue-900/30 dark:focus:text-blue-300"
+                    />
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
-            
-            <AnimatePresence>
-              {isEndNextDay && (
-                <motion.div
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: "auto" }}
-                  exit={{ opacity: 0, height: 0 }}
-                  className="overflow-hidden"
-                >
-                  <div className="flex items-center gap-2 rounded-xl bg-amber-100/80 px-3 py-2 text-xs font-semibold text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
-                    📌 Ends on {format(endDateDisplay, "MMMM d, yyyy")}
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
 
             <div className="space-y-2">
               <Label>Repeat</Label>
@@ -530,8 +662,12 @@ export function CreateEventModal({
                   onChange={(e) =>
                     setRecurrence(e.target.value as RecurrenceType)
                   }
-                  className="w-full appearance-none rounded-xl border border-neutral-200/70 bg-neutral-50/50 bg-none py-3 pl-4 pr-9 text-sm font-medium text-neutral-900 shadow-[inset_0_2px_4px_rgba(0,0,0,0.02)] transition-all focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-[3px] focus:ring-blue-500/10 dark:border-dark-400/50 dark:bg-dark-300/50 dark:text-white dark:focus:bg-dark-200"
+                  className={`w-full appearance-none rounded-xl border bg-none py-3 pl-4 pr-9 text-sm font-medium shadow-[inset_0_2px_4px_rgba(0,0,0,0.02)] transition-all focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-[3px] focus:ring-blue-500/10 dark:focus:bg-dark-200 ${hasAttemptedSave && recurrence === "UNSELECTED" ? "border-rose-400 bg-rose-50/50 text-rose-700 dark:border-rose-900/50 dark:bg-rose-900/20 dark:text-rose-400" : "border-neutral-200/70 bg-neutral-50/50 text-neutral-900 dark:border-dark-400/50 dark:bg-dark-300/50 dark:text-white"}`}
+                  style={{ backgroundImage: "none" }}
                 >
+                  <option value="UNSELECTED" disabled hidden>
+                    Select repeating option...
+                  </option>
                   {recurrenceOptions.map((opt) => (
                     <option key={opt.value} value={opt.value}>
                       {opt.label}
@@ -687,8 +823,10 @@ export function CreateEventModal({
               )}
             </p>
             <p className="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">
-              {format(currentDate, "MMMM d, yyyy")} · {startTime} – {endTime}
-              {isEndNextDay && ` (ends ${format(endDateDisplay, "MMM d")})`}
+              {format(currentDate, "MMM d, yyyy")}{" "}
+              {currentDate.getTime() !== endDateVal.getTime() &&
+                `– ${format(endDateVal, "MMM d, yyyy")}`}{" "}
+              · {startTime} – {endTime}
             </p>
             {recurrence !== "NONE" && selectedOpt && (
               <p className="mt-1 text-xs font-medium text-blue-600 dark:text-blue-400">
@@ -731,7 +869,7 @@ export function CreateEventModal({
                 : "bg-blue-500 hover:bg-blue-600"
             }`}
           >
-            {isEditMode ? "Update Event" : "Save Event"}
+            {isEditMode ? "Update" : "Save"}
           </button>
         </div>
       </motion.div>

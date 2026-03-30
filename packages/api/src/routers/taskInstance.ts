@@ -38,44 +38,45 @@ export const taskInstanceRouter = createTRPCRouter({
         });
     }),
     getVirtual: protectedProcedure
-  .meta({
-    openapi: {
-      summary: "Get virtual task instances",
-      method: "GET",
-      path: "/task-instance-virtual",
-      tags: ["taskInstance"],
-      protect: true,
-    },
-  })
-  .input(
-    z.object({
-      taskMasterId: z.string(),
-      from: z.date(),
-      to: z.date(),
+    .meta({
+        openapi: {
+        summary: "Get virtual task instances",
+        method: "GET",
+        path: "/task-instance-virtual",
+        tags: ["taskInstance"],
+        protect: true,
+        },
     })
-  )
-  .output(z.custom<Awaited<ReturnType<typeof taskInstanceRepo.generateVirtualTaskInstances>>>())
-  .query(async ({ ctx, input }) => {
-    const taskMaster = await ctx.db.query.taskMasters.findFirst({
-      where: (t, { eq }) => eq(t.id, input.taskMasterId),
-      with: { frequence: true },
-    });
+    .input(
+        z.object({
+        taskMasterId: z.string(),
+        from: z.coerce.date(),
+        to: z.coerce.date(),
+        })
+    )
+    .output(z.custom<Awaited<ReturnType<typeof taskInstanceRepo.generateVirtualTaskInstances>>>())
+    .query(async ({ ctx, input }) => {
+        console.log("input",input)
+        const taskMaster = await ctx.db.query.taskMasters.findFirst({
+            where: (t, { eq }) => eq(t.id, input.taskMasterId),
+            with: { frequence: true },
+        });
 
-    if (!taskMaster?.frequence) {
-      throw new Error("TaskMaster not found");
-    }
+        if (!taskMaster?.frequence) {
+            throw new Error("TaskMaster not found");
+        }
 
-    if (!taskMaster.frequence.rruleString || !taskMaster.frequence.dtStart) {
-      throw new Error("Frequence not found");
-    }
+        if (!taskMaster.frequence.rruleString || !taskMaster.frequence.dtStart) {
+            throw new Error("Frequence not found");
+        }
 
-    return taskInstanceRepo.generateVirtualTaskInstances({
-      userId: taskMaster.targetUser,
-      taskMasterId: taskMaster.id,
-      rruleString: taskMaster.frequence.rruleString,
-      startDate: taskMaster.startDate,
-      from: input.from,
-      to: input.to,
-    });
-  }),
+        return taskInstanceRepo.generateVirtualTaskInstances({
+            userId: taskMaster.targetUser,
+            taskMasterId: taskMaster.id,
+            rruleString: taskMaster.frequence.rruleString,
+            startDate: taskMaster.startDate,
+            from: input.from,
+            to: input.to,
+        });
+    }),
 })

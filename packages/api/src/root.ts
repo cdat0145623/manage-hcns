@@ -14,6 +14,8 @@ import { userRouter } from "./routers/user";
 import { webhookRouter } from "./routers/webhook";
 import { workspaceRouter } from "./routers/workspace";
 import { createTRPCRouter } from "./trpc";
+import { taskInstanceRouter } from "./routers/taskInstance";
+import { taskMasterRouter } from "./routers/taskMaster";
 
 export const appRouter = createTRPCRouter({
   attachment: attachmentRouter,
@@ -31,6 +33,8 @@ export const appRouter = createTRPCRouter({
   webhook: webhookRouter,
   workspace: workspaceRouter,
   integration: integrationRouter,
+  taskMaster: taskMasterRouter,
+  taskInstance: taskInstanceRouter,
 });
 
 export type AppRouter = typeof appRouter;

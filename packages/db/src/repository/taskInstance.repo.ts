@@ -1,6 +1,7 @@
 import {taskInstances, statusTypeEnum} from "@kan/db/schema";
 import type { dbClient } from "@kan/db/client";
-import { RRule } from 'rrule';
+import pkg from 'rrule';
+const { RRule } = pkg;
 
 export type TaskStatus = typeof statusTypeEnum.enumValues[number];
 

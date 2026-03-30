@@ -1,5 +1,6 @@
 import { Dialog, Transition } from "@headlessui/react";
 import { Fragment } from "react";
+import { twMerge } from "tailwind-merge";
 
 import { useModal } from "~/providers/modal";
 
@@ -10,6 +11,7 @@ interface Props {
   isVisible?: boolean;
   closeOnClickOutside?: boolean;
   centered?: boolean;
+  className?: string;
 }
 
 const Modal: React.FC<Props> = ({
@@ -19,6 +21,7 @@ const Modal: React.FC<Props> = ({
   isVisible,
   closeOnClickOutside,
   centered = false,
+  className,
 }) => {
   const {
     isOpen,
@@ -46,7 +49,7 @@ const Modal: React.FC<Props> = ({
     <Transition.Root show={shouldShow} as={Fragment}>
       <Dialog
         as="div"
-        className="relative z-50"
+        className={twMerge("relative z-50", className)}
         onClose={shouldCloseOnClickOutside ? closeModal : () => null}
       >
         <Transition.Child

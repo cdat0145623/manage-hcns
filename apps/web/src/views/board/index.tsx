@@ -1,5 +1,4 @@
 import type { DropResult } from "react-beautiful-dnd";
-import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useRouter } from "next/router";
 import { t } from "@lingui/core/macro";
@@ -26,16 +25,18 @@ import { StrictModeDroppable as Droppable } from "~/components/StrictModeDroppab
 import { Tooltip } from "~/components/Tooltip";
 import { EditYouTubeModal } from "~/components/YouTubeEmbed/EditYouTubeModal";
 import { useDragToScroll } from "~/hooks/useDragToScroll";
-import { useScrollRestore } from "~/hooks/useScrollRestore";
 import { usePermissions } from "~/hooks/usePermissions";
+import { useScrollRestore } from "~/hooks/useScrollRestore";
 import { useKeyboardShortcut } from "~/providers/keyboard-shortcuts";
 import { useModal } from "~/providers/modal";
 import { usePopup } from "~/providers/popup";
 import { useWorkspace } from "~/providers/workspace";
 import { api } from "~/utils/api";
 import { formatToArray } from "~/utils/helpers";
-import BoardDropdown from "./components/BoardDropdown";
+import CardDetailsModalContent from "../card/components/CardDetailsModalContent";
+import { childModalTypes } from "../card/constants";
 import BoardActivitySidebar from "./components/BoardActivitySidebar";
+import BoardDropdown from "./components/BoardDropdown";
 import Card from "./components/Card";
 import { DeleteBoardConfirmation } from "./components/DeleteBoardConfirmation";
 import { DeleteListConfirmation } from "./components/DeleteListConfirmation";
@@ -56,7 +57,8 @@ export default function BoardPage({ isTemplate }: { isTemplate?: boolean }) {
   const utils = api.useUtils();
   const { showPopup } = usePopup();
   const { workspace } = useWorkspace();
-  const { openModal, modalContentType, entityId, isOpen } = useModal();
+  const { openModal, closeModal, modalContentType, entityId, isOpen } =
+    useModal();
   const [selectedPublicListId, setSelectedPublicListId] =
     useState<PublicListId>("");
   const [isActivitySidebarOpen, setIsActivitySidebarOpen] = useState(false);
@@ -69,6 +71,18 @@ export default function BoardPage({ isTemplate }: { isTemplate?: boolean }) {
 
   const { canCreateList, canEditList, canEditCard, canEditBoard } =
     usePermissions();
+
+  const openCardDetails = (cardPublicId: string) => {
+    openModal("CARD_DETAILS", cardPublicId);
+    const newQuery = { ...router.query, cardId: cardPublicId };
+    void router.push({ query: newQuery }, undefined, { shallow: true });
+  };
+
+  const handleCloseCardModal = () => {
+    closeModal();
+    const { cardId: _removed, ...newQuery } = router.query;
+    void router.push({ query: newQuery }, undefined, { shallow: true });
+  };
 
   const { tooltipContent: createListShortcutTooltipContent } =
     useKeyboardShortcut({
@@ -142,6 +156,26 @@ export default function BoardPage({ isTemplate }: { isTemplate?: boolean }) {
     }
   }, [router, boardId, isQueryLoading, error, boardData]);
 
+  // Open card modal if URL has cardId on initial load
+  useEffect(() => {
+    if (
+      router.isReady &&
+      router.query.cardId &&
+      typeof router.query.cardId === "string" &&
+      !isOpen
+    ) {
+      openModal("CARD_DETAILS", router.query.cardId);
+    }
+  }, [router.isReady, router.query.cardId, isOpen, openModal]);
+
+  // Sync URL when card modal closes
+  useEffect(() => {
+    if (!isOpen && router.query.cardId) {
+      const { cardId: _removed, ...newQuery } = router.query;
+      void router.push({ query: newQuery }, undefined, { shallow: true });
+    }
+  }, [isOpen]);
+
   const refetchBoard = async () => {
     if (boardId) await utils.board.byId.refetch({ boardPublicId: boardId });
   };
@@ -154,7 +188,12 @@ export default function BoardPage({ isTemplate }: { isTemplate?: boolean }) {
 
   const isLoading = isInitialLoading || isQueryLoading;
 
-  useScrollRestore(boardId, scrollRef, router, !isLoading && (boardData?.lists.length ?? 0) > 0);
+  useScrollRestore(
+    boardId,
+    scrollRef,
+    router,
+    !isLoading && (boardData?.lists.length ?? 0) > 0,
+  );
 
   const updateListMutation = api.list.update.useMutation({
     onMutate: async (args) => {
@@ -350,14 +389,14 @@ export default function BoardPage({ isTemplate }: { isTemplate?: boolean }) {
 
         <Modal
           modalSize="sm"
-          isVisible={isOpen && modalContentType === "NEW_LABEL"}
+          isVisible={isOpen && modalContentType === "NEW_LABEL" && !router.query.cardId}
         >
           <LabelForm boardPublicId={boardId ?? ""} refetch={refetchBoard} />
         </Modal>
 
         <Modal
           modalSize="sm"
-          isVisible={isOpen && modalContentType === "EDIT_LABEL"}
+          isVisible={isOpen && modalContentType === "EDIT_LABEL" && !router.query.cardId}
         >
           <LabelForm
             boardPublicId={boardId ?? ""}
@@ -368,7 +407,7 @@ export default function BoardPage({ isTemplate }: { isTemplate?: boolean }) {
 
         <Modal
           modalSize="sm"
-          isVisible={isOpen && modalContentType === "DELETE_LABEL"}
+          isVisible={isOpen && modalContentType === "DELETE_LABEL" && !router.query.cardId}
         >
           <DeleteLabelConfirmation
             refetch={refetchBoard}
@@ -400,10 +439,15 @@ export default function BoardPage({ isTemplate }: { isTemplate?: boolean }) {
         </Modal>
 
         <Modal
-          modalSize="sm"
-          isVisible={isOpen && modalContentType === "EDIT_YOUTUBE"}
+          modalSize="lg"
+          centered
+          isVisible={isOpen && (modalContentType === "CARD_DETAILS" || childModalTypes.includes(modalContentType))}
         >
-          <EditYouTubeModal />
+          <CardDetailsModalContent
+            cardId={(router.query.cardId as string) || entityId || undefined}
+            isTemplate={!!isTemplate}
+            onClose={handleCloseCardModal}
+          />
         </Modal>
       </>
     );
@@ -468,14 +512,23 @@ export default function BoardPage({ isTemplate }: { isTemplate?: boolean }) {
                   boardSlug={boardData?.slug ?? ""}
                   queryParams={queryParams}
                   isLoading={!boardData}
-                  isAdmin={workspace.role === "admin"}
+                  isAdmin={workspace.role === "ADMIN"}
                 />
                 {boardData && (
                   <Filters
                     labels={boardData.labels}
-                    members={boardData.workspace.members.filter(
-                      (member) => member.user !== null,
-                    )}
+                    members={boardData.workspace.members
+                      .filter((member) => member.user !== null)
+                      .map((member) => ({
+                        ...member,
+                        email: member.email ?? "",
+                        user: member.user
+                          ? {
+                              ...member.user,
+                              email: member.user.email ?? "",
+                            }
+                          : null,
+                      }))}
                     lists={boardData.allLists}
                     position="left"
                     isLoading={!boardData}
@@ -599,27 +652,24 @@ export default function BoardPage({ isTemplate }: { isTemplate?: boolean }) {
                                       isDragDisabled={!canEditCard}
                                     >
                                       {(provided) => (
-                                        <Link
-                                          onClick={(e) => {
+                                        <div
+                                          onClick={() => {
                                             if (
-                                              card.publicId.startsWith(
+                                              !card.publicId.startsWith(
                                                 "PLACEHOLDER",
                                               )
-                                            )
-                                              e.preventDefault();
+                                            ) {
+                                              openCardDetails(card.publicId);
+                                            }
                                           }}
                                           key={card.publicId}
-                                          href={
-                                            isTemplate
-                                              ? `/templates/${boardId}/cards/${card.publicId}`
-                                              : `/cards/${card.publicId}`
-                                          }
-                                          className={`mb-2 flex !cursor-pointer flex-col ${card.publicId.startsWith(
-                                            "PLACEHOLDER",
-                                          )
-                                            ? "pointer-events-none"
-                                            : ""
-                                            }`}
+                                          className={`mb-2 flex cursor-pointer flex-col ${
+                                            card.publicId.startsWith(
+                                              "PLACEHOLDER",
+                                            )
+                                              ? "pointer-events-none"
+                                              : ""
+                                          }`}
                                           ref={provided.innerRef}
                                           {...provided.draggableProps}
                                           {...provided.dragHandleProps}
@@ -636,7 +686,7 @@ export default function BoardPage({ isTemplate }: { isTemplate?: boolean }) {
                                             attachments={card.attachments}
                                             dueDate={card.dueDate ?? null}
                                           />
-                                        </Link>
+                                        </div>
                                       )}
                                     </Draggable>
                                   ))}

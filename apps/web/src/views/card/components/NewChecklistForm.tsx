@@ -17,7 +17,13 @@ interface NewChecklistFormInput {
   cardPublicId: string;
 }
 
-export function NewChecklistForm({ cardPublicId }: { cardPublicId: string }) {
+export function NewChecklistForm({
+  cardPublicId,
+  hideHeader,
+}: {
+  cardPublicId: string;
+  hideHeader?: boolean;
+}) {
   const { closeModal, setModalState } = useModal();
   const { showPopup } = usePopup();
 
@@ -98,6 +104,7 @@ export function NewChecklistForm({ cardPublicId }: { cardPublicId: string }) {
   return (
     <form onSubmit={handleSubmit(onSubmit)}>
       <div className="px-5 pt-5">
+      {!hideHeader && (
         <div className="flex w-full items-center justify-between pb-4">
           <h2 className="text-sm font-bold text-neutral-900 dark:text-dark-1000">
             {t`New checklist`}
@@ -113,6 +120,7 @@ export function NewChecklistForm({ cardPublicId }: { cardPublicId: string }) {
             <HiXMark size={18} className="text-light-900 dark:text-dark-900" />
           </button>
         </div>
+      )}
 
         <Input
           id="checklist-name"

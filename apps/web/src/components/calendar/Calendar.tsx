@@ -1,52 +1,159 @@
+import type { DropResult } from "react-beautiful-dnd";
+import { t } from "@lingui/macro";
+import { motion } from "framer-motion";
 import { useState } from "react";
-import { CalendarHeader } from "./CalendarHeader";
+import { DragDropContext } from "react-beautiful-dnd";
+
 import type { ViewMode } from "./CalendarHeader";
+import type { CreateEventInput, EditableEntry } from "./CreateEventModal";
+import type { CalendarEntry } from "~/hooks/useRecurrence";
+import { useRecurrence } from "~/hooks/useRecurrence";
+import { usePopup } from "~/providers/popup";
+import { CalendarHeader } from "./CalendarHeader";
+import { CreateEventModal } from "./CreateEventModal";
+import { DayView } from "./DayView";
+import { EventDetailModal } from "./EventDetailModal";
 import { MonthView } from "./MonthView";
 import { WeekView } from "./WeekView";
-import { DayView } from "./DayView";
-import { useRecurrence } from "~/hooks/useRecurrence";
-import type { CalendarEntry } from "~/hooks/useRecurrence";
-import { motion } from "framer-motion";
-import Modal from "../modal";
-import { format, parseISO } from "date-fns";
-import { DragDropContext } from "react-beautiful-dnd";
-import type { DropResult } from "react-beautiful-dnd";
-import { usePopup } from "~/providers/popup";
-import { t } from "@lingui/macro";
+
+function toEditableEntry(entry: CalendarEntry): EditableEntry {
+  const date = new Date(entry.date);
+  const startTime = `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
+  const endTotalMins =
+    date.getHours() * 60 + date.getMinutes() + (entry.duration ?? 60);
+  const endTime = `${String(Math.floor(endTotalMins / 60) % 24).padStart(2, "0")}:${String(endTotalMins % 60).padStart(2, "0")}`;
+  return {
+    id: entry.id,
+    title: entry.title,
+    description: "",
+    date,
+    startTime,
+    endTime,
+    color: entry.color,
+    recurrence: "NONE",
+    attendees: [],
+  };
+}
+
+// ─────────────────────────────────────────────
+// Component
+// ─────────────────────────────────────────────
 
 export function Calendar() {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [viewMode, setViewMode] = useState<ViewMode>("MONTH");
-  const { calendarEntries, createInstance, moveTask } = useRecurrence(currentDate);
+  const { calendarEntries, createInstance, moveTask } =
+    useRecurrence(currentDate);
   const { showPopup } = usePopup();
 
-  const [selectedEntry, setSelectedEntry] = useState<CalendarEntry | null>(null);
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  // ── Date selection ───────────────────────────
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
 
+  // ── Detail modal state ───────────────────────
+  const [detailEntry, setDetailEntry] = useState<EditableEntry | null>(null);
+  const [isDetailOpen, setIsDetailOpen] = useState(false);
+
+  // ── Create/Edit modal state ──────────────────
+  const [editEntry, setEditEntry] = useState<EditableEntry | null>(null);
+  const [isFormOpen, setIsFormOpen] = useState(false);
+
+  // ─── Handlers ──────────────────────────────────────────────────────────────
+
+  /**
+   * Click vào ô trống (cell / time slot) → mở form Create
+   */
+  const handleCellClick = (date: Date) => {
+    setSelectedDate(date);
+    setEditEntry(null);
+    setIsFormOpen(true);
+  };
+
+  /**
+   * Click vào task đã có → mở Detail popup
+   * Virtual task (recurrence preview) → thông báo và không cho edit
+   */
   const handleTaskClick = (entry: CalendarEntry) => {
-    setSelectedEntry(entry);
-    setIsModalOpen(true);
-  };
-
-  const handleCreateInstance = () => {
-    if (selectedEntry && selectedEntry.type === "VIRTUAL") {
-      createInstance(selectedEntry.masterId, selectedEntry.date);
-      setIsModalOpen(false);
-      setSelectedEntry(null);
+    if (entry.type === "VIRTUAL") {
+      showPopup({
+        header: t`Virtual Task`,
+        message: t`This is a preview of a recurring event. Create an instance first to edit it.`,
+        icon: "info",
+      });
+      return;
     }
+    setDetailEntry(toEditableEntry(entry));
+    setIsDetailOpen(true);
   };
 
+  /**
+   * Nút "Edit Event" trong Detail popup → đóng detail, mở form Edit
+   */
+  const handleEditFromDetail = (entry: EditableEntry) => {
+    setIsDetailOpen(false);
+    // Dùng small delay để animation close của detail chạy xong trước khi mở form
+    setTimeout(() => {
+      setSelectedDate(new Date(entry.date));
+      setEditEntry(entry);
+      setIsFormOpen(true);
+    }, 220);
+  };
+
+  /**
+   * Nút "Delete" trong Detail popup
+   */
+  const handleDeleteEvent = (id: string) => {
+    // TODO: gọi mutation / API xóa event ở đây
+    console.log("Deleting event:", id);
+    showPopup({
+      header: t`Event Deleted`,
+      message: t`The event has been removed from your calendar.`,
+      icon: "success",
+    });
+  };
+
+  /** Đóng detail popup */
+  const handleDetailClose = () => {
+    setIsDetailOpen(false);
+    setTimeout(() => setDetailEntry(null), 280);
+  };
+
+  /** Đóng form modal */
+  const handleFormClose = () => {
+    setIsFormOpen(false);
+    setTimeout(() => setEditEntry(null), 280);
+  };
+
+  /** Tạo event mới */
+  const handleCreateEvent = (eventData: CreateEventInput) => {
+    console.log("Creating event:", eventData);
+    // TODO: gọi createInstance hoặc API tạo event
+    showPopup({
+      header: t`Event Created`,
+      message: t`"${eventData.title}" has been added to your calendar.`,
+      icon: "success",
+    });
+  };
+
+  /** Cập nhật event */
+  const handleUpdateEvent = (id: string, eventData: CreateEventInput) => {
+    console.log("Updating event:", id, eventData);
+    // TODO: gọi API update event
+    showPopup({
+      header: t`Event Updated`,
+      message: t`"${eventData.title}" has been updated.`,
+      icon: "success",
+    });
+  };
+
+  /** Drag & drop */
   const onDragEnd = (result: DropResult) => {
     const { destination, draggableId } = result;
-
     if (!destination) return;
-    
-    // Check if the drop target is a day cell
+
     if (destination.droppableId.startsWith("droppable-")) {
       const dateStr = destination.droppableId.replace("droppable-", "");
-      const newDate = parseISO(dateStr);
+      const newDate = new Date(dateStr);
 
-      // Virtual tasks cannot be moved in this simple implementation
       if (draggableId.startsWith("v_")) {
         showPopup({
           header: t`Cannot move virtual task`,
@@ -60,6 +167,8 @@ export function Calendar() {
     }
   };
 
+  // ─── Render ────────────────────────────────────────────────────────────────
+
   return (
     <div className="flex h-full flex-col bg-white dark:bg-dark-50">
       <CalendarHeader
@@ -69,9 +178,10 @@ export function Calendar() {
         setViewMode={setViewMode}
       />
 
-      <div className="flex-1 overflow-hidden relative">
+      <div className="relative flex-1 overflow-hidden">
         <DragDropContext onDragEnd={onDragEnd}>
-          <div className="h-full w-full relative">
+          <div className="relative h-full w-full">
+            {/* Month View */}
             {viewMode === "MONTH" && (
               <motion.div
                 key="month"
@@ -84,9 +194,12 @@ export function Calendar() {
                   currentDate={currentDate}
                   entries={calendarEntries}
                   onTaskClick={handleTaskClick}
+                  onCellClick={handleCellClick}
                 />
               </motion.div>
             )}
+
+            {/* Week View */}
             {viewMode === "WEEK" && (
               <motion.div
                 key="week"
@@ -99,9 +212,12 @@ export function Calendar() {
                   currentDate={currentDate}
                   entries={calendarEntries}
                   onTaskClick={handleTaskClick}
+                  onCellClick={handleCellClick}
                 />
               </motion.div>
             )}
+
+            {/* Day View */}
             {viewMode === "DAY" && (
               <motion.div
                 key="day"
@@ -114,6 +230,7 @@ export function Calendar() {
                   currentDate={currentDate}
                   entries={calendarEntries}
                   onTaskClick={handleTaskClick}
+                  onCellClick={handleCellClick}
                 />
               </motion.div>
             )}
@@ -121,95 +238,24 @@ export function Calendar() {
         </DragDropContext>
       </div>
 
-      {/* Quick Create / Detail Modal */}
-      <Modal isVisible={isModalOpen} centered modalSize="md">
-        <div className="relative overflow-hidden rounded-xl bg-white shadow-2xl transition-all dark:bg-dark-100">
-          {selectedEntry && (
-            <>
-              {/* Header with Background Accent */}
-              <div 
-                className="h-24 w-full opacity-20 dark:opacity-40"
-                style={{ backgroundColor: selectedEntry.color }}
-              />
-              
-              <div className="px-8 pb-8 pt-0">
-                <div className="-mt-12 flex items-center justify-between">
-                  <div 
-                    className="flex h-20 w-20 items-center justify-center rounded-2xl border-4 border-white bg-white text-3xl shadow-lg dark:border-dark-100 dark:bg-dark-200"
-                    style={{ color: selectedEntry.color }}
-                  >
-                    {selectedEntry.type === "VIRTUAL" ? "✨" : "📌"}
-                  </div>
-                  <button
-                    onClick={() => setIsModalOpen(false)}
-                    className="flex h-10 w-10 items-center justify-center rounded-full bg-light-100 text-light-500 hover:bg-light-200 hover:text-light-900 dark:bg-dark-300 dark:text-dark-500 dark:hover:bg-dark-400 dark:hover:text-dark-100"
-                  >
-                    ✕
-                  </button>
-                </div>
+      {/* ── Detail Popup (view only) ── */}
+      <EventDetailModal
+        isVisible={isDetailOpen}
+        entry={detailEntry}
+        onClose={handleDetailClose}
+        onEdit={handleEditFromDetail}
+        onDelete={handleDeleteEvent}
+      />
 
-                <div className="mt-6">
-                  <span
-                    className="rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-widest text-white shadow-md"
-                    style={{ backgroundColor: selectedEntry.color }}
-                  >
-                    {selectedEntry.type} OCCURRENCE
-                  </span>
-                  <h2 className="mt-4 text-3xl font-black leading-tight tracking-tight text-neutral-900 dark:text-white">
-                    {selectedEntry.title}
-                  </h2>
-                  
-                  <div className="mt-6 flex flex-wrap gap-4">
-                    <div className="flex items-center gap-2 rounded-lg bg-light-100 px-3 py-2 text-sm font-medium text-light-600 dark:bg-dark-200 dark:text-dark-600">
-                      <span className="text-lg">📅</span>
-                      {format(selectedEntry.date, "EEEE, MMMM do")}
-                    </div>
-                    <div className="flex items-center gap-2 rounded-lg bg-light-100 px-3 py-2 text-sm font-medium text-light-600 dark:bg-dark-200 dark:text-dark-600">
-                      <span className="text-lg">⏰</span>
-                      {format(selectedEntry.date, "HH:mm")} ({selectedEntry.duration} mins)
-                    </div>
-                  </div>
-
-                  <div className="mt-8 rounded-2xl border border-light-200 bg-light-50 p-6 dark:border-dark-300 dark:bg-dark-50/50">
-                    <h3 className="text-xs font-bold uppercase tracking-widest text-light-400 dark:text-dark-500">
-                      Description & Guidance
-                    </h3>
-                    <p className="mt-3 text-sm leading-relaxed text-neutral-600 dark:text-neutral-400">
-                      {selectedEntry.type === "VIRTUAL"
-                        ? "This event is currently a projection from your Master Schedule. \"Realizing\" this instance will create a persistent task where you can track progress, add comments, and manage checklists."
-                        : "This is a realized instance. You can manage this task directly in the board or use the quick actions below."}
-                    </p>
-                  </div>
-
-                  <div className="mt-8 flex gap-3">
-                    {selectedEntry.type === "VIRTUAL" ? (
-                      <button
-                        onClick={handleCreateInstance}
-                        className="flex-1 items-center justify-center rounded-xl bg-primary-500 py-4 font-black tracking-tight text-white shadow-[0_10px_20px_-5px_rgba(59,130,246,0.3)] transition-all hover:bg-primary-600 hover:shadow-[0_15px_25px_-5px_rgba(59,130,246,0.4)] active:scale-[0.98]"
-                      >
-                        ⚡ Realize Task Instance
-                      </button>
-                    ) : (
-                      <button
-                        onClick={() => setIsModalOpen(false)}
-                        className="flex-1 items-center justify-center rounded-xl bg-primary-500 py-4 font-black tracking-tight text-white shadow-[0_10px_20px_-5px_rgba(59,130,246,0.3)] transition-all hover:bg-primary-600"
-                      >
-                        Open Task Board
-                      </button>
-                    )}
-                    <button
-                      onClick={() => setIsModalOpen(false)}
-                      className="rounded-xl bg-light-100 px-6 py-4 font-bold text-light-600 transition-all hover:bg-light-200 dark:bg-dark-200 dark:text-dark-600 dark:hover:bg-dark-300"
-                    >
-                      Close
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </>
-          )}
-        </div>
-      </Modal>
+      {/* ── Create / Edit Form Modal ── */}
+      <CreateEventModal
+        isVisible={isFormOpen}
+        selectedDate={selectedDate}
+        onClose={handleFormClose}
+        onSave={handleCreateEvent}
+        onUpdate={handleUpdateEvent}
+        editEntry={editEntry}
+      />
     </div>
   );
 }

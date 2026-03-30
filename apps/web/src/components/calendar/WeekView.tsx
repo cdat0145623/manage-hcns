@@ -8,8 +8,8 @@ import {
   startOfDay,
   startOfWeek,
 } from "date-fns";
-import { useMemo, useState, useEffect } from "react";
 import { motion } from "framer-motion";
+import { useEffect, useMemo, useState } from "react";
 
 import type { CalendarEntry } from "~/hooks/useRecurrence";
 import { StrictModeDroppable as Droppable } from "~/components/StrictModeDroppable";
@@ -19,11 +19,17 @@ interface WeekViewProps {
   currentDate: Date;
   entries: CalendarEntry[];
   onTaskClick: (entry: CalendarEntry) => void;
+  onCellClick: (date: Date) => void;
 }
 
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
 
-export function WeekView({ currentDate, entries, onTaskClick }: WeekViewProps) {
+export function WeekView({
+  currentDate,
+  entries,
+  onTaskClick,
+  onCellClick,
+}: WeekViewProps) {
   const weekStart = startOfWeek(currentDate);
   const weekEnd = endOfWeek(currentDate);
   const days = useMemo(
@@ -35,27 +41,34 @@ export function WeekView({ currentDate, entries, onTaskClick }: WeekViewProps) {
     return entries.filter((entry) => isSameDay(new Date(entry.date), day));
   };
 
-  // For Now Indicator
   const [now, setNow] = useState(new Date());
   useEffect(() => {
-    const timer = setInterval(() => setNow(new Date()), 60000);
+    const timer = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
 
-  const nowTop = (now.getHours() * 96) + (now.getMinutes() * 96 / 60);
+  const nowTop = now.getHours() * 96 + (now.getMinutes() * 96) / 60;
+
+  const handleTimeSlotClick = (day: Date, hour: number) => {
+    const clickedDate = new Date(day);
+    clickedDate.setHours(hour, 0, 0, 0);
+    onCellClick(clickedDate);
+  };
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
-      {/* Header with Alignment Spacer */}
       <div className="flex border-b border-light-200 bg-light-100/50 pr-4 transition-all dark:border-dark-300 dark:bg-dark-200/50">
         <div className="w-16 flex-shrink-0 border-r border-light-100 dark:border-dark-300" />
         <div className="flex flex-1">
           {days.map((day) => (
             <div
               key={day.toISOString()}
-              className={`flex flex-1 flex-col items-center justify-center p-2 transition-all ${
-                isToday(day) ? "relative" : "text-neutral-500 dark:text-neutral-400"
+              className={`flex flex-1 cursor-pointer flex-col items-center justify-center p-2 transition-all ${
+                isToday(day)
+                  ? "relative"
+                  : "text-neutral-500 dark:text-neutral-400"
               }`}
+              onClick={() => onCellClick(day)}
             >
               <span className="text-[10px] font-black uppercase tracking-[0.2em] opacity-50">
                 {format(day, "EEE")}
@@ -71,22 +84,22 @@ export function WeekView({ currentDate, entries, onTaskClick }: WeekViewProps) {
                   {format(day, "d")}
                 </span>
                 {isToday(day) && (
-                  <motion.div 
+                  <motion.div
                     layoutId="today-underline"
-                    animate={{ 
+                    animate={{
                       scaleX: [1, 1.1, 1],
                       boxShadow: [
                         "0 2px 10px rgba(59,130,246,0.3)",
                         "0 2px 20px rgba(59,130,246,0.6)",
-                        "0 2px 10px rgba(59,130,246,0.3)"
-                      ]
+                        "0 2px 10px rgba(59,130,246,0.3)",
+                      ],
                     }}
-                    transition={{ 
-                      repeat: Infinity, 
-                      duration: 3, 
-                      ease: "easeInOut" 
+                    transition={{
+                      repeat: Infinity,
+                      duration: 3,
+                      ease: "easeInOut",
                     }}
-                    className="absolute -bottom-1 left-0 right-0 h-1 rounded-full bg-gradient-to-r from-primary-500 to-primary-300" 
+                    className="from-primary-500 to-primary-300 absolute -bottom-1 left-0 right-0 h-1 rounded-full bg-gradient-to-r"
                   />
                 )}
               </div>
@@ -95,10 +108,8 @@ export function WeekView({ currentDate, entries, onTaskClick }: WeekViewProps) {
         </div>
       </div>
 
-      {/* Grid */}
       <div className="flex-1 overflow-y-auto">
         <div className="flex min-h-full pt-8">
-          {/* Time gutter */}
           <div className="w-16 flex-shrink-0 border-r border-light-100 bg-neutral-50/30 dark:border-dark-300 dark:bg-neutral-900/10">
             {HOURS.map((hour) => (
               <div
@@ -112,7 +123,6 @@ export function WeekView({ currentDate, entries, onTaskClick }: WeekViewProps) {
             ))}
           </div>
 
-          {/* Day columns */}
           {days.map((day) => {
             const dayEntries = getEntriesForDay(day);
             const droppableId = `droppable-${format(day, "yyyy-MM-dd")}`;
@@ -122,11 +132,10 @@ export function WeekView({ currentDate, entries, onTaskClick }: WeekViewProps) {
                 key={day.toISOString()}
                 className={`relative flex min-w-0 flex-1 flex-col border-r border-light-100 transition-colors dark:border-dark-300 ${
                   isToday(day)
-                    ? "bg-gradient-to-b from-primary-500/5 to-transparent dark:from-primary-500/10"
+                    ? "from-primary-500/5 dark:from-primary-500/10 bg-gradient-to-b to-transparent"
                     : ""
                 }`}
               >
-                {/* Hour dividers */}
                 <div className="absolute inset-x-0 h-full">
                   {HOURS.map((hour) => (
                     <div
@@ -136,12 +145,11 @@ export function WeekView({ currentDate, entries, onTaskClick }: WeekViewProps) {
                   ))}
                 </div>
 
-                {/* Now Indicator with Animation */}
                 {isToday(day) && (
-                  <motion.div 
+                  <motion.div
                     initial={{ opacity: 0, scaleX: 0 }}
                     animate={{ opacity: 1, scaleX: 1 }}
-                    className="pointer-events-none absolute left-0 right-0 z-30 flex items-center origin-left"
+                    className="pointer-events-none absolute left-0 right-0 z-30 flex origin-left items-center"
                     style={{ top: `${nowTop}px` }}
                     transition={{ duration: 0.5, ease: "easeOut" }}
                   >
@@ -161,6 +169,16 @@ export function WeekView({ currentDate, entries, onTaskClick }: WeekViewProps) {
                       }`}
                       style={{ height: `${24 * 96}px` }}
                     >
+                      <div className="absolute inset-x-0 z-0 h-full">
+                        {HOURS.map((hour) => (
+                          <div
+                            key={`slot-${hour}`}
+                            onClick={() => handleTimeSlotClick(day, hour)}
+                            className="h-24 cursor-pointer transition-colors hover:bg-blue-100/30 dark:hover:bg-blue-900/20"
+                          />
+                        ))}
+                      </div>
+
                       {dayEntries.map((entry, index) => (
                         <CalendarTask
                           key={entry.id}

@@ -28,8 +28,12 @@ const Card = ({
   labels?: { name: string; colourCode: string | null }[];
   members?: {
     publicId: string;
-    email: string;
-    user: { name: string | null; email: string; image: string | null } | null;
+    email: string | null;
+    user: {
+      name: string | null;
+      email: string | null;
+      image: string | null;
+    } | null;
   }[];
   checklists?: {
     publicId: string;
@@ -142,7 +146,7 @@ const Card = ({
                     return (
                       <Avatar
                         name={user?.name ?? ""}
-                        email={user?.email ?? email}
+                        email={user?.email ?? email ?? ""}
                         imageUrl={avatarUrl}
                         size="sm"
                       />

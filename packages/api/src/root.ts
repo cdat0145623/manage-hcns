@@ -10,13 +10,12 @@ import { labelRouter } from "./routers/label";
 import { listRouter } from "./routers/list";
 import { memberRouter } from "./routers/member";
 import { permissionRouter } from "./routers/permission";
+import { taskInstanceRouter } from "./routers/taskInstance";
 import { taskMasterRouter } from "./routers/taskMaster";
 import { userRouter } from "./routers/user";
 import { webhookRouter } from "./routers/webhook";
 import { workspaceRouter } from "./routers/workspace";
 import { createTRPCRouter } from "./trpc";
-import { taskInstanceRouter } from "./routers/taskInstance";
-import { taskMasterRouter } from "./routers/taskMaster";
 
 export const appRouter = createTRPCRouter({
   attachment: attachmentRouter,
@@ -35,10 +34,8 @@ export const appRouter = createTRPCRouter({
   workspace: workspaceRouter,
   integration: integrationRouter,
   taskMaster: taskMasterRouter,
-<<<<<<< HEAD
-=======
   taskInstance: taskInstanceRouter,
->>>>>>> a77a786762bff73596f8050616a964aafd435c07
 });
 
 export type AppRouter = typeof appRouter;
+

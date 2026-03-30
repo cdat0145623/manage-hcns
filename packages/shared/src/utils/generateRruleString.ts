@@ -22,48 +22,45 @@ interface FreqConfig {
 export const generateRRuleString = (config: FreqConfig): string => {
   const { type, days, dates, rank, rankDay, startDate, startTime } = config;
   
-  // Tách giờ phút từ startTime "08:30"
   const parts = startTime.split(':').map(Number);
+  if (parts.length < 2 || parts.some(isNaN)) {
+    throw new Error("Định dạng thời gian không hợp lệ. Mong đợi HH:mm");
+  }
+  const [hour = 0, minute = 0] = parts;
 
-    if (parts.length < 2 || parts.some(isNaN)) {
-        throw new Error("Định dạng thời gian không hợp lệ. Mong đợi HH:mm");
-    }
-
-    const [hour = 0, minute = 0] = parts;
+  // TẠO NGÀY BẮT ĐẦU VỚI MÚI GIỜ VIỆT NAM
+  // Chúng ta tạo một ngày dựa trên startDate nhưng set đúng giờ/phút
   const dtstart = new Date(startDate);
-  dtstart.setHours(hour, minute, 0);
+  dtstart.setHours(hour, minute, 0, 0);
 
-  let rule: RRule;
+  let ruleOptions: any = {
+    dtstart: dtstart,
+    // TZID giúp rrule hiểu quy tắc lặp dựa trên múi giờ cụ thể 
+    // (Quan trọng cho việc nhảy giờ mùa hè/đông nếu có, dù VN không có nhưng là chuẩn tốt)
+    tzid: 'Asia/Ho_Chi_Minh', 
+  };
 
   switch (type) {
     case 'dayOfWeek':
-      rule = new RRule({
-        freq: RRule.WEEKLY,
-        byweekday: days, // mảng số 0-6
-        dtstart
-      });
+      ruleOptions.freq = RRule.WEEKLY;
+      ruleOptions.byweekday = days;
       break;
 
     case 'monthlyDate':
-      rule = new RRule({
-        freq: RRule.MONTHLY,
-        bymonthday: dates,
-        dtstart
-      });
+      ruleOptions.freq = RRule.MONTHLY;
+      ruleOptions.bymonthday = dates;
       break;
 
     case 'monthlyDayRank':
-      rule = new RRule({
-        freq: RRule.MONTHLY,
-        byweekday: rankDay, // ví dụ: 1 (Thứ 2)
-        bysetpos: rank,     // ví dụ: 1 (Đầu tiên)
-        dtstart
-      });
+      ruleOptions.freq = RRule.MONTHLY;
+      ruleOptions.byweekday = rankDay;
+      ruleOptions.bysetpos = rank;
       break;
       
     default:
       throw new Error("Invalid frequency type");
   }
 
+  const rule = new RRule(ruleOptions);
   return rule.toString();
 };

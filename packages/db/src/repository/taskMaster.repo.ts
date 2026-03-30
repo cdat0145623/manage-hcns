@@ -16,30 +16,43 @@ export const create = async (
     rruleString: string,
   }
 ) => {
-    
-  const frequence = await frequenceRepo.create(db, {
-    name: taskMasterInput.name,
-    rrule: taskMasterInput.rruleString,
-    dtStart: taskMasterInput.startDate,
-  });
+  return await db.transaction(async (tx) => {
+    const frequence = await frequenceRepo.create(tx, {
+      name: taskMasterInput.name,
+      rrule: taskMasterInput.rruleString,
+      dtStart: taskMasterInput.startDate,
+    });
 
-  const [taskMaster] = await db.insert(taskMasters).values({
-    targetUser: taskMasterInput.selectedUserId,
-    name: taskMasterInput.name,
-    description: taskMasterInput.description,
-    startDate: taskMasterInput.startDate,
-    endDate: taskMasterInput.endDate,
-    createdBy: taskMasterInput.userId,
-    freqId: frequence!.id,
-  }).returning({
-    id: taskMasters.id,
-    name: taskMasters.name,
-    description: taskMasters.description,
-    startDate: taskMasters.startDate,
-    endDate: taskMasters.endDate,
-    targetUser: taskMasters.targetUser,
-    createdBy: taskMasters.createdBy,
-  });
+    if (!frequence) {
+      throw new Error("Failed to create frequency");
+    }
 
-  return taskMaster;
+    // 2. Tạo task master
+    const [taskMaster] = await tx
+      .insert(taskMasters)
+      .values({
+        targetUser: taskMasterInput.selectedUserId,
+        name: taskMasterInput.name,
+        description: taskMasterInput.description,
+        startDate: taskMasterInput.startDate,
+        endDate: taskMasterInput.endDate,
+        createdBy: taskMasterInput.userId,
+        freqId: frequence.id,
+      })
+      .returning({
+        id: taskMasters.id,
+        name: taskMasters.name,
+        description: taskMasters.description,
+        startDate: taskMasters.startDate,
+        endDate: taskMasters.endDate,
+        targetUser: taskMasters.targetUser,
+        createdBy: taskMasters.createdBy,
+      });
+
+    if (!taskMaster) {
+      throw new Error("Failed to create task master");
+    }
+
+    return taskMaster;
+  });
 };

@@ -11,19 +11,32 @@ export const create = async (
         dtStart: Date,
     }
 ) => {
-    const [frequence] = await db
+    if (!frequenceInput.rrule) {
+    throw new Error("rrule is required");
+  }
+
+  if (!frequenceInput.dtStart) {
+    throw new Error("dtStart is required");
+  }
+
+  const [frequence] = await db
     .insert(frequences)
     .values({
-        id: generateUID(),
-        name: frequenceInput.name,
-        rruleString: frequenceInput.rrule,
-        dtStart: frequenceInput.dtStart,
+      id: generateUID(),
+      name: frequenceInput.name,
+      rruleString: frequenceInput.rrule,
+      dtStart: frequenceInput.dtStart,
     })
     .returning({
-        id: frequences.id,
-        name: frequences.name,
-        rrule: frequences.rruleString,
-        dtStart: frequences.dtStart,
+      id: frequences.id,
+      name: frequences.name,
+      rrule: frequences.rruleString,
+      dtStart: frequences.dtStart,
     });
-    return frequence;
+
+  if (!frequence) {
+    throw new Error("Failed to create frequence");
+  }
+
+  return frequence;
 }

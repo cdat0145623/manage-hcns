@@ -112,7 +112,7 @@ export function CardRightPanel({ isTemplate }: { isTemplate?: boolean }) {
             imageUrl={
               member.user?.image ? getAvatarUrl(member.user.image) : undefined
             }
-            email={member.user?.email ?? member.email}
+            email={member.user?.email ?? member.email ?? ""}
           />
         ),
       };
@@ -215,7 +215,7 @@ export default function CardPage({ isTemplate }: { isTemplate?: boolean }) {
       ?.filter((member) => member.email)
       .map((member) => ({
         publicId: member.publicId,
-        email: member.email,
+        email: member.email ?? "",
         user: member.user
           ? {
               id: member.user.id,
@@ -419,7 +419,12 @@ export default function CardPage({ isTemplate }: { isTemplate?: boolean }) {
                           onBlur={
                             canEdit ? () => handleSubmit(onSubmit)() : undefined
                           }
-                          workspaceMembers={workspaceMembers ?? []}
+                          workspaceMembers={
+                            (workspaceMembers ?? []).map((member) => ({
+                              ...member,
+                              email: member.email ?? "",
+                            }))
+                          }
                           readOnly={!canEdit}
                         />
                       </div>
@@ -458,7 +463,7 @@ export default function CardPage({ isTemplate }: { isTemplate?: boolean }) {
                       <ActivityList
                         cardPublicId={cardId}
                         isLoading={!card}
-                        isAdmin={workspace.role === "admin"}
+                        isAdmin={workspace.role === "ADMIN"}
                       />
                     </div>
                     {!isTemplate && (

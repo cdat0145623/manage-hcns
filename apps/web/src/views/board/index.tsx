@@ -468,14 +468,24 @@ export default function BoardPage({ isTemplate }: { isTemplate?: boolean }) {
                   boardSlug={boardData?.slug ?? ""}
                   queryParams={queryParams}
                   isLoading={!boardData}
-                  isAdmin={workspace.role === "admin"}
+                  isAdmin={workspace.role === "ADMIN"}
                 />
                 {boardData && (
                   <Filters
                     labels={boardData.labels}
-                    members={boardData.workspace.members.filter(
-                      (member) => member.user !== null,
-                    )}
+                    members={boardData.workspace.members
+  .filter((member) => member.user !== null)
+  .map((member) => ({
+    ...member,
+    email: member.email ?? "",
+    user: member.user
+      ? {
+          ...member.user,
+          email: member.user.email ?? "",
+        }
+      : null,
+  }))
+}
                     lists={boardData.allLists}
                     position="left"
                     isLoading={!boardData}

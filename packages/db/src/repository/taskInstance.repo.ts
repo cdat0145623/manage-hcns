@@ -40,7 +40,7 @@ export const create = async (
     return taskInstance;
 }
 
-export const generateVirtualTaskInstances = (params: {
+export const generateVirtualTaskInstances = async (params: {
   userId: string;
   taskMasterId: string;
   rruleString: string;
@@ -54,12 +54,24 @@ export const generateVirtualTaskInstances = (params: {
 
   const dates = rule.between(params.from, params.to, true);
 
-  return dates.map((date) => ({
-    id: `virtual-${params.taskMasterId}-${date.getTime()}`,
-    userId: params.userId,
-    taskMasterId: params.taskMasterId,
-    targetDate: date,
-    actualDate: null,
-    status: "pending" as const,
-  }));
+  if (dates.length > 100) {
+    throw new Error("Too many instances generated");
+  }
+
+  const hour = params.startDate.getUTCHours();
+  const minute = params.startDate.getUTCMinutes();
+
+  return dates.map((date) => {
+    const target = new Date(date);
+    target.setUTCHours(hour, minute, 0, 0);
+
+    return {
+      id: `virtual-${params.taskMasterId}-${date.getTime()}`,
+      userId: params.userId,
+      taskMasterId: params.taskMasterId,
+      targetDate: target,
+      actualDate: null,
+      status: "pending" as const,
+    }
+  });
 };

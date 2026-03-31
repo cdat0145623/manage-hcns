@@ -23,7 +23,6 @@ export const create = async (
   const [frequence] = await db
     .insert(frequences)
     .values({
-      id: generateUID(),
       name: frequenceInput.name,
       rruleString: frequenceInput.rrule,
       dtStart: frequenceInput.dtStart,

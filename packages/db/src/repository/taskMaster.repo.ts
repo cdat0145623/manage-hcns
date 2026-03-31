@@ -58,6 +58,12 @@ export const create = async (
     await tx.insert(cardActivities).values({
       publicId: generateUID(),
       taskMasterId: taskMaster.id,
+      type: "created",
+      createdBy: taskMasterInput.userId
+    });
+
+    await tx.insert(cardActivities).values({
+      publicId: generateUID(),
       freqId: frequence.id,
       type: "created",
       createdBy: taskMasterInput.userId

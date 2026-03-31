@@ -268,7 +268,7 @@ export const taskInstanceRouter = createTRPCRouter({
             });
         }
 
-        const {id, type} = input;
+        const {id, taskMasterId, type} = input;
 
         if (type === 'single') {
             const newTaskInstance = await taskInstanceRepo.deleteSingle(ctx.db, {
@@ -288,7 +288,7 @@ export const taskInstanceRouter = createTRPCRouter({
         
         if (type === 'all') {
             const newTaskInstance = await taskInstanceRepo.deleteAll(ctx.db, {
-                taskMasterId: input.taskMasterId,
+                taskMasterId,
                 userId,
             });
 
@@ -300,7 +300,7 @@ export const taskInstanceRouter = createTRPCRouter({
             }
 
             const taskMaster = await taskMasterRepo.softDelete(ctx.db, {
-                id: input.taskMasterId,
+                id: taskMasterId,
                 userId,
             });
 

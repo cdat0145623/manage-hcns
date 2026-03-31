@@ -86,4 +86,191 @@ export const taskInstanceRouter = createTRPCRouter({
         to: input.to,
       });
     }),
+<<<<<<< HEAD
 });
+=======
+    update: protectedProcedure
+    .meta({
+        openapi: {
+            summary: "Update a task instance",
+            method: "PUT",
+            path: "/task-instance",
+            description: "Update a task instance",
+            tags: ["taskInstance"],
+            protect: true,
+        }
+    })
+    .input(
+        z.object({
+            id: z.string(),
+            userId: z.string(),
+            taskMasterId: z.string(),
+            targetDate: z.date(),
+            actualDate: z.date(),
+            status: statusTypeEnumSchema,
+        })
+    )
+    .mutation(async ({ctx, input}) => {
+        const userId = ctx.user?.id;
+        
+        if (!userId) {
+            throw new TRPCError({
+                message: `User not authenticated`,
+                code: "UNAUTHORIZED",
+            });
+        }
+
+        const {id, taskMasterId, targetDate, actualDate, status} = input;
+
+        const oldTaskInstance = await ctx.db.query.taskInstances.findFirst({
+            where: (t, { eq }) => eq(t.id, id),
+        });
+
+        if (!oldTaskInstance) {
+            throw new TRPCError({
+                message: `Task instance not found`,
+                code: "NOT_FOUND",
+            });
+        }
+
+        const taskMaster = await ctx.db.query.taskMasters.findFirst({
+            where: (t, { eq }) => eq(t.id, taskMasterId),
+        });
+
+        if (!taskMaster) {
+            throw new TRPCError({
+                message: `Task master not found`,
+                code: "NOT_FOUND",
+            });
+        }
+
+        if (taskMaster.targetUser !== userId || taskMaster.createdBy !== userId) {
+            throw new TRPCError({
+                message: `User not authorized to update this task instance`,
+                code: "UNAUTHORIZED",
+            });
+        }
+
+        const newTaskInstance = await taskInstanceRepo.update(ctx.db, {
+            id,
+            userId,
+            taskMasterId,
+            targetDate,
+            actualDate,
+            status: status || oldTaskInstance.status,
+        });
+
+        if (!newTaskInstance) {
+            throw new TRPCError({
+                message: `Failed to update task instance`,
+                code: "INTERNAL_SERVER_ERROR",
+            });
+        }
+
+        if (oldTaskInstance.status !== newTaskInstance.status) {
+            const cardActivitesInsert = [{
+                type: "status_changed" as const,
+                taskInstanceId: oldTaskInstance.id,
+                createdBy: userId,
+                oldValue: oldTaskInstance.status,
+                newValue: newTaskInstance.status,
+            }];
+
+            await cardActivityRepo.bulkCreateForTaskInstance(ctx.db, cardActivitesInsert);
+        }
+
+        if (oldTaskInstance.targetDate !== newTaskInstance.targetDate) {
+            const cardActivitesInsert = [{
+                type: "deadline_changed" as const,
+                taskInstanceId: oldTaskInstance.id,
+                createdBy: userId,
+                oldValue: oldTaskInstance.targetDate?.toISOString(),
+                newValue: newTaskInstance.targetDate?.toISOString(),
+            }];
+
+            await cardActivityRepo.bulkCreateForTaskInstance(ctx.db, cardActivitesInsert);
+        }
+
+        return newTaskInstance;
+    }),
+    delete: protectedProcedure
+    .meta({
+        openapi: {
+            summary: "Delete a task instance",
+            method: "DELETE",
+            path: "/task-instance",
+            description: "Delete a task instance",
+            tags: ["taskInstance"],
+            protect: true,
+        }
+    })
+    .input(
+        z.object({
+            id: z.string(),
+            taskMasterId: z.string(),
+            type: z.enum(["single", "all"]), 
+        })
+    )
+    .mutation(async ({ctx, input}) => {
+        const userId = ctx.user?.id;
+        
+        if (!userId) {
+            throw new TRPCError({
+                message: `User not authenticated`,
+                code: "UNAUTHORIZED",
+            });
+        }
+
+        const {id, taskMasterId, type} = input;
+
+        if (type === 'single') {
+            const newTaskInstance = await taskInstanceRepo.deleteSingle(ctx.db, {
+                id,
+                userId,
+            });
+
+            if (!newTaskInstance) {
+                throw new TRPCError({
+                    message: `Failed to delete task instance`,
+                    code: "INTERNAL_SERVER_ERROR",
+                });
+            }
+
+            return newTaskInstance;
+        }
+        
+        if (type === 'all') {
+            const newTaskInstance = await taskInstanceRepo.deleteAll(ctx.db, {
+                taskMasterId,
+                userId,
+            });
+
+            if (!newTaskInstance) {
+                throw new TRPCError({
+                    message: `Failed to delete task instance`,
+                    code: "INTERNAL_SERVER_ERROR",
+                });
+            }
+
+            const taskMaster = await taskMasterRepo.softDelete(ctx.db, {
+                id: taskMasterId,
+                userId,
+            });
+
+            if (!taskMaster) {
+                throw new TRPCError({
+                    message: `Failed to delete task master`,
+                    code: "INTERNAL_SERVER_ERROR",
+                });
+            }
+
+            return {newTaskInstance, taskMaster};
+        }
+
+        throw new TRPCError({
+            message: `Invalid type`,
+            code: "BAD_REQUEST",
+        });
+    })
+})
+>>>>>>> d8e9006efb240249ed3a3c7347bdc94eaf1c91bf

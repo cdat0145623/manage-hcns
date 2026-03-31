@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import * as taskMasterRepo from "@kan/db/repository/taskMaster.repo";
+import * as taskInstanceRepo from "@kan/db/repository/taskInstance.repo";
 
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
@@ -14,6 +15,7 @@ export const taskMasterRouter = createTRPCRouter({
         description: "Create a task master",
         tags: ["taskMaster"],
         protect: true,
+<<<<<<< HEAD
       },
     })
     .input(
@@ -49,6 +51,55 @@ export const taskMasterRouter = createTRPCRouter({
       });
     }),
 
+=======
+    }
+  })
+  .input(
+    z.object({
+      name: z.string(),
+      description: z.string(),
+      startDate: z.coerce.date(),
+      endDate: z.coerce.date(),
+      selectedUserId: z.string(),
+      rruleString: z.string(),
+      from: z.coerce.date(),
+      to: z.coerce.date(),
+    })
+  )
+  .mutation(async ({ctx, input}) => {
+    const userId = ctx.user?.id;
+
+    if (!userId) {
+      throw new TRPCError({
+        message: `User not authenticated`,
+        code: "UNAUTHORIZED",
+      });
+    }
+
+    const {name, description, startDate, endDate, selectedUserId, rruleString, from, to } = input;
+
+    const taskMaster = await taskMasterRepo.create(ctx.db, {
+      userId: userId,
+      name,
+      description,
+      startDate,
+      endDate,
+      selectedUserId,
+      rruleString,
+    });
+
+    const virtualTaskInstances = await taskInstanceRepo.generateVirtualTaskInstances({
+      userId: userId,
+      taskMasterId: taskMaster.id,
+      rruleString,
+      startDate,
+      from,
+      to,
+    });
+
+    return virtualTaskInstances;
+  }),
+>>>>>>> d8e9006efb240249ed3a3c7347bdc94eaf1c91bf
   update: protectedProcedure
     .meta({
       openapi: {

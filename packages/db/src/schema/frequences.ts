@@ -9,7 +9,7 @@ export const frequences = pgTable("frequence", {
     .primaryKey()
     .default(sql`uuid_generate_v4()`),
   name: text("name").notNull(),
-  rruleString: text("rruleString"),
+  rruleString: text("rruleString").notNull(),
   dtStart: timestamp("dtStart", { mode: "date" }),
   createAt: timestamp("createAt").notNull().defaultNow(),
   updateAt: timestamp("updateAt").notNull().defaultNow(),

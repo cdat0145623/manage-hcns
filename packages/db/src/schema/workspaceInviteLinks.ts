@@ -23,7 +23,7 @@ export const workspaceInviteLinks = pgTable("workspace_invite_links", {
   publicId: varchar("publicId", { length: 12 }).notNull().unique(),
   workspaceId: bigint("workspaceId", { mode: "number" })
     .notNull()
-    .references(() => workspaces.id, { onDelete: "cascade" }),
+    .references(() => workspaces.id, { onDelete: "restrict" }),
   code: varchar("code", { length: 12 }).notNull().unique(),
   status: inviteLinkStatusEnum("status").notNull().default("active"),
   expiresAt: timestamp("expiresAt"),

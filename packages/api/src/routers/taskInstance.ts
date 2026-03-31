@@ -1,5 +1,6 @@
 import * as taskInstanceRepo from "@kan/db/repository/taskInstance.repo";
 import * as cardActivityRepo from "@kan/db/repository/cardActivity.repo";
+import * as taskMasterRepo from "@kan/db/repository/taskMaster.repo";
 import {protectedProcedure, createTRPCRouter} from "../trpc";
 import {z} from "zod";
 import {statusTypeEnum} from "@kan/db/schema";
@@ -83,6 +84,7 @@ export const taskInstanceRouter = createTRPCRouter({
                     gte(t.endDate, input.from),
                     ...(input.targetUser ? [eq(t.targetUser, input.targetUser)] : []),
                     ...(input.createdBy ? [eq(t.createdBy, input.createdBy)] : []),
+                    eq(t.isDeleted, false),
                 ),
             with: { frequence: true },
         });
@@ -112,6 +114,7 @@ export const taskInstanceRouter = createTRPCRouter({
                                 lt(t.targetDate, to),
                                 gte(t.targetDate, from),
                                 eq(t.taskMasterId, taskMaster.id),
+                                eq(t.isDeleted, false),
                             ),
                     });
 
@@ -236,5 +239,84 @@ export const taskInstanceRouter = createTRPCRouter({
         }
 
         return newTaskInstance;
+    }),
+    delete: protectedProcedure
+    .meta({
+        openapi: {
+            summary: "Delete a task instance",
+            method: "DELETE",
+            path: "/task-instance",
+            description: "Delete a task instance",
+            tags: ["taskInstance"],
+            protect: true,
+        }
+    })
+    .input(
+        z.object({
+            id: z.string(),
+            taskMasterId: z.string(),
+            type: z.enum(["single", "all"]), 
+        })
+    )
+    .mutation(async ({ctx, input}) => {
+        const userId = ctx.user?.id;
+        
+        if (!userId) {
+            throw new TRPCError({
+                message: `User not authenticated`,
+                code: "UNAUTHORIZED",
+            });
+        }
+
+        const {id, type} = input;
+
+        if (type === 'single') {
+            const newTaskInstance = await taskInstanceRepo.deleteSingle(ctx.db, {
+                id,
+                userId,
+            });
+
+            if (!newTaskInstance) {
+                throw new TRPCError({
+                    message: `Failed to delete task instance`,
+                    code: "INTERNAL_SERVER_ERROR",
+                });
+            }
+
+            return newTaskInstance;
+        }
+        
+        if (type === 'all') {
+            const newTaskInstance = await taskInstanceRepo.deleteAll(ctx.db, {
+                taskMasterId: input.taskMasterId,
+                userId,
+            });
+
+            if (!newTaskInstance) {
+                throw new TRPCError({
+                    message: `Failed to delete task instance`,
+                    code: "INTERNAL_SERVER_ERROR",
+                });
+            }
+
+            const taskMaster = await taskMasterRepo.softDelete(ctx.db, {
+                id: input.taskMasterId,
+                userId,
+            });
+
+            if (!taskMaster) {
+                throw new TRPCError({
+                    message: `Failed to delete task master`,
+                    code: "INTERNAL_SERVER_ERROR",
+                });
+            }
+
+            return {newTaskInstance, taskMaster};
+        }
+
+        throw new TRPCError({
+            message: `Invalid type`,
+            code: "BAD_REQUEST",
+        });
     })
 })

@@ -10,6 +10,7 @@ import {
   uniqueIndex,
   unique,
   index,
+  boolean,
 } from "drizzle-orm/pg-core";
 import { users } from "./users";
 import { cards } from "./cards";
@@ -46,11 +47,16 @@ export const taskMasters = pgTable("taskMasters", {
   targetUser: uuid("targetUser")
     .notNull()
     .references(() => users.id),
+  isDeleted: boolean("isDeleted").notNull().default(false),
   createdBy: uuid("createdBy")
     .notNull()
     .references(() => users.id),
   createdAt: timestamp("createdAt").notNull().defaultNow(),
   updatedAt: timestamp("updatedAt").notNull().defaultNow(),
+  deletedAt: timestamp("deletedAt"),
+  deletedBy: uuid("deletedBy").references(() => users.id, {
+    onDelete: "restrict",
+  }),
 });
 
 export const taskInstances = pgTable(
@@ -68,8 +74,13 @@ export const taskInstances = pgTable(
     targetDate: timestamp("targetDate"),
     actualDate: timestamp("actualDate"),
     status: statusTypeEnum("status").notNull().default("pending"),
+    isDeleted: boolean("isDeleted").notNull().default(false),
     createdAt: timestamp("createdAt").notNull().defaultNow(),
     updatedAt: timestamp("updatedAt").notNull().defaultNow(),
+    deleteAt: timestamp("deleteAt"),
+    deleteBy: uuid("deleteBy").references(() => users.id, {
+      onDelete: "restrict",
+    }),
   },
   (t) => [
     unique().on(t.userId, t.taskMasterId, t.targetDate),

@@ -20,7 +20,7 @@ export const checklists = pgTable("card_checklist", {
   index: integer("index").notNull(),
   cardId: bigint("cardId", { mode: "number" })
     .notNull()
-    .references(() => cards.id, { onDelete: "cascade" }),
+    .references(() => cards.id, { onDelete: "restrict" }),
   createdBy: uuid("createdBy").references(() => users.id, {
     onDelete: "set null",
   }),
@@ -59,7 +59,7 @@ export const checklistItems = pgTable("card_checklist_item", {
   index: integer("index").notNull(),
   checklistId: bigint("checklistId", { mode: "number" })
     .notNull()
-    .references(() => checklists.id, { onDelete: "cascade" }),
+    .references(() => checklists.id, { onDelete: "restrict" }),
   createdBy: uuid("createdBy").references(() => users.id, {
     onDelete: "set null",
   }),

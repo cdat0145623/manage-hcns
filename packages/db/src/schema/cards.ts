@@ -20,7 +20,7 @@ import { labels } from "./labels";
 import { lists } from "./lists";
 import { users } from "./users";
 import { workspaceMembers } from "./workspaces";
-import { taskInstances, fileActivityLog } from "./tasks";
+import { taskInstances, fileActivityLog, taskMasters, frequence } from "./tasks";
 
 export const activityTypes = [
   "created",
@@ -78,7 +78,7 @@ export const cards = pgTable("card", {
   }),
   listId: bigint("listId", { mode: "number" })
     .notNull()
-    .references(() => lists.id, { onDelete: "cascade" }),
+    .references(() => lists.id, { onDelete: "restrict" }),
   importId: bigint("importId", { mode: "number" }).references(() => imports.id),
   dueDate: timestamp("dueDate"),
 }).enableRLS();
@@ -123,7 +123,7 @@ export const cardActivities = pgTable("card_activity", {
   publicId: varchar("publicId", { length: 12 }).notNull().unique(),
   type: activityTypeEnum("type").notNull(),
   cardId: bigint("cardId", { mode: "number" }).references(() => cards.id, {
-    onDelete: "cascade",
+    onDelete: "restrict",
   }),
   taskInstanceId: uuid("taskInstanceId").references(() => taskInstances.id),
   oldValue: text("oldValue"),
@@ -133,13 +133,13 @@ export const cardActivities = pgTable("card_activity", {
   toIndex: integer("toIndex"),
   fromListId: bigint("fromListId", { mode: "number" }).references(
     () => lists.id,
-    { onDelete: "cascade" },
+    { onDelete: "restrict" },
   ),
   toListId: bigint("toListId", { mode: "number" }).references(() => lists.id, {
-    onDelete: "cascade",
+    onDelete: "restrict",
   }),
   labelId: bigint("labelId", { mode: "number" }).references(() => labels.id, {
-    onDelete: "cascade",
+    onDelete: "restrict",
   }),
   workspaceMemberId: bigint("workspaceMemberId", {
     mode: "number",
@@ -154,7 +154,7 @@ export const cardActivities = pgTable("card_activity", {
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   commentId: bigint("commentId", { mode: "number" }).references(
     () => comments.id,
-    { onDelete: "cascade" },
+    { onDelete: "restrict" },
   ),
   fromComment: text("fromComment"),
   toComment: text("toComment"),
@@ -166,8 +166,10 @@ export const cardActivities = pgTable("card_activity", {
   ),
   attachmentId: bigint("attachmentId", { mode: "number" }).references(
     () => cardAttachments.id,
-    { onDelete: "cascade" },
+    { onDelete: "restrict" },
   ),
+  taskMasterId: uuid("taskMasterId").references(() => taskMasters.id),
+  freqId: uuid("freqId").references(() => frequence.id),
 }).enableRLS();
 
 export const cardActivitiesRelations = relations(cardActivities, ({ one }) => ({
@@ -228,10 +230,10 @@ export const cardsToLabels = pgTable(
   {
     cardId: bigint("cardId", { mode: "number" })
       .notNull()
-      .references(() => cards.id, { onDelete: "cascade" }),
+      .references(() => cards.id, { onDelete: "restrict" }),
     labelId: bigint("labelId", { mode: "number" })
       .notNull()
-      .references(() => labels.id, { onDelete: "cascade" }),
+      .references(() => labels.id, { onDelete: "restrict" }),
   },
   (t) => [primaryKey({ columns: [t.cardId, t.labelId] })],
 ).enableRLS();
@@ -254,10 +256,10 @@ export const cardToWorkspaceMembers = pgTable(
   {
     cardId: bigint("cardId", { mode: "number" })
       .notNull()
-      .references(() => cards.id, { onDelete: "cascade" }),
+      .references(() => cards.id, { onDelete: "restrict" }),
     workspaceMemberId: bigint("workspaceMemberId", { mode: "number" })
       .notNull()
-      .references(() => workspaceMembers.id, { onDelete: "cascade" }),
+      .references(() => workspaceMembers.id, { onDelete: "restrict" }),
   },
   (t) => [primaryKey({ columns: [t.cardId, t.workspaceMemberId] })],
 ).enableRLS();
@@ -283,7 +285,7 @@ export const comments = pgTable("comments", {
   publicId: varchar("publicId", { length: 12 }).notNull().unique(),
   comment: text("comment").notNull(),
   cardId: bigint("cardId", { mode: "number" }).references(() => cards.id, {
-    onDelete: "cascade",
+    onDelete: "restrict",
   }),
   taskInstanceId: uuid("taskInstanceId").references(() => taskInstances.id),
   createdBy: uuid("createdBy").references(() => users.id, {
@@ -325,7 +327,7 @@ export const cardAttachments = pgTable("card_attachment", {
   publicId: varchar("publicId", { length: 12 }).notNull().unique(),
   cardId: bigint("cardId", { mode: "number" })
     .notNull()
-    .references(() => cards.id, { onDelete: "cascade" }),
+    .references(() => cards.id, { onDelete: "restrict" }),
   filename: varchar("filename", { length: 255 }).notNull(),
   originalFilename: varchar("originalFilename", { length: 255 }).notNull(),
   contentType: varchar("contentType", { length: 100 }).notNull(),

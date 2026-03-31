@@ -12,14 +12,14 @@ import { generateUID } from "@kan/shared/utils";
 export type TaskStatus = typeof statusTypeEnum.enumValues[number];
 
 export const create = async (
-    db: dbClient,
-    taskInstanceInput: {
-        userId: string,
-        taskMasterId: string,
-        targetDate: Date,
-        actualDate: Date,
-        status: TaskStatus,
-    }
+  db: dbClient,
+  taskInstanceInput: {
+      userId: string,
+      taskMasterId: string,
+      targetDate: Date,
+      actualDate: Date,
+      status: TaskStatus,
+  }
 ) => {
   return db.transaction(async (tx) => {
     const [taskInstance] = await tx
@@ -48,13 +48,6 @@ export const create = async (
       publicId: generateUID(),
       taskInstanceId: taskInstance.id,
       type: "created",
-      createdBy: taskInstance.userId,
-    });
-
-    await tx.insert(cardActivities).values({
-      publicId: generateUID(),
-      taskInstanceId: taskInstance.id,
-      type: "member_assigned",
       createdBy: taskInstance.userId,
     });
 
@@ -99,38 +92,108 @@ export const generateVirtualTaskInstances = async (params: {
 };
 
 export const update = async (
-    db: dbClient,
-    taskInstanceInput: {
-        id: string,
-        userId: string,
-        taskMasterId: string,
-        targetDate: Date,
-        actualDate: Date,
-        status: TaskStatus,
-    }
+  db: dbClient,
+  taskInstanceInput: {
+      id: string,
+      userId: string,
+      taskMasterId: string,
+      targetDate: Date,
+      actualDate: Date,
+      status: TaskStatus,
+  }
 ) => {
-    const [taskInstance] = await db
-    .update(taskInstances)
-    .set({
-        userId: taskInstanceInput.userId,
-        taskMasterId: taskInstanceInput.taskMasterId,
-        targetDate: taskInstanceInput.targetDate,
-        actualDate: taskInstanceInput.actualDate,
-        status: taskInstanceInput.status,
-    })
-    .where(eq(taskInstances.id, taskInstanceInput.id))
-    .returning({
-        id: taskInstances.id,
-        userId: taskInstances.userId,
-        taskMasterId: taskInstances.taskMasterId,
-        targetDate: taskInstances.targetDate,
-        actualDate: taskInstances.actualDate,
-        status: taskInstances.status,
-    });
+  const oldTaskInstance = await db.query.taskInstances.findFirst({
+    where: (t, { eq }) => eq(t.id, taskInstanceInput.id),
+  });
 
-    if (!taskInstance) {
-        throw new Error("Failed to update task instance");
-    }
+  const [taskInstance] = await db
+  .update(taskInstances)
+  .set({
+      userId: taskInstanceInput.userId,
+      taskMasterId: taskInstanceInput.taskMasterId,
+      targetDate: taskInstanceInput.targetDate,
+      actualDate: taskInstanceInput.actualDate,
+      status: taskInstanceInput.status,
+  })
+  .where(eq(taskInstances.id, taskInstanceInput.id))
+  .returning({
+      id: taskInstances.id,
+      userId: taskInstances.userId,
+      taskMasterId: taskInstances.taskMasterId,
+      targetDate: taskInstances.targetDate,
+      actualDate: taskInstances.actualDate,
+      status: taskInstances.status,
+  });
 
-    return taskInstance;
+  if (!taskInstance) {
+      throw new Error("Failed to update task instance");
+  }
+
+  await db.insert(cardActivities).values({
+    publicId: generateUID(),
+    taskInstanceId: taskInstance.id,
+    type: "status_changed",
+    oldValue: oldTaskInstance?.status,
+    newValue: taskInstance.status,
+    createdBy: taskInstance.userId,
+  });
+
+  return taskInstance;
+}
+
+export const deleteSingle = async (
+  db: dbClient,
+  taskInstanceInput: {
+      id: string,
+      userId: string,
+  }
+) => {
+  const [taskInstance] = await db
+  .update(taskInstances)
+  .set({
+      isDeleted: true,
+      deleteAt: new Date(),
+      deleteBy: taskInstanceInput.userId,
+  })
+  .where(eq(taskInstances.id, taskInstanceInput.id))
+  .returning({
+      id: taskInstances.id,
+  });
+
+  if (!taskInstance) {
+      throw new Error("Failed to delete task instance");
+  }
+
+  await db.insert(cardActivities).values({
+    publicId: generateUID(),
+    taskInstanceId: taskInstance.id,
+    type: "archived",
+    createdBy: taskInstanceInput.userId,
+    createdAt: new Date()
+  });
+
+  return taskInstance;
+}
+
+export const deleteAll = async (
+  db: dbClient,
+  taskInstanceInput: {
+      taskMasterId: string,
+      userId: string,
+  }
+) => {
+  const taskInstance = await db
+  .update(taskInstances)
+  .set({
+      isDeleted: true,
+      deleteAt: new Date(),
+      deleteBy: taskInstanceInput.userId,
+  })
+  .where(eq(taskInstances.taskMasterId, taskInstanceInput.taskMasterId));
+
+  if (!taskInstance) {
+      throw new Error("Failed to delete task instance");
+  }
+
+  return taskInstance;
 }

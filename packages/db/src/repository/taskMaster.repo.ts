@@ -1,6 +1,7 @@
 import { eq } from "drizzle-orm";
-import { taskMasters, frequences } from "@kan/db/schema";
+import { taskMasters, frequences, cardActivities } from "@kan/db/schema";
 import type { dbClient } from "@kan/db/client";
+import { generateUID } from "@kan/shared/utils";
 
 import * as frequenceRepo from "./frequence.repo";
 import * as cardActivitesRepo from "./cardActivity.repo";
@@ -53,6 +54,14 @@ export const create = async (
     if (!taskMaster) {
       throw new Error("Failed to create task master");
     }
+
+    await tx.insert(cardActivities).values({
+      publicId: generateUID(),
+      taskMasterId: taskMaster.id,
+      freqId: frequence.id,
+      type: "created",
+      createdBy: taskMasterInput.userId
+    });
 
     return taskMaster;
   });
@@ -164,3 +173,39 @@ export const update = async (
     return taskMaster;
   });
 };
+
+export const softDelete = async (
+    db: dbClient,
+    taskMasterInput: {
+        id: string,
+        userId: string,
+    }
+) => {
+    const [taskMaster] = await db
+    .update(taskMasters)
+    .set({
+        isDeleted: true,
+        deletedAt: new Date(),
+        deletedBy: taskMasterInput.userId,
+    })
+    .where(eq(taskMasters.id, taskMasterInput.id))
+    .returning({
+        id: taskMasters.id,
+        freqId: taskMasters.freqId,
+    });
+
+    if (!taskMaster) {
+        throw new Error("Failed to delete task instance");
+    }
+
+    await db.insert(cardActivities).values({
+      publicId: generateUID(),
+      taskMasterId: taskMaster.id,
+      freqId: taskMaster.freqId,
+      type: "archived",
+      createdBy: taskMasterInput.userId,
+      createdAt: new Date()
+    });
+
+    return taskMaster;
+}

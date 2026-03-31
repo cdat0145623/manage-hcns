@@ -27,7 +27,7 @@ export const workspaceWebhooks = pgTable("workspace_webhooks", {
   publicId: varchar("publicId", { length: 12 }).notNull().unique(),
   workspaceId: bigint("workspaceId", { mode: "number" })
     .notNull()
-    .references(() => workspaces.id, { onDelete: "cascade" }),
+    .references(() => workspaces.id, { onDelete: "restrict" }),
   name: varchar("name", { length: 255 }).notNull(),
   url: varchar("url", { length: 2048 }).notNull(),
   secret: text("secret"),
@@ -35,7 +35,7 @@ export const workspaceWebhooks = pgTable("workspace_webhooks", {
   active: boolean("active").notNull().default(true),
   createdBy: uuid("createdBy")
     .notNull()
-    .references(() => users.id, { onDelete: "cascade" }),
+    .references(() => users.id, { onDelete: "restrict" }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt"),
 }, (table) => [

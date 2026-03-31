@@ -1,4 +1,5 @@
-import { RRule, Weekday } from 'rrule';
+import pkg from 'rrule';
+const { RRule } = pkg;
 
 type FreqType = 'dayOfWeek' | 'monthlyDate' | 'monthlyDayRank';
 

@@ -21,7 +21,7 @@ export const session = pgTable("session", {
   userAgent: text("userAgent"),
   userId: uuid("userId")
     .notNull()
-    .references(() => users.id, { onDelete: "cascade" }),
+    .references(() => users.id, { onDelete: "restrict" }),
 }).enableRLS();
 
 export const apikey = pgTable("apiKey", {
@@ -32,7 +32,7 @@ export const apikey = pgTable("apiKey", {
   key: text("key").notNull(),
   userId: uuid("userId")
     .notNull()
-    .references(() => users.id, { onDelete: "cascade" }),
+    .references(() => users.id, { onDelete: "restrict" }),
   refillInterval: integer("refillInterval"),
   refillAmount: integer("refillAmount"),
   lastRefillAt: timestamp("lastRefillAt"),

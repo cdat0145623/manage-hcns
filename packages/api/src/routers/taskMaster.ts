@@ -47,5 +47,47 @@ export const taskMasterRouter = createTRPCRouter({
         selectedUserId,
         rruleString: rruleString ?? "",
       });
+<<<<<<< HEAD
     }),
 });
+=======
+  }),
+  update: protectedProcedure
+  .meta({
+    openapi: {
+        summary: "Update a task master",
+        method: "PUT",
+        path: "/task-master",
+        description: "Update a task master",
+        tags: ["taskMaster"],
+        protect: true,
+    }
+  })
+  .input(
+    z.object({
+      id: z.string(),
+      name: z.string(),
+      description: z.string(),
+      startDate: z.date(),
+      endDate: z.date(),
+      selectedUserId: z.string(),
+      rruleString: z.string(),
+      userId: z.string(),
+    })
+  )
+  .mutation(async ({ctx, input}) => {
+    const {id, name, description, startDate, endDate, selectedUserId, rruleString, userId} = input;
+
+    return taskMasterRepo.update(ctx.db, {
+        id,
+        name,
+        description,
+        startDate,
+        endDate,
+        selectedUserId,
+        rruleString,
+        userId,
+      });
+  })
+})
+>>>>>>> a77a786762bff73596f8050616a964aafd435c07

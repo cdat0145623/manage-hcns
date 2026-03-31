@@ -82,7 +82,7 @@ export const workspaceMembers = pgTable("workspace_members", {
   userId: uuid("userId").references(() => users.id, { onDelete: "set null" }),
   workspaceId: bigint("workspaceId", { mode: "number" })
     .notNull()
-    .references(() => workspaces.id, { onDelete: "cascade" }),
+    .references(() => workspaces.id, { onDelete: "restrict" }),
   createdBy: uuid("createdBy").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt"),

@@ -20,7 +20,7 @@ export const workspaceRoles = pgTable(
     publicId: varchar("publicId", { length: 12 }).notNull().unique(),
     workspaceId: bigint("workspaceId", { mode: "number" })
       .notNull()
-      .references(() => workspaces.id, { onDelete: "cascade" }),
+      .references(() => workspaces.id, { onDelete: "restrict" }),
     name: varchar("name", { length: 64 }).notNull(),
     description: varchar("description", { length: 255 }),
     hierarchyLevel: integer("hierarchyLevel").notNull(),
@@ -53,7 +53,7 @@ export const workspaceRolePermissions = pgTable(
     id: bigserial("id", { mode: "number" }).primaryKey(),
     workspaceRoleId: bigint("workspaceRoleId", { mode: "number" })
       .notNull()
-      .references(() => workspaceRoles.id, { onDelete: "cascade" }),
+      .references(() => workspaceRoles.id, { onDelete: "restrict" }),
     permission: varchar("permission", { length: 64 }).notNull(),
     granted: boolean("granted").notNull().default(true),
     createdAt: timestamp("createdAt").defaultNow().notNull(),

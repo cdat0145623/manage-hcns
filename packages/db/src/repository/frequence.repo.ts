@@ -1,3 +1,4 @@
+import { eq } from "drizzle-orm";
 import { frequences } from "@kan/db/schema";
 import type { dbClient } from "@kan/db/client";
 
@@ -36,6 +37,37 @@ export const create = async (
 
   if (!frequence) {
     throw new Error("Failed to create frequence");
+  }
+
+  return frequence;
+}
+
+export const update = async (
+    db: dbClient,
+    frequenceInput: {
+        id: string,
+        name?: string,
+        rrule?: string,
+        dtStart?: Date,
+    }
+) => {
+  const [frequence] = await db
+    .update(frequences)
+    .set({
+      name: frequenceInput.name,
+      rruleString: frequenceInput.rrule,
+      dtStart: frequenceInput.dtStart,
+    })
+    .where(eq(frequences.id, frequenceInput.id))
+    .returning({
+      id: frequences.id,
+      name: frequences.name,
+      rrule: frequences.rruleString,
+      dtStart: frequences.dtStart,
+    });
+
+  if (!frequence) {
+    throw new Error("Failed to update frequence");
   }
 
   return frequence;

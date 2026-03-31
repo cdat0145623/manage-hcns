@@ -56,6 +56,7 @@ export const update = async (
       name: frequenceInput.name,
       rruleString: frequenceInput.rrule,
       dtStart: frequenceInput.dtStart,
+      updateAt: new Date(),
     })
     .where(eq(frequences.id, frequenceInput.id))
     .returning({

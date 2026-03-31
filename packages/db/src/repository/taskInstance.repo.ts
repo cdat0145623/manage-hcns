@@ -97,8 +97,8 @@ export const update = async (
       id: string,
       userId: string,
       taskMasterId: string,
-      targetDate: Date,
-      actualDate: Date,
+      targetDate?: Date,
+      actualDate?: Date,
       status: TaskStatus,
   }
 ) => {
@@ -114,6 +114,7 @@ export const update = async (
       targetDate: taskInstanceInput.targetDate,
       actualDate: taskInstanceInput.actualDate,
       status: taskInstanceInput.status,
+      updatedAt: new Date(),
   })
   .where(eq(taskInstances.id, taskInstanceInput.id))
   .returning({
@@ -154,6 +155,7 @@ export const deleteSingle = async (
       isDeleted: true,
       deleteAt: new Date(),
       deleteBy: taskInstanceInput.userId,
+      updatedAt: new Date(),
   })
   .where(eq(taskInstances.id, taskInstanceInput.id))
   .returning({
@@ -188,6 +190,7 @@ export const deleteAll = async (
       isDeleted: true,
       deleteAt: new Date(),
       deleteBy: taskInstanceInput.userId,
+      updatedAt: new Date(),
   })
   .where(eq(taskInstances.taskMasterId, taskInstanceInput.taskMasterId));
 

@@ -62,7 +62,16 @@ export const taskMasterRouter = createTRPCRouter({
       to,
     });
 
-    return virtualTaskInstances;
+    const newVirtualTaskInstances = virtualTaskInstances.map((taskInstance) => {
+      return {
+        ...taskInstance,
+        selectedUserId: taskMaster.targetUser,
+        startDate: taskMaster.startDate,
+        endDate: taskMaster.endDate,
+      };
+    });
+
+    return newVirtualTaskInstances;
   }),
   update: protectedProcedure
   .meta({
@@ -78,17 +87,25 @@ export const taskMasterRouter = createTRPCRouter({
   .input(
     z.object({
       id: z.string(),
-      name: z.string(),
-      description: z.string(),
-      startDate: z.date(),
-      endDate: z.date(),
-      selectedUserId: z.string(),
-      rruleString: z.string(),
-      userId: z.string(),
+      name: z.string().optional(),
+      description: z.string().optional(),
+      startDate: z.date().optional(),
+      endDate: z.date().optional(),
+      selectedUserId: z.string().optional(),
+      rruleString: z.string().optional(),
     })
   )
   .mutation(async ({ctx, input}) => {
-    const {id, name, description, startDate, endDate, selectedUserId, rruleString, userId} = input;
+    const userId = ctx.user?.id;
+
+    if (!userId) {
+      throw new TRPCError({
+        message: `User not authenticated`,
+        code: "UNAUTHORIZED",
+      });
+    }
+
+    const {id, name, description, startDate, endDate, selectedUserId, rruleString} = input;
 
     return taskMasterRepo.update(ctx.db, {
         id,

@@ -77,6 +77,15 @@ export const taskInstanceRouter = createTRPCRouter({
 
         // const from = input.from.toLocaleString('en-US', { timeZone: 'Asia/Ho_Chi_Minh' });
         // const to = input.to.toLocaleString('en-US', { timeZone: 'Asia/Ho_Chi_Minh' });
+        const userId = ctx.user?.id;
+
+        if (!userId) {
+            throw new TRPCError({
+                message: `User not authenticated`,
+                code: "UNAUTHORIZED",
+            });
+        }
+        
         const taskMasters = await ctx.db.query.taskMasters.findMany({
             where: (t, { and, lt, gte, eq }) => 
                 and(
@@ -124,7 +133,12 @@ export const taskInstanceRouter = createTRPCRouter({
 
                     const newVirtualTaskInstances = virtualTaskInstances.map((virtualInstance) => {
                         const existing = existingTaskInstanceMap.get(virtualInstance.targetDate!.toISOString());
-                        return existing ?? virtualInstance;
+                        return existing ?? {
+                            ...virtualInstance,
+                            selectedUserId: taskMaster.targetUser,
+                            startDate: taskMaster.startDate,
+                            endDate: taskMaster.endDate,
+                        };
                     });
 
                     return newVirtualTaskInstances;
@@ -150,10 +164,9 @@ export const taskInstanceRouter = createTRPCRouter({
     .input(
         z.object({
             id: z.string(),
-            userId: z.string(),
             taskMasterId: z.string(),
-            targetDate: z.date(),
-            actualDate: z.date(),
+            targetDate: z.date().optional(),
+            actualDate: z.date().optional(),
             status: statusTypeEnumSchema,
         })
     )
@@ -204,7 +217,7 @@ export const taskInstanceRouter = createTRPCRouter({
             taskMasterId,
             targetDate,
             actualDate,
-            status: status || oldTaskInstance.status,
+            status: status,
         });
 
         if (!newTaskInstance) {

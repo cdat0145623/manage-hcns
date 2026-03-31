@@ -110,6 +110,43 @@ export const bulkCreate = async (
   return results;
 };
 
+export const bulkCreateForTaskInstance = async (
+  db: dbClient,
+  activityInputs: {
+    type: ActivityType;
+    taskInstanceId: string;
+    fromIndex?: number;
+    toIndex?: number;
+    fromListId?: number;
+    toListId?: number;
+    labelId?: number;
+    workspaceMemberId?: number;
+    fromTitle?: string;
+    toTitle?: string;
+    fromDescription?: string;
+    toDescription?: string;
+    createdBy: string;
+    fromDueDate?: Date;
+    toDueDate?: Date;
+    sourceBoardId?: number;
+    attachmentId?: number;
+    oldValue?: string;
+    newValue?: string;
+  }[],
+) => {
+  const activitiesWithPublicIds = activityInputs.map((activity) => ({
+    ...activity,
+    publicId: generateUID(),
+  }));
+
+  const results = await db
+    .insert(cardActivities)
+    .values(activitiesWithPublicIds)
+    .returning({ id: cardActivities.id });
+
+  return results;
+};
+
 export const getPaginatedActivities = async (
   db: dbClient,
   cardId: number,

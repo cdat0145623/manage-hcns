@@ -1,7 +1,13 @@
-import {taskInstances, statusTypeEnum} from "@kan/db/schema";
+import {eq} from "drizzle-orm";
+import {
+  taskInstances,
+  statusTypeEnum,
+  cardActivities,
+} from "@kan/db/schema";
 import type { dbClient } from "@kan/db/client";
 import pkg from 'rrule';
 const { RRule } = pkg;
+import { generateUID } from "@kan/shared/utils";
 
 export type TaskStatus = typeof statusTypeEnum.enumValues[number];
 
@@ -15,7 +21,8 @@ export const create = async (
         status: TaskStatus,
     }
 ) => {
-    const [taskInstance] = await db
+  return db.transaction(async (tx) => {
+    const [taskInstance] = await tx
     .insert(taskInstances)
     .values({
         userId: taskInstanceInput.userId,
@@ -37,7 +44,22 @@ export const create = async (
         throw new Error("Failed to create task instance");
     }
 
+    await tx.insert(cardActivities).values({
+      publicId: generateUID(),
+      taskInstanceId: taskInstance.id,
+      type: "created",
+      createdBy: taskInstance.userId,
+    });
+
+    await tx.insert(cardActivities).values({
+      publicId: generateUID(),
+      taskInstanceId: taskInstance.id,
+      type: "member_assigned",
+      createdBy: taskInstance.userId,
+    });
+
     return taskInstance;
+  });
 }
 
 export const generateVirtualTaskInstances = async (params: {
@@ -75,3 +97,40 @@ export const generateVirtualTaskInstances = async (params: {
     }
   });
 };
+
+export const update = async (
+    db: dbClient,
+    taskInstanceInput: {
+        id: string,
+        userId: string,
+        taskMasterId: string,
+        targetDate: Date,
+        actualDate: Date,
+        status: TaskStatus,
+    }
+) => {
+    const [taskInstance] = await db
+    .update(taskInstances)
+    .set({
+        userId: taskInstanceInput.userId,
+        taskMasterId: taskInstanceInput.taskMasterId,
+        targetDate: taskInstanceInput.targetDate,
+        actualDate: taskInstanceInput.actualDate,
+        status: taskInstanceInput.status,
+    })
+    .where(eq(taskInstances.id, taskInstanceInput.id))
+    .returning({
+        id: taskInstances.id,
+        userId: taskInstances.userId,
+        taskMasterId: taskInstances.taskMasterId,
+        targetDate: taskInstances.targetDate,
+        actualDate: taskInstances.actualDate,
+        status: taskInstances.status,
+    });
+
+    if (!taskInstance) {
+        throw new Error("Failed to update task instance");
+    }
+
+    return taskInstance;
+}

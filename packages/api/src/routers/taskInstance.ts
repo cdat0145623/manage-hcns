@@ -1,8 +1,9 @@
 import * as taskInstanceRepo from "@kan/db/repository/taskInstance.repo";
+import * as cardActivityRepo from "@kan/db/repository/cardActivity.repo";
 import {protectedProcedure, createTRPCRouter} from "../trpc";
 import {z} from "zod";
 import {statusTypeEnum} from "@kan/db/schema";
-import { createStripeClient } from "@kan/stripe";
+import { TRPCError } from "@trpc/server";
 
 const statusTypeEnumSchema = z.enum(statusTypeEnum.enumValues);
 
@@ -30,13 +31,22 @@ export const taskInstanceRouter = createTRPCRouter({
     .mutation(async ({ctx, input}) => {
         const {userId, taskMasterId, targetDate, actualDate, status} = input;
 
-        return taskInstanceRepo.create(ctx.db, {
+        const newTaskInstance = await taskInstanceRepo.create(ctx.db, {
             userId,
             taskMasterId,
             targetDate,
             actualDate,
             status,
         });
+
+        if (!newTaskInstance) {
+            throw new TRPCError({
+                message: `Failed to create task instance`,
+                code: "INTERNAL_SERVER_ERROR",
+            });
+        }
+
+        return newTaskInstance;
     }),
     getVirtual: protectedProcedure
     .meta({
@@ -123,4 +133,108 @@ export const taskInstanceRouter = createTRPCRouter({
 
         return results.flat();
     }),
+    update: protectedProcedure
+    .meta({
+        openapi: {
+            summary: "Update a task instance",
+            method: "PUT",
+            path: "/task-instance",
+            description: "Update a task instance",
+            tags: ["taskInstance"],
+            protect: true,
+        }
+    })
+    .input(
+        z.object({
+            id: z.string(),
+            userId: z.string(),
+            taskMasterId: z.string(),
+            targetDate: z.date(),
+            actualDate: z.date(),
+            status: statusTypeEnumSchema,
+        })
+    )
+    .mutation(async ({ctx, input}) => {
+        const userId = ctx.user?.id;
+        
+        if (!userId) {
+            throw new TRPCError({
+                message: `User not authenticated`,
+                code: "UNAUTHORIZED",
+            });
+        }
+
+        const {id, taskMasterId, targetDate, actualDate, status} = input;
+
+        const oldTaskInstance = await ctx.db.query.taskInstances.findFirst({
+            where: (t, { eq }) => eq(t.id, id),
+        });
+
+        if (!oldTaskInstance) {
+            throw new TRPCError({
+                message: `Task instance not found`,
+                code: "NOT_FOUND",
+            });
+        }
+
+        const taskMaster = await ctx.db.query.taskMasters.findFirst({
+            where: (t, { eq }) => eq(t.id, taskMasterId),
+        });
+
+        if (!taskMaster) {
+            throw new TRPCError({
+                message: `Task master not found`,
+                code: "NOT_FOUND",
+            });
+        }
+
+        if (taskMaster.targetUser !== userId || taskMaster.createdBy !== userId) {
+            throw new TRPCError({
+                message: `User not authorized to update this task instance`,
+                code: "UNAUTHORIZED",
+            });
+        }
+
+        const newTaskInstance = await taskInstanceRepo.update(ctx.db, {
+            id,
+            userId,
+            taskMasterId,
+            targetDate,
+            actualDate,
+            status: status || oldTaskInstance.status,
+        });
+
+        if (!newTaskInstance) {
+            throw new TRPCError({
+                message: `Failed to update task instance`,
+                code: "INTERNAL_SERVER_ERROR",
+            });
+        }
+
+        if (oldTaskInstance.status !== newTaskInstance.status) {
+            const cardActivitesInsert = [{
+                type: "status_changed" as const,
+                taskInstanceId: oldTaskInstance.id,
+                createdBy: userId,
+                oldValue: oldTaskInstance.status,
+                newValue: newTaskInstance.status,
+            }];
+
+            await cardActivityRepo.bulkCreateForTaskInstance(ctx.db, cardActivitesInsert);
+        }
+
+        if (oldTaskInstance.targetDate !== newTaskInstance.targetDate) {
+            const cardActivitesInsert = [{
+                type: "deadline_changed" as const,
+                taskInstanceId: oldTaskInstance.id,
+                createdBy: userId,
+                oldValue: oldTaskInstance.targetDate?.toISOString(),
+                newValue: newTaskInstance.targetDate?.toISOString(),
+            }];
+
+            await cardActivityRepo.bulkCreateForTaskInstance(ctx.db, cardActivitesInsert);
+        }
+
+        return newTaskInstance;
+    })
 })

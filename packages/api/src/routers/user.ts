@@ -117,4 +117,30 @@ export const userRouter = createTRPCRouter({
         image: imageUrl,
       };
     }),
+  getAll: protectedProcedure
+    .meta({
+      openapi: {
+        method: "GET",
+        path: "/users",
+        summary: "Get all users without Admin role",
+        description:
+          "Retrieves all users without Admin role",
+        tags: ["Users"],
+        protect: true,
+      },
+    })
+    .input(z.void())
+    .output(
+      z.array(
+        z.object({
+          id: z.string(),
+          email: z.string().nullable(),
+          username: z.string().nullable(),
+          name: z.string().nullable(),
+        }),
+      ),
+    )
+    .query(async ({ ctx }) => {
+      return await userRepo.getAll(ctx.db);
+    }),
 });

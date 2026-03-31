@@ -1,4 +1,4 @@
-import { count, desc, eq } from "drizzle-orm";
+import { count, desc, eq, or } from "drizzle-orm";
 import { v4 as uuidv4 } from "uuid";
 
 import type { dbClient } from "@kan/db/client";
@@ -122,4 +122,20 @@ export const update = async (
     });
 
   return result;
+};
+
+export const getAll = async (db: dbClient) => {
+  return await db.query.users.findMany({
+    columns: {
+      id: true,
+      name: true,
+      email: true,
+      username: true,
+    },
+    where: or(
+      eq(users.role, "NVKD_MANAGER"),
+      eq(users.role, "NVVP"),
+      eq(users.role, "NVKT_MANAGER"),
+    ),
+  });
 };

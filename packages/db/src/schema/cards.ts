@@ -21,6 +21,7 @@ import { lists } from "./lists";
 import { users } from "./users";
 import { workspaceMembers } from "./workspaces";
 import { taskInstances, fileActivityLog, taskMasters, frequence } from "./tasks";
+import { statusTypeEnum } from "./tasks";
 
 export const activityTypes = [
   "created",
@@ -67,6 +68,7 @@ export const cards = pgTable("card", {
   targetUser: uuid("targetUser").references(() => users.id, {
     onDelete: "set null",
   }),
+  status: statusTypeEnum("status").notNull().default("pending"),
   createdBy: uuid("createdBy").references(() => users.id, {
     onDelete: "set null",
   }),

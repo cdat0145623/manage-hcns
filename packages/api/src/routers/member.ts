@@ -52,6 +52,14 @@ export const memberRouter = createTRPCRouter({
           code: "UNAUTHORIZED",
         });
 
+      const existingUser = await userRepo.getByEmail(ctx.db, input.email);
+
+      if (!existingUser)
+        throw new TRPCError({
+          message: `Email not found`,
+          code: "NOT_FOUND",
+        });
+
       const workspace = await workspaceRepo.getByPublicIdWithMembers(
         ctx.db,
         input.workspacePublicId,
@@ -117,8 +125,6 @@ export const memberRouter = createTRPCRouter({
         }
       }
 
-      const existingUser = await userRepo.getByEmail(ctx.db, input.email);
-
       // Get the workspace role to set roleId
       const memberRole = await permissionRepo.getRoleByWorkspaceIdAndName(
         ctx.db,
@@ -133,7 +139,7 @@ export const memberRouter = createTRPCRouter({
         createdBy: userId,
         role: "NVVP",
         roleId: memberRole?.id ?? null,
-        status: "invited",
+        status: "active",
       });
 
       if (!invite)

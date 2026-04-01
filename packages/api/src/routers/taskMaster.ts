@@ -1,35 +1,46 @@
-import { TRPCError } from "@trpc/server";
-import { z } from "zod";
+import {TRPCError} from "@trpc/server";
+import {protectedProcedure, createTRPCRouter} from "../trpc";
+import {generateUID} from "@kan/shared/utils";
+import {z} from "zod";
+import { RRule } from 'rrule';
 
 import * as taskMasterRepo from "@kan/db/repository/taskMaster.repo";
-
-import { createTRPCRouter, protectedProcedure } from "../trpc";
+import * as taskInstanceRepo from "@kan/db/repository/taskInstance.repo";
 
 export const taskMasterRouter = createTRPCRouter({
   create: protectedProcedure
-    .input(
-      z.object({
-        name: z.string(),
-        description: z.string(),
-        startDate: z.coerce.date(),
-        endDate: z.coerce.date(),
-        selectedUserId: z.string(),
-        rruleString: z.string(),
-      }),
-    )
-    .mutation(async ({ ctx, input }) => {
-      const userId = ctx.user?.id;
+  .meta({
+    openapi: {
+        summary: "Create a task master",
+        method: "POST",
+        path: "/task-master",
+        description: "Create a task master",
+        tags: ["taskMaster"],
+        protect: true,
+    }
+  })
+  .input(
+    z.object({
+      name: z.string(),
+      description: z.string(),
+      startDate: z.coerce.date(),
+      endDate: z.coerce.date(),
+      selectedUserId: z.string(),
+      rruleString: z.string(),
+      from: z.coerce.date(),
+      to: z.coerce.date(),
+    })
+  )
+  .mutation(async ({ctx, input}) => {
+    const userId = ctx.user?.id;
 
-      if (!userId) {
-        throw new TRPCError({
-          message: "User not authenticated",
-          code: "UNAUTHORIZED",
-        });
-      }
+    if (!userId) {
+      throw new TRPCError({
+        message: `User not authenticated`,
+        code: "UNAUTHORIZED",
+      });
+    }
 
-<<<<<<< HEAD
-      return taskMasterRepo.create(ctx.db, {
-=======
     const {name, description, startDate, endDate, selectedUserId, rruleString, from, to } = input;
 
     const taskMaster = await taskMasterRepo.create(ctx.db, {
@@ -104,31 +115,7 @@ export const taskMasterRouter = createTRPCRouter({
         endDate,
         selectedUserId,
         rruleString,
->>>>>>> e77a7e028a51ce657f32e2ef28e353b7899ff620
         userId,
-        name: input.name,
-        description: input.description,
-        startDate: input.startDate,
-        endDate: input.endDate,
-        selectedUserId: input.selectedUserId,
-        rruleString: input.rruleString,
       });
-    }),
-
-  update: protectedProcedure
-    .input(
-      z.object({
-        id: z.string(),
-        name: z.string(),
-        description: z.string(),
-        startDate: z.date(),
-        endDate: z.date(),
-        selectedUserId: z.string(),
-        rruleString: z.string(),
-        userId: z.string(),
-      }),
-    )
-    .mutation(async ({ ctx, input }) => {
-      return taskMasterRepo.update(ctx.db, input);
-    }),
-});
+  })
+})

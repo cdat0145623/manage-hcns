@@ -65,7 +65,7 @@ export function NewWorkspaceForm() {
   });
   const utils = api.useUtils();
 
-  const hasAvailableWorkspaces = availableWorkspaces.length > 0;
+  const hasAvailableWorkspaces = availableWorkspaces.length >= 0;
 
   const isCloudEnv = env("NEXT_PUBLIC_KAN_ENV") === "cloud";
 

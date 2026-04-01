@@ -1,14 +1,12 @@
 import {
   addMonths,
-  eachDayOfInterval,
   endOfMonth,
-  format,
-  isSameDay,
   startOfMonth,
 } from "date-fns";
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
+import { api } from "~/utils/api";
 
-export type RecurrenceType = "DAILY" | "WEEKLY" | "MONTHLY";
+export type RecurrenceType = "DAILY" | "WEEKLY" | "MONTHLY" | "MONTHLY_DATE" | "MONTHLY_DAY" | "NONE" | "UNSELECTED";
 
 export interface TaskMaster {
   id: string;
@@ -31,97 +29,75 @@ export interface TaskInstance {
 export interface CalendarEntry {
   id: string;
   masterId: string;
+  instanceId?: string;
   title: string;
   date: Date;
+  status?: "pending" | "done" | "missed";
   type: "VIRTUAL" | "INSTANCE";
   color: string;
   duration: number;
 }
 
-const MOCK_MASTERS: TaskMaster[] = [];
-
 export function useRecurrence(currentDate: Date) {
-  const [instances, setInstances] = useState<TaskInstance[]>([]);
+  const monthStart = startOfMonth(currentDate);
+  const monthEnd = endOfMonth(addMonths(currentDate, 1)); // Buffer
+
+  // Lấy dữ liệu thực tế từ backend
+  const { data: virtualTasks } = api.taskInstance.getVirtual.useQuery({
+    from: monthStart,
+    to: monthEnd,
+  });
+
+  const utils = api.useUtils();
+  const updateTask = api.taskInstance.update.useMutation({
+    onSuccess: () => {
+      void utils.taskInstance.getVirtual.invalidate();
+    }
+  });
 
   const calendarEntries = useMemo(() => {
-    const monthStart = startOfMonth(currentDate);
-    const monthEnd = endOfMonth(addMonths(currentDate, 1)); // Buffer
-    const days = eachDayOfInterval({ start: monthStart, end: monthEnd });
+    if (!virtualTasks) return [];
 
-    const entries: CalendarEntry[] = [];
+    return virtualTasks.map((task: any) => {
+      const isVirtual = task.id?.startsWith("virtual_");
+      
+      // Chuyển status về chữ thường để tránh lỗi khi hiển thị màu giao diện (bắt buộc phải là "pending" | "done" | "missed")
+      let currentStatus = typeof task.status === "string" ? task.status.toLowerCase() : "pending";
+      if (!["pending", "done", "missed"].includes(currentStatus)) {
+        currentStatus = "pending";
+      }
 
-    days.forEach((day) => {
-      MOCK_MASTERS.forEach((master) => {
-        let shouldShow = false;
-
-        if (master.recurrence === "DAILY") {
-          shouldShow = true;
-        } else if (master.recurrence === "WEEKLY") {
-          shouldShow = day.getDay() === 1;
-        } else {
-          shouldShow = day.getDate() === 1;
-        }
-
-        if (shouldShow) {
-          const entryDate = new Date(day);
-          if (master.title === "Daily Standup") entryDate.setHours(9, 0, 0, 0);
-          else if (master.title === "Weekly Review")
-            entryDate.setHours(14, 0, 0, 0);
-          else if (master.title === "Monthly Planning")
-            entryDate.setHours(10, 0, 0, 0);
-
-          const instance = instances.find(
-            (inst) =>
-              inst.masterId === master.id &&
-              isSameDay(new Date(inst.date), day),
-          );
-
-          if (instance) {
-            entries.push({
-              id: instance.id,
-              masterId: master.id,
-              title: master.title,
-              date: entryDate,
-              type: "INSTANCE",
-              color: master.color,
-              duration: master.duration ?? 60,
-            });
-          } else {
-            entries.push({
-              id: `v_${master.id}_${format(day, "yyyy-MM-dd")}`,
-              masterId: master.id,
-              title: master.title,
-              date: entryDate,
-              type: "VIRTUAL",
-              color: master.color,
-              duration: master.duration ?? 60,
-            });
-          }
-        }
-      });
+      return {
+        id: task.id,
+        masterId: task.taskMasterId || task.masterId,
+        instanceId: isVirtual ? undefined : task.id,
+        // Dùng tạm fallback text "Công việc chưa có tên" nếu backend chưa return name
+        title: task.name || task.taskMaster?.name || task.title || "Công việc (Chưa có tên)", 
+        date: new Date(task.targetDate || task.date),
+        status: currentStatus,
+        type: isVirtual ? "VIRTUAL" : "INSTANCE",
+        color: task.color ?? "bg-blue-500",
+        duration: task.duration ?? 60,
+      } as CalendarEntry;
     });
-
-    return entries;
-  }, [currentDate, instances]);
+  }, [virtualTasks]);
 
   const createInstance = (masterId: string, date: Date) => {
-    const newInstance: TaskInstance = {
-      id: `inst_${Math.random().toString(36).substr(2, 9)}`,
-      publicId: `ti_${Math.random().toString(36).substr(2, 9)}`,
-      masterId,
-      date,
-      status: "PENDING",
-    };
-    setInstances((prev) => [...prev, newInstance]);
+    // Không dùng array local nữa vì UI sẽ tự động update qua API Invalidate
   };
 
   const moveTask = (instanceId: string, newDate: Date) => {
-    setInstances((prev) =>
-      prev.map((inst) =>
-        inst.id === instanceId ? { ...inst, date: newDate } : inst,
-      ),
-    );
+    const entry = calendarEntries.find((e: CalendarEntry) => e.id === instanceId);
+    if (!entry) return;
+
+    // Gửi yêu cầu đổi ngày (kéo thả) xuống DB
+    updateTask.mutate({
+      id: instanceId,
+      taskMasterId: entry.masterId,
+      targetDate: newDate,
+      status: "pending",
+    });
   };
 
-  return { calendarEntries, createInstance, moveTask, masters: MOCK_MASTERS };
+  return { calendarEntries, createInstance, moveTask, masters: [] };
 }

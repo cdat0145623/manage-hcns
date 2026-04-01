@@ -1,116 +1,44 @@
+import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 
 import * as taskMasterRepo from "@kan/db/repository/taskMaster.repo";
-import * as taskInstanceRepo from "@kan/db/repository/taskInstance.repo";
 
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 export const taskMasterRouter = createTRPCRouter({
   create: protectedProcedure
-    .meta({
-      openapi: {
-        summary: "Create a task master",
-        method: "POST",
-        path: "/task-master",
-        description: "Create a task master",
-        tags: ["taskMaster"],
-        protect: true,
-<<<<<<< HEAD
-      },
-    })
     .input(
       z.object({
         name: z.string(),
         description: z.string(),
-        startDate: z.date(),
-        endDate: z.date(),
+        startDate: z.coerce.date(),
+        endDate: z.coerce.date(),
         selectedUserId: z.string(),
-        rruleString: z.string().optional().nullable(),
-        createdBy: z.string(),
+        rruleString: z.string(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      const {
-        name,
-        description,
-        startDate,
-        endDate,
-        selectedUserId,
-        rruleString,
-        createdBy,
-      } = input;
+      const userId = ctx.user?.id;
+
+      if (!userId) {
+        throw new TRPCError({
+          message: "User not authenticated",
+          code: "UNAUTHORIZED",
+        });
+      }
 
       return taskMasterRepo.create(ctx.db, {
-        userId: createdBy,
-        name,
-        description,
-        startDate,
-        endDate,
-        selectedUserId,
-        rruleString: rruleString ?? "",
+        userId,
+        name: input.name,
+        description: input.description,
+        startDate: input.startDate,
+        endDate: input.endDate,
+        selectedUserId: input.selectedUserId,
+        rruleString: input.rruleString,
       });
     }),
 
-=======
-    }
-  })
-  .input(
-    z.object({
-      name: z.string(),
-      description: z.string(),
-      startDate: z.coerce.date(),
-      endDate: z.coerce.date(),
-      selectedUserId: z.string(),
-      rruleString: z.string(),
-      from: z.coerce.date(),
-      to: z.coerce.date(),
-    })
-  )
-  .mutation(async ({ctx, input}) => {
-    const userId = ctx.user?.id;
-
-    if (!userId) {
-      throw new TRPCError({
-        message: `User not authenticated`,
-        code: "UNAUTHORIZED",
-      });
-    }
-
-    const {name, description, startDate, endDate, selectedUserId, rruleString, from, to } = input;
-
-    const taskMaster = await taskMasterRepo.create(ctx.db, {
-      userId: userId,
-      name,
-      description,
-      startDate,
-      endDate,
-      selectedUserId,
-      rruleString,
-    });
-
-    const virtualTaskInstances = await taskInstanceRepo.generateVirtualTaskInstances({
-      userId: userId,
-      taskMasterId: taskMaster.id,
-      rruleString,
-      startDate,
-      from,
-      to,
-    });
-
-    return virtualTaskInstances;
-  }),
->>>>>>> d8e9006efb240249ed3a3c7347bdc94eaf1c91bf
   update: protectedProcedure
-    .meta({
-      openapi: {
-        summary: "Update a task master",
-        method: "PUT",
-        path: "/task-master",
-        description: "Update a task master",
-        tags: ["taskMaster"],
-        protect: true,
-      },
-    })
     .input(
       z.object({
         id: z.string(),
@@ -124,26 +52,6 @@ export const taskMasterRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      const {
-        id,
-        name,
-        description,
-        startDate,
-        endDate,
-        selectedUserId,
-        rruleString,
-        userId,
-      } = input;
-
-      return taskMasterRepo.update(ctx.db, {
-        id,
-        name,
-        description,
-        startDate,
-        endDate,
-        selectedUserId,
-        rruleString,
-        userId,
-      });
+      return taskMasterRepo.update(ctx.db, input);
     }),
 });

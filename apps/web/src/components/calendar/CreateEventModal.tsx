@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unnecessary-condition */
 import { format, getDate, getDay } from "date-fns";
 import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -7,6 +6,7 @@ import { authClient } from "@kan/auth/client";
 import { generateRRuleString } from "@kan/shared/utils";
 
 import { api } from "~/utils/api";
+import { usePopup } from "~/providers/popup";
 import Modal from "../modal";
 
 export type RecurrenceType =
@@ -26,6 +26,10 @@ export interface Attendee {
 
 export interface EditableEntry {
   id: string;
+  masterId?: string;
+  instanceId?: string | null;
+  type?: "VIRTUAL" | "INSTANCE";
+  status?: "pending" | "done" | "missed";
   title: string;
   description?: string;
   date: Date | string;
@@ -53,6 +57,7 @@ interface CreateEventModalProps {
   onClose: () => void;
   onSave: (event: CreateEventInput) => void;
   onUpdate?: (id: string, event: CreateEventInput) => void;
+  onSuccess?: () => void;
   selectedDate: Date;
   editEntry?: EditableEntry | null;
 }
@@ -132,23 +137,62 @@ export function CreateEventModal({
   onClose,
   onSave,
   onUpdate,
+  onSuccess: onSuccessProp,
   selectedDate,
   editEntry,
 }: CreateEventModalProps) {
   const isEditMode = !!editEntry;
   const { data: session } = authClient.useSession();
 
-  // const utils = api.useUtils();
-  // const createTask = api.taskMaster.create.useMutation({
-  //   onSuccess: () => {
-  //     // Refresh the queries
-  //     void utils.taskMaster.invalidate();
-  //     onClose();
-  //   },
-  //   onError: (err: { message?: string }) => {
-  //     alert(`Failed to save event: ${err.message ?? "Unknown error"}`);
-  //   },
-  // });
+  const utils = api.useUtils();
+  const { showPopup } = usePopup();
+
+  const createTask = api.taskMaster.create.useMutation({
+    onSuccess: () => {
+      void utils.taskInstance.getVirtual.invalidate();
+      onSuccessProp?.();
+      onClose();
+    },
+    onError: (error: any) => {
+      console.error("Create failed:", error);
+      const isDuplicate = 
+        error.message?.toLowerCase().includes("unique constraint") || 
+        error.message?.toLowerCase().includes("duplicate") ||
+        JSON.stringify(error).toLowerCase().includes("unique constraint");
+
+      if (isDuplicate) {
+        showPopup({
+          header: "Lỗi xung đột",
+          message: "Dữ liệu này đã được thay đổi trước đó. Lịch sẽ tự động làm mới.",
+          icon: "info",
+        });
+      } else {
+        showPopup({
+          header: "Lỗi",
+          message: error.message || "Không thể tạo công việc mới.",
+          icon: "error",
+        });
+      }
+      void utils.taskInstance.getVirtual.invalidate();
+    },
+  });
+
+  const updateTask = api.taskMaster.update.useMutation({
+    onSuccess: () => {
+      void utils.taskInstance.getVirtual.invalidate();
+      onSuccessProp?.();
+      onClose();
+    },
+    onError: (error: any) => {
+      console.error("Update failed:", error);
+      showPopup({
+        header: "Lỗi",
+        message: error.message || "Không thể cập nhật công việc.",
+        icon: "error",
+      });
+      void utils.taskInstance.getVirtual.invalidate();
+    },
+  });
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -359,6 +403,7 @@ export function CreateEventModal({
       recurrence,
       attendees,
     };
+
     if (isEditMode && onUpdate && editEntry) {
       onUpdate(editEntry.id, payload);
     } else {
@@ -367,7 +412,14 @@ export function CreateEventModal({
 
     // Connect to Backend API
     let rruleString = "";
+    let finalEndDate = endDT;
+
     if (recurrence !== "NONE") {
+      // 100% Frontend Workaround: Extend endDate to 1 year for recurring tasks
+      // so the backend generates future virtual instances.
+      finalEndDate = new Date(startDT);
+      finalEndDate.setFullYear(finalEndDate.getFullYear() + 1);
+
       try {
         rruleString = generateRRuleString({
           type:
@@ -376,10 +428,16 @@ export function CreateEventModal({
               : recurrence === "MONTHLY_DATE"
                 ? "monthlyDate"
                 : "monthlyDayRank",
-          days: recurrence === "WEEKLY" ? [startDT.getDay()] : undefined,
+          days:
+            recurrence === "WEEKLY"
+              ? [(startDT.getDay() + 6) % 7]
+              : undefined,
           dates:
             recurrence === "MONTHLY_DATE" ? [startDT.getDate()] : undefined,
-          rankDay: recurrence === "MONTHLY_DAY" ? startDT.getDay() : undefined,
+          rankDay:
+            recurrence === "MONTHLY_DAY"
+              ? (startDT.getDay() + 6) % 7
+              : undefined,
           rank:
             recurrence === "MONTHLY_DAY"
               ? Math.ceil(startDT.getDate() / 7)
@@ -398,16 +456,29 @@ export function CreateEventModal({
       return;
     }
 
-    createTask.mutate({
-      name: title,
-      description,
-      startDate: startDT,
-      endDate: endDT,
-      selectedUserId: attendees.length > 0 ? attendees[0]?.id! : currentUserId,
-      rruleString,
-      createdBy: currentUserId,
-    });
+    if (isEditMode && editEntry) {
+      updateTask.mutate({
+        id: editEntry.id,
+        name: title,
+        description,
+        startDate: startDT,
+        endDate: finalEndDate,
+        selectedUserId: attendees.length > 0 ? attendees[0]?.id! : currentUserId,
+        rruleString,
+        userId: currentUserId,
+      });
+    } else {
+      createTask.mutate({
+        name: title,
+        description,
+        startDate: startDT,
+        endDate: finalEndDate,
+        selectedUserId: attendees.length > 0 ? attendees[0]?.id! : currentUserId,
+        rruleString,
+      });
+    }
   };
+
   return (
     <Modal isVisible={isVisible} centered modalSize={showEndDate ? "lg" : "md"}>
       <motion.div

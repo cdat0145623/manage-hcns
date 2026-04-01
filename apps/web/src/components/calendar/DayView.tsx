@@ -1,10 +1,12 @@
 import { addHours, format, isSameDay, isToday, startOfDay } from "date-fns";
-import { motion } from "framer-motion";
-import { useEffect, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
+import { useEffect, useMemo, useState } from "react";
 
 import type { CalendarEntry } from "~/hooks/useRecurrence";
 import { StrictModeDroppable as Droppable } from "~/components/StrictModeDroppable";
+import { calculateOverlap } from "~/utils/calendar";
 import { CalendarTask } from "./CalendarTask";
+import { DayTasksPopover } from "./DayTasksPopover";
 
 interface DayViewProps {
   currentDate: Date;
@@ -13,6 +15,7 @@ interface DayViewProps {
   onCellClick: (date: Date) => void;
 }
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
+
 export function DayView({
   currentDate,
   entries,
@@ -20,8 +23,15 @@ export function DayView({
   onCellClick,
 }: DayViewProps) {
   const isDayToday = isToday(currentDate);
-  const dayEntries = entries.filter((entry) =>
-    isSameDay(new Date(entry.date), currentDate),
+  const [popoverDay, setPopoverDay] = useState<Date | null>(null);
+  const dayEntries = useMemo(
+    () =>
+      entries.filter((entry) => isSameDay(new Date(entry.date), currentDate)),
+    [entries, currentDate],
+  );
+  const overlapInfoMap = useMemo(
+    () => calculateOverlap(dayEntries),
+    [dayEntries],
   );
   const droppableId = `droppable-${format(currentDate, "yyyy-MM-dd")}`;
 
@@ -38,56 +48,51 @@ export function DayView({
     clickedDate.setHours(hour, 0, 0, 0);
     onCellClick(clickedDate);
   };
-
   return (
     <div className="flex h-full flex-col overflow-hidden">
       <div className="flex border-b border-light-200 bg-light-100/50 transition-all dark:border-dark-300 dark:bg-dark-200/50">
         <div className="w-20 flex-shrink-0 border-r border-light-200 dark:border-dark-300" />
-        <div className="flex flex-col items-start gap-3 p-6">
-          <div className="flex items-center gap-4">
-            <span className="text-primary-500 text-xs font-black uppercase tracking-[0.2em]">
+        <div className="flex flex-col items-start gap-1 p-6">
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-black uppercase tracking-[0.2em] text-neutral-400">
               {format(currentDate, "EEEE")}
             </span>
-            {isDayToday && (
-              <motion.div
-                layoutId="today-pill"
-                initial={{ opacity: 0, scale: 0.9, x: -10 }}
-                animate={{
-                  opacity: 1,
-                  scale: 1,
-                  x: 0,
-                  boxShadow: [
-                    "0 0 0px rgba(59,130,246,0)",
-                    "0 0 20px rgba(59,130,246,0.4)",
-                    "0 0 0px rgba(59,130,246,0)",
-                  ],
-                }}
-                transition={{
-                  duration: 0.3,
-                  boxShadow: {
-                    repeat: Infinity,
-                    duration: 4,
-                    ease: "easeInOut",
-                  },
-                }}
-                className="border-primary-200 bg-primary-100/50 dark:border-primary-800 dark:bg-primary-900/30 flex items-center gap-2 rounded-full border px-4 py-1.5 shadow-sm backdrop-blur-sm"
-              >
-                <div className="bg-primary-500 h-2 w-2 animate-pulse rounded-full shadow-[0_0_8px_rgba(59,130,246,0.8)]" />
-                <span className="text-primary-600 dark:text-primary-400 text-[10px] font-black uppercase tracking-widest">
-                  Today
-                </span>
-              </motion.div>
-            )}
           </div>
-          <h1
-            className={`text-5xl font-black tracking-tighter transition-all ${
-              isDayToday
-                ? "from-primary-600 to-primary-400 dark:from-primary-400 dark:to-primary-600 bg-gradient-to-r bg-clip-text text-transparent"
-                : "text-neutral-900 dark:text-white"
-            }`}
-          >
-            {format(currentDate, "MMMM d, yyyy")}
-          </h1>
+          <div className="mt-2 flex items-center gap-4">
+            <div
+              className={`flex h-14 w-14 items-center justify-center rounded-2xl text-3xl font-black transition-all ${
+                isDayToday
+                  ? "bg-blue-600 text-white shadow-lg shadow-blue-500/30"
+                  : "border border-neutral-100 bg-white text-neutral-900 shadow-sm hover:bg-neutral-50 dark:border-neutral-800 dark:bg-neutral-900 dark:text-white"
+              }`}
+            >
+              {format(currentDate, "d")}
+            </div>
+            <div className="flex flex-col">
+              <span className="text-lg font-black text-neutral-900 dark:text-white">
+                {format(currentDate, "MMMM")}
+              </span>
+              <span className="text-sm font-bold text-neutral-400">
+                {format(currentDate, "yyyy")}
+              </span>
+              {dayEntries.length > 0 && (
+                <motion.button
+                  initial={{ opacity: 0, x: -10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => setPopoverDay(currentDate)}
+                  className="mt-3 flex w-fit items-center gap-2 rounded-xl bg-blue-50 px-3 py-1.5 text-[10px] font-black uppercase tracking-wider text-blue-600 ring-1 ring-blue-500/20 transition-all hover:bg-blue-100 dark:bg-blue-900/30 dark:text-blue-400"
+                >
+                   <span className="relative flex h-2 w-2">
+                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-blue-400 opacity-75"></span>
+                    <span className="relative inline-flex h-2 w-2 rounded-full bg-blue-500"></span>
+                  </span>
+                  View All {dayEntries.length} Tasks
+                </motion.button>
+              )}
+            </div>
+          </div>
         </div>
       </div>
 
@@ -97,10 +102,10 @@ export function DayView({
             {HOURS.map((hour) => (
               <div
                 key={hour}
-                className="relative h-24 border-b border-light-100 dark:border-dark-200"
+                className="relative h-24 border-b border-neutral-100/30 dark:border-white/5"
               >
-                <span className="absolute -top-3 left-0 w-full pr-3 text-right text-xs font-bold uppercase tracking-tighter text-neutral-400 dark:text-neutral-600">
-                  {format(addHours(startOfDay(new Date()), hour), "HH:00")}
+                <span className="absolute -top-3 left-0 w-full pr-4 text-right text-[10px] font-black uppercase tracking-tighter text-neutral-300 dark:text-neutral-600">
+                  {format(addHours(startOfDay(new Date()), hour), "h a")}
                 </span>
               </div>
             ))}
@@ -114,26 +119,26 @@ export function DayView({
               {HOURS.map((hour) => (
                 <div
                   key={hour}
-                  className="h-24 border-b border-light-100/50 dark:border-dark-200/50"
+                  className="h-24 border-b border-neutral-100/30 dark:border-white/5"
                 />
               ))}
             </div>
 
             {isDayToday && (
-              <motion.div
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
+              <div
                 className="pointer-events-none absolute left-0 right-0 z-30 flex items-center"
                 style={{ top: `${nowTop}px` }}
-                transition={{ type: "spring", stiffness: 100, damping: 20 }}
               >
-                <motion.div
-                  animate={{ scale: [1, 1.2, 1] }}
-                  transition={{ repeat: Infinity, duration: 2 }}
-                  className="h-3 w-3 rounded-full bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.5)]"
-                />
-                <div className="h-0.5 flex-1 bg-red-500 shadow-[0_1px_2px_rgba(239,68,68,0.3)]" />
-              </motion.div>
+                <div className="relative flex items-center">
+                  <div className="absolute -left-[54px] z-40 rounded-full bg-rose-500/10 px-1.5 py-0.5 ring-1 ring-rose-500/20 backdrop-blur-sm">
+                    <span className="text-[9px] font-black uppercase tracking-tighter text-rose-600 dark:text-rose-400">
+                      Now
+                    </span>
+                  </div>
+                  <div className="h-2.5 w-2.5 rounded-full bg-rose-500 shadow-[0_0_10px_rgba(244,63,94,0.6)] ring-4 ring-rose-500/20" />
+                </div>
+                <div className="h-[2px] flex-1 bg-gradient-to-r from-rose-500 via-rose-500/40 to-transparent opacity-80" />
+              </div>
             )}
 
             <Droppable droppableId={droppableId} type="TASK">
@@ -157,16 +162,63 @@ export function DayView({
                     ))}
                   </div>
 
-                  {dayEntries.map((entry, index) => (
-                    <CalendarTask
-                      key={entry.id}
-                      entry={entry}
-                      onClick={onTaskClick}
-                      variant="DETAILED"
-                      isPositioned={true}
-                      index={index}
-                    />
-                  ))}
+                  {(() => {
+                    const renderedEntries = dayEntries.filter(e => (overlapInfoMap.get(e.id)?.overlapIndex ?? 0) < 2);
+                    const hiddenEntries = dayEntries.filter(e => (overlapInfoMap.get(e.id)?.overlapIndex ?? 0) >= 2);
+                    const hiddenCount = hiddenEntries.length;
+                    
+                    // Calculate Y position for badge: position at the top of the first hidden task
+                    const firstHidden = hiddenEntries[0];
+                    const hourHeight = 96;
+                    const badgeTop = firstHidden
+                      ? (() => {
+                          const d = new Date(firstHidden.date);
+                          return d.getHours() * hourHeight + (d.getMinutes() * hourHeight) / 60;
+                        })()
+                      : 8;
+                    
+                    return (
+                      <>
+                        {renderedEntries.map((entry, index) => {
+                          const overlapInfo = overlapInfoMap.get(entry.id);
+                          return (
+                            <CalendarTask
+                              key={entry.id}
+                              entry={entry}
+                              onClick={onTaskClick}
+                              variant="DETAILED"
+                              isPositioned={true}
+                              totalOverlap={Math.min(overlapInfo?.totalOverlap ?? 1, 2)}
+                              overlapIndex={overlapInfo?.overlapIndex}
+                              index={index}
+                            />
+                          );
+                        })}
+                        {hiddenCount > 0 && (
+                          <motion.button
+                            initial={{ opacity: 0, scale: 0.9 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            whileHover={{ scale: 1.05 }}
+                            whileTap={{ scale: 0.95 }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setPopoverDay(currentDate);
+                            }}
+                            style={{ top: `${badgeTop + 4}px`, right: "12px" }}
+                            className="absolute z-[250] flex h-8 w-fit items-center gap-2 rounded-full border border-blue-200 bg-white/95 px-3 py-1.5 shadow-xl backdrop-blur-md transition-all hover:bg-blue-50 dark:border-white/10 dark:bg-neutral-800/95"
+                          >
+                            <span className="relative flex h-2 w-2">
+                              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-blue-400 opacity-75"></span>
+                              <span className="relative inline-flex h-2 w-2 rounded-full bg-blue-500"></span>
+                            </span>
+                            <span className="text-[10px] font-bold text-blue-600 dark:text-blue-400">
+                              +{hiddenCount} more
+                            </span>
+                          </motion.button>
+                        )}
+                      </>
+                    );
+                  })()}
                   {provided.placeholder}
                 </div>
               )}
@@ -174,6 +226,16 @@ export function DayView({
           </div>
         </div>
       </div>
+      <AnimatePresence>
+        {popoverDay && (
+          <DayTasksPopover
+            day={popoverDay}
+            entries={dayEntries}
+            onClose={() => setPopoverDay(null)}
+            onTaskClick={onTaskClick}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }

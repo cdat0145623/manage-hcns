@@ -1,7 +1,12 @@
+/* eslint-disable @typescript-eslint/no-unnecessary-condition */
+/* eslint-disable @typescript-eslint/prefer-nullish-coalescing */
+/* eslint-disable @typescript-eslint/no-unsafe-member-access */
+/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
 import type { DropResult } from "react-beautiful-dnd";
 import { t } from "@lingui/macro";
-import { motion } from "framer-motion";
-import { useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
+import { useEffect, useRef, useState } from "react";
 import { DragDropContext } from "react-beautiful-dnd";
 
 import type { ViewMode } from "./CalendarHeader";
@@ -9,11 +14,13 @@ import type { CreateEventInput, EditableEntry } from "./CreateEventModal";
 import type { CalendarEntry } from "~/hooks/useRecurrence";
 import { useRecurrence } from "~/hooks/useRecurrence";
 import { usePopup } from "~/providers/popup";
+import { api } from "~/utils/api";
 import { CalendarHeader } from "./CalendarHeader";
 import { CreateEventModal } from "./CreateEventModal";
 import { DayView } from "./DayView";
 import { EventDetailModal } from "./EventDetailModal";
 import { MonthView } from "./MonthView";
+import { SuccessModal } from "./SuccessModal";
 import { WeekView } from "./WeekView";
 
 function toEditableEntry(entry: CalendarEntry): EditableEntry {
@@ -24,8 +31,12 @@ function toEditableEntry(entry: CalendarEntry): EditableEntry {
   const endTime = `${String(Math.floor(endTotalMins / 60) % 24).padStart(2, "0")}:${String(endTotalMins % 60).padStart(2, "0")}`;
   return {
     id: entry.id,
+    masterId: entry.masterId,
+    instanceId: entry.instanceId,
+    type: entry.type,
+    status: entry.status,
     title: entry.title,
-    description: "",
+    description: (entry as any).description || "",
     date,
     startTime,
     endTime,
@@ -35,62 +46,88 @@ function toEditableEntry(entry: CalendarEntry): EditableEntry {
   };
 }
 
-// ─────────────────────────────────────────────
-// Component
-// ─────────────────────────────────────────────
-
 export function Calendar() {
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [viewMode, setViewMode] = useState<ViewMode>("MONTH");
-  const { calendarEntries, createInstance, moveTask } =
-    useRecurrence(currentDate);
-  const { showPopup } = usePopup();
+  const prevDateRef = useRef(currentDate);
+  const [direction, setDirection] = useState(0);
 
-  // ── Date selection ───────────────────────────
+  useEffect(() => {
+    if (currentDate.getTime() > prevDateRef.current.getTime()) {
+      setDirection(1);
+    } else if (currentDate.getTime() < prevDateRef.current.getTime()) {
+      setDirection(-1);
+    }
+    prevDateRef.current = currentDate;
+  }, [currentDate]);
+
+  const [viewMode, setViewMode] = useState<ViewMode>("MONTH");
+  const { calendarEntries, moveTask } = useRecurrence(currentDate);
+  const { showPopup } = usePopup();
+  const utils = api.useUtils();
+
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
 
-  // ── Detail modal state ───────────────────────
   const [detailEntry, setDetailEntry] = useState<EditableEntry | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
 
-  // ── Create/Edit modal state ──────────────────
   const [editEntry, setEditEntry] = useState<EditableEntry | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
 
-  // ─── Handlers ──────────────────────────────────────────────────────────────
+  const [isSuccessOpen, setIsSuccessOpen] = useState(false);
+  const [successData, setSuccessData] = useState({ title: "", message: "" });
 
-  /**
-   * Click vào ô trống (cell / time slot) → mở form Create
-   */
+  // Custom delete confirmation (replaces window.confirm)
+  const [deleteConfirmEntry, setDeleteConfirmEntry] =
+    useState<EditableEntry | null>(null);
+
+  const deleteMutation = api.taskInstance.delete.useMutation({
+    onSuccess: () => {
+      void utils.taskInstance.getVirtual.invalidate();
+      setIsDetailOpen(false);
+      showPopup({
+        header: t`Event Deleted`,
+        message: t`The event has been removed from your calendar.`,
+        icon: "success",
+      });
+    },
+    onError: (error: any) => {
+      console.error("Delete failed:", error);
+      const isDuplicate =
+        error.message?.toLowerCase().includes("unique constraint") ||
+        error.message?.toLowerCase().includes("duplicate") ||
+        JSON.stringify(error).toLowerCase().includes("unique constraint");
+
+      if (isDuplicate) {
+        showPopup({
+          header: "Lỗi xung đột",
+          message:
+            "Dữ liệu này đã được thay đổi trước đó. Lịch sẽ tự động làm mới.",
+          icon: "info",
+        });
+      } else {
+        showPopup({
+          header: "Lỗi",
+          message: error.message || "Không thể thực hiện yêu cầu xóa.",
+          icon: "error",
+        });
+      }
+      void utils.taskInstance.getVirtual.invalidate();
+    },
+  });
+
   const handleCellClick = (date: Date) => {
     setSelectedDate(date);
     setEditEntry(null);
     setIsFormOpen(true);
   };
 
-  /**
-   * Click vào task đã có → mở Detail popup
-   * Virtual task (recurrence preview) → thông báo và không cho edit
-   */
   const handleTaskClick = (entry: CalendarEntry) => {
-    if (entry.type === "VIRTUAL") {
-      showPopup({
-        header: t`Virtual Task`,
-        message: t`This is a preview of a recurring event. Create an instance first to edit it.`,
-        icon: "info",
-      });
-      return;
-    }
     setDetailEntry(toEditableEntry(entry));
     setIsDetailOpen(true);
   };
 
-  /**
-   * Nút "Edit Event" trong Detail popup → đóng detail, mở form Edit
-   */
   const handleEditFromDetail = (entry: EditableEntry) => {
     setIsDetailOpen(false);
-    // Dùng small delay để animation close của detail chạy xong trước khi mở form
     setTimeout(() => {
       setSelectedDate(new Date(entry.date));
       setEditEntry(entry);
@@ -98,54 +135,67 @@ export function Calendar() {
     }, 220);
   };
 
-  /**
-   * Nút "Delete" trong Detail popup
-   */
-  const handleDeleteEvent = (id: string) => {
-    // TODO: gọi mutation / API xóa event ở đây
-    console.log("Deleting event:", id);
-    showPopup({
-      header: t`Event Deleted`,
-      message: t`The event has been removed from your calendar.`,
-      icon: "success",
-    });
+  const handleDeleteEvent = (
+    entry: EditableEntry,
+    deleteType?: "single" | "all",
+  ) => {
+    if (!entry.masterId) return;
+
+    // If no type is provided, show custom confirmation modal
+    if (!deleteType) {
+      setDeleteConfirmEntry(entry);
+      return;
+    }
+
+    // Close the detail modal first
+    setIsDetailOpen(false);
+    setTimeout(() => setDetailEntry(null), 280);
+
+    if (deleteType === "all") {
+      deleteMutation.mutate({
+        id: entry.id,
+        taskMasterId: entry.masterId,
+        type: "all",
+      });
+    } else {
+      // For single deletion, we now pass instanceId OR virtual id
+      // The backend has been updated to handle virtual- IDs
+      const idToDelete = entry.instanceId || entry.id;
+
+      deleteMutation.mutate({
+        id: idToDelete,
+        taskMasterId: entry.masterId,
+        type: "single",
+      });
+    }
   };
 
-  /** Đóng detail popup */
   const handleDetailClose = () => {
     setIsDetailOpen(false);
     setTimeout(() => setDetailEntry(null), 280);
   };
 
-  /** Đóng form modal */
   const handleFormClose = () => {
     setIsFormOpen(false);
     setTimeout(() => setEditEntry(null), 280);
   };
 
-  /** Tạo event mới */
   const handleCreateEvent = (eventData: CreateEventInput) => {
     console.log("Creating event:", eventData);
-    // TODO: gọi createInstance hoặc API tạo event
-    showPopup({
-      header: t`Event Created`,
+    setSuccessData({
+      title: t`Created Successfully!`,
       message: t`"${eventData.title}" has been added to your calendar.`,
-      icon: "success",
     });
   };
 
-  /** Cập nhật event */
   const handleUpdateEvent = (id: string, eventData: CreateEventInput) => {
     console.log("Updating event:", id, eventData);
-    // TODO: gọi API update event
-    showPopup({
-      header: t`Event Updated`,
+    setSuccessData({
+      title: t`Updated Successfully!`,
       message: t`"${eventData.title}" has been updated.`,
-      icon: "success",
     });
   };
 
-  /** Drag & drop */
   const onDragEnd = (result: DropResult) => {
     const { destination, draggableId } = result;
     if (!destination) return;
@@ -154,7 +204,7 @@ export function Calendar() {
       const dateStr = destination.droppableId.replace("droppable-", "");
       const newDate = new Date(dateStr);
 
-      if (draggableId.startsWith("v_")) {
+      if (draggableId.startsWith("virtual_") || draggableId.startsWith("v_")) {
         showPopup({
           header: t`Cannot move virtual task`,
           message: t`Please create the task instance first before moving it.`,
@@ -167,95 +217,297 @@ export function Calendar() {
     }
   };
 
-  // ─── Render ────────────────────────────────────────────────────────────────
-
   return (
-    <div className="flex h-full flex-col bg-white dark:bg-dark-50">
-      <CalendarHeader
-        currentDate={currentDate}
-        setCurrentDate={setCurrentDate}
-        viewMode={viewMode}
-        setViewMode={setViewMode}
-      />
+    <div className="flex h-full flex-col bg-neutral-50/50 dark:bg-neutral-950">
+      <div className="z-20 border-b border-neutral-200/50 bg-white/80 shadow-sm backdrop-blur-xl dark:border-white/5 dark:bg-neutral-900/80">
+        <CalendarHeader
+          currentDate={currentDate}
+          setCurrentDate={setCurrentDate}
+          viewMode={viewMode}
+          setViewMode={(mode) => {
+            setDirection(0);
+            setViewMode(mode);
+          }}
+        />
+      </div>
 
       <div className="relative flex-1 overflow-hidden">
         <DragDropContext onDragEnd={onDragEnd}>
-          <div className="relative h-full w-full">
-            {/* Month View */}
-            {viewMode === "MONTH" && (
-              <motion.div
-                key="month"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="absolute inset-0"
-              >
-                <MonthView
-                  currentDate={currentDate}
-                  entries={calendarEntries}
-                  onTaskClick={handleTaskClick}
-                  onCellClick={handleCellClick}
-                />
-              </motion.div>
-            )}
+          <div className="relative h-full w-full overflow-hidden">
+            <AnimatePresence
+              initial={false}
+              mode="popLayout"
+              custom={direction}
+            >
+              {viewMode === "MONTH" && (
+                <motion.div
+                  key={`month-${currentDate.getFullYear()}-${currentDate.getMonth()}`}
+                  custom={direction}
+                  variants={{
+                    enter: (dir: number) => ({
+                      x: dir > 0 ? "100%" : dir < 0 ? "-100%" : 0,
+                      opacity: 0,
+                    }),
+                    center: {
+                      x: 0,
+                      opacity: 1,
+                    },
+                    exit: (dir: number) => ({
+                      x: dir > 0 ? "-100%" : dir < 0 ? "100%" : 0,
+                      opacity: 0,
+                    }),
+                  }}
+                  initial="enter"
+                  animate="center"
+                  exit="exit"
+                  transition={{
+                    x: { type: "spring", stiffness: 300, damping: 30 },
+                    opacity: { duration: 0.2 },
+                  }}
+                  className="absolute inset-0"
+                >
+                  <MonthView
+                    currentDate={currentDate}
+                    entries={calendarEntries}
+                    onTaskClick={handleTaskClick}
+                    onCellClick={handleCellClick}
+                  />
+                </motion.div>
+              )}
 
-            {/* Week View */}
-            {viewMode === "WEEK" && (
-              <motion.div
-                key="week"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="absolute inset-0"
-              >
-                <WeekView
-                  currentDate={currentDate}
-                  entries={calendarEntries}
-                  onTaskClick={handleTaskClick}
-                  onCellClick={handleCellClick}
-                />
-              </motion.div>
-            )}
+              {viewMode === "WEEK" && (
+                <motion.div
+                  key={`week-${currentDate.toISOString()}`}
+                  custom={direction}
+                  variants={{
+                    enter: (dir: number) => ({
+                      x: dir > 0 ? "100%" : dir < 0 ? "-100%" : 0,
+                      opacity: 0,
+                    }),
+                    center: {
+                      x: 0,
+                      opacity: 1,
+                    },
+                    exit: (dir: number) => ({
+                      x: dir > 0 ? "-100%" : dir < 0 ? "100%" : 0,
+                      opacity: 0,
+                    }),
+                  }}
+                  initial="enter"
+                  animate="center"
+                  exit="exit"
+                  transition={{
+                    x: { type: "spring", stiffness: 300, damping: 30 },
+                    opacity: { duration: 0.2 },
+                  }}
+                  className="absolute inset-0"
+                >
+                  <WeekView
+                    currentDate={currentDate}
+                    entries={calendarEntries}
+                    onTaskClick={handleTaskClick}
+                    onCellClick={handleCellClick}
+                  />
+                </motion.div>
+              )}
 
-            {/* Day View */}
-            {viewMode === "DAY" && (
-              <motion.div
-                key="day"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="absolute inset-0"
-              >
-                <DayView
-                  currentDate={currentDate}
-                  entries={calendarEntries}
-                  onTaskClick={handleTaskClick}
-                  onCellClick={handleCellClick}
-                />
-              </motion.div>
-            )}
+              {viewMode === "DAY" && (
+                <motion.div
+                  key={`day-${currentDate.toISOString()}`}
+                  custom={direction}
+                  variants={{
+                    enter: (dir: number) => ({
+                      x: dir > 0 ? "100%" : dir < 0 ? "-100%" : 0,
+                      opacity: 0,
+                    }),
+                    center: {
+                      x: 0,
+                      opacity: 1,
+                    },
+                    exit: (dir: number) => ({
+                      x: dir > 0 ? "-100%" : dir < 0 ? "100%" : 0,
+                      opacity: 0,
+                    }),
+                  }}
+                  initial="enter"
+                  animate="center"
+                  exit="exit"
+                  transition={{
+                    x: { type: "spring", stiffness: 300, damping: 30 },
+                    opacity: { duration: 0.2 },
+                  }}
+                  className="absolute inset-0"
+                >
+                  <DayView
+                    currentDate={currentDate}
+                    entries={calendarEntries}
+                    onTaskClick={handleTaskClick}
+                    onCellClick={handleCellClick}
+                  />
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
         </DragDropContext>
       </div>
 
-      {/* ── Detail Popup (view only) ── */}
       <EventDetailModal
         isVisible={isDetailOpen}
         entry={detailEntry}
         onClose={handleDetailClose}
         onEdit={handleEditFromDetail}
         onDelete={handleDeleteEvent}
+        isDeleting={deleteMutation.isPending}
       />
 
-      {/* ── Create / Edit Form Modal ── */}
       <CreateEventModal
         isVisible={isFormOpen}
         selectedDate={selectedDate}
         onClose={handleFormClose}
         onSave={handleCreateEvent}
         onUpdate={handleUpdateEvent}
+        onSuccess={() => setIsSuccessOpen(true)}
         editEntry={editEntry}
       />
+
+      <SuccessModal
+        isVisible={isSuccessOpen}
+        onClose={() => setIsSuccessOpen(false)}
+        title={successData.title}
+        message={successData.message}
+      />
+
+      {/* Custom Delete Confirmation Modal */}
+      <AnimatePresence>
+        {deleteConfirmEntry && (
+          <div className="fixed inset-0 z-[3000] flex items-center justify-center p-4">
+            {/* Backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setDeleteConfirmEntry(null)}
+              className="absolute inset-0 bg-black/30 backdrop-blur-[3px]"
+            />
+            {/* Card */}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.92, y: 16 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.92, y: 16 }}
+              transition={{ type: "spring", stiffness: 380, damping: 28 }}
+              className="relative w-full max-w-sm overflow-hidden rounded-3xl border border-white/40 bg-white shadow-2xl dark:border-white/10 dark:bg-neutral-900"
+            >
+              {/* Icon */}
+              <div className="flex flex-col items-center px-8 pb-4 pt-8">
+                <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-red-50 shadow-lg shadow-red-500/10">
+                  <svg
+                    className="h-7 w-7 text-red-500"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                    />
+                  </svg>
+                </div>
+                <h3 className="text-lg font-black text-neutral-900 dark:text-white">
+                  Xóa công việc
+                </h3>
+                <p className="mt-1.5 text-center text-sm text-neutral-500 dark:text-neutral-400">
+                  <span className="font-semibold text-neutral-700 dark:text-neutral-200">
+                    "{deleteConfirmEntry.title}"
+                  </span>{" "}
+                  là công việc lặp lại. Bạn muốn xóa loại nào?
+                </p>
+              </div>
+
+              {/* Options */}
+              <div className="flex flex-col gap-2 px-6 pb-6">
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.97 }}
+                  onClick={() => {
+                    const e = deleteConfirmEntry;
+                    setDeleteConfirmEntry(null);
+                    handleDeleteEvent(e, "single");
+                  }}
+                  className="flex items-center gap-3 rounded-2xl border border-neutral-100 bg-neutral-50 px-5 py-3.5 text-left transition-all hover:border-neutral-200 hover:bg-neutral-100 dark:border-neutral-800 dark:bg-neutral-800/50 dark:hover:bg-neutral-800"
+                >
+                  <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-orange-100 dark:bg-orange-900/30">
+                    <svg
+                      className="h-4.5 w-4.5 text-orange-500"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      strokeWidth={2}
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+                      />
+                    </svg>
+                  </div>
+                  <div>
+                    <p className="text-sm font-black text-neutral-900 dark:text-white">
+                      Chỉ ngày này
+                    </p>
+                    <p className="text-xs text-neutral-400">
+                      Xóa công việc vào ngày đã chọn
+                    </p>
+                  </div>
+                </motion.button>
+
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.97 }}
+                  onClick={() => {
+                    const e = deleteConfirmEntry;
+                    setDeleteConfirmEntry(null);
+                    handleDeleteEvent(e, "all");
+                  }}
+                  className="flex items-center gap-3 rounded-2xl border border-red-100 bg-red-50 px-5 py-3.5 text-left transition-all hover:border-red-200 hover:bg-red-100 dark:border-red-900/40 dark:bg-red-900/20 dark:hover:bg-red-900/30"
+                >
+                  <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-red-100 dark:bg-red-900/40">
+                    <svg
+                      className="h-4.5 w-4.5 text-red-500"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      strokeWidth={2}
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M4 4l16 16M4 20L20 4"
+                      />
+                    </svg>
+                  </div>
+                  <div>
+                    <p className="text-sm font-black text-red-700 dark:text-red-400">
+                      Toàn bộ chuỗi lặp
+                    </p>
+                    <p className="text-xs text-red-400/80">
+                      Xóa tất cả các ngày trong lịch lặp
+                    </p>
+                  </div>
+                </motion.button>
+
+                <button
+                  onClick={() => setDeleteConfirmEntry(null)}
+                  className="mt-1 rounded-xl py-2 text-sm font-bold text-neutral-400 transition-all hover:text-neutral-600 dark:hover:text-neutral-200"
+                >
+                  Hủy
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

@@ -1,15 +1,5 @@
-import {
-  addDays,
-  addMonths,
-  addWeeks,
-  format,
-  subDays,
-  subMonths,
-  subWeeks,
-  startOfWeek,
-  endOfWeek,
-  isSameMonth,
-} from "date-fns";
+import { addDays, addMonths, addWeeks, format, subDays, subMonths, subWeeks, startOfWeek, endOfWeek, isSameMonth } from "date-fns";
+import { motion } from "framer-motion";
 import { HiOutlineChevronLeft, HiOutlineChevronRight } from "react-icons/hi2";
 
 export type ViewMode = "DAY" | "WEEK" | "MONTH";
@@ -61,41 +51,49 @@ export function CalendarHeader({
             format(currentDate, "MMMM d, yyyy")
           )}
         </h2>
-        <div className="flex items-center rounded-lg bg-light-200 p-1 dark:bg-dark-200">
-          <button
+        <div className="flex items-center gap-1.5 rounded-full bg-neutral-100/80 p-1 dark:bg-neutral-800/80 shadow-inner">
+          <motion.button
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.9 }}
             onClick={onPrev}
-            className="rounded-md p-1 hover:bg-light-300 dark:hover:bg-dark-300"
+            className="flex h-8 w-8 items-center justify-center rounded-full transition-all hover:bg-white hover:text-blue-600 hover:shadow-sm dark:hover:bg-neutral-700"
           >
-            <HiOutlineChevronLeft size={20} />
-          </button>
-          <button
+            <HiOutlineChevronLeft size={18} />
+          </motion.button>
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
             onClick={onToday}
-            className="hover:text-primary-500 mx-2 px-2 text-sm font-medium"
+            className="px-4 py-1 text-sm font-black uppercase tracking-tighter text-neutral-700 transition-all hover:text-blue-600 dark:text-neutral-300 dark:hover:text-white"
           >
             Today
-          </button>
-          <button
+          </motion.button>
+          <motion.button
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.9 }}
             onClick={onNext}
-            className="rounded-md p-1 hover:bg-light-300 dark:hover:bg-dark-300"
+            className="flex h-8 w-8 items-center justify-center rounded-full transition-all hover:bg-white hover:text-blue-600 hover:shadow-sm dark:hover:bg-neutral-700"
           >
-            <HiOutlineChevronRight size={20} />
-          </button>
+            <HiOutlineChevronRight size={18} />
+          </motion.button>
         </div>
       </div>
 
-      <div className="flex items-center rounded-lg bg-light-200 p-1 dark:bg-dark-200">
+      <div className="flex items-center gap-1 rounded-full bg-neutral-100/80 p-1 dark:bg-neutral-800/80 shadow-inner">
         {(["DAY", "WEEK", "MONTH"] as ViewMode[]).map((mode) => (
-          <button
+          <motion.button
             key={mode}
+            whileHover={viewMode !== mode ? { scale: 1.05, backgroundColor: "rgba(255,255,255,0.8)" } : {}}
+            whileTap={{ scale: 0.95 }}
             onClick={() => setViewMode(mode)}
-            className={`rounded-md px-4 py-1.5 text-sm font-medium transition-all ${
+            className={`rounded-full px-5 py-1.5 text-[10px] font-black uppercase tracking-widest transition-all duration-300 ${
               viewMode === mode
-                ? "text-primary-600 dark:text-primary-400 bg-white shadow-sm dark:bg-dark-400"
-                : "text-light-600 hover:text-light-900 dark:text-dark-600 dark:hover:text-dark-900"
+                ? "bg-white text-blue-600 shadow-md dark:bg-neutral-700 dark:text-white"
+                : "text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-white"
             }`}
           >
-            {mode.charAt(0) + mode.slice(1).toLowerCase()}
-          </button>
+            {mode}
+          </motion.button>
         ))}
       </div>
     </div>

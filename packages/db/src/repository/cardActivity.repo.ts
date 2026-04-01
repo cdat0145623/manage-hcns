@@ -114,7 +114,9 @@ export const bulkCreateForTaskInstance = async (
   db: dbClient,
   activityInputs: {
     type: ActivityType;
-    taskInstanceId: string;
+    taskInstanceId?: string;
+    taskMasterId?: string;
+    freqId?: string;
     fromIndex?: number;
     toIndex?: number;
     fromListId?: number;

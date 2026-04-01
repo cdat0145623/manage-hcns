@@ -81,6 +81,7 @@ export const taskInstanceRouter = createTRPCRouter({
       //     with: { frequence: true },
       // });
 
+<<<<<<< HEAD
       // const from = input.from.toLocaleString('en-US', { timeZone: 'Asia/Ho_Chi_Minh' });
       // const to = input.to.toLocaleString('en-US', { timeZone: 'Asia/Ho_Chi_Minh' });
       const userId = ctx.user?.id;
@@ -89,6 +90,29 @@ export const taskInstanceRouter = createTRPCRouter({
         throw new TRPCError({
           message: `User not authenticated`,
           code: "UNAUTHORIZED",
+=======
+        // const from = input.from.toLocaleString('en-US', { timeZone: 'Asia/Ho_Chi_Minh' });
+        // const to = input.to.toLocaleString('en-US', { timeZone: 'Asia/Ho_Chi_Minh' });
+        const userId = ctx.user?.id;
+
+        if (!userId) {
+            throw new TRPCError({
+                message: `User not authenticated`,
+                code: "UNAUTHORIZED",
+            });
+        }
+        
+        const taskMasters = await ctx.db.query.taskMasters.findMany({
+            where: (t, { and, lt, gte, eq }) => 
+                and(
+                    lt(t.startDate, input.to), 
+                    gte(t.endDate, input.from),
+                    ...(input.targetUser ? [eq(t.targetUser, input.targetUser)] : []),
+                    ...(input.createdBy ? [eq(t.createdBy, input.createdBy)] : []),
+                    eq(t.isDeleted, false),
+                ),
+            with: { frequence: true },
+>>>>>>> e77a7e028a51ce657f32e2ef28e353b7899ff620
         });
       }
 
@@ -142,12 +166,24 @@ export const taskInstanceRouter = createTRPCRouter({
                   ),
               });
 
+<<<<<<< HEAD
             const existingTaskInstanceMap = new Map(
               existingTaskInstances.map((taskInstance) => [
                 taskInstance.targetDate!.toISOString(),
                 taskInstance,
               ]),
             );
+=======
+                    const newVirtualTaskInstances = virtualTaskInstances.map((virtualInstance) => {
+                        const existing = existingTaskInstanceMap.get(virtualInstance.targetDate!.toISOString());
+                        return existing ?? {
+                            ...virtualInstance,
+                            selectedUserId: taskMaster.targetUser,
+                            startDate: taskMaster.startDate,
+                            endDate: taskMaster.endDate,
+                        };
+                    });
+>>>>>>> e77a7e028a51ce657f32e2ef28e353b7899ff620
 
             const newVirtualTaskInstances = virtualTaskInstances.map(
               (virtualInstance) => {
@@ -186,6 +222,7 @@ export const taskInstanceRouter = createTRPCRouter({
       },
     })
     .input(
+<<<<<<< HEAD
       z.object({
         id: z.string(),
         taskMasterId: z.string(),
@@ -193,6 +230,15 @@ export const taskInstanceRouter = createTRPCRouter({
         actualDate: z.date().optional(),
         status: statusTypeEnumSchema,
       }),
+=======
+        z.object({
+            id: z.string(),
+            taskMasterId: z.string(),
+            targetDate: z.date().optional(),
+            actualDate: z.date().optional(),
+            status: statusTypeEnumSchema,
+        })
+>>>>>>> e77a7e028a51ce657f32e2ef28e353b7899ff620
     )
     .mutation(async ({ ctx, input }) => {
       const userId = ctx.user?.id;
@@ -228,6 +274,7 @@ export const taskInstanceRouter = createTRPCRouter({
         });
       }
 
+<<<<<<< HEAD
       if (taskMaster.targetUser !== userId || taskMaster.createdBy !== userId) {
         throw new TRPCError({
           message: `User not authorized to update this task instance`,
@@ -321,6 +368,15 @@ export const taskInstanceRouter = createTRPCRouter({
         const newTaskInstance = await taskInstanceRepo.deleteSingle(ctx.db, {
           id,
           userId,
+=======
+        const newTaskInstance = await taskInstanceRepo.update(ctx.db, {
+            id,
+            userId,
+            taskMasterId,
+            targetDate,
+            actualDate,
+            status: status,
+>>>>>>> e77a7e028a51ce657f32e2ef28e353b7899ff620
         });
 
         if (!newTaskInstance) {

@@ -103,15 +103,18 @@ export const update = async (
       throw new Error("Frequency not found");
     }
 
-    const frequence = await frequenceRepo.update(tx, {
-      id: existingTaskMaster.freqId,
-      name: taskMasterInput.rruleString,
-      rrule: taskMasterInput.rruleString,
-      dtStart: taskMasterInput.startDate,
-    });
+    let frequence;
+      if (taskMasterInput.rruleString) {
+        frequence = await frequenceRepo.update(tx, {
+          id: existingTaskMaster.freqId,
+          name: taskMasterInput.rruleString,
+          rrule: taskMasterInput.rruleString,
+          dtStart: taskMasterInput.startDate,
+      });
 
-    if (!frequence) {
-      throw new Error("Failed to update frequency");
+      if (!frequence) {
+        throw new Error("Failed to update frequency");
+      }
     }
 
     // 2. Tạo task master
@@ -123,7 +126,8 @@ export const update = async (
         description: taskMasterInput.description,
         startDate: taskMasterInput.startDate,
         endDate: taskMasterInput.endDate,
-        freqId: frequence.id,
+        freqId: frequence?.id || oldFreq.id,
+        updatedAt: new Date(),
       })
       .where(eq(taskMasters.id, taskMasterInput.id))
       .returning({
@@ -140,10 +144,10 @@ export const update = async (
       throw new Error("Failed to update task master");
     }
 
-    if (taskMasterInput.rruleString !== oldFreq.rruleString) {
+    if (taskMasterInput.rruleString && taskMasterInput.rruleString !== oldFreq.rruleString) {
       const cardActivitesInsert = [{
         type: "updated_index" as const,
-        taskInstanceId: taskMaster.id,
+        taskMasterId: taskMaster.id,
         oldValue: oldFreq.rruleString ?? undefined,
         newValue: taskMasterInput.rruleString ?? undefined,
         createdBy: taskMasterInput.userId,
@@ -152,10 +156,10 @@ export const update = async (
       await cardActivitesRepo.bulkCreateForTaskInstance(tx, cardActivitesInsert);
     }
 
-    if (taskMasterInput.description !== existingTaskMaster.description) {
+    if (taskMasterInput.description && taskMasterInput.description !== existingTaskMaster.description) {
       const cardActivitesInsert = [{
         type: "updated_description" as const,
-        taskInstanceId: taskMaster.id,
+        taskMasterId: taskMaster.id,
         oldValue: existingTaskMaster.description ?? undefined,
         newValue: taskMasterInput.description ?? undefined,
         createdBy: taskMasterInput.userId,
@@ -164,10 +168,10 @@ export const update = async (
       await cardActivitesRepo.bulkCreateForTaskInstance(tx, cardActivitesInsert);
     }
 
-    if (taskMasterInput.selectedUserId !== existingTaskMaster.targetUser) {
+    if (taskMasterInput.selectedUserId && taskMasterInput.selectedUserId !== existingTaskMaster.targetUser) {
       const cardActivitesInsert = [{
         type: "member_assigned" as const,
-        taskInstanceId: taskMaster.id,
+        taskMasterId: taskMaster.id,
         oldValue: existingTaskMaster.targetUser,
         newValue: taskMasterInput.selectedUserId,
         createdBy: taskMasterInput.userId,
@@ -193,6 +197,7 @@ export const softDelete = async (
         isDeleted: true,
         deletedAt: new Date(),
         deletedBy: taskMasterInput.userId,
+        updatedAt: new Date(),
     })
     .where(eq(taskMasters.id, taskMasterInput.id))
     .returning({

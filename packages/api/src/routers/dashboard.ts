@@ -22,7 +22,9 @@ export const dashboardRouter = createTRPCRouter({
       z.object({
         selectedUserId: z.string(),
         boardPublicId: z.string().optional(),
+        viewMode: z.enum(["week", "month", "year"]).optional(),
         month: z.number().min(1).max(12).optional(),
+        week: z.number().min(1).max(53).optional(),
         year: z.number().optional(),
       }),
     )
@@ -69,13 +71,15 @@ export const dashboardRouter = createTRPCRouter({
       }
 
       // ── Calendar section ───────────────────────────────────────
-      if (input.month !== undefined && input.year !== undefined) {
-        result.calendar = await dashboardRepo.getCalendarMetrics(ctx.db, {
-          selectedUserId: input.selectedUserId,
-          month: input.month,
-          year: input.year,
-        });
-      }
+      const year = input.year ?? new Date().getFullYear();
+      const viewMode = input.viewMode ?? "month";
+      
+      result.calendar = await dashboardRepo.getCalendarMetrics(ctx.db, {
+        selectedUserId: input.selectedUserId,
+        viewMode,
+        value: viewMode === "week" ? input.week : input.month,
+        year,
+      });
 
       return result;
     }),

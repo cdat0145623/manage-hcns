@@ -99,6 +99,18 @@ export default function SideNavigation({
     keyboardShortcut: KeyboardShortcut;
   }[] = [
     {
+      name: t`Dashboard`,
+      href: "/reports",
+      icon: isDarkMode ? activityLogsIconDark : activityLogsIconLight,
+      keyboardShortcut: {
+        type: "SEQUENCE",
+        strokes: [{ key: "G" }, { key: "D" }],
+        action: () => router.push("/reports"),
+        group: "NAVIGATION",
+        description: t`Go to dashboard`,
+      },
+    },
+    {
       name: t`Boards`,
       href: "/boards",
       icon: isDarkMode ? boardsIconDark : boardsIconLight,
@@ -109,6 +121,7 @@ export default function SideNavigation({
         group: "NAVIGATION",
         description: t`Go to boards`,
       },
+
     },
     {
       name: t`Calendar`,
@@ -179,6 +192,7 @@ export default function SideNavigation({
                 <h1 className="pl-2 text-[16px] font-bold tracking-tight text-neutral-900 dark:text-dark-1000">
                   kan.bn
                 </h1>
+
               </Link>
             )}
             <Button

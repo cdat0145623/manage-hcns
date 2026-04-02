@@ -6,11 +6,11 @@ import {
   cards,
   cardActivities,
   lists,
-  taskInstances,
-  taskMasters,
   cardToWorkspaceMembers,
   workspaceMembers,
 } from "@kan/db/schema";
+
+
 
 import { generateVirtualTaskInstances } from "./taskInstance.repo";
 
@@ -65,14 +65,16 @@ export const getCardDistributionByBoard = async (
       : [];
 
   const cardsByList = userCards.reduce((acc, card) => {
-    acc[card.listId] = (acc[card.listId] || 0) + 1;
+    acc[card.listId] = (acc[card.listId] ?? 0) + 1;
+
     return acc;
   }, {} as Record<number, number>);
 
   const totalCards = userCards.length;
 
   const data = listsData.map((list) => {
-    const cardCount = cardsByList[list.id] || 0;
+    const cardCount = cardsByList[list.id] ?? 0;
+
     return {
       listId: list.publicId,
       listName: list.name,
@@ -82,6 +84,7 @@ export const getCardDistributionByBoard = async (
           ? Math.round((cardCount / totalCards) * 10000) / 100
           : 0,
     };
+
   });
 
   return { data, totalCards };
@@ -198,26 +201,49 @@ export const getKanbanDeadlineRate = async (
 // CALENDAR METRICS
 // ================================================================
 
-type MergedInstance = {
+interface MergedInstance {
   id: string;
   userId: string;
   taskMasterId: string;
   taskMasterName: string | null;
   targetDate: Date | null;
   status: "pending" | "done" | "missed";
-};
+}
+
 
 export const getCalendarMetrics = async (
   db: dbClient,
   params: {
     selectedUserId: string;
-    month: number; // 1–12
+    viewMode: "week" | "month" | "year";
+    value?: number; // week number (1-52) or month number (1-12)
     year: number;
   },
 ) => {
-  // Build date range for the given month
-  const from = new Date(Date.UTC(params.year, params.month - 1, 1));
-  const to = new Date(Date.UTC(params.year, params.month, 0, 23, 59, 59, 999));
+  let from: Date;
+  let to: Date;
+
+  if (params.viewMode === "week") {
+    const week = params.value ?? 1;
+    // Week calculation: start from Jan 1st and add weeks.
+    // To make it simpler and consistent across JS:
+    const jan1 = new Date(Date.UTC(params.year, 0, 1));
+    const dayOfWeek = jan1.getUTCDay();
+    const diffToMonday = dayOfWeek === 1 ? 0 : (dayOfWeek === 0 ? 1 : 8 - dayOfWeek);
+    const firstMonday = new Date(Date.UTC(params.year, 0, 1 + diffToMonday));
+    
+    from = new Date(firstMonday.getTime() + (week - 1) * 7 * 24 * 60 * 60 * 1000);
+    to = new Date(from.getTime() + 7 * 24 * 60 * 60 * 1000 - 1);
+  } else if (params.viewMode === "year") {
+    from = new Date(Date.UTC(params.year, 0, 1));
+    to = new Date(Date.UTC(params.year, 11, 31, 23, 59, 59, 999));
+  } else {
+    // Default: month
+    const month = params.value ?? 1;
+    from = new Date(Date.UTC(params.year, month - 1, 1));
+    to = new Date(Date.UTC(params.year, month, 0, 23, 59, 59, 999));
+  }
+
 
   // Get all task masters active in range for the selected user
   const taskMastersData = await db.query.taskMasters.findMany({
@@ -241,7 +267,8 @@ console.log(taskMastersData)
         | undefined
         | null;
 
-      if (!freq?.rruleString || !freq?.dtStart) continue;
+      if (!freq?.rruleString || !freq.dtStart) continue;
+
 
       const effectiveFrom =
         from > taskMaster.startDate ? from : taskMaster.startDate;
@@ -271,11 +298,14 @@ console.log(taskMastersData)
       });
 
       const actualMap = new Map(
-        actualInstances.map((ti) => [ti.targetDate!.toISOString(), ti]),
+        actualInstances.map((ti) => [ti.targetDate?.toISOString() ?? "", ti]),
       );
 
+
       for (const virt of virtualInstances) {
-        const actual = actualMap.get(virt.targetDate!.toISOString());
+        const actual = actualMap.get(virt.targetDate.toISOString());
+
+
         allInstances.push({
           id: actual ? actual.id : virt.id,
           userId: taskMaster.targetUser,
@@ -284,6 +314,7 @@ console.log(taskMastersData)
           targetDate: virt.targetDate,
           status: actual ? actual.status : ("pending" as const),
         });
+
       }
     } catch {
       // Skip task masters with bad rrule config

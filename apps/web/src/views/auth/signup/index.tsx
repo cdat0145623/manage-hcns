@@ -17,7 +17,8 @@ export default function SignUpPage() {
 
   const { data } = authClient.useSession();
 
-  if (data?.user.id) router.push("/boards");
+  if (data?.user.id) router.push("/reports");
+
 
   const isInviteFlow = redirect?.startsWith("/invite/");
 

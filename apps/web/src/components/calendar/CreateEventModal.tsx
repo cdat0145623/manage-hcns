@@ -465,7 +465,6 @@ export function CreateEventModal({
         endDate: finalEndDate,
         selectedUserId: attendees.length > 0 ? attendees[0]?.id! : currentUserId,
         rruleString,
-        userId: currentUserId,
       });
     } else {
       createTask.mutate({
@@ -475,8 +474,11 @@ export function CreateEventModal({
         endDate: finalEndDate,
         selectedUserId: attendees.length > 0 ? attendees[0]?.id! : currentUserId,
         rruleString,
+        from: startDT,
+        to: finalEndDate,
       });
     }
+
   };
 
   return (

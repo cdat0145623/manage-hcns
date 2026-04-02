@@ -465,17 +465,6 @@ export function CreateEventModal({
     }
 
     if (isEditMode && editEntry) {
-<<<<<<< HEAD:apps/web/src/components/calendar/CreateEventModal.tsx
-      updateTask.mutate({
-        id: editEntry.id,
-        name: title,
-        description,
-        startDate: startDT,
-        endDate: finalEndDate,
-        selectedUserId: attendees.length > 0 ? attendees[0]?.id! : currentUserId,
-        rruleString,
-      });
-=======
       if (updateType === 'all') {
         updateTask.mutate({
           id: editEntry.masterId!,
@@ -495,7 +484,6 @@ export function CreateEventModal({
           status: editEntry.status!,
         });
       }
->>>>>>> 317b66643f25548a5b045be197d93c7ccba9d678:apps/web/src/views/calendar/calendar/CreateEventModal.tsx
     } else {
       createTask.mutate({
         name: title,
@@ -504,13 +492,8 @@ export function CreateEventModal({
         endDate: finalEndDate,
         selectedUserId: selectedUserId || currentUserId,
         rruleString,
-<<<<<<< HEAD:apps/web/src/components/calendar/CreateEventModal.tsx
-        from: startDT,
-        to: finalEndDate,
-=======
         from: startOfMonth(startDT),
         to: endOfMonth(startDT),
->>>>>>> 317b66643f25548a5b045be197d93c7ccba9d678:apps/web/src/views/calendar/calendar/CreateEventModal.tsx
       });
     }
 

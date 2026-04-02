@@ -1,3 +1,4 @@
+import { eq } from "drizzle-orm";
 import * as taskInstanceRepo from "@kan/db/repository/taskInstance.repo";
 import * as cardActivityRepo from "@kan/db/repository/cardActivity.repo";
 import * as taskMasterRepo from "@kan/db/repository/taskMaster.repo";
@@ -6,7 +7,7 @@ import {z} from "zod";
 import {statusTypeEnum} from "@kan/db/schema";
 import { TRPCError } from "@trpc/server";
 
-const statusTypeEnumSchema = z.enum(statusTypeEnum.enumValues);
+const statusTypeEnumSchema = z.enum(statusTypeEnum.enumValues); 
 
 export const taskInstanceRouter = createTRPCRouter({
     create: protectedProcedure
@@ -22,7 +23,6 @@ export const taskInstanceRouter = createTRPCRouter({
     })
     .input(
         z.object({
-            userId: z.string(),
             taskMasterId: z.string(),
             targetDate: z.date(),
             actualDate: z.date(),
@@ -30,11 +30,32 @@ export const taskInstanceRouter = createTRPCRouter({
         })
     )
     .mutation(async ({ctx, input}) => {
-        const {userId, taskMasterId, targetDate, actualDate, status} = input;
+        const userId = ctx.user?.id;
+        if (!userId) {
+            throw new TRPCError({
+                message: `User not authenticated`,
+                code: "UNAUTHORIZED",
+            });
+        }
+
+        const {taskMasterId, targetDate, actualDate, status} = input;
+
+        const taskMaster = await ctx.db.query.taskMasters.findFirst({
+            where: (t, { eq }) => eq(t.id, taskMasterId),
+        });
+
+        if (!taskMaster) {
+            throw new TRPCError({
+                message: `Task master not found`,
+                code: "NOT_FOUND",
+            });
+        }
 
         const newTaskInstance = await taskInstanceRepo.create(ctx.db, {
             userId,
             taskMasterId,
+            name: taskMaster.name!,
+            description: taskMaster.description!,
             targetDate,
             actualDate,
             status,
@@ -95,7 +116,7 @@ export const taskInstanceRouter = createTRPCRouter({
                     ...(input.createdBy ? [eq(t.createdBy, input.createdBy)] : []),
                     eq(t.isDeleted, false),
                 ),
-            with: { frequence: true },
+            with: { frequence: true, assignee: true },
         });
 
         const results = await Promise.all(
@@ -133,11 +154,27 @@ export const taskInstanceRouter = createTRPCRouter({
 
                     const newVirtualTaskInstances = virtualTaskInstances.map((virtualInstance) => {
                         const existing = existingTaskInstanceMap.get(virtualInstance.targetDate!.toISOString());
-                        return existing ?? {
-                            ...virtualInstance,
+                        
+                        const taskMasterInfo = {
+                            name: taskMaster.name,
+                            description: taskMaster.description,
                             selectedUserId: taskMaster.targetUser,
                             startDate: taskMaster.startDate,
                             endDate: taskMaster.endDate,
+                        };
+
+                        if (existing) {
+                            return {
+                                ...existing,
+                                taskMaster: taskMasterInfo,
+                                assignee: taskMaster.assignee,
+                            };
+                        }
+
+                        return {
+                            ...virtualInstance,
+                            taskMaster: taskMasterInfo,
+                            assignee: taskMaster.assignee,
                         };
                     });
 
@@ -165,6 +202,8 @@ export const taskInstanceRouter = createTRPCRouter({
         z.object({
             id: z.string(),
             taskMasterId: z.string(),
+            name: z.string().optional(),
+            description: z.string().optional(),
             targetDate: z.date().optional(),
             actualDate: z.date().optional(),
             status: statusTypeEnumSchema,
@@ -172,7 +211,7 @@ export const taskInstanceRouter = createTRPCRouter({
     )
     .mutation(async ({ctx, input}) => {
         const userId = ctx.user?.id;
-        
+
         if (!userId) {
             throw new TRPCError({
                 message: `User not authenticated`,
@@ -180,7 +219,7 @@ export const taskInstanceRouter = createTRPCRouter({
             });
         }
 
-        const {id, taskMasterId, targetDate, actualDate, status} = input;
+        const {id, taskMasterId, name, description, targetDate, actualDate, status} = input;
 
         const oldTaskInstance = await ctx.db.query.taskInstances.findFirst({
             where: (t, { eq }) => eq(t.id, id),
@@ -204,7 +243,7 @@ export const taskInstanceRouter = createTRPCRouter({
             });
         }
 
-        if (taskMaster.targetUser !== userId || taskMaster.createdBy !== userId) {
+        if (taskMaster.targetUser !== userId && taskMaster.createdBy !== userId) {
             throw new TRPCError({
                 message: `User not authorized to update this task instance`,
                 code: "UNAUTHORIZED",
@@ -215,6 +254,8 @@ export const taskInstanceRouter = createTRPCRouter({
             id,
             userId,
             taskMasterId,
+            name,
+            description,
             targetDate,
             actualDate,
             status: status,

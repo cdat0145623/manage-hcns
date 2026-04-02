@@ -107,15 +107,32 @@ export const taskMasterRouter = createTRPCRouter({
 
     const {id, name, description, startDate, endDate, selectedUserId, rruleString} = input;
 
-    return taskMasterRepo.update(ctx.db, {
-        id,
-        name,
-        description,
-        startDate,
-        endDate,
-        selectedUserId,
-        rruleString,
-        userId,
+    const taskMaster = await taskMasterRepo.update(ctx.db, {
+      id,
+      name,
+      description,
+      startDate,
+      endDate,
+      selectedUserId,
+      rruleString,
+      userId,
+    });
+
+    const taskInstances = await ctx.db.query.taskInstances.findMany({
+      where: (t, { eq }) => eq(t.taskMasterId, id),
+    });
+
+    const updatedTaskInstances = taskInstances.map(async (taskInstance) => {
+      await taskInstanceRepo.update(ctx.db, {
+        id: taskInstance.id,
+        taskMasterId: id,
+        userId: userId,
+        name: taskMaster.name!,
+        description: taskMaster.description!,
+        status: taskInstance.status,
       });
+    });
+
+    return taskMaster;
   })
 })

@@ -15,6 +15,8 @@ export const create = async (
   taskInstanceInput: {
     userId: string;
     taskMasterId: string;
+    name: string;
+    description: string;
     targetDate: Date;
     actualDate: Date;
     status: TaskStatus;
@@ -95,6 +97,8 @@ export const update = async (
       id: string,
       userId: string,
       taskMasterId: string,
+      name?: string,
+      description?: string,
       targetDate?: Date,
       actualDate?: Date,
       status: TaskStatus,
@@ -109,6 +113,8 @@ export const update = async (
     .set({
       userId: taskInstanceInput.userId,
       taskMasterId: taskInstanceInput.taskMasterId,
+      name: taskInstanceInput.name,
+      description: taskInstanceInput.description,
       targetDate: taskInstanceInput.targetDate,
       actualDate: taskInstanceInput.actualDate,
       status: taskInstanceInput.status,

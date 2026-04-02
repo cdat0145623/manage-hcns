@@ -189,7 +189,7 @@ export function CalendarTask({
             </span>
             {entry.duration && entry.duration > 40 && (
               <p className="mt-2 line-clamp-1 text-[11px] font-medium opacity-50">
-                {entry.description}
+                {entry.duration} minutes
               </p>
             )}
           </div>

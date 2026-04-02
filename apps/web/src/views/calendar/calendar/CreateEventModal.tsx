@@ -7,7 +7,9 @@ import { generateRRuleString } from "@kan/shared/utils";
 
 import { api } from "~/utils/api";
 import { usePopup } from "~/providers/popup";
-import Modal from "../modal";
+import Modal from "../../../components/modal";
+
+import { startOfMonth, endOfMonth } from "date-fns";
 
 export type RecurrenceType =
   | "UNSELECTED"
@@ -34,6 +36,8 @@ export interface EditableEntry {
   description?: string;
   date: Date | string;
   endDate?: Date | string;
+  selectedUserId?: string;
+  assigneeName?: string;
   startTime?: string;
   endTime?: string;
   color?: string;
@@ -143,7 +147,7 @@ export function CreateEventModal({
 }: CreateEventModalProps) {
   const isEditMode = !!editEntry;
   const { data: session } = authClient.useSession();
-
+  const { data: users } = api.user.getAll.useQuery();
   const utils = api.useUtils();
   const { showPopup } = usePopup();
 
@@ -177,6 +181,23 @@ export function CreateEventModal({
     },
   });
 
+  const updateTaskInstance = api.taskInstance.update.useMutation({
+    onSuccess: () => {
+      void utils.taskInstance.getVirtual.invalidate();
+      onSuccessProp?.();
+      onClose();
+    },
+    onError: (error: any) => {
+      console.error("Update failed:", error);
+      showPopup({
+        header: "Lỗi",
+        message: error.message || "Không thể cập nhật công việc.",
+        icon: "error",
+      });
+      void utils.taskInstance.getVirtual.invalidate();
+    },
+  });
+
   const updateTask = api.taskMaster.update.useMutation({
     onSuccess: () => {
       void utils.taskInstance.getVirtual.invalidate();
@@ -203,8 +224,9 @@ export function CreateEventModal({
   const [recurrence, setRecurrence] = useState<RecurrenceType>("UNSELECTED");
   const [attendees, setAttendees] = useState<Attendee[]>([]);
   const [hasAttemptedSave, setHasAttemptedSave] = useState(false);
+  const [showUpdateConfirm, setShowUpdateConfirm] = useState(false);
 
-  const [attendeeIdInput, setAttendeeIdInput] = useState("");
+  const [selectedUserId, setSelectedUserId] = useState<string>("");
 
   const [showStartOptions, setShowStartOptions] = useState(false);
   const [showEndOptions, setShowEndOptions] = useState(false);
@@ -281,6 +303,7 @@ export function CreateEventModal({
       setStartTime(editEntry.startTime ?? "09:00");
       setEndTime(editEntry.endTime ?? "10:00");
       setRecurrence(editEntry.recurrence ?? "NONE");
+      setSelectedUserId(editEntry.selectedUserId ?? "");
       setAttendees(editEntry.attendees ?? []);
     } else {
       setTitle("");
@@ -299,8 +322,8 @@ export function CreateEventModal({
       setRecurrence("UNSELECTED");
       setAttendees([]);
       setHasAttemptedSave(false);
+      setShowUpdateConfirm(false);
     }
-    setAttendeeIdInput("");
   }, [isVisible, editEntry, selectedDate]);
 
   const recurrenceOptions = useMemo(() => {
@@ -356,31 +379,16 @@ export function CreateEventModal({
     }
   }, [currentDate, endDateVal, isEndNextDay]);
 
-  const handleAddGuestById = () => {
-    const id = attendeeIdInput.trim();
-    if (!id) return;
-
-    const newGuest: Attendee = {
-      id,
-      name: `User ${id}`,
-      email: `${id}@employee.com`,
-    };
-
-    setAttendees((prev) => {
-      if (prev.find((a) => a.id === id)) return prev;
-      return [...prev, newGuest];
-    });
-    setAttendeeIdInput("");
-  };
-
-  const removeAttendee = (id: string) =>
-    setAttendees((prev) => prev.filter((a) => a.id !== id));
-
-  const handleSave = () => {
+  const handleSave = (updateType?: "single" | "all") => {
     setHasAttemptedSave(true);
     if (!title.trim()) return alert("Please enter a title");
     if (recurrence === "UNSELECTED") {
       return alert("Vui lòng chọn tùy chọn lặp lại (Repeat).");
+    }
+
+    if (isEditMode && editEntry && editEntry.masterId && !updateType) {
+      setShowUpdateConfirm(true);
+      return;
     }
 
     // Setup precise dates
@@ -457,6 +465,7 @@ export function CreateEventModal({
     }
 
     if (isEditMode && editEntry) {
+<<<<<<< HEAD:apps/web/src/components/calendar/CreateEventModal.tsx
       updateTask.mutate({
         id: editEntry.id,
         name: title,
@@ -466,30 +475,57 @@ export function CreateEventModal({
         selectedUserId: attendees.length > 0 ? attendees[0]?.id! : currentUserId,
         rruleString,
       });
+=======
+      if (updateType === 'all') {
+        updateTask.mutate({
+          id: editEntry.masterId!,
+          name: title,
+          description,
+          startDate: startDT,
+          endDate: finalEndDate,
+          selectedUserId: selectedUserId,
+          rruleString,
+        });
+      } else if (updateType === 'single') {
+        updateTaskInstance.mutate({
+          id: editEntry.id,
+          taskMasterId: editEntry.masterId!,
+          name: title,
+          description,
+          status: editEntry.status!,
+        });
+      }
+>>>>>>> 317b66643f25548a5b045be197d93c7ccba9d678:apps/web/src/views/calendar/calendar/CreateEventModal.tsx
     } else {
       createTask.mutate({
         name: title,
         description,
         startDate: startDT,
         endDate: finalEndDate,
-        selectedUserId: attendees.length > 0 ? attendees[0]?.id! : currentUserId,
+        selectedUserId: selectedUserId || currentUserId,
         rruleString,
+<<<<<<< HEAD:apps/web/src/components/calendar/CreateEventModal.tsx
         from: startDT,
         to: finalEndDate,
+=======
+        from: startOfMonth(startDT),
+        to: endOfMonth(startDT),
+>>>>>>> 317b66643f25548a5b045be197d93c7ccba9d678:apps/web/src/views/calendar/calendar/CreateEventModal.tsx
       });
     }
 
   };
 
   return (
-    <Modal isVisible={isVisible} centered modalSize={showEndDate ? "lg" : "md"}>
-      <motion.div
-        initial={{ opacity: 0, scale: 0.96, y: 16 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.96, y: 16 }}
-        transition={{ type: "spring", stiffness: 320, damping: 28 }}
-        className="relative flex max-h-[92vh] flex-col overflow-hidden rounded-2xl bg-white shadow-2xl dark:bg-dark-100"
-      >
+    <>
+      <Modal isVisible={isVisible} centered modalSize={showEndDate ? "lg" : "md"}>
+        <motion.div
+          initial={{ opacity: 0, scale: 0.96, y: 16 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          exit={{ opacity: 0, scale: 0.96, y: 16 }}
+          transition={{ type: "spring", stiffness: 320, damping: 28 }}
+          className="relative flex max-h-[92vh] flex-col overflow-hidden rounded-2xl bg-white shadow-2xl dark:bg-dark-100"
+        >
         <div
           className={`flex-shrink-0 border-b border-light-200 px-7 py-5 dark:border-dark-300 ${
             isEditMode
@@ -783,105 +819,39 @@ export function CreateEventModal({
           </motion.div>
 
           <div className="space-y-2.5">
-            <Label>Add Guests</Label>
+            <Label>Assign to</Label>
 
-            <div className="flex items-center gap-2">
-              <div className="relative flex flex-1 items-center gap-2.5 overflow-hidden rounded-xl border border-neutral-200/70 bg-neutral-50/50 px-4 py-3 shadow-[inset_0_2px_4px_rgba(0,0,0,0.02)] transition-all focus-within:border-blue-500 focus-within:bg-white focus-within:ring-[3px] focus-within:ring-blue-500/10 hover:bg-neutral-50 dark:border-dark-400/50 dark:bg-dark-300/50 dark:focus-within:bg-dark-200">
+            <div className="relative">
+              <select
+                value={selectedUserId}
+                onChange={(e) => setSelectedUserId(e.target.value)}
+                className="w-full appearance-none rounded-xl border border-neutral-200/70 bg-neutral-50/50 py-3 pl-4 pr-9 text-sm font-medium text-neutral-900 shadow-[inset_0_2px_4px_rgba(0,0,0,0.02)] transition-all hover:bg-neutral-50 focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-[3px] focus:ring-blue-500/10 dark:border-dark-400/50 dark:bg-dark-300/50 dark:text-white dark:focus:bg-dark-200"
+              >
+                <option value="" disabled hidden>
+                  Select user...
+                </option>
+                {users?.map((user) => (
+                  <option key={user.id} value={user.id}>
+                    {user.name || user.username || user.email}
+                  </option>
+                ))}
+              </select>
+              <div className="pointer-events-none absolute inset-y-0 right-4 flex items-center">
                 <svg
-                  className="h-4 w-4 flex-shrink-0 text-neutral-400"
+                  className="h-4 w-4 text-blue-500"
                   fill="none"
                   viewBox="0 0 24 24"
                   stroke="currentColor"
-                  strokeWidth={2}
+                  strokeWidth={2.5}
                 >
                   <path
                     strokeLinecap="round"
                     strokeLinejoin="round"
-                    d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+                    d="M19 9l-7 7-7-7"
                   />
                 </svg>
-                <input
-                  type="text"
-                  value={attendeeIdInput}
-                  onChange={(e) => setAttendeeIdInput(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      e.preventDefault();
-                      handleAddGuestById();
-                    }
-                  }}
-                  placeholder="Enter User ID to add..."
-                  className="flex-1 appearance-none border-none bg-transparent p-0 text-sm text-neutral-900 placeholder-neutral-400 shadow-none focus:outline-none focus:ring-0 dark:text-white dark:placeholder-dark-500"
-                />
               </div>
-              <button
-                onClick={handleAddGuestById}
-                className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-2.5 text-sm font-bold text-blue-600 transition-all hover:bg-blue-100 active:scale-95 dark:border-blue-900/40 dark:bg-blue-900/20 dark:text-blue-400 dark:hover:bg-blue-900/40"
-              >
-                Add
-              </button>
             </div>
-
-            <AnimatePresence>
-              {attendees.length > 0 && (
-                <motion.div
-                  layout
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  className="overflow-hidden rounded-xl border border-light-200 dark:border-dark-300"
-                >
-                  {attendees.map((att, idx) => (
-                    <motion.div
-                      key={att.id}
-                      layout
-                      initial={{ opacity: 0, x: -8 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      exit={{ opacity: 0, x: -8 }}
-                      transition={{ duration: 0.15 }}
-                      className={`flex items-center gap-3 px-4 py-2.5 ${
-                        idx !== attendees.length - 1
-                          ? "border-b border-light-200 dark:border-dark-300"
-                          : ""
-                      } bg-white dark:bg-dark-200`}
-                    >
-                      <div
-                        className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full text-xs font-bold text-white ${avatarColor(att.id)}`}
-                      >
-                        {getInitials(att.name)}
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-semibold text-neutral-800 dark:text-white">
-                          {att.name}
-                        </p>
-                        <p className="truncate text-xs text-neutral-400 dark:text-neutral-500">
-                          {att.email}
-                          {att.role ? ` · ${att.role}` : ""}
-                        </p>
-                      </div>
-                      <button
-                        onClick={() => removeAttendee(att.id)}
-                        className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full text-neutral-300 transition-colors hover:bg-rose-100 hover:text-rose-500 dark:hover:bg-rose-900/30"
-                      >
-                        <svg
-                          className="h-3.5 w-3.5"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          stroke="currentColor"
-                          strokeWidth={2.5}
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            d="M6 18L18 6M6 6l12 12"
-                          />
-                        </svg>
-                      </button>
-                    </motion.div>
-                  ))}
-                </motion.div>
-              )}
-            </AnimatePresence>
           </div>
 
           <div className="rounded-xl bg-neutral-50 p-4 dark:bg-dark-200">
@@ -935,7 +905,7 @@ export function CreateEventModal({
             Cancel
           </button>
           <button
-            onClick={handleSave}
+            onClick={() => handleSave()}
             className={`flex-1 rounded-xl px-6 py-3 text-sm font-bold text-white shadow-md transition-all hover:shadow-lg active:scale-[0.98] ${
               isEditMode
                 ? "bg-violet-500 hover:bg-violet-600"
@@ -945,7 +915,134 @@ export function CreateEventModal({
             {isEditMode ? "Update" : "Save"}
           </button>
         </div>
-      </motion.div>
-    </Modal>
+            </motion.div>
+      </Modal>
+
+      {/* Custom Update Confirmation Modal */}
+      <AnimatePresence>
+        {showUpdateConfirm && (
+          <div className="fixed inset-0 z-[3000] flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowUpdateConfirm(false)}
+              className="absolute inset-0 bg-black/30 backdrop-blur-[3px]"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.92, y: 16 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.92, y: 16 }}
+              transition={{ type: "spring", stiffness: 380, damping: 28 }}
+              className="relative w-full max-w-sm overflow-hidden rounded-3xl border border-white/40 bg-white shadow-2xl dark:border-white/10 dark:bg-neutral-900"
+            >
+              <div className="flex flex-col items-center px-8 pb-4 pt-8">
+                <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-50 shadow-lg shadow-blue-500/10">
+                  <svg
+                    className="h-7 w-7 text-blue-500"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                    />
+                  </svg>
+                </div>
+                <h3 className="text-lg font-black text-neutral-900 dark:text-white">
+                  Cập nhật công việc
+                </h3>
+                <p className="mt-1.5 text-center text-sm text-neutral-500 dark:text-neutral-400">
+                  <span className="font-semibold text-neutral-700 dark:text-neutral-200">
+                    "{title}"
+                  </span>{" "}
+                  là công việc lặp lại. Bạn muốn cập nhật loại nào?
+                </p>
+              </div>
+
+              <div className="flex flex-col gap-2 px-6 pb-6">
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.97 }}
+                  onClick={() => {
+                    setShowUpdateConfirm(false);
+                    handleSave("single");
+                  }}
+                  className="flex items-center gap-3 rounded-2xl border border-neutral-100 bg-neutral-50 px-5 py-3.5 text-left transition-all hover:border-neutral-200 hover:bg-neutral-100 dark:border-neutral-800 dark:bg-neutral-800/50 dark:hover:bg-neutral-800"
+                >
+                  <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-orange-100 dark:bg-orange-900/30">
+                    <svg
+                      className="h-4.5 w-4.5 text-orange-500"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      strokeWidth={2}
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+                      />
+                    </svg>
+                  </div>
+                  <div>
+                    <p className="text-sm font-black text-neutral-900 dark:text-white">
+                      Chỉ ngày này
+                    </p>
+                    <p className="text-xs text-neutral-400">
+                      Sửa thông tin công việc vào ngày đã chọn
+                    </p>
+                  </div>
+                </motion.button>
+
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.97 }}
+                  onClick={() => {
+                    setShowUpdateConfirm(false);
+                    handleSave("all");
+                  }}
+                  className="flex items-center gap-3 rounded-2xl border border-blue-100 bg-blue-50 px-5 py-3.5 text-left transition-all hover:border-blue-200 hover:bg-blue-100 dark:border-blue-900/40 dark:bg-blue-900/20 dark:hover:bg-blue-900/30"
+                >
+                  <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-blue-100 dark:bg-blue-900/40">
+                    <svg
+                      className="h-4.5 w-4.5 text-blue-500"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      strokeWidth={2}
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                      />
+                    </svg>
+                  </div>
+                  <div>
+                    <p className="text-sm font-black text-blue-700 dark:text-blue-400">
+                      Toàn bộ chuỗi lặp
+                    </p>
+                    <p className="text-xs text-blue-400/80">
+                      Sửa thông tin cho tất cả các ngày trong lịch
+                    </p>
+                  </div>
+                </motion.button>
+
+                <button
+                  onClick={() => setShowUpdateConfirm(false)}
+                  className="mt-1 rounded-xl py-2 text-sm font-bold text-neutral-400 transition-all hover:text-neutral-600 dark:hover:text-neutral-200"
+                >
+                  Hủy
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+    </>
   );
 }

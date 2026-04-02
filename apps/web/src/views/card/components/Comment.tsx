@@ -67,7 +67,7 @@ const Comment = ({
 
   const workspaceMembers: WorkspaceMember[] =
     cardData?.list.board.workspace.members
-      .filter((member) => member.email)
+      .filter((member): member is typeof member & { email: string } => !!member.email)
       .map((member) => ({
         publicId: member.publicId,
         email: member.email,

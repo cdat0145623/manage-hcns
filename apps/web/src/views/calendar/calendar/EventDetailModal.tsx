@@ -7,7 +7,7 @@ import { authClient } from "@kan/auth/client";
 import type { EditableEntry } from "./CreateEventModal";
 import { api } from "~/utils/api";
 import { usePopup } from "~/providers/popup";
-import Modal from "../modal";
+import Modal from "../../../components/modal";
 
 interface EventDetailModalProps {
   isVisible: boolean;
@@ -58,10 +58,54 @@ export function EventDetailModal({
   const isVirtual = entry.type === "VIRTUAL";
   const isDone = entry.status === "done";
 
+  const handleCreateInstance = async () => {
+    if (!entry.masterId) return;
+    try {
+      const userId = session?.user?.id;
+      if (!userId) {
+        showPopup({
+          header: "Yêu cầu đăng nhập",
+          message: "Bạn cần đăng nhập để hoàn thành công việc.",
+          icon: "info",
+        });
+        return;
+      }
+      await createInstance.mutateAsync({
+        taskMasterId: entry.masterId,
+        targetDate: new Date(entry.date),
+        actualDate: new Date(entry.date),
+        status: "pending",
+      });
+    } catch (error: any) {
+      console.error("Caught error in handleCreateInstance:", error);
+      // More aggressive check for ANY database constraint or duplicate error
+      const isDuplicate = 
+        error.message?.toLowerCase().includes("unique constraint") || 
+        error.message?.toLowerCase().includes("duplicate") ||
+        error.shape?.message?.toLowerCase().includes("unique constraint") ||
+        JSON.stringify(error).toLowerCase().includes("unique constraint");
+
+      if (isDuplicate) {
+        showPopup({
+          header: "Lỗi xung đột",
+          message: "Công việc này đã được hoàn thành trước đó. Lịch sẽ tự động làm mới.",
+          icon: "info",
+        });
+        void utils.taskInstance.getVirtual.invalidate();
+        onClose();
+      } else {
+        showPopup({
+          header: "Lỗi",
+          message: error.message || "Không thể hoàn thành công việc. Vui lòng thử lại sau.",
+          icon: "error",
+        });
+      }
+    }
+  };
+
   const handleComplete = async () => {
     if (!entry.masterId) return;
     try {
-      if (isVirtual) {
         const userId = session?.user?.id;
         if (!userId) {
           showPopup({
@@ -71,22 +115,13 @@ export function EventDetailModal({
           });
           return;
         }
-        await createInstance.mutateAsync({
-          userId,
-          taskMasterId: entry.masterId,
-          targetDate: new Date(entry.date),
-          actualDate: new Date(),
-          status: "done",
-        });
-      } else if (entry.instanceId) {
         await updateInstance.mutateAsync({
-          id: entry.instanceId,
+          id: entry.instanceId!,
           taskMasterId: entry.masterId,
           targetDate: new Date(entry.date),
-          actualDate: new Date(),
+          actualDate: new Date(entry.date),
           status: "done",
         });
-      }
     } catch (error: any) {
       console.error("Caught error in handleComplete:", error);
       // More aggressive check for ANY database constraint or duplicate error
@@ -163,25 +198,30 @@ export function EventDetailModal({
               </p>
             </div>
             {entry.status && (
-              <div
-                className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-[10px] font-black uppercase tracking-widest shadow-sm ${
-                  entry.status === "done"
-                    ? "bg-green-200 border-green-300 text-green-900 dark:bg-green-900/40 dark:border-green-800 dark:text-white"
-                    : entry.status === "missed"
-                      ? "bg-red-200 border-red-300 text-red-900 dark:bg-red-900/40 dark:border-red-800 dark:text-white"
-                      : "bg-blue-200 border-blue-300 text-blue-900 dark:bg-blue-900/40 dark:border-blue-800 dark:text-white"
-                }`}
-              >
+              <div className="flex items-center gap-2 flex-col">
                 <div
-                  className={`h-1.5 w-1.5 rounded-full ${
+                  className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-[10px] font-black uppercase tracking-widest shadow-sm ${
                     entry.status === "done"
-                      ? "bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.5)]"
+                      ? "bg-green-200 border-green-300 text-green-900 dark:bg-green-900/40 dark:border-green-800 dark:text-white"
                       : entry.status === "missed"
-                        ? "bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]"
-                        : "bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.5)]"
+                        ? "bg-red-200 border-red-300 text-red-900 dark:bg-red-900/40 dark:border-red-800 dark:text-white"
+                        : "bg-blue-200 border-blue-300 text-blue-900 dark:bg-blue-900/40 dark:border-blue-800 dark:text-white"
                   }`}
-                />
-                {entry.status}
+                >
+                  <div
+                    className={`h-1.5 w-1.5 rounded-full ${
+                      entry.status === "done"
+                        ? "bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.5)]"
+                        : entry.status === "missed"
+                          ? "bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]"
+                          : "bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.5)]"
+                    }`}
+                  />
+                  {entry.status}
+                </div>
+                <div className="flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-[10px] font-black uppercase tracking-widest shadow-sm bg-yellow-200 border-yellow-300 text-yellow-900 dark:bg-yellow-900/40 dark:border-yellow-800 dark:text-white">
+                  {entry.assigneeName}
+                </div>
               </div>
             )}
           </div>
@@ -195,9 +235,8 @@ export function EventDetailModal({
           )}
 
           {isVirtual && (
-            <div className="rounded-xl bg-amber-50 p-3 text-[10px] text-amber-700 dark:bg-amber-900/20 dark:text-amber-400">
-              ⚠️ Đây là công việc ảo được tạo tự động từ lịch lặp. Nhấn Hoàn
-              thành để lưu kết quả.
+            <div className="rounded-xl bg-amber-50 p-3 text-[12px] text-amber-700 dark:bg-amber-900/20 dark:text-amber-400">
+              ⚠️ Đây là công việc ảo được tạo tự động từ lịch lặp. Nhấn <strong>Tạo</strong> để tạo công việc và <strong>Hoàn thành</strong> để hoàn thành công việc.
             </div>
           )}
         </div>
@@ -220,15 +259,28 @@ export function EventDetailModal({
           </div>
 
           {isPending && (
+            <div className="flex gap-3">
+              {isVirtual && (
+                <button
+                  onClick={handleCreateInstance}
+                  disabled={createInstance.isPending || updateInstance.isPending}
+                  className="w-full rounded-xl bg-blue-600 px-6 py-3 text-base font-bold text-white shadow-md transition-all hover:bg-blue-700 hover:shadow-lg active:scale-[0.98] disabled:opacity-50 dark:bg-blue-500 dark:hover:bg-blue-600"
+                >
+                  {createInstance.isPending || updateInstance.isPending
+                    ? "Đang xử lý..."
+                    : "Tạo"}
+                </button>
+              )}
             <button
               onClick={handleComplete}
               disabled={createInstance.isPending || updateInstance.isPending}
-              className="w-full rounded-xl bg-emerald-600 px-6 py-3 text-sm font-bold text-white shadow-md transition-all hover:bg-emerald-700 hover:shadow-lg active:scale-[0.98] disabled:opacity-50 dark:bg-emerald-500 dark:hover:bg-emerald-600"
+              className="w-full rounded-xl bg-emerald-600 px-6 py-3 text-base font-bold text-white shadow-md transition-all hover:bg-emerald-700 hover:shadow-lg active:scale-[0.98] disabled:opacity-50 dark:bg-emerald-500 dark:hover:bg-emerald-600"
             >
               {createInstance.isPending || updateInstance.isPending
                 ? "Đang xử lý..."
-                : "Hoàn thành ✓"}
+                : "Hoàn thành"}
             </button>
+            </div>
           )}
         </div>
       </motion.div>

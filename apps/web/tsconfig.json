@@ -5,7 +5,9 @@
     "jsx": "preserve",
     "baseUrl": ".",
     "paths": {
-      "~/*": ["./src/*"]
+      "~/*": ["./src/*"],
+      "@kan/api": ["../../packages/api/src/index.ts"],
+      "@kan/api/*": ["../../packages/api/src/*"],
     },
     "plugins": [{ "name": "next" }],
     "module": "esnext"

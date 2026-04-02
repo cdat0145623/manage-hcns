@@ -71,6 +71,8 @@ export const taskInstances = pgTable(
     taskMasterId: uuid("taskMasterId")
       .notNull()
       .references(() => taskMasters.id),
+    name: varchar("name", { length: 255 }),
+    description: text("description"),
     targetDate: timestamp("targetDate"),
     actualDate: timestamp("actualDate"),
     status: statusTypeEnum("status").notNull().default("pending"),
@@ -129,12 +131,12 @@ export const taskMasterRelations = relations(taskMasters, ({ one, many }) => ({
     fields: [taskMasters.freqId],
     references: [frequence.id],
   }),
-  targetUser: one(users, {
+  assignee: one(users, {
     fields: [taskMasters.targetUser],
     references: [users.id],
     relationName: "taskMastersTargetUser",
   }),
-  createdBy: one(users, {
+  creator: one(users, {
     fields: [taskMasters.createdBy],
     references: [users.id],
     relationName: "taskMastersCreatedByUser",

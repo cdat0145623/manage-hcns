@@ -95,7 +95,7 @@ export default function CardDetailsModalContent({
   } = useModal();
   const { showPopup } = usePopup();
   const { workspace } = useWorkspace();
-  const { canEditCard } = usePermissions();
+  const { canEditCard, canAttach, canTick, canCreateComment } = usePermissions();
   const { data: session } = authClient.useSession();
   const [activeChecklistForm, setActiveChecklistForm] = useState<string | null>(
     null,
@@ -105,7 +105,7 @@ export default function CardDetailsModalContent({
     { cardPublicId: cardId ?? "" },
     { enabled: !!cardId && cardId.length >= 12 },
   );
-
+console.log(card)
   const isCreator = card?.createdBy && session?.user.id === card.createdBy;
   const canEdit = canEditCard || isCreator;
 
@@ -417,7 +417,7 @@ export default function CardDetailsModalContent({
                   />
                 </div>
               )}
-              {canEdit && (
+              {(canAttach && (isCreator || card.members.map((m) => m.user?.id).includes(session?.user.id))) && (
                 <div className="mt-4">
                   <AttachmentUpload cardPublicId={cardId} />
                 </div>
@@ -436,7 +436,7 @@ export default function CardDetailsModalContent({
                 isLoading={!card}
                 isAdmin={workspace.role === "ADMIN"}
               />
-              {!isTemplate && (
+              {!isTemplate && (canCreateComment && (isCreator || card.members.map((m) => m.user?.id).includes(session?.user.id))) && (
                 <div className="mt-4">
                   <NewCommentForm
                     cardPublicId={cardId}

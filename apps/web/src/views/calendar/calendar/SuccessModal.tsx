@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import Modal from "../modal";
+import Modal from "../../../components/modal";
 
 interface SuccessModalProps {
   isVisible: boolean;

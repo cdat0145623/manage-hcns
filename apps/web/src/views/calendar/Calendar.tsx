@@ -9,19 +9,19 @@ import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useRef, useState } from "react";
 import { DragDropContext } from "react-beautiful-dnd";
 
-import type { ViewMode } from "./CalendarHeader";
-import type { CreateEventInput, EditableEntry } from "./CreateEventModal";
+import type { ViewMode } from "./calendar/CalendarHeader";
+import type { CreateEventInput, EditableEntry } from "./calendar/CreateEventModal";
 import type { CalendarEntry } from "~/hooks/useRecurrence";
 import { useRecurrence } from "~/hooks/useRecurrence";
 import { usePopup } from "~/providers/popup";
 import { api } from "~/utils/api";
-import { CalendarHeader } from "./CalendarHeader";
-import { CreateEventModal } from "./CreateEventModal";
-import { DayView } from "./DayView";
-import { EventDetailModal } from "./EventDetailModal";
-import { MonthView } from "./MonthView";
-import { SuccessModal } from "./SuccessModal";
-import { WeekView } from "./WeekView";
+import { CalendarHeader } from "./calendar/CalendarHeader";
+import { CreateEventModal } from "./calendar/CreateEventModal";
+import { DayView } from "./calendar/DayView";
+import { EventDetailModal } from "./calendar/EventDetailModal";
+import { MonthView } from "./calendar/MonthView";
+import { SuccessModal } from "./calendar/SuccessModal";
+import { WeekView } from "./calendar/WeekView";
 
 function toEditableEntry(entry: CalendarEntry): EditableEntry {
   const date = new Date(entry.date);
@@ -36,7 +36,9 @@ function toEditableEntry(entry: CalendarEntry): EditableEntry {
     type: entry.type,
     status: entry.status,
     title: entry.title,
-    description: (entry as any).description || "",
+    description: entry.description,
+    assigneeName: entry.assigneeName,
+    selectedUserId: entry.selectedUserId,
     date,
     startTime,
     endTime,

@@ -1,5 +1,5 @@
 import { getDashboardLayout } from "~/components/Dashboard";
-import { Calendar } from "~/components/calendar/Calendar";
+import { Calendar } from "~/views/calendar/Calendar";
 import Head from "next/head";
 
 export default function CalendarPage() {

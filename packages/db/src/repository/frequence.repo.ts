@@ -20,11 +20,13 @@ export const create = async (
     throw new Error("dtStart is required");
   }
 
+  const normalizedRrule = frequenceInput.rrule.replace(/\n/g, "\\n");
+
   const [frequence] = await db
     .insert(frequences)
     .values({
       name: frequenceInput.name,
-      rruleString: frequenceInput.rrule,
+      rruleString: normalizedRrule,
       dtStart: frequenceInput.dtStart,
     })
     .returning({

@@ -5,6 +5,7 @@ import { generateUID } from "@kan/shared/utils";
 
 import * as frequenceRepo from "./frequence.repo";
 import * as cardActivitesRepo from "./cardActivity.repo";
+import * as taskInstanceRepo from "./taskInstance.repo";
 
 export const create = async (
   db: dbClient,
@@ -104,12 +105,12 @@ export const update = async (
     }
 
     let frequence;
-      if (taskMasterInput.rruleString) {
-        frequence = await frequenceRepo.update(tx, {
-          id: existingTaskMaster.freqId,
-          name: taskMasterInput.rruleString,
-          rrule: taskMasterInput.rruleString,
-          dtStart: taskMasterInput.startDate,
+    if (taskMasterInput.rruleString) {
+      frequence = await frequenceRepo.update(tx, {
+        id: existingTaskMaster.freqId,
+        name: taskMasterInput.rruleString,
+        rrule: taskMasterInput.rruleString,
+        dtStart: taskMasterInput.startDate,
       });
 
       if (!frequence) {

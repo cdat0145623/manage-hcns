@@ -31,6 +31,9 @@ export interface CalendarEntry {
   masterId: string;
   instanceId?: string;
   title: string;
+  description: string;
+  assigneeName: string;
+  selectedUserId?: string;
   date: Date;
   status?: "pending" | "done" | "missed";
   type: "VIRTUAL" | "INSTANCE";
@@ -40,7 +43,7 @@ export interface CalendarEntry {
 
 export function useRecurrence(currentDate: Date) {
   const monthStart = startOfMonth(currentDate);
-  const monthEnd = endOfMonth(addMonths(currentDate, 1)); // Buffer
+  const monthEnd = endOfMonth(currentDate); // Buffer
 
   // Lấy dữ liệu thực tế từ backend
   const { data: virtualTasks } = api.taskInstance.getVirtual.useQuery({
@@ -60,7 +63,7 @@ export function useRecurrence(currentDate: Date) {
 
     return virtualTasks.map((task: any) => {
       const isVirtual = task.id?.startsWith("virtual_");
-      
+
       // Chuyển status về chữ thường để tránh lỗi khi hiển thị màu giao diện (bắt buộc phải là "pending" | "done" | "missed")
       let currentStatus = typeof task.status === "string" ? task.status.toLowerCase() : "pending";
       if (!["pending", "done", "missed"].includes(currentStatus)) {
@@ -71,8 +74,10 @@ export function useRecurrence(currentDate: Date) {
         id: task.id,
         masterId: task.taskMasterId || task.masterId,
         instanceId: isVirtual ? undefined : task.id,
-        // Dùng tạm fallback text "Công việc chưa có tên" nếu backend chưa return name
-        title: task.name || task.taskMaster?.name || task.title || "Công việc (Chưa có tên)", 
+        title: task.name || task.taskMaster?.name,
+        description: task.description || task.taskMaster?.description,
+        assigneeName: task.assignee?.name || "",
+        selectedUserId: task.assignee?.id || "",
         date: new Date(task.targetDate || task.date),
         status: currentStatus,
         type: isVirtual ? "VIRTUAL" : "INSTANCE",

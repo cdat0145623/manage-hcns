@@ -9,6 +9,7 @@ import { t } from "@lingui/macro";
 import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useRef, useState } from "react";
 import { DragDropContext } from "react-beautiful-dnd";
+import { isSameMonth, startOfMonth } from "date-fns";
 
 import type { ViewMode } from "./calendar/CalendarHeader";
 import type {
@@ -129,14 +130,20 @@ export function Calendar() {
 
   const handleTaskClick = (entry: CalendarEntry) => {
     const editable = toEditableEntry(entry);
-    if (entry.type === "VIRTUAL") {
-      setSelectedDate(new Date(entry.date));
-      setEditEntry(editable);
-      setIsFormOpen(true);
-    } else {
+    // if (entry.type === "VIRTUAL") {
+    //   setSelectedDate(new Date(entry.date));
+    //   setEditEntry(editable);
+    //   setIsFormOpen(true);
+    // } else {
       setDetailEntry(editable);
       setIsDetailOpen(true);
-    }
+    // }
+  };
+
+  const handleViewDay = (date: Date) => {
+    setDirection(0);
+    setCurrentDate(date);
+    setViewMode("DAY");
   };
 
   const handleEditFromDetail = (entry: EditableEntry) => {
@@ -181,16 +188,17 @@ export function Calendar() {
         taskMasterId: entry.masterId,
         type: "all",
       });
-    } else {
+    } 
+    // else {
       // For single deletion, use instanceId (BUG-2: guard already blocks virtual tasks above)
-      const idToDelete = entry.instanceId ?? entry.id;
+      // const idToDelete = entry.instanceId ?? entry.id;
 
-      deleteMutation.mutate({
-        id: idToDelete,
-        taskMasterId: entry.masterId,
-        type: "single",
-      });
-    }
+      // deleteMutation.mutate({
+      //   id: idToDelete,
+      //   taskMasterId: entry.masterId,
+      //   type: "single",
+      // });
+    //}
   };
 
   const handleDetailClose = () => {
@@ -247,6 +255,13 @@ export function Calendar() {
           viewMode={viewMode}
           setViewMode={(mode) => {
             setDirection(0);
+            
+            if (!isSameMonth(currentDate, new Date())) {
+              if (mode === "WEEK" || mode === "DAY") {
+                setCurrentDate(startOfMonth(currentDate));
+              }
+            }
+
             setViewMode(mode);
           }}
         />
@@ -292,6 +307,7 @@ export function Calendar() {
                     entries={calendarEntries}
                     onTaskClick={handleTaskClick}
                     onCellClick={handleCellClick}
+                    onViewDay={handleViewDay}
                   />
                 </motion.div>
               )}
@@ -328,6 +344,7 @@ export function Calendar() {
                     entries={calendarEntries}
                     onTaskClick={handleTaskClick}
                     onCellClick={handleCellClick}
+                    onViewDay={handleViewDay}
                   />
                 </motion.div>
               )}
@@ -449,7 +466,7 @@ export function Calendar() {
 
               {/* Options */}
               <div className="flex flex-col gap-2 px-6 pb-6">
-                <motion.button
+                {/* <motion.button
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.97 }}
                   onClick={() => {
@@ -482,7 +499,7 @@ export function Calendar() {
                       Remove only the selected date
                     </p>
                   </div>
-                </motion.button>
+                </motion.button> */}
 
                 <motion.button
                   whileHover={{ scale: 1.02 }}

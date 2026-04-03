@@ -184,22 +184,22 @@ export function CreateEventModal({
     },
   });
 
-  const updateTaskInstance = api.taskInstance.update.useMutation({
-    onSuccess: () => {
-      void utils.taskInstance.getVirtual.invalidate();
-      onSuccessProp?.();
-      onClose();
-    },
-    onError: (error: any) => {
-      console.error("Update failed:", error);
-      showPopup({
-        header: "Error",
-        message: error.message || "Unable to update task.",
-        icon: "error",
-      });
-      void utils.taskInstance.getVirtual.invalidate();
-    },
-  });
+  // const updateTaskInstance = api.taskInstance.update.useMutation({
+  //   onSuccess: () => {
+  //     void utils.taskInstance.getVirtual.invalidate();
+  //     onSuccessProp?.();
+  //     onClose();
+  //   },
+  //   onError: (error: any) => {
+  //     console.error("Update failed:", error);
+  //     showPopup({
+  //       header: "Error",
+  //       message: error.message || "Unable to update task.",
+  //       icon: "error",
+  //     });
+  //     void utils.taskInstance.getVirtual.invalidate();
+  //   },
+  // });
 
   const updateTask = api.taskMaster.update.useMutation({
     onSuccess: () => {
@@ -473,27 +473,28 @@ export function CreateEventModal({
           selectedUserId: selectedUserId,
           rruleString,
         });
-      } else if (updateType === "single") {
-        if (editEntry.type === "VIRTUAL") {
-          showPopup({
-            header: "Cannot edit virtual occurrence",
-            message:
-              "You must mark this scheduled occurrence as Pending or Done to instantiate it before you can edit its details.",
-            icon: "info",
-          });
-          setShowUpdateConfirm(false);
-          setHasAttemptedSave(false);
-          return;
-        }
+      } 
+      // else if (updateType === "single") {
+        // if (editEntry.type === "VIRTUAL") {
+        //   showPopup({
+        //     header: "Cannot edit virtual occurrence",
+        //     message:
+        //       "You must mark this scheduled occurrence as Pending or Done to instantiate it before you can edit its details.",
+        //     icon: "info",
+        //   });
+        //   setShowUpdateConfirm(false);
+        //   setHasAttemptedSave(false);
+        //   return;
+        // }
 
-        updateTaskInstance.mutate({
-          id: editEntry.id,
-          taskMasterId: editEntry.masterId!,
-          name: title,
-          description,
-          status: editEntry.status!,
-        });
-      }
+        // updateTaskInstance.mutate({
+        //   id: editEntry.id,
+        //   taskMasterId: editEntry.masterId!,
+        //   name: title,
+        //   description,
+        //   status: editEntry.status!,
+        // });
+      // }
     } else {
       createTask.mutate({
         name: title,
@@ -966,7 +967,7 @@ export function CreateEventModal({
               </div>
 
               <div className="flex flex-col gap-2 px-6 pb-6">
-                <motion.button
+                {/* <motion.button
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.97 }}
                   onClick={() => {
@@ -998,7 +999,7 @@ export function CreateEventModal({
                       Update only the selected date
                     </p>
                   </div>
-                </motion.button>
+                </motion.button> */}
 
                 <motion.button
                   whileHover={{ scale: 1.02 }}

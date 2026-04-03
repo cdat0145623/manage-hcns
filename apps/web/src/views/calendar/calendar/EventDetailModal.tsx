@@ -127,6 +127,51 @@ export function EventDetailModal({
   const isVirtual = entry.type === "VIRTUAL";
   const isBusy = createInstance.isPending || updateInstance.isPending || isUpdating;
 
+  const handleCreateInstance = async () => {
+    if (!entry.masterId) return;
+    try {
+      const userId = session?.user?.id;
+      if (!userId) {
+        showPopup({
+          header: "Yêu cầu đăng nhập",
+          message: "Bạn cần đăng nhập để hoàn thành công việc.",
+          icon: "info",
+        });
+        return;
+      }
+      await createInstance.mutateAsync({
+        taskMasterId: entry.masterId,
+        targetDate: new Date(entry.date),
+        actualDate: new Date(entry.date),
+        status: "pending",
+      });
+    } catch (error: any) {
+      console.error("Caught error in handleCreateInstance:", error);
+      // More aggressive check for ANY database constraint or duplicate error
+      const isDuplicate = 
+        error.message?.toLowerCase().includes("unique constraint") || 
+        error.message?.toLowerCase().includes("duplicate") ||
+        error.shape?.message?.toLowerCase().includes("unique constraint") ||
+        JSON.stringify(error).toLowerCase().includes("unique constraint");
+
+      if (isDuplicate) {
+        showPopup({
+          header: "Lỗi xung đột",
+          message: "Công việc này đã được hoàn thành trước đó. Lịch sẽ tự động làm mới.",
+          icon: "info",
+        });
+        void utils.taskInstance.getVirtual.invalidate();
+        onClose();
+      } else {
+        showPopup({
+          header: "Lỗi",
+          message: error.message || "Không thể hoàn thành công việc. Vui lòng thử lại sau.",
+          icon: "error",
+        });
+      }
+    }
+  };
+
   const handleStatusChange = async (newStatus: TaskStatus) => {
     if (newStatus === currentStatus || isBusy) return;
     if (!entry.masterId) return;
@@ -226,12 +271,13 @@ export function EventDetailModal({
         </div>
 
         {/* Body */}
-        <div className="space-y-5 px-7 py-6">
-          {/* Title & Meta */}
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex-1 min-w-0">
-              <h3 className="text-xl font-bold text-neutral-900 dark:text-white truncate">
-                {entry.title}
+        {!isVirtual ? (
+          <div className="space-y-5 px-7 py-6">
+            {/* Title & Meta */}
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex-1 min-w-0">
+                <h3 className="text-xl font-bold text-neutral-900 dark:text-white truncate">
+                  {entry.title}
               </h3>
               <p className="mt-1 text-sm text-neutral-500 dark:text-neutral-400">
                 {format(new Date(entry.date), "MMMM d, yyyy")} · {entry.startTime} – {entry.endTime}
@@ -327,7 +373,84 @@ export function EventDetailModal({
               })}
             </div>
           </div>
+        </div>) : (
+          <motion.div
+        initial={{ opacity: 0, scale: 0.96, y: 16 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.96, y: 16 }}
+        transition={{ type: "spring", stiffness: 320, damping: 28 }}
+        className="flex flex-col"
+      >
+          <div className="space-y-4 px-7 py-6">
+          <div className="flex items-start justify-between">
+            <div className="flex-1">
+              <h3 className="text-xl font-bold text-neutral-900 dark:text-white">
+                {entry.title}
+              </h3>
+              <p className="mt-1 text-sm text-neutral-500 dark:text-neutral-400">
+                {format(new Date(entry.date), "MMMM d, yyyy")} ·{" "}
+                {entry.startTime} – {entry.endTime}
+              </p>
+            </div>
+            {entry.status && (
+              <div className="flex items-center gap-2 flex-col">
+                <div
+                  className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-[10px] font-black uppercase tracking-widest shadow-sm ${
+                    entry.status === "done"
+                      ? "bg-green-200 border-green-300 text-green-900 dark:bg-green-900/40 dark:border-green-800 dark:text-white"
+                      : entry.status === "missed"
+                        ? "bg-red-200 border-red-300 text-red-900 dark:bg-red-900/40 dark:border-red-800 dark:text-white"
+                        : "bg-blue-200 border-blue-300 text-blue-900 dark:bg-blue-900/40 dark:border-blue-800 dark:text-white"
+                  }`}
+                >
+                  <div
+                    className={`h-1.5 w-1.5 rounded-full ${
+                      entry.status === "done"
+                        ? "bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.5)]"
+                        : entry.status === "missed"
+                          ? "bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]"
+                          : "bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.5)]"
+                    }`}
+                  />
+                  {entry.status}
+                </div>
+                <div className="flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-[10px] font-black uppercase tracking-widest shadow-sm bg-yellow-200 border-yellow-300 text-yellow-900 dark:bg-yellow-900/40 dark:border-yellow-800 dark:text-white">
+                  {entry.assigneeName}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {entry.description && (
+            <div>
+              <p className="text-sm text-neutral-700 dark:text-neutral-300">
+                {entry.description}
+              </p>
+            </div>
+          )}
+
+          {isVirtual && (
+            <div className="rounded-xl bg-amber-50 p-3 text-[12px] text-amber-700 dark:bg-amber-900/20 dark:text-amber-400">
+              ⚠️ Đây là công việc ảo được tạo tự động từ lịch lặp. Nhấn <strong>Tạo</strong> để tạo công việc.
+            </div>
+          )}
         </div>
+
+        <div className="flex flex-shrink-0 flex-col gap-3 border-t border-light-200 bg-light-50 px-7 py-4 dark:border-dark-300 dark:bg-dark-200">
+            <div className="flex gap-3">
+                {/* <button
+                  onClick={handleCreateInstance}
+                  disabled={createInstance.isPending || updateInstance.isPending}
+                  className="w-full rounded-xl bg-blue-600 px-6 py-3 text-base font-bold text-white shadow-md transition-all hover:bg-blue-700 hover:shadow-lg active:scale-[0.98] disabled:opacity-50 dark:bg-blue-500 dark:hover:bg-blue-600"
+                >
+                  {createInstance.isPending || updateInstance.isPending
+                    ? "Đang xử lý..."
+                    : "Tạo"}
+                </button> */}
+            </div>
+        </div>
+        </motion.div>
+        )}
 
         {/* Footer */}
         <div className="flex flex-shrink-0 gap-3 border-t border-light-200 bg-light-50 px-7 py-4 dark:border-dark-300 dark:bg-dark-200">
@@ -349,6 +472,19 @@ export function EventDetailModal({
           >
             Edit
           </motion.button>
+          {isVirtual && (
+            <div className="flex gap-3">
+              <button
+                onClick={handleCreateInstance}
+                disabled={createInstance.isPending || updateInstance.isPending}
+                className="w-full rounded-xl bg-blue-600 px-6 py-3 text-base font-bold text-white shadow-md transition-all hover:bg-blue-700 hover:shadow-lg active:scale-[0.98] disabled:opacity-50 dark:bg-blue-500 dark:hover:bg-blue-600"
+              >
+                {createInstance.isPending || updateInstance.isPending
+                  ? "Đang xử lý..."
+                  : "Tạo"}
+              </button>
+            </div>
+          )}
         </div>
       </motion.div>
     </Modal>

@@ -26,7 +26,9 @@ export function DayView({
   const [popoverDay, setPopoverDay] = useState<Date | null>(null);
   const dayEntries = useMemo(
     () =>
-      entries.filter((entry) => isSameDay(new Date(entry.date), currentDate)),
+      entries
+        .filter((entry) => isSameDay(new Date(entry.date), currentDate))
+        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()),
     [entries, currentDate],
   );
   const overlapInfoMap = useMemo(
@@ -50,17 +52,17 @@ export function DayView({
   };
   return (
     <div className="flex h-full flex-col overflow-hidden">
-      <div className="flex border-b border-light-200 bg-light-100/50 transition-all dark:border-dark-300 dark:bg-dark-200/50">
-        <div className="w-20 flex-shrink-0 border-r border-light-200 dark:border-dark-300" />
-        <div className="flex flex-col items-start gap-1 p-6">
+      <div className="flex border-b border-light-300 bg-light-100/50 transition-all dark:border-dark-300 dark:bg-dark-200/50">
+        <div className="w-20 flex-shrink-0 border-r border-light-300 dark:border-dark-300" />
+        <div className="flex flex-col items-start gap-1 p-2 ">
           <div className="flex items-center gap-2">
-            <span className="text-xs font-black uppercase tracking-[0.2em] text-neutral-400">
+            <span className="text-xs font-black uppercase tracking-[0.2em] text-neutral-600">
               {format(currentDate, "EEEE")}
             </span>
           </div>
           <div className="mt-2 flex items-center gap-4">
             <div
-              className={`flex h-14 w-14 items-center justify-center rounded-2xl text-3xl font-black transition-all ${
+              className={`flex h-10 w-10 items-center justify-center rounded-2xl text-2xl font-black transition-all ${
                 isDayToday
                   ? "bg-blue-600 text-white shadow-lg shadow-blue-500/30"
                   : "border border-neutral-100 bg-white text-neutral-900 shadow-sm hover:bg-neutral-50 dark:border-neutral-800 dark:bg-neutral-900 dark:text-white"
@@ -70,10 +72,7 @@ export function DayView({
             </div>
             <div className="flex flex-col">
               <span className="text-lg font-black text-neutral-900 dark:text-white">
-                {format(currentDate, "MMMM")}
-              </span>
-              <span className="text-sm font-bold text-neutral-400">
-                {format(currentDate, "yyyy")}
+                {format(currentDate, "MMMM yyyy")}
               </span>
               {dayEntries.length > 0 && (
                 <motion.button
@@ -98,13 +97,13 @@ export function DayView({
 
       <div className="flex-1 overflow-y-auto">
         <div className="flex min-h-full pt-8">
-          <div className="w-20 flex-shrink-0 border-r border-light-200 bg-neutral-50/30 dark:border-dark-300 dark:bg-neutral-900/10">
+          <div className="w-20 flex-shrink-0 border-r border-light-300 bg-neutral-50/30 dark:border-dark-300 dark:bg-neutral-900/10">
             {HOURS.map((hour) => (
               <div
                 key={hour}
                 className="relative h-24 border-b border-neutral-100/30 dark:border-white/5"
               >
-                <span className="absolute -top-3 left-0 w-full pr-4 text-right text-[10px] font-black uppercase tracking-tighter text-neutral-300 dark:text-neutral-600">
+                <span className="absolute -top-3 left-0 w-full pr-4 text-right text-[10px] font-black uppercase tracking-tighter text-neutral-600 dark:text-neutral-600">
                   {format(addHours(startOfDay(new Date()), hour), "h a")}
                 </span>
               </div>
@@ -119,7 +118,7 @@ export function DayView({
               {HOURS.map((hour) => (
                 <div
                   key={hour}
-                  className="h-24 border-b border-neutral-100/30 dark:border-white/5"
+                  className="h-24 border-b border-dark-400 dark:border-white/5"
                 />
               ))}
             </div>

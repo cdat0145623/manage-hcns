@@ -32,8 +32,8 @@ export function CalendarHeader({
   const onToday = () => setCurrentDate(new Date());
 
   return (
-    <div className="flex items-center justify-between border-b border-light-300 px-4 py-3 dark:border-dark-300">
-      <div className="flex items-center space-x-4">
+    <div className="flex items-center justify-between border-b border-light-300 p-2 dark:border-dark-300">
+      <div className="flex items-center space-x-4 pl-2">
         <h2 className="text-xl font-bold text-neutral-900 dark:text-white">
           {viewMode === "MONTH" ? (
             format(currentDate, "MMMM yyyy")

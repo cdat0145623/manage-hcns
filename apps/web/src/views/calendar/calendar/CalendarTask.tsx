@@ -23,19 +23,19 @@ const STATUS_COLORS: Record<
   pending: {
     bg: "bg-blue-100 shadow-sm dark:bg-blue-600/30",
     border: "border-blue-200 dark:border-blue-500/40",
-    accent: "bg-blue-600",
+    accent: "bg-blue-700",
     text: "text-blue-900 dark:text-blue-50",
   },
   done: {
     bg: "bg-green-200 shadow-sm dark:bg-green-600/40",
     border: "border-green-300 dark:border-green-500/50",
-    accent: "bg-green-600",
+    accent: "bg-green-700",
     text: "text-green-900 dark:text-green-50",
   },
   missed: {
     bg: "bg-red-100 shadow-sm dark:bg-red-600/30",
     border: "border-red-200 dark:border-red-500/40",
-    accent: "bg-red-600",
+    accent: "bg-red-700",
     text: "text-red-900 dark:text-red-50",
   },
 };
@@ -47,7 +47,7 @@ const VIRTUAL_COLORS: Record<
   pending: {
     bg: "bg-blue-50/70 dark:bg-blue-500/10",
     border: "border-blue-100/50 dark:border-blue-500/20",
-    accent: "bg-blue-400/50",
+    accent: "bg-blue-500/50",
     text: "text-blue-900/70 dark:text-blue-100/70",
   },
   done: {
@@ -59,7 +59,7 @@ const VIRTUAL_COLORS: Record<
   missed: {
     bg: "bg-red-50/70 dark:bg-red-500/10",
     border: "border-red-100/50 dark:border-red-500/20",
-    accent: "bg-red-400/50",
+    accent: "bg-red-500/50",
     text: "text-red-900/70 dark:text-red-100/70",
   },
 };
@@ -92,7 +92,7 @@ export function CalendarTask({
     const spaceUntilMidnight =
       ((24 * 60 - (hours * 60 + minutes)) * hourHeight) / 60;
     const height = Math.min(
-      Math.max(((entry.duration || 60) * hourHeight) / 60 - 1, 32), // Min height 32px
+      Math.max(((entry.duration || 60) * hourHeight) / 60 - 1, 20), // Min height 20px
       spaceUntilMidnight - 1,
     );
 
@@ -151,8 +151,8 @@ export function CalendarTask({
         {...safeDragHandleProps}
         className={`${
           variant === "SUMMARY"
-            ? `relative mx-0.5 mb-1 flex h-7 w-[calc(100%-4px)] items-center overflow-hidden rounded-xl border border-l-[3px] px-2.5 text-[10px] font-black transition-all ${colors.bg} ${colors.border} ${colors.text}`
-            : `relative flex h-full w-full flex-col overflow-hidden rounded-2xl border border-l-[6px] px-4 py-3 shadow-sm backdrop-blur-md transition-all ${colors.bg} ${colors.border} ${colors.text}`
+            ? `relative mx-0.5 mb-1 flex w-[calc(100%-4px)] items-center overflow-hidden rounded-xl border border-l-[3px] px-2.5 text-[10px] font-black transition-all ${colors.bg} ${colors.border} ${colors.text}`
+            : `relative flex w-full flex-col overflow-hidden rounded-2xl border border-l-[6px] px-2 py-1 shadow-sm backdrop-blur-md transition-all ${colors.bg} ${colors.border} ${colors.text}`
         }`}
         style={{
           ...draggableProps?.style,
@@ -169,7 +169,7 @@ export function CalendarTask({
         )}
 
         {variant === "SUMMARY" ? (
-          <div className="pointer-events-none ml-1 flex w-full items-center gap-2 overflow-hidden">
+          <div className="pointer-events-none ml-1 flex flex-row h-full align-center items-center justify-between w-full items-center gap-2 overflow-hidden">
             <span className="truncate leading-none">
               {entry.title || "(No title)"}
             </span>
@@ -178,17 +178,17 @@ export function CalendarTask({
             </span>
           </div>
         ) : (
-          <div className="pointer-events-none ml-1 flex flex-1 flex-col overflow-hidden">
-            <div className="flex items-start justify-between">
+          <div className="pointer-events-none ml-1 flex flex-row h-full align-center items-center justify-between overflow-hidden">
+            {/* <div className="flex items-start justify-between"> */}
               <span className="truncate text-xs font-black leading-tight">
                 {entry.title || "(No title)"}
               </span>
-            </div>
-            <span className="mt-1 block text-[10px] font-bold opacity-60">
+            {/* </div> */}
+            <span className="block text-[10px] font-bold opacity-60">
               {format(new Date(entry.date), "h:mm a")}
             </span>
             {entry.duration && entry.duration > 40 && (
-              <p className="mt-2 line-clamp-1 text-[11px] font-medium opacity-50">
+              <p className="line-clamp-1 text-[11px] font-medium opacity-50">
                 {entry.duration} minutes
               </p>
             )}

@@ -21,6 +21,7 @@ interface MonthViewProps {
   entries: CalendarEntry[];
   onTaskClick: (entry: CalendarEntry) => void;
   onCellClick: (date: Date) => void;
+  onViewDay: (date: Date) => void;
 }
 
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -30,6 +31,7 @@ export function MonthView({
   entries,
   onTaskClick,
   onCellClick,
+  onViewDay,
 }: MonthViewProps) {
   const monthStart = startOfMonth(currentDate);
   const [popoverDay, setPopoverDay] = useState<Date | null>(null);
@@ -54,14 +56,14 @@ export function MonthView({
         {WEEKDAYS.map((day) => (
           <div
             key={day}
-            className="p-3 text-center text-[10px] font-black uppercase tracking-[0.2em] text-neutral-300 dark:text-neutral-600"
+            className="p-3 text-center text-[10px] font-black uppercase tracking-[0.2em] text-neutral-600 dark:text-neutral-600"
           >
             {day}
           </div>
         ))}
       </div>
 
-      <div className="grid h-full flex-1 grid-cols-7 grid-rows-6 overflow-hidden border-t border-light-200 dark:border-dark-300">
+      <div className="grid h-full flex-1 grid-cols-7 grid-rows-6 overflow-hidden border-t border-dark-400 dark:border-dark-600">
         {days.map((day) => {
           const isCurrentMonth = isSameMonth(day, monthStart);
           const isDayToday = isToday(day);
@@ -75,22 +77,24 @@ export function MonthView({
               initial={{ opacity: 0, scale: 0.98 }}
               animate={{ opacity: 1, scale: 1 }}
               onClick={() => onCellClick(day)}
-              className={`group relative flex min-h-0 cursor-pointer flex-col border-b border-r border-neutral-50 p-1 transition-all duration-300 hover:bg-blue-50/40 dark:border-white/5 dark:hover:bg-blue-900/10 ${
+              className={`group relative flex min-h-0 cursor-pointer flex-col border-b border-r border-dark-200/50 p-1 transition-all duration-300 hover:bg-blue-50/40 dark:border-neutral-800 dark:hover:bg-blue-900/10 ${
                 !isCurrentMonth
                   ? "bg-neutral-50/20 dark:bg-neutral-900/5 text-neutral-300 dark:text-neutral-600"
-                  : [0, 6].includes(day.getDay())
-                    ? "bg-neutral-50/40 dark:bg-neutral-900/50"
-                    : "bg-white dark:bg-neutral-900"
+                  : "bg-white dark:bg-neutral-900"
               }`}
             >
-              <div className="mb-1 flex items-center justify-between p-1.5">
+              <div className="mb-1 flex items-center justify-between p-1.5 h-6">
                 <div
-                  className={`flex h-8 w-8 items-center justify-center rounded-xl text-md font-black transition-all ${
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onViewDay(day);
+                  }}
+                  className={`flex h-4 w-8 cursor-pointer items-center justify-center rounded-xl text-[10px] font-black transition-all hover:bg-blue-600 hover:text-white hover:shadow-sm dark:hover:bg-neutral-700 ${
                     isDayToday
                       ? "bg-blue-600 text-white shadow-lg shadow-blue-500/30"
                       : isCurrentMonth
-                        ? "text-neutral-900 hover:bg-neutral-50 dark:text-neutral-100 dark:hover:bg-neutral-800"
-                        : "text-neutral-200 dark:text-neutral-700 font-bold"
+                        ? "text-neutral-900 hover:bg-blue-600 hover:text-white hover:shadow-sm dark:text-neutral-100 dark:hover:bg-neutral-800"
+                        : "text-neutral-500 dark:text-neutral-700 font-bold"
                   }`}
                 >
                   {format(day, "d")}

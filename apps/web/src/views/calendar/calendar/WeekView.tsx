@@ -21,6 +21,7 @@ interface WeekViewProps {
   entries: CalendarEntry[];
   onTaskClick: (entry: CalendarEntry) => void;
   onCellClick: (date: Date) => void;
+  onViewDay: (date: Date) => void;
 }
 
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
@@ -30,6 +31,7 @@ export function WeekView({
   entries,
   onTaskClick,
   onCellClick,
+  onViewDay,
 }: WeekViewProps) {
   const weekStart = startOfWeek(currentDate);
   const weekEnd = endOfWeek(currentDate);
@@ -41,7 +43,9 @@ export function WeekView({
   );
 
   const getEntriesForDay = (day: Date) => {
-    return entries.filter((entry) => isSameDay(new Date(entry.date), day));
+    return entries
+      .filter((entry) => isSameDay(new Date(entry.date), day))
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
   };
 
   const [now, setNow] = useState(new Date());
@@ -60,8 +64,8 @@ export function WeekView({
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
-      <div className="flex border-b border-light-200 bg-light-100/50 pr-4 transition-all dark:border-dark-300 dark:bg-dark-200/50">
-        <div className="w-16 flex-shrink-0 border-r border-light-100 dark:border-dark-300" />
+      <div className="flex border-b border-light-300 bg-light-200/50 pr-4 transition-all dark:border-dark-300 dark:bg-dark-200/50">
+        <div className="w-16 flex-shrink-0 border-r border-light-200 dark:border-dark-300" />
         <div className="flex flex-1">
           {days.map((day) => {
             const dayEntries = getEntriesForDay(day);
@@ -71,18 +75,22 @@ export function WeekView({
                 className={`flex flex-1 cursor-pointer flex-col items-center justify-center p-2 transition-all ${
                   isToday(day)
                     ? "relative"
-                    : "text-neutral-500 dark:text-neutral-400"
+                    : "text-neutral-500 dark:text-neutral-600"
                 }`}
                 onClick={() => onCellClick(day)}
               >
-                <span className="text-neutral-400 text-[10px] font-black uppercase tracking-[0.2em]">
+                <span className="text-neutral-600 text-[10px] font-black uppercase tracking-[0.2em]">
                   {format(day, "EEE")}
                 </span>
                 <div
-                  className={`mt-2 flex h-10 w-10 items-center justify-center rounded-xl text-lg font-black transition-all ${
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onViewDay(day);
+                  }}
+                  className={`mt-2 flex h-10 w-10 cursor-pointer items-center justify-center rounded-xl text-lg font-black transition-all ${
                     isToday(day)
                       ? "bg-blue-600 text-white shadow-lg shadow-blue-500/30"
-                      : "text-neutral-900 border border-neutral-100 bg-white shadow-sm hover:bg-neutral-50 dark:border-neutral-800 dark:bg-neutral-900 dark:text-white"
+                      : "text-neutral-900 border border-neutral-100 bg-white shadow-sm hover:bg-blue-600 hover:text-white hover:shadow-sm dark:border-neutral-800 dark:bg-neutral-900 dark:text-white"
                   }`}
                 >
                   {format(day, "d")}
@@ -114,13 +122,13 @@ export function WeekView({
 
       <div className="flex-1 overflow-y-auto">
         <div className="flex min-h-full pt-8">
-          <div className="w-16 flex-shrink-0 border-r border-light-100 bg-neutral-50/30 dark:border-dark-300 dark:bg-neutral-900/10">
+          <div className="w-16 flex-shrink-0 border-r border-light-300 bg-neutral-100/30 dark:border-dark-600 dark:bg-neutral-900/10">
             {HOURS.map((hour) => (
               <div
                 key={hour}
                 className="relative h-24 border-b border-neutral-100/30 dark:border-white/5"
               >
-                <span className="absolute -top-3 left-0 w-full pr-4 text-right text-[10px] font-black uppercase tracking-tighter text-neutral-300 dark:text-neutral-600">
+                <span className="absolute -top-3 left-0 w-full pr-4 text-right text-[10px] font-black uppercase tracking-tighter text-neutral-600 dark:text-neutral-600">
                   {format(addHours(startOfDay(new Date()), hour), "h a")}
                 </span>
               </div>
@@ -135,7 +143,7 @@ export function WeekView({
             return (
               <div
                 key={day.toISOString()}
-                className={`relative flex min-w-0 flex-1 flex-col border-r border-light-100 transition-colors dark:border-dark-300 ${
+                className={`relative flex min-w-0 flex-1 flex-col border-r border-dark-400 transition-colors dark:border-dark-400 ${
                   isToday(day)
                     ? "from-primary-500/5 dark:from-primary-500/10 bg-gradient-to-b to-transparent"
                     : ""
@@ -145,7 +153,7 @@ export function WeekView({
                   {HOURS.map((hour) => (
                     <div
                       key={hour}
-                      className="h-24 border-b border-neutral-100/30 dark:border-white/5"
+                      className="h-24 border-b border-dark-400 dark:border-white/5"
                     />
                   ))}
                 </div>

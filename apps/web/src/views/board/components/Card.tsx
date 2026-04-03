@@ -23,6 +23,7 @@ const Card = ({
   comments = [],
   attachments = [],
   dueDate,
+  startDate,
 }: {
   title: string;
   labels?: { name: string; colourCode: string | null }[];
@@ -49,6 +50,7 @@ const Card = ({
   comments?: { publicId: string }[];
   attachments?: { publicId: string }[];
   dueDate?: Date | null;
+  startDate?: Date | null;
 }) => {
   const { dateLocale } = useLocalisation();
   const showYear = dueDate ? !isSameYear(dueDate, new Date()) : false;
@@ -106,7 +108,13 @@ const Card = ({
                 >
                   <HiOutlineClock className="h-4 w-4" />
                   <span className="text-[11px]">
-                    {format(dueDate, showYear ? "do MMM yyyy" : "do MMM", {
+                    {startDate &&
+                      format(startDate, showYear ? "MMM dd, yyyy" : "MMM dd", {
+                        locale: dateLocale,
+                      })
+                    }
+                    {startDate && " - "}
+                    {format(dueDate, showYear ? "MMM dd, yyyy" : "MMM dd", {
                       locale: dateLocale,
                     })}
                   </span>

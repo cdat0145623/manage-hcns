@@ -48,7 +48,6 @@ interface CardDetailsModalContentProps {
   onClose: () => void;
 }
 
-import DateSelector from "~/components/DateSelector";
 import { childModalTypes } from "../constants";
 
 function SideDockedPopup({
@@ -105,7 +104,6 @@ export default function CardDetailsModalContent({
     { cardPublicId: cardId ?? "" },
     { enabled: !!cardId && cardId.length >= 12 },
   );
-console.log(card)
   const isCreator = card?.createdBy && session?.user.id === card.createdBy;
   const canEdit = canEditCard || isCreator;
 
@@ -285,8 +283,7 @@ console.log(card)
               modalContentType === "NEW_LABEL" ? t`Create new label` :
               modalContentType === "EDIT_LABEL" ? t`Edit label` :
               modalContentType === "DELETE_LABEL" ? t`Delete label` :
-              modalContentType === "ADD_CHECKLIST" ? t`Add checklist` :
-              modalContentType === "DUE_DATE" ? t`Set due date` : ""
+              modalContentType === "ADD_CHECKLIST" ? t`Add checklist` : ""
             }
             onClose={closeModal}
           >
@@ -301,18 +298,6 @@ console.log(card)
             )}
             {modalContentType === "ADD_CHECKLIST" && (
               <NewChecklistForm cardPublicId={cardId} hideHeader />
-            )}
-            {modalContentType === "DUE_DATE" && card && (
-              <DateSelector
-                selectedDate={card.dueDate}
-                onDateSelect={(date) => {
-                  updateCard.mutate({
-                    cardPublicId: card.publicId,
-                    dueDate: date ?? null,
-                  });
-                }}
-                weekStartsOn={workspace.weekStartDay}
-              />
             )}
           </SideDockedPopup>
         </div>
@@ -487,6 +472,26 @@ console.log(card)
           )}
           <div className="mb-4">
             <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-light-700 dark:text-dark-700">
+              {t`Start date`}
+            </p>
+            <DueDateSelector
+              cardPublicId={cardId}
+              dueDate={card?.startDate}
+              isLoading={!card}
+              disabled={!canEdit}
+              onDateSelect={(date) => {
+                if (card) {
+                  updateCard.mutate({
+                    cardPublicId: card.publicId,
+                    startDate: date ?? null,
+                  });
+                }
+              }}
+              weekStartsOn={workspace.weekStartDay}
+            />
+          </div>
+          <div className="mb-4">
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-light-700 dark:text-dark-700">
               {t`Due date`}
             </p>
             <DueDateSelector
@@ -494,6 +499,15 @@ console.log(card)
               dueDate={card?.dueDate}
               isLoading={!card}
               disabled={!canEdit}
+              onDateSelect={(date) => {
+                if (card) {
+                  updateCard.mutate({
+                    cardPublicId: card.publicId,
+                    dueDate: date ?? null,
+                  });
+                }
+              }}
+              weekStartsOn={workspace.weekStartDay}
             />
           </div>
         </div>

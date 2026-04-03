@@ -254,6 +254,7 @@ export const getByPublicId = async (
               listId: true,
               index: true,
               dueDate: true,
+              startDate: true,
             },
             with: {
               labels: {
@@ -448,6 +449,7 @@ export const getBySlug = async (
               listId: true,
               index: true,
               dueDate: true,
+              startDate: true,
             },
             with: {
               labels: {

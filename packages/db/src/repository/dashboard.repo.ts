@@ -256,7 +256,7 @@ export const getCalendarMetrics = async (
       ),
     with: { frequence: true },
   });
-console.log(taskMastersData)
+
   // Generate virtual instances and merge with actual DB instances
   const allInstances: MergedInstance[] = [];
 

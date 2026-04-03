@@ -82,6 +82,7 @@ export default function BoardPage({ isTemplate }: { isTemplate?: boolean }) {
     closeModal();
     const { cardId: _removed, ...newQuery } = router.query;
     void router.push({ query: newQuery }, undefined, { shallow: true });
+    void utils.board.byId.invalidate();
   };
 
   const { tooltipContent: createListShortcutTooltipContent } =
@@ -161,20 +162,12 @@ export default function BoardPage({ isTemplate }: { isTemplate?: boolean }) {
     if (
       router.isReady &&
       router.query.cardId &&
-      typeof router.query.cardId === "string" &&
-      !isOpen
+      typeof router.query.cardId === "string"
     ) {
       openModal("CARD_DETAILS", router.query.cardId);
     }
-  }, [router.isReady, router.query.cardId, isOpen, openModal]);
-
-  // Sync URL when card modal closes
-  useEffect(() => {
-    if (!isOpen && router.query.cardId) {
-      const { cardId: _removed, ...newQuery } = router.query;
-      void router.push({ query: newQuery }, undefined, { shallow: true });
-    }
-  }, [isOpen]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [router.isReady, router.query.cardId]);
 
   const refetchBoard = async () => {
     if (boardId) await utils.board.byId.refetch({ boardPublicId: boardId });
@@ -698,6 +691,7 @@ export default function BoardPage({ isTemplate }: { isTemplate?: boolean }) {
                                             comments={card.comments}
                                             attachments={card.attachments}
                                             dueDate={card.dueDate ?? null}
+                                            startDate={card.startDate ?? null}
                                           />
                                         </div>
                                       )}

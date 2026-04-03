@@ -108,10 +108,8 @@ export const taskInstanceRouter = createTRPCRouter({
         }
         
         const taskMasters = await ctx.db.query.taskMasters.findMany({
-            where: (t, { and, lt, gte, eq }) => 
+            where: (t, { and, eq }) => 
                 and(
-                    lt(t.startDate, input.to), 
-                    gte(t.endDate, input.from),
                     ...(input.targetUser ? [eq(t.targetUser, input.targetUser)] : []),
                     ...(input.createdBy ? [eq(t.createdBy, input.createdBy)] : []),
                     eq(t.isDeleted, false),
@@ -126,8 +124,8 @@ export const taskInstanceRouter = createTRPCRouter({
                         return [];
                     }
 
-                    const from = input.from > taskMaster.startDate ? input.from : taskMaster.startDate;
-                    const to = input.to > taskMaster.endDate ? taskMaster.endDate : input.to;
+                    const from = input.from;
+                    const to = input.to;
 
                     const virtualTaskInstances = await taskInstanceRepo.generateVirtualTaskInstances({
                         userId: taskMaster.targetUser,
@@ -139,10 +137,8 @@ export const taskInstanceRouter = createTRPCRouter({
                     });
 
                     const existingTaskInstances = await ctx.db.query.taskInstances.findMany({
-                        where: (t, { and, lt, gte, eq }) => 
+                        where: (t, { and, eq }) => 
                             and(
-                                lt(t.targetDate, to),
-                                gte(t.targetDate, from),
                                 eq(t.taskMasterId, taskMaster.id),
                                 eq(t.isDeleted, false),
                             ),

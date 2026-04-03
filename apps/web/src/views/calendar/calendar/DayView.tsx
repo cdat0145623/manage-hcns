@@ -191,6 +191,7 @@ export function DayView({
                               totalOverlap={Math.min(overlapInfo?.totalOverlap ?? 1, 2)}
                               overlapIndex={overlapInfo?.overlapIndex}
                               index={index}
+                              isDraggable={false}
                             />
                           );
                         })}

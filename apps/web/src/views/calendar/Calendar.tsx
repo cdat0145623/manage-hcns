@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-call */
 /* eslint-disable @typescript-eslint/no-unnecessary-condition */
 /* eslint-disable @typescript-eslint/prefer-nullish-coalescing */
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
@@ -10,7 +11,10 @@ import { useEffect, useRef, useState } from "react";
 import { DragDropContext } from "react-beautiful-dnd";
 
 import type { ViewMode } from "./calendar/CalendarHeader";
-import type { CreateEventInput, EditableEntry } from "./calendar/CreateEventModal";
+import type {
+  CreateEventInput,
+  EditableEntry,
+} from "./calendar/CreateEventModal";
 import type { CalendarEntry } from "~/hooks/useRecurrence";
 import { useRecurrence } from "~/hooks/useRecurrence";
 import { usePopup } from "~/providers/popup";
@@ -101,15 +105,15 @@ export function Calendar() {
 
       if (isDuplicate) {
         showPopup({
-          header: "Lỗi xung đột",
+          header: "Conflict detected",
           message:
-            "Dữ liệu này đã được thay đổi trước đó. Lịch sẽ tự động làm mới.",
+            "This data was already changed elsewhere. The calendar will refresh automatically.",
           icon: "info",
         });
       } else {
         showPopup({
-          header: "Lỗi",
-          message: error.message || "Không thể thực hiện yêu cầu xóa.",
+          header: "Error",
+          message: error.message || "Unable to delete the event.",
           icon: "error",
         });
       }
@@ -124,8 +128,15 @@ export function Calendar() {
   };
 
   const handleTaskClick = (entry: CalendarEntry) => {
-    setDetailEntry(toEditableEntry(entry));
-    setIsDetailOpen(true);
+    const editable = toEditableEntry(entry);
+    if (entry.type === "VIRTUAL") {
+      setSelectedDate(new Date(entry.date));
+      setEditEntry(editable);
+      setIsFormOpen(true);
+    } else {
+      setDetailEntry(editable);
+      setIsDetailOpen(true);
+    }
   };
 
   const handleEditFromDetail = (entry: EditableEntry) => {
@@ -145,6 +156,17 @@ export function Calendar() {
 
     // If no type is provided, show custom confirmation modal
     if (!deleteType) {
+      // BUG-2 FIX: Virtual tasks have no real instance — cannot delete "single"
+      if (entry.type === "VIRTUAL") {
+        showPopup({
+          header: "Cannot delete virtual task",
+          message:
+            "This task has no saved instance. Delete the entire recurring series instead.",
+          icon: "info",
+        });
+        setDeleteConfirmEntry(null);
+        return;
+      }
       setDeleteConfirmEntry(entry);
       return;
     }
@@ -160,9 +182,8 @@ export function Calendar() {
         type: "all",
       });
     } else {
-      // For single deletion, we now pass instanceId OR virtual id
-      // The backend has been updated to handle virtual- IDs
-      const idToDelete = entry.instanceId || entry.id;
+      // For single deletion, use instanceId (BUG-2: guard already blocks virtual tasks above)
+      const idToDelete = entry.instanceId ?? entry.id;
 
       deleteMutation.mutate({
         id: idToDelete,
@@ -183,7 +204,6 @@ export function Calendar() {
   };
 
   const handleCreateEvent = (eventData: CreateEventInput) => {
-    console.log("Creating event:", eventData);
     setSuccessData({
       title: t`Created Successfully!`,
       message: t`"${eventData.title}" has been added to your calendar.`,
@@ -191,7 +211,6 @@ export function Calendar() {
   };
 
   const handleUpdateEvent = (id: string, eventData: CreateEventInput) => {
-    console.log("Updating event:", id, eventData);
     setSuccessData({
       title: t`Updated Successfully!`,
       message: t`"${eventData.title}" has been updated.`,
@@ -417,13 +436,14 @@ export function Calendar() {
                   </svg>
                 </div>
                 <h3 className="text-lg font-black text-neutral-900 dark:text-white">
-                  Xóa công việc
+                  Delete task
                 </h3>
                 <p className="mt-1.5 text-center text-sm text-neutral-500 dark:text-neutral-400">
                   <span className="font-semibold text-neutral-700 dark:text-neutral-200">
                     "{deleteConfirmEntry.title}"
                   </span>{" "}
-                  là công việc lặp lại. Bạn muốn xóa loại nào?
+                  is a recurring task. Which occurrences would you like to
+                  delete?
                 </p>
               </div>
 
@@ -456,10 +476,10 @@ export function Calendar() {
                   </div>
                   <div>
                     <p className="text-sm font-black text-neutral-900 dark:text-white">
-                      Chỉ ngày này
+                      This occurrence only
                     </p>
                     <p className="text-xs text-neutral-400">
-                      Xóa công việc vào ngày đã chọn
+                      Remove only the selected date
                     </p>
                   </div>
                 </motion.button>
@@ -491,10 +511,10 @@ export function Calendar() {
                   </div>
                   <div>
                     <p className="text-sm font-black text-red-700 dark:text-red-400">
-                      Toàn bộ chuỗi lặp
+                      All occurrences
                     </p>
                     <p className="text-xs text-red-400/80">
-                      Xóa tất cả các ngày trong lịch lặp
+                      Remove all dates in the recurring schedule
                     </p>
                   </div>
                 </motion.button>
@@ -503,7 +523,7 @@ export function Calendar() {
                   onClick={() => setDeleteConfirmEntry(null)}
                   className="mt-1 rounded-xl py-2 text-sm font-bold text-neutral-400 transition-all hover:text-neutral-600 dark:hover:text-neutral-200"
                 >
-                  Hủy
+                  Cancel
                 </button>
               </div>
             </motion.div>

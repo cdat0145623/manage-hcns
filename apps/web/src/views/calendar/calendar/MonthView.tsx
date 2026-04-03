@@ -35,7 +35,9 @@ export function MonthView({
   const [popoverDay, setPopoverDay] = useState<Date | null>(null);
 
   const calendarStart = startOfWeek(monthStart);
-  const calendarEnd = addDays(calendarStart, 34);
+  // BUG-4 FIX: Always generate 42 days (6 weeks) so months that start
+  // near the end of a week (needing 6 rows) are never truncated
+  const calendarEnd = addDays(calendarStart, 41);
 
   const days = useMemo(
     () => eachDayOfInterval({ start: calendarStart, end: calendarEnd }),
@@ -59,7 +61,7 @@ export function MonthView({
         ))}
       </div>
 
-      <div className="grid h-full flex-1 grid-cols-7 grid-rows-[repeat(5,1fr)] overflow-hidden border-t border-light-200 dark:border-dark-300">
+      <div className="grid h-full flex-1 grid-cols-7 grid-rows-6 overflow-hidden border-t border-light-200 dark:border-dark-300">
         {days.map((day) => {
           const isCurrentMonth = isSameMonth(day, monthStart);
           const isDayToday = isToday(day);

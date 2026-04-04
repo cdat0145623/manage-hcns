@@ -144,12 +144,23 @@ export const taskInstanceRouter = createTRPCRouter({
                             ),
                     });
 
+                    const normalizeToMidnight = (date: Date) => {
+                        const d = new Date(date);
+                        d.setUTCHours(0, 0, 0, 0);
+                        return d.getTime();
+                    };
+
                     const existingTaskInstanceMap = new Map(
-                        existingTaskInstances.map((taskInstance) => [taskInstance.targetDate!.toISOString(), taskInstance])
+                        existingTaskInstances.map((taskInstance) => [
+                            normalizeToMidnight(taskInstance.targetDate!),
+                            taskInstance,
+                        ]),
                     );
 
                     const newVirtualTaskInstances = virtualTaskInstances.map((virtualInstance) => {
-                        const existing = existingTaskInstanceMap.get(virtualInstance.targetDate!.toISOString());
+                        const existing = existingTaskInstanceMap.get(
+                            normalizeToMidnight(virtualInstance.targetDate!),
+                        );
                         
                         const taskMasterInfo = {
                             name: taskMaster.name,

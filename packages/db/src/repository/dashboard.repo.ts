@@ -3,14 +3,12 @@ import { and, eq, inArray, isNull } from "drizzle-orm";
 import type { dbClient } from "@kan/db/client";
 import {
   boards,
-  cards,
   cardActivities,
-  lists,
+  cards,
   cardToWorkspaceMembers,
+  lists,
   workspaceMembers,
 } from "@kan/db/schema";
-
-
 
 import { generateVirtualTaskInstances } from "./taskInstance.repo";
 
@@ -49,26 +47,29 @@ export const getCardDistributionByBoard = async (
           .from(cards)
           .innerJoin(
             cardToWorkspaceMembers,
-            eq(cards.id, cardToWorkspaceMembers.cardId)
+            eq(cards.id, cardToWorkspaceMembers.cardId),
           )
           .innerJoin(
             workspaceMembers,
-            eq(cardToWorkspaceMembers.workspaceMemberId, workspaceMembers.id)
+            eq(cardToWorkspaceMembers.workspaceMemberId, workspaceMembers.id),
           )
           .where(
             and(
               isNull(cards.deletedAt),
               eq(workspaceMembers.userId, params.selectedUserId),
-              inArray(cards.listId, listIds)
-            )
+              inArray(cards.listId, listIds),
+            ),
           )
       : [];
 
-  const cardsByList = userCards.reduce((acc, card) => {
-    acc[card.listId] = (acc[card.listId] ?? 0) + 1;
+  const cardsByList = userCards.reduce(
+    (acc, card) => {
+      acc[card.listId] = (acc[card.listId] ?? 0) + 1;
 
-    return acc;
-  }, {} as Record<number, number>);
+      return acc;
+    },
+    {} as Record<number, number>,
+  );
 
   const totalCards = userCards.length;
 
@@ -80,11 +81,8 @@ export const getCardDistributionByBoard = async (
       listName: list.name,
       cardCount,
       percentage:
-        totalCards > 0
-          ? Math.round((cardCount / totalCards) * 10000) / 100
-          : 0,
+        totalCards > 0 ? Math.round((cardCount / totalCards) * 10000) / 100 : 0,
     };
-
   });
 
   return { data, totalCards };
@@ -125,18 +123,18 @@ export const getKanbanDeadlineRate = async (
           .from(cards)
           .innerJoin(
             cardToWorkspaceMembers,
-            eq(cards.id, cardToWorkspaceMembers.cardId)
+            eq(cards.id, cardToWorkspaceMembers.cardId),
           )
           .innerJoin(
             workspaceMembers,
-            eq(cardToWorkspaceMembers.workspaceMemberId, workspaceMembers.id)
+            eq(cardToWorkspaceMembers.workspaceMemberId, workspaceMembers.id),
           )
           .where(
             and(
               isNull(cards.deletedAt),
               eq(workspaceMembers.userId, params.selectedUserId),
-              inArray(cards.listId, listIds)
-            )
+              inArray(cards.listId, listIds),
+            ),
           )
       : [];
   const totalCards = userCards.length;
@@ -190,9 +188,7 @@ export const getKanbanDeadlineRate = async (
   }
 
   const rate =
-    totalCards > 0
-      ? Math.round((onTimeCount / totalCards) * 10000) / 100
-      : 0;
+    totalCards > 0 ? Math.round((onTimeCount / totalCards) * 10000) / 100 : 0;
 
   return { onTimeCount, totalCards, rate };
 };
@@ -210,16 +206,21 @@ interface MergedInstance {
   status: "pending" | "done" | "missed";
 }
 
-
 export const getCalendarMetrics = async (
   db: dbClient,
   params: {
     selectedUserId: string;
     viewMode: "week" | "month" | "year";
-    value?: number; // week number (1-52) or month number (1-12)
+    value?: number;
     year: number;
   },
 ) => {
+  const normalizeToMidnight = (date: Date) => {
+    const d = new Date(date);
+    d.setUTCHours(0, 0, 0, 0);
+    return d.getTime();
+  };
+
   let from: Date;
   let to: Date;
 
@@ -229,10 +230,13 @@ export const getCalendarMetrics = async (
     // To make it simpler and consistent across JS:
     const jan1 = new Date(Date.UTC(params.year, 0, 1));
     const dayOfWeek = jan1.getUTCDay();
-    const diffToMonday = dayOfWeek === 1 ? 0 : (dayOfWeek === 0 ? 1 : 8 - dayOfWeek);
+    const diffToMonday =
+      dayOfWeek === 1 ? 0 : dayOfWeek === 0 ? 1 : 8 - dayOfWeek;
     const firstMonday = new Date(Date.UTC(params.year, 0, 1 + diffToMonday));
-    
-    from = new Date(firstMonday.getTime() + (week - 1) * 7 * 24 * 60 * 60 * 1000);
+
+    from = new Date(
+      firstMonday.getTime() + (week - 1) * 7 * 24 * 60 * 60 * 1000,
+    );
     to = new Date(from.getTime() + 7 * 24 * 60 * 60 * 1000 - 1);
   } else if (params.viewMode === "year") {
     from = new Date(Date.UTC(params.year, 0, 1));
@@ -243,7 +247,6 @@ export const getCalendarMetrics = async (
     from = new Date(Date.UTC(params.year, month - 1, 1));
     to = new Date(Date.UTC(params.year, month, 0, 23, 59, 59, 999));
   }
-
 
   // Get all task masters active in range for the selected user
   const taskMastersData = await db.query.taskMasters.findMany({
@@ -269,11 +272,9 @@ export const getCalendarMetrics = async (
 
       if (!freq?.rruleString || !freq.dtStart) continue;
 
-
       const effectiveFrom =
         from > taskMaster.startDate ? from : taskMaster.startDate;
-      const effectiveTo =
-        to > taskMaster.endDate ? taskMaster.endDate : to;
+      const effectiveTo = to > taskMaster.endDate ? taskMaster.endDate : to;
 
       const virtualInstances = await generateVirtualTaskInstances({
         userId: taskMaster.targetUser,
@@ -298,13 +299,19 @@ export const getCalendarMetrics = async (
       });
 
       const actualMap = new Map(
-        actualInstances.map((ti) => [ti.targetDate?.toISOString() ?? "", ti]),
+        actualInstances.map((ti) => [
+          normalizeToMidnight(ti.targetDate ?? new Date(0)),
+          ti,
+        ]),
       );
 
+      const matchedActualIds = new Set<string>();
 
       for (const virt of virtualInstances) {
-        const actual = actualMap.get(virt.targetDate.toISOString());
-
+        const actual = actualMap.get(normalizeToMidnight(virt.targetDate));
+        if (actual) {
+          matchedActualIds.add(actual.id);
+        }
 
         allInstances.push({
           id: actual ? actual.id : virt.id,
@@ -314,7 +321,20 @@ export const getCalendarMetrics = async (
           targetDate: virt.targetDate,
           status: actual ? actual.status : ("pending" as const),
         });
+      }
 
+      // Add actual instances that didn't match a virtual slot (e.g. ad-hoc or rule changed)
+      for (const actual of actualInstances) {
+        if (!matchedActualIds.has(actual.id)) {
+          allInstances.push({
+            id: actual.id,
+            userId: taskMaster.targetUser,
+            taskMasterId: taskMaster.id,
+            taskMasterName: taskMaster.name ?? null,
+            targetDate: actual.targetDate,
+            status: actual.status,
+          });
+        }
       }
     } catch {
       // Skip task masters with bad rrule config
@@ -330,9 +350,7 @@ export const getCalendarMetrics = async (
     doneCount,
     totalCount,
     rate:
-      totalCount > 0
-        ? Math.round((doneCount / totalCount) * 10000) / 100
-        : 0,
+      totalCount > 0 ? Math.round((doneCount / totalCount) * 10000) / 100 : 0,
   };
 
   // ── deadlineCompletionRate ─────────────────────────────────────
@@ -395,31 +413,58 @@ export const getCalendarMetrics = async (
   // ── taskProgressBreakdown ──────────────────────────────────────
   const taskGroupMap = new Map<
     string,
-    { taskName: string | null; doneCount: number; totalCount: number }
+    {
+      taskName: string | null;
+      doneCount: number;
+      missedCount: number;
+      pendingCount: number;
+      totalCount: number;
+    }
   >();
 
   for (const instance of allInstances) {
     const entry = taskGroupMap.get(instance.taskMasterId) ?? {
       taskName: instance.taskMasterName,
       doneCount: 0,
+      missedCount: 0,
+      pendingCount: 0,
       totalCount: 0,
     };
     entry.totalCount++;
     if (instance.status === "done") entry.doneCount++;
+    else if (instance.status === "missed") entry.missedCount++;
+    else entry.pendingCount++;
+
     taskGroupMap.set(instance.taskMasterId, entry);
   }
 
   const taskProgressBreakdown = {
-    data: Array.from(taskGroupMap.entries()).map(([taskId, group]) => ({
-      taskId,
-      taskName: group.taskName ?? taskId,
-      doneCount: group.doneCount,
-      totalCount: group.totalCount,
-      completionRate:
+    data: Array.from(taskGroupMap.entries()).map(([taskId, group]) => {
+      const completionRate =
         group.totalCount > 0
           ? Math.round((group.doneCount / group.totalCount) * 10000) / 100
-          : 0,
-    })),
+          : 0;
+      const missedRate =
+        group.totalCount > 0
+          ? Math.round((group.missedCount / group.totalCount) * 10000) / 100
+          : 0;
+      const pendingRate =
+        group.totalCount > 0
+          ? Math.max(0, 100 - completionRate - missedRate)
+          : 0;
+
+      return {
+        taskId,
+        taskName: group.taskName ?? taskId,
+        doneCount: group.doneCount,
+        missedCount: group.missedCount,
+        pendingCount: group.pendingCount,
+        totalCount: group.totalCount,
+        completionRate,
+        missedRate,
+        pendingRate,
+      };
+    }),
   };
 
   return {

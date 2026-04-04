@@ -1,8 +1,4 @@
-/* eslint-disable @typescript-eslint/no-unsafe-argument */
-/* eslint-disable @typescript-eslint/no-unsafe-return */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-
-/* eslint-disable @typescript-eslint/no-unnecessary-condition */
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 /* eslint-disable @typescript-eslint/no-unsafe-call */
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
@@ -150,34 +146,34 @@ function FilterSelector<T>({
 
   return (
     <div className="flex flex-col gap-1.5">
-      <label className="text-[10px] font-bold uppercase tracking-widest text-light-600 dark:text-dark-700">
+      <label className="pl-1 text-[9px] font-black uppercase tracking-[0.25em] text-light-500/70 dark:text-dark-700/50">
         {label}
       </label>
       <Listbox value={value} onChange={onChange}>
         <div className="relative">
-          <Listbox.Button className="relative flex w-full items-center gap-2.5 rounded-xl border border-light-300/60 bg-white/40 py-2.5 pl-3 pr-10 text-left text-sm text-neutral-900 shadow-sm transition-all hover:bg-white/80 hover:shadow-indigo-500/10 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 dark:border-dark-400/40 dark:bg-dark-300/40 dark:text-dark-950 dark:hover:bg-dark-300/80">
+          <Listbox.Button className="relative flex w-full items-center gap-2.5 rounded-xl border border-light-200/50 bg-light-50/50 py-2.5 pl-3.5 pr-9 text-left text-[13px] text-neutral-900 transition-all hover:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/10 dark:border-dark-400/30 dark:bg-dark-300/30 dark:text-dark-950 dark:hover:bg-dark-300/60">
             {icon && (
-              <span className="text-indigo-500 dark:text-indigo-400">
+              <span className="text-indigo-500/70 dark:text-indigo-400/70">
                 {icon}
               </span>
             )}
-            <span className="block truncate font-semibold">
+            <span className="block truncate font-bold tracking-tight">
               {selected?.label}
             </span>
-            <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
-              <HiChevronDown className="h-4 w-4 text-light-500" />
+            <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2.5">
+              <HiChevronDown className="h-3.5 w-3.5 text-light-400" />
             </span>
           </Listbox.Button>
           <Transition
             as={Fragment}
-            enter="transition ease-out duration-150"
+            enter="transition ease-out duration-200"
             enterFrom="opacity-0 translate-y-1 scale-95"
             enterTo="opacity-100 translate-y-0 scale-100"
             leave="transition ease-in duration-100"
             leaveFrom="opacity-100 scale-100"
             leaveTo="opacity-0 scale-95"
           >
-            <Listbox.Options className="absolute -left-1 z-[100] mt-2 max-h-60 min-w-[160px] overflow-auto rounded-2xl border border-light-200 bg-white/95 p-1 text-sm shadow-2xl backdrop-blur-md focus:outline-none dark:border-dark-400 dark:bg-dark-200/95 sm:left-auto sm:right-0">
+            <Listbox.Options className="absolute -left-1 z-[100] mt-2 max-h-72 min-w-[180px] overflow-auto rounded-2xl border border-light-200 bg-white p-1 text-sm focus:outline-none dark:border-dark-400 dark:bg-dark-200 sm:left-auto sm:right-0">
               {options.map((option, idx) => (
                 <Listbox.Option
                   key={idx}
@@ -185,13 +181,15 @@ function FilterSelector<T>({
                     twMerge(
                       "relative cursor-pointer select-none rounded-xl py-2.5 pl-4 pr-4 transition-all",
                       active
-                        ? "bg-indigo-500 text-white shadow-lg shadow-indigo-500/30"
-                        : "text-neutral-900 dark:text-dark-950",
+                        ? "bg-indigo-600 text-white"
+                        : "text-neutral-900 hover:bg-light-100 dark:text-dark-950 dark:hover:bg-dark-300",
                     )
                   }
                   value={option.value}
                 >
-                  <span className="block truncate">{option.label}</span>
+                  <span className="block truncate font-medium">
+                    {option.label}
+                  </span>
                 </Listbox.Option>
               ))}
             </Listbox.Options>
@@ -201,10 +199,6 @@ function FilterSelector<T>({
     </div>
   );
 }
-
-// ════════════════════════════════════════════════════════════════
-// DASHBOARD CARD WRAPPER
-// ════════════════════════════════════════════════════════════════
 
 const DashboardCard = ({
   title,
@@ -249,10 +243,6 @@ const DashboardCard = ({
   );
 };
 
-// ════════════════════════════════════════════════════════════════
-// STAT CARD (KPI)
-// ════════════════════════════════════════════════════════════════
-
 const StatCard = ({
   label,
   value,
@@ -277,30 +267,81 @@ const StatCard = ({
   }, [delay]);
 
   const themes = {
-    indigo: "border-l-indigo-500 bg-indigo-50/30 text-indigo-600",
-    cyan: "border-l-cyan-500 bg-cyan-50/30 text-cyan-600",
-    emerald: "border-l-emerald-500 bg-emerald-50/30 text-emerald-600",
-    rose: "border-l-rose-500 bg-rose-50/30 text-rose-600",
+    indigo: {
+      bg: "bg-indigo-50 dark:bg-indigo-500/10",
+      border: "border-indigo-100 dark:border-indigo-500/20",
+      iconBg: "bg-indigo-500 text-white shadow-lg shadow-indigo-500/20",
+      iconText: "text-white",
+      accent: "bg-indigo-500",
+      colorText: "text-indigo-600 dark:text-indigo-400",
+    },
+    cyan: {
+      bg: "bg-cyan-50 dark:bg-cyan-500/10",
+      border: "border-cyan-100 dark:border-cyan-500/20",
+      iconBg: "bg-cyan-500 text-white shadow-lg shadow-cyan-500/20",
+      iconText: "text-white",
+      accent: "bg-cyan-500",
+      colorText: "text-cyan-600 dark:text-cyan-400",
+    },
+    emerald: {
+      bg: "bg-emerald-50 dark:bg-emerald-500/10",
+      border: "border-emerald-100 dark:border-emerald-500/20",
+      iconBg: "bg-emerald-500 text-white shadow-lg shadow-emerald-500/20",
+      iconText: "text-white",
+      accent: "bg-emerald-500",
+      colorText: "text-emerald-600 dark:text-emerald-400",
+    },
+    rose: {
+      bg: "bg-rose-50 dark:bg-rose-500/10",
+      border: "border-rose-100 dark:border-rose-500/20",
+      iconBg: "bg-rose-500 text-white shadow-lg shadow-rose-500/20",
+      iconText: "text-white",
+      accent: "bg-rose-500",
+      colorText: "text-rose-600 dark:text-rose-400",
+    },
   };
+
+  const t = themes[color];
 
   return (
     <div
       className={twMerge(
-        "relative flex items-center gap-5 overflow-hidden rounded-2xl border-l-4 border-light-200 bg-white p-5 shadow-sm transition-all duration-700 hover:shadow-xl dark:bg-dark-200",
-        themes[color],
-        isVisible ? "translate-x-0 opacity-100" : "-translate-x-4 opacity-0",
+        "group relative flex items-center gap-6 overflow-hidden rounded-[28px] border p-6 transition-all duration-500 hover:-translate-y-1",
+        t.bg,
+        t.border,
+        isVisible ? "opacity-100" : "translate-y-4 opacity-0",
       )}
     >
-      <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-white/80 text-current shadow-sm dark:bg-dark-300/80">
+      <div
+        className={twMerge(
+          "absolute right-0 top-0 h-24 w-24 -translate-y-8 translate-x-8 rounded-full opacity-10 blur-3xl transition-opacity group-hover:opacity-30",
+          t.accent,
+        )}
+      />
+      <div
+        className={twMerge(
+          "h-15 w-15 flex shrink-0 items-center justify-center rounded-2xl transition-transform duration-500 group-hover:rotate-6 group-hover:scale-110",
+          t.iconBg,
+          t.iconText,
+        )}
+        style={{ width: "60px", height: "60px" }}
+      >
         {icon}
       </div>
-      <div>
+      <div className="flex flex-col gap-0.5">
+        <p
+          className={twMerge(
+            "text-[10px] font-black uppercase tracking-[0.25em]",
+            t.colorText,
+          )}
+        >
+          {label}
+        </p>
         <p className="text-3xl font-black tabular-nums tracking-tighter text-neutral-900 dark:text-dark-1000">
           {animatedValue}
-          {suffix}
-        </p>
-        <p className="text-[11px] font-bold uppercase tracking-widest text-light-700 dark:text-dark-700/80">
-          {label}
+          <span className="ml-0.5 text-lg font-bold text-neutral-400/80">
+            {suffix}
+          </span>
         </p>
       </div>
     </div>
@@ -331,21 +372,40 @@ const RadialGauge = ({
   const gt = GAUGE_THEMES[theme];
 
   return (
-    <div className="flex h-full flex-col items-center justify-center gap-6">
+    <div className="flex h-full flex-col items-center justify-center gap-8">
       <div className="relative flex items-center justify-center">
+        {/* Background Glow */}
+        <div
+          className={twMerge(
+            "absolute h-32 w-32 rounded-full opacity-20 blur-[60px] transition-opacity duration-1000",
+            gt.bg,
+          )}
+        />
         <svg
-          className="h-48 w-48 -rotate-90 transform drop-shadow-xl"
+          className="h-52 w-52 -rotate-90 transform drop-shadow-2xl"
           viewBox="0 0 180 180"
         >
+          {/* Subtle Outer Ring */}
+          <circle
+            cx="90"
+            cy="90"
+            r={radius + 8}
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1"
+            className="text-light-200/30 dark:text-dark-400/20"
+          />
+          {/* Main Track */}
           <circle
             cx="90"
             cy="90"
             r={radius}
             fill="none"
             stroke="currentColor"
-            strokeWidth="14"
-            className="text-light-100 dark:text-dark-300/40"
+            strokeWidth="12"
+            className="text-light-100/50 dark:text-dark-300/20"
           />
+          {/* Progress Arc */}
           <circle
             cx="90"
             cy="90"
@@ -362,7 +422,7 @@ const RadialGauge = ({
         <div className="absolute flex flex-col items-center">
           <span
             className={twMerge(
-              "text-5xl font-black tabular-nums tracking-tighter",
+              "text-5xl font-black tabular-nums tracking-tighter drop-shadow-sm",
               gt.text,
             )}
           >
@@ -370,17 +430,17 @@ const RadialGauge = ({
           </span>
         </div>
       </div>
-      <div className="flex flex-col items-center gap-1.5">
-        <div className="flex items-center gap-2">
-          <span className="text-lg font-bold text-neutral-900 dark:text-dark-1000">
+      <div className="flex flex-col items-center gap-2">
+        <div className="flex items-baseline gap-1.5 font-bold">
+          <span className="text-2xl tracking-tighter text-neutral-900 dark:text-dark-1000">
             {doneCount}
           </span>
-          <span className="text-light-400 dark:text-dark-700">/</span>
-          <span className="text-lg font-medium text-light-500 dark:text-dark-600">
+          <span className="text-light-300 dark:text-dark-600">/</span>
+          <span className="text-sm text-light-500 dark:text-dark-500">
             {totalCount}
           </span>
         </div>
-        <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-light-600 dark:text-dark-700">
+        <p className="text-[10px] font-extrabold uppercase tracking-[0.3em] text-light-500/80 dark:text-dark-700">
           {label}
         </p>
       </div>
@@ -389,7 +449,7 @@ const RadialGauge = ({
 };
 
 // ════════════════════════════════════════════════════════════════
-// CUSTOM BAR COMPONENTS (V3)
+// CUSTOM COMPONENTS FOR CHARTS
 // ════════════════════════════════════════════════════════════════
 
 const getPath = (
@@ -408,25 +468,10 @@ const getPath = (
           Z`;
 };
 
-const CustomBar = (props: any) => {
-  const { fill, x, y, width, height } = props;
-  if (height <= 0) return null;
-
-  const radius = Math.min(width / 2, 10);
-  return (
-    <path
-      d={getPath(x, y, width, height, radius)}
-      stroke="none"
-      fill={fill}
-      className="transition-all duration-500"
-    />
-  );
-};
-
 const CustomXAxisTick = (props: any) => {
   const { x, y, payload } = props;
   const name = payload.value;
-  const truncatedName = name.length > 12 ? name.substring(0, 10) + "..." : name;
+  const truncatedName = name.length > 15 ? name.substring(0, 13) + "..." : name;
 
   return (
     <g transform={`translate(${x},${y})`}>
@@ -434,9 +479,8 @@ const CustomXAxisTick = (props: any) => {
         x={0}
         y={0}
         dy={16}
-        textAnchor="end"
-        fill="#64748b"
-        transform="rotate(-35)"
+        textAnchor="middle"
+        fill="#94a3b8"
         className="text-[11px] font-bold"
       >
         {truncatedName}
@@ -444,10 +488,6 @@ const CustomXAxisTick = (props: any) => {
     </g>
   );
 };
-
-// ════════════════════════════════════════════════════════════════
-// INTERACTIVE PIE PIECE
-// ════════════════════════════════════════════════════════════════
 
 const renderActiveShape = (props: any) => {
   const { cx, cy, innerRadius, outerRadius, startAngle, endAngle, fill } =
@@ -477,7 +517,7 @@ const renderActiveShape = (props: any) => {
 };
 
 // ════════════════════════════════════════════════════════════════
-// MAIN VIEW (ULTRA PREMIUM V3)
+// MAIN VIEW
 // ════════════════════════════════════════════════════════════════
 
 export default function ReportsView() {
@@ -492,6 +532,8 @@ export default function ReportsView() {
   const [year, setYear] = useState<number>(now.getFullYear());
   const [activeIndex, setActiveIndex] = useState(-1);
 
+  const { data: users } = api.user.getAll.useQuery();
+
   const { data: workspaceData } = api.workspace.byId.useQuery(
     { workspacePublicId: workspace.publicId },
     { enabled: !!workspace.publicId },
@@ -503,29 +545,34 @@ export default function ReportsView() {
   );
 
   useEffect(() => {
-    if (workspaceData?.members?.[0] && !selectedUserId) {
-      const defaultMember =
-        workspaceData.members.find((m) => m.role === "ADMIN") ||
-        workspaceData.members[0];
-      setSelectedUserId(defaultMember.user?.id || "");
+    if (users && users.length > 0) {
+      const isValid = users.some((u) => u.id === selectedUserId);
+      if (!isValid) {
+        setSelectedUserId(users[0]?.id || "");
+      }
     }
-  }, [workspaceData]);
+  }, [users, selectedUserId]);
 
   useEffect(() => {
-    if (boardsData?.[0] && !boardPublicId) {
-      setBoardPublicId(boardsData[0].publicId);
+    if (boardsData) {
+      const isValid = boardsData.some((b) => b.publicId === boardPublicId);
+      if (!isValid && boardsData.length > 0) {
+        setBoardPublicId(boardsData[0]?.publicId || "");
+      } else if (!isValid && boardsData.length === 0) {
+        setBoardPublicId("");
+      }
     }
-  }, [boardsData]);
+  }, [boardsData, boardPublicId]);
 
   const { data: metrics, isLoading } = api.dashboard.get.useQuery(
     { selectedUserId, boardPublicId, viewMode, month, week, year },
-    { enabled: !!selectedUserId && !!boardPublicId },
+    { enabled: !!selectedUserId && boardsData !== undefined },
   );
 
-  const memberOptions = (workspaceData?.members || [])
-    .map((m) => ({
-      label: m.user?.name || m.email || "Unknown Member",
-      value: m.user?.id || "",
+  const memberOptions = (users || [])
+    .map((u) => ({
+      label: u.name || "Unknown User",
+      value: u.id || "",
     }))
     .filter((o) => o.value !== "");
 
@@ -566,6 +613,7 @@ export default function ReportsView() {
         <div className="absolute inset-0 bg-gradient-to-tr from-light-50 via-transparent to-light-100 mix-blend-overlay dark:from-dark-50 dark:to-dark-100" />
         <div className="absolute inset-0 bg-light-50 [mask-image:radial-gradient(ellipse_at_center,transparent_20%,black)] dark:bg-dark-50" />
       </div>
+
       <svg className="absolute h-0 w-0">
         <defs>
           <linearGradient id="gaugeGradientIndigo" x1="0" y1="0" x2="1" y2="1">
@@ -580,32 +628,49 @@ export default function ReportsView() {
             <stop offset="0%" stopColor="#34d399" />
             <stop offset="100%" stopColor="#059669" />
           </linearGradient>
-          <linearGradient id="barGradient" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#6366f1" />
-            <stop offset="100%" stopColor="#a855f7" />
+          <linearGradient id="doneGradient" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#10b981" />
+            <stop offset="100%" stopColor="#059669" />
+          </linearGradient>
+          <linearGradient id="missedGradient" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#f43f5e" />
+            <stop offset="100%" stopColor="#e11d48" />
+          </linearGradient>
+          <linearGradient id="pendingGradient" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#94a3b8" />
+            <stop offset="100%" stopColor="#64748b" />
           </linearGradient>
         </defs>
       </svg>
 
       <div className="relative z-10 p-6 md:p-10 lg:p-12">
-        <header className="relative z-30 mb-12 flex flex-col gap-10 lg:flex-row lg:items-end lg:justify-between">
-          <div className="flex items-center gap-6">
-            <div className="flex h-16 w-16 items-center justify-center rounded-[24px] bg-indigo-600 text-white shadow-2xl shadow-indigo-600/30 ring-8 ring-indigo-600/10 transition-transform hover:scale-105 active:scale-95">
-              <HiChartBar size={32} />
+        <header className="relative z-30 mb-16 flex flex-col gap-12 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex items-center gap-8">
+            <div className="group relative">
+              <div className="absolute -inset-2 rounded-[28px] bg-indigo-500/20 blur-xl transition-all group-hover:bg-indigo-500/30" />
+              <div className="relative flex h-20 w-20 items-center justify-center rounded-[28px] bg-indigo-600 text-white shadow-2xl transition-transform hover:scale-105 active:scale-95">
+                <HiChartBar size={40} />
+              </div>
             </div>
             <div>
-              <h1 className="text-4xl font-black tracking-tighter text-neutral-900 dark:text-dark-1000">
+              <h1 className="text-5xl font-black tracking-tighter text-neutral-900 dark:text-dark-1000">
                 {t`Dashboard`}
               </h1>
-
-              <p className="text-[11px] font-bold uppercase tracking-widest text-light-600 dark:text-dark-700/60">
-                {t`Workspace Insights & Metrics`}
-              </p>
+              <div className="mt-2 flex items-center gap-2">
+                <div className="h-4 rounded-full bg-indigo-500/10 px-2 text-[10px] font-extrabold uppercase tracking-widest text-indigo-600 dark:bg-indigo-500/20 dark:text-indigo-400">
+                  {users?.find((u) => u.id === selectedUserId)?.name ||
+                    workspace.name}
+                </div>
+                <div className="h-1.5 w-1.5 rounded-full bg-light-300 dark:bg-dark-600" />
+                <p className="text-[11px] font-bold uppercase tracking-widest text-light-500/80 dark:text-dark-700/60">
+                  {t`Insights & Metrics`}
+                </p>
+              </div>
             </div>
           </div>
 
-          <div className="rounded-[28px] border border-light-200 bg-white/40 p-5 shadow-2xl ring-1 ring-light-100 backdrop-blur-2xl dark:border-dark-400/40 dark:bg-dark-200/40">
-            <div className="grid grid-cols-2 gap-4 sm:min-w-[800px] lg:grid-cols-5">
+          <div className="rounded-[28px] border border-light-200/60 bg-white/40 p-5 shadow-2xl ring-1 ring-light-100/50 backdrop-blur-3xl dark:border-dark-400/30 dark:bg-dark-200/30">
+            <div className="grid grid-cols-2 gap-x-4 gap-y-4 sm:min-w-[700px] lg:grid-cols-5">
               <FilterSelector
                 label={t`Employee`}
                 options={memberOptions}
@@ -621,13 +686,13 @@ export default function ReportsView() {
                 icon={<HiTableCells size={18} />}
               />
               <FilterSelector
-                label={t`View`}
+                label={t`View Mode`}
                 options={viewModeOptions}
                 value={viewMode}
                 onChange={setViewMode}
-                icon={<HiChartBar size={18} />}
+                icon={<HiRectangleStack size={18} />}
               />
-              {viewMode === "month" && (
+              {viewMode === "month" ? (
                 <FilterSelector
                   label={t`Month`}
                   options={monthOptions}
@@ -635,8 +700,7 @@ export default function ReportsView() {
                   onChange={setMonth}
                   icon={<HiCalendar size={18} />}
                 />
-              )}
-              {viewMode === "week" && (
+              ) : viewMode === "week" ? (
                 <FilterSelector
                   label={t`Week`}
                   options={weekOptions}
@@ -644,12 +708,11 @@ export default function ReportsView() {
                   onChange={setWeek}
                   icon={<HiCalendar size={18} />}
                 />
-              )}
-              {viewMode === "year" && (
-                 <div className="flex flex-col gap-1.5 opacity-40 pointer-events-none">
-                    <label className="text-[10px] font-bold uppercase tracking-widest text-light-600 dark:text-dark-700">{t`Selection`}</label>
-                    <div className="h-10 rounded-xl border border-light-300/60 bg-white/20" />
-                 </div>
+              ) : (
+                <div className="flex flex-col gap-2 opacity-30">
+                  <label className="text-[10px] font-extrabold uppercase tracking-[0.2em] text-light-500/80">{t`Fixed View`}</label>
+                  <div className="h-11 rounded-2xl border border-dashed border-light-300" />
+                </div>
               )}
               <FilterSelector
                 label={t`Year`}
@@ -660,7 +723,6 @@ export default function ReportsView() {
               />
             </div>
           </div>
-
         </header>
 
         {/* KPI Grid */}
@@ -715,7 +777,7 @@ export default function ReportsView() {
           >
             {isLoading ? (
               <SkeletonPulse className="mx-auto h-64 max-w-[250px] rounded-full" />
-            ) : pieData.length > 0 ? (
+            ) : totalCards > 0 ? (
               <ResponsiveContainer width="100%" height={320}>
                 <PieChart>
                   <circle
@@ -757,11 +819,11 @@ export default function ReportsView() {
                       if (!active || !payload?.length) return null;
                       const d = payload[0].payload;
                       return (
-                        <div className="rounded-xl border border-light-200 bg-white p-3 shadow-2xl dark:border-dark-400 dark:bg-dark-300">
-                          <p className="text-sm font-black text-neutral-900 dark:text-dark-1000">
+                        <div className="w-[200px] rounded-xl border border-light-200 bg-white/90 p-4 shadow-[0_10px_40px_-10px_rgba(0,0,0,0.1)] backdrop-blur-xl dark:border-dark-400 dark:bg-dark-300">
+                          <p className="mb-1 text-sm font-black text-neutral-900 dark:text-dark-1000">
                             {d.listName}
                           </p>
-                          <p className="text-[10px] font-bold uppercase tracking-widest text-light-600">
+                          <p className="text-[10px] font-extrabold uppercase tracking-widest text-indigo-600">
                             {d.cardCount} Cards · {d.percentage}%
                           </p>
                         </div>
@@ -773,19 +835,27 @@ export default function ReportsView() {
                     iconType="circle"
                     iconSize={8}
                     formatter={(val) => (
-                      <span className="ml-4 text-[11px] font-bold uppercase tracking-widest text-light-600">
+                      <span className="ml-4 text-[10px] font-extrabold uppercase tracking-[0.2em] text-light-500/80">
                         {val}
                       </span>
                     )}
                   />
                 </PieChart>
               </ResponsiveContainer>
-            ) : null}
+            ) : (
+              <div className="flex h-64 flex-col items-center justify-center gap-4 text-light-400">
+                <div className="rounded-full bg-light-100 p-6 dark:bg-dark-300">
+                  <HiChartPie size={48} className="opacity-20" />
+                </div>
+                <p className="text-xs font-bold uppercase tracking-widest">{t`No cards found`}</p>
+              </div>
+            )}
           </DashboardCard>
+
           <DashboardCard
-            title={t`Deadline Metrics`}
+            title={t`Kanban Deadline Metrics`}
             icon={<HiClock size={20} />}
-            delay={400}
+            delay={300}
           >
             {isLoading ? (
               <SkeletonPulse className="mx-auto h-64 max-w-[250px] rounded-full" />
@@ -804,7 +874,52 @@ export default function ReportsView() {
             )}
           </DashboardCard>
 
-          {/* New Full Width Section (V3 - Ultra Premium Vertical Chart) */}
+          {/* Calendar Segment */}
+          <DashboardCard
+            title={t`Calendar Task Completion`}
+            icon={<HiCheckCircle size={20} />}
+            delay={400}
+          >
+            {isLoading ? (
+              <SkeletonPulse className="mx-auto h-64 max-w-[250px] rounded-full" />
+            ) : (
+              <RadialGauge
+                rate={metrics?.calendar?.taskCompletionRate?.rate || 0}
+                doneCount={
+                  metrics?.calendar?.taskCompletionRate?.doneCount || 0
+                }
+                totalCount={
+                  metrics?.calendar?.taskCompletionRate?.totalCount || 0
+                }
+                label={t`Completed Tasks`}
+                theme="emerald"
+              />
+            )}
+          </DashboardCard>
+
+          <DashboardCard
+            title={t`Calendar Deadline Metrics`}
+            icon={<HiClipboardDocumentList size={20} />}
+            delay={500}
+          >
+            {isLoading ? (
+              <SkeletonPulse className="mx-auto h-64 max-w-[250px] rounded-full" />
+            ) : (
+              <RadialGauge
+                rate={metrics?.calendar?.deadlineCompletionRate?.rate || 0}
+                doneCount={
+                  metrics?.calendar?.deadlineCompletionRate?.onTimeCount || 0
+                }
+                totalCount={
+                  metrics?.calendar?.deadlineCompletionRate?.totalCount || 0
+                }
+                label={t`Tasks On Time`}
+                theme="sky"
+              />
+            )}
+          </DashboardCard>
+
+          {/* Detailed Performance Section */}
           <div className="lg:col-span-2">
             <DashboardCard
               title={t`Detailed Task Performance`}
@@ -814,34 +929,19 @@ export default function ReportsView() {
               {isLoading ? (
                 <SkeletonPulse className="h-80 w-full" />
               ) : taskProgressData.length > 0 ? (
-                <div className="h-[400px] w-full">
-                  <ResponsiveContainer width="100%" height="100%">
+                <div className="h-[400px] w-full overflow-hidden">
+                  <ResponsiveContainer
+                    width={
+                      taskProgressData.length < 4
+                        ? `${taskProgressData.length * 25}%`
+                        : "100%"
+                    }
+                    height="100%"
+                  >
                     <BarChart
-                      data={taskProgressData.map((d: any) => ({
-                        ...d,
-                        pending: 100 - (d.completionRate || 0),
-                      }))}
-                      margin={{ top: 40, right: 30, left: 0, bottom: 80 }}
+                      data={taskProgressData}
+                      margin={{ top: 40, right: 0, left: -20, bottom: 80 }}
                     >
-                      <defs>
-                        <filter
-                          id="shadow"
-                          x="-20%"
-                          y="-20%"
-                          width="140%"
-                          height="140%"
-                        >
-                          <feGaussianBlur in="SourceAlpha" stdDeviation="3" />
-                          <feOffset dx="2" dy="2" result="offsetblur" />
-                          <feComponentTransfer>
-                            <feFuncA type="linear" slope="0.2" />
-                          </feComponentTransfer>
-                          <feMerge>
-                            <feMergeNode />
-                            <feMergeNode in="SourceGraphic" />
-                          </feMerge>
-                        </filter>
-                      </defs>
                       <CartesianGrid
                         strokeDasharray="3 3"
                         vertical={false}
@@ -856,8 +956,8 @@ export default function ReportsView() {
                       />
                       <YAxis
                         tick={{
-                          fontSize: 11,
-                          fontWeight: 700,
+                          fontSize: 10,
+                          fontWeight: 800,
                           fill: "#94a3b8",
                         }}
                         axisLine={false}
@@ -866,48 +966,84 @@ export default function ReportsView() {
                         domain={[0, 100]}
                       />
                       <Tooltip
-                        cursor={{ fill: "rgba(99, 102, 241, 0.04)" }}
+                        cursor={false}
                         content={({ active, payload }: any) => {
                           if (!active || !payload?.length) return null;
                           const d = payload[0].payload;
                           return (
-                            <div className="overflow-hidden rounded-xl border border-light-200 bg-white/95 p-4 shadow-2xl backdrop-blur-md dark:border-dark-400 dark:bg-dark-300/95">
-                              <div className="absolute left-0 top-0 h-1 w-full bg-gradient-to-r from-indigo-500 to-purple-500" />
-                              <p className="mb-2 text-sm font-black text-neutral-900 dark:text-dark-1000">
+                            <div className="w-[220px] overflow-hidden rounded-2xl border border-light-200/60 bg-white/95 p-4 shadow-xl backdrop-blur-xl dark:border-dark-400/40 dark:bg-dark-300/95">
+                              <div className="absolute left-0 top-0 h-1.5 w-full bg-gradient-to-r from-indigo-500 via-emerald-500 to-sky-500" />
+                              <p className="mb-4 text-xs font-black tracking-tight text-neutral-900 dark:text-dark-1000">
                                 {d.taskName}
                               </p>
-                              <div className="flex items-center justify-between gap-8">
-                                <span className="text-[10px] font-bold uppercase tracking-widest text-light-500">{t`Completion`}</span>
-                                <span className="text-sm font-black text-indigo-500">
-                                  {d.completionRate}%
-                                </span>
-                              </div>
-                              <div className="mt-2 h-1.5 w-full rounded-full bg-light-100 dark:bg-dark-400">
-                                <div
-                                  className="h-full rounded-full bg-indigo-500"
-                                  style={{ width: `${d.completionRate}%` }}
-                                />
+                              <div className="flex flex-col gap-2.5">
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-2">
+                                    <div className="h-2 w-2 rounded-full bg-[#10b981]" />
+                                    <span className="text-[10px] font-extrabold uppercase tracking-wider text-light-500">{t`Done`}</span>
+                                  </div>
+                                  <span className="text-xs font-black text-emerald-600">
+                                    {d.doneCount} ({d.completionRate}%)
+                                  </span>
+                                </div>
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-2">
+                                    <div className="h-2 w-2 rounded-full bg-[#f43f5e]" />
+                                    <span className="text-[10px] font-extrabold uppercase tracking-wider text-light-500">{t`Missed`}</span>
+                                  </div>
+                                  <span className="text-xs font-black text-rose-600">
+                                    {d.missedCount} ({d.missedRate}%)
+                                  </span>
+                                </div>
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-2">
+                                    <div className="h-2 w-2 rounded-full bg-[#94a3b8]" />
+                                    <span className="text-[10px] font-extrabold uppercase tracking-wider text-light-500">{t`Pending`}</span>
+                                  </div>
+                                  <span className="text-xs font-black text-slate-600">
+                                    {d.pendingCount} ({d.pendingRate}%)
+                                  </span>
+                                </div>
                               </div>
                             </div>
                           );
                         }}
                       />
-                      <Bar
-                        name={t`Progress`}
-                        dataKey="completionRate"
-                        stackId="stack"
-                        fill="url(#barGradient)"
-                        shape={<CustomBar />}
-                        animationDuration={1500}
-                        animationEasing="ease-out"
+                      <Legend
+                        verticalAlign="top"
+                        align="right"
+                        iconType="circle"
+                        iconSize={8}
+                        wrapperStyle={{ paddingBottom: "30px" }}
+                        formatter={(value) => (
+                          <span className="text-[10px] font-extrabold uppercase tracking-[0.2em] text-light-500/80">
+                            {value}
+                          </span>
+                        )}
                       />
                       <Bar
                         name={t`Pending`}
-                        dataKey="pending"
+                        dataKey="pendingRate"
                         stackId="stack"
-                        fill="currentColor"
-                        className="text-light-100/50 dark:text-dark-300/10"
-                        radius={[10, 10, 0, 0]}
+                        fill="url(#pendingGradient)"
+                        barSize={45}
+                        isAnimationActive={false}
+                      />
+                      <Bar
+                        name={t`Done`}
+                        dataKey="completionRate"
+                        stackId="stack"
+                        fill="url(#doneGradient)"
+                        barSize={45}
+                        isAnimationActive={false}
+                      />
+                      <Bar
+                        name={t`Missed`}
+                        dataKey="missedRate"
+                        stackId="stack"
+                        fill="url(#missedGradient)"
+                        barSize={45}
+                        radius={[12, 12, 0, 0]}
                         isAnimationActive={false}
                       />
                     </BarChart>

@@ -64,6 +64,8 @@ export const getActivityText = ({
   label,
   fromTitle,
   toDueDate,
+  oldValue,
+  newValue,
   dateLocale,
   mergedLabels,
   attachmentName,
@@ -79,6 +81,8 @@ export const getActivityText = ({
   fromTitle?: string | null;
   fromDueDate?: Date | null;
   toDueDate?: Date | null;
+  oldValue?: string | null;
+  newValue?: string | null;
   dateLocale: DateFnsLocale;
   mergedLabels?: string[];
   attachmentName?: string | null;
@@ -144,7 +148,12 @@ export const getActivityText = ({
     "updated_attachment_renamed": t`renamed an attachment`,
     "updated_attachment_removed": t`removed an attachment`,
     "deadline_changed": t`changed the due date`,
+    "deadline_added": t`added a due date`,
+    "deadline_removed": t`removed a due date`,
     "archived": t`archived the card`,
+    "start_date_added": t`added a start date`,
+    "start_date_changed": t`changed a start date`,
+    "start_date_removed": t`removed a start date`,
   } as const;
 
   if (!(type in ACTIVITY_TYPE_MAP)) return null;
@@ -314,12 +323,31 @@ export const getActivityText = ({
     const showYear = !isSameYear(toDueDate, new Date());
     const formattedDate = format(
       toDueDate,
-      showYear ? "do MMM yyyy" : "do MMM",
+      showYear ? "HH:mm do MMM yyyy" : "HH:mm do MMM",
       { locale: dateLocale },
     );
     return (
       <Trans>
         changed the due date to <TextHighlight>{formattedDate}</TextHighlight>
+      </Trans>
+    );
+  }
+
+  if (
+    (type === "start_date_added" ||
+      type === "start_date_changed" ||
+      type === "start_date_removed") &&
+    newValue
+  ) {
+    const showYear = !isSameYear(newValue, new Date());
+    const formattedDate = format(
+      newValue,
+      showYear ? "HH:mm do MMM yyyy" : "HH:mm do MMM",
+      { locale: dateLocale },
+    );
+    return (
+      <Trans>
+        changed the start date to <TextHighlight>{formattedDate}</TextHighlight>
       </Trans>
     );
   }
@@ -352,6 +380,11 @@ const ACTIVITY_ICON_MAP: Partial<Record<ActivityType, React.ReactNode | null>> =
     "updated_attachment_renamed": <HiOutlinePaperClip />,
     "updated_attachment_removed": <HiOutlinePaperClip />,
     "deadline_changed": <HiOutlineClock />,
+    "deadline_added": <HiOutlineClock />,
+    "deadline_removed": <HiOutlineClock />,
+    "start_date_changed": <HiOutlineClock />,
+    "start_date_added": <HiOutlineClock />,
+    "start_date_removed": <HiOutlineClock />,
   } as const;
 
 export const getActivityIcon = (
@@ -493,7 +526,7 @@ const ActivityList = ({
     cardIsLoading || (isFetchingFirst && allActivities.length === 0);
 
   return (
-    <div className="flex flex-col space-y-4 pt-4">
+    <div className="flex max-h-[350px] flex-col overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-light-400 dark:scrollbar-thumb-dark-300 space-y-4 pt-4">
       {allActivities.map((activity, index) => {
         const activityText = getActivityText({
           type: activity.type,
@@ -507,6 +540,8 @@ const ActivityList = ({
           fromTitle: activity.fromTitle ?? null,
           fromDueDate: activity.fromDueDate ?? null,
           toDueDate: activity.toDueDate ?? null,
+          oldValue: activity.oldValue ?? null,
+          newValue: activity.newValue ?? null,
           dateLocale: dateLocale,
           mergedLabels: (activity as ActivityWithMergedLabels).mergedLabels,
           attachmentName:
@@ -573,7 +608,7 @@ const ActivityList = ({
         );
       })}
       {hasMore && (
-        <div className="flex justify-center pt-4">
+        <div className="flex justify-center py-4">
           <button
             onClick={handleLoadMore}
             disabled={isFetching}

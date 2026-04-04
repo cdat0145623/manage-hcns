@@ -247,7 +247,7 @@ export function EventDetailModal({
         className="relative flex flex-col overflow-hidden rounded-3xl border border-neutral-200/50 bg-white/90 shadow-[0_20px_50px_rgba(0,0,0,0.15)] backdrop-blur-xl dark:border-white/10 dark:bg-neutral-900/90"
       >
         {/* Header */}
-        <div className="flex-shrink-0 border-b border-light-200 bg-gradient-to-r from-blue-50 to-indigo-50 px-7 py-5 dark:border-dark-300 dark:from-dark-200 dark:to-dark-300">
+        <div className="flex-shrink-0 border-b border-light-200 bg-gradient-to-r from-blue-50 to-indigo-50 p-3 dark:border-dark-300 dark:from-dark-200 dark:to-dark-300">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2.5">
               <div className={`flex h-8 w-8 items-center justify-center rounded-xl text-sm ${statusConfig.activeBg} ${statusConfig.activeText}`}>
@@ -257,16 +257,41 @@ export function EventDetailModal({
                 Task Details
               </h2>
             </div>
-            <motion.button
-              whileHover={{ scale: 1.1, backgroundColor: "rgba(255,255,255,0.8)" }}
-              whileTap={{ scale: 0.9 }}
-              onClick={onClose}
-              className="flex h-10 w-10 items-center justify-center rounded-2xl text-neutral-400 shadow-sm transition-all hover:text-neutral-900 dark:hover:bg-dark-300"
-            >
-              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </motion.button>
+            <div className="flex gap-1">
+              <motion.button
+                title="Delete"
+                whileHover={{ scale: 1.1, backgroundColor: "rgba(255,255,255,0.8)" }}
+                whileTap={{ scale: 0.9 }}
+                onClick={() => onDelete(entry)}
+                className="flex h-10 w-10 items-center justify-center rounded-2xl text-neutral-400 shadow-sm transition-all hover:text-neutral-900 dark:hover:bg-dark-300"
+              >
+                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+              </motion.button>
+              <motion.button
+                title="Edit"
+                whileHover={{ scale: 1.1, backgroundColor: "rgba(255,255,255,0.8)" }}
+                whileTap={{ scale: 0.9 }}
+                onClick={() => onEdit(entry)}
+                className="flex h-10 w-10 items-center justify-center rounded-2xl text-neutral-400 shadow-sm transition-all hover:text-neutral-900 dark:hover:bg-dark-300"
+              >
+                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                </svg>
+              </motion.button>
+              <motion.button
+                title="Close"
+                whileHover={{ scale: 1.1, backgroundColor: "rgba(255,255,255,0.8)" }}
+                whileTap={{ scale: 0.9 }}
+                onClick={onClose}
+                className="flex h-10 w-10 items-center justify-center rounded-2xl text-neutral-400 shadow-sm transition-all hover:text-neutral-900 dark:hover:bg-dark-300"
+              >
+                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </motion.button>
+            </div>
           </div>
         </div>
 
@@ -310,77 +335,36 @@ export function EventDetailModal({
 
           {/* Status Selector */}
           <div className="space-y-2.5">
-            <p className="text-[10px] font-black uppercase tracking-[0.15em] text-neutral-400">
-              Status
-            </p>
-            <div className="grid grid-cols-3 gap-2.5">
-              {(Object.keys(STATUS_CONFIG) as TaskStatus[]).map((status) => {
-                const config = STATUS_CONFIG[status];
-                const isActive = currentStatus === status;
-                return (
-                  <motion.button
-                    key={status}
-                    whileHover={{ scale: isBusy ? 1 : 1.03, y: isBusy ? 0 : -1 }}
-                    whileTap={{ scale: isBusy ? 1 : 0.97 }}
-                    onClick={() => handleStatusChange(status)}
-                    disabled={isBusy}
-                    className={`group relative flex flex-col items-center gap-1.5 overflow-hidden rounded-2xl border-2 px-3 py-3.5 text-center transition-all duration-200 ${
-                      isActive
-                        ? `${config.activeBg} ${config.activeBorder} shadow-lg ${config.glow}`
-                        : `${config.bg} ${config.border} hover:${config.activeBg} hover:${config.activeBorder}`
-                    } disabled:cursor-not-allowed disabled:opacity-50`}
-                  >
-                    {/* Active indicator dot */}
-                    <AnimatePresence>
-                      {isActive && (
-                        <motion.div
-                          initial={{ scale: 0, opacity: 0 }}
-                          animate={{ scale: 1, opacity: 1 }}
-                          exit={{ scale: 0, opacity: 0 }}
-                          className={`absolute right-2 top-2 h-2 w-2 rounded-full ${config.dot} shadow-sm`}
-                        />
-                      )}
-                    </AnimatePresence>
-
-                    {/* Icon */}
-                    <div className={`transition-colors duration-200 ${isActive ? config.activeText : config.text} group-hover:${config.activeText}`}>
-                      {config.icon}
-                    </div>
-
-                    {/* Label */}
-                    <span className={`text-[11px] font-black leading-none transition-colors duration-200 ${isActive ? config.activeText : config.text} group-hover:${config.activeText}`}>
-                      {config.label}
-                    </span>
-
-                    {/* Loading spinner overlay */}
-                    <AnimatePresence>
-                      {isBusy && isActive && (
-                        <motion.div
-                          initial={{ opacity: 0 }}
-                          animate={{ opacity: 1 }}
-                          exit={{ opacity: 0 }}
-                          className="absolute inset-0 flex items-center justify-center rounded-2xl bg-white/60 dark:bg-neutral-900/60"
-                        >
-                          <svg className={`h-4 w-4 animate-spin ${config.activeText}`} viewBox="0 0 24 24" fill="none">
-                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                          </svg>
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
-                  </motion.button>
-                );
-              })}
+            <div className="flex items-center justify-end">
+              {entry.status === "pending" ? (
+                <motion.button
+                  whileHover={{ scale: 1.03, y: -1 }}
+                  whileTap={{ scale: 0.97 }}
+                  onClick={() => handleStatusChange("done")}
+                  className="group relative flex flex-col items-center gap-1.5 overflow-hidden rounded-2xl border-2 border-neutral-300 bg-white px-3 py-3.5 text-center text-neutral-900 shadow-sm transition-all duration-200 hover:border-neutral-400 hover:bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100 dark:hover:border-neutral-600 dark:hover:bg-neutral-800"
+                >
+                  <span className="text-[12px] font-black tracking-widest">Mark completed</span>
+                </motion.button>
+              ) : (
+                <motion.button
+                  whileHover={{ scale: 1.03, y: -1 }}
+                  whileTap={{ scale: 0.97 }}
+                  onClick={() => handleStatusChange("pending")}
+                  className="group relative flex flex-col items-center gap-1.5 overflow-hidden rounded-2xl border-2 border-neutral-300 bg-white px-3 py-3.5 text-center text-neutral-900 shadow-sm transition-all duration-200 hover:border-neutral-400 hover:bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100 dark:hover:border-neutral-600 dark:hover:bg-neutral-800"
+                >
+                  <span className="text-[12px] font-black tracking-widest">Mark in-progress</span>
+                </motion.button>
+              )}
             </div>
           </div>
         </div>) : (
-          <motion.div
-        initial={{ opacity: 0, scale: 0.96, y: 16 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.96, y: 16 }}
-        transition={{ type: "spring", stiffness: 320, damping: 28 }}
-        className="flex flex-col"
-      >
+        <motion.div
+          initial={{ opacity: 0, scale: 0.96, y: 16 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          exit={{ opacity: 0, scale: 0.96, y: 16 }}
+          transition={{ type: "spring", stiffness: 320, damping: 28 }}
+          className="flex flex-col"
+        >
           <div className="space-y-4 px-7 py-6">
           <div className="flex items-start justify-between">
             <div className="flex-1">
@@ -435,45 +419,13 @@ export function EventDetailModal({
             </div>
           )}
         </div>
-
-        <div className="flex flex-shrink-0 flex-col gap-3 border-t border-light-200 bg-light-50 px-7 py-4 dark:border-dark-300 dark:bg-dark-200">
-            <div className="flex gap-3">
-                {/* <button
-                  onClick={handleCreateInstance}
-                  disabled={createInstance.isPending || updateInstance.isPending}
-                  className="w-full rounded-xl bg-blue-600 px-6 py-3 text-base font-bold text-white shadow-md transition-all hover:bg-blue-700 hover:shadow-lg active:scale-[0.98] disabled:opacity-50 dark:bg-blue-500 dark:hover:bg-blue-600"
-                >
-                  {createInstance.isPending || updateInstance.isPending
-                    ? "Đang xử lý..."
-                    : "Tạo"}
-                </button> */}
-            </div>
-        </div>
         </motion.div>
         )}
 
         {/* Footer */}
-        <div className="flex flex-shrink-0 gap-3 border-t border-light-200 bg-light-50 px-7 py-4 dark:border-dark-300 dark:bg-dark-200">
-          <motion.button
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.97 }}
-            onClick={() => onDelete(entry)}
-            disabled={isDeleting || isBusy}
-            className="flex-1 rounded-xl bg-red-50 px-4 py-2.5 text-sm font-bold text-red-600 transition-all hover:bg-red-100 disabled:opacity-50 dark:bg-red-900/20 dark:text-red-400 dark:hover:bg-red-900/40"
-          >
-            {isDeleting ? "Deleting..." : "Delete"}
-          </motion.button>
-          <motion.button
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.97 }}
-            onClick={() => onEdit(entry)}
-            disabled={isBusy}
-            className="flex-1 rounded-xl border border-light-300 bg-white px-4 py-2.5 text-sm font-bold text-neutral-700 shadow-sm transition-all hover:bg-light-100 disabled:opacity-50 dark:border-dark-400 dark:bg-dark-300 dark:text-neutral-300 dark:hover:bg-dark-400"
-          >
-            Edit
-          </motion.button>
-          {isVirtual && (
-            <div className="flex gap-3">
+        <div className="flex flex-shrink-0 justify-center gap-3 border-t border-light-200 bg-light-50 px-7 py-4 dark:border-dark-300 dark:bg-dark-200">
+          {isVirtual ? (
+            <div className="flex items-center gap-2">
               <button
                 onClick={handleCreateInstance}
                 disabled={createInstance.isPending || updateInstance.isPending}
@@ -483,6 +435,10 @@ export function EventDetailModal({
                   ? "Đang xử lý..."
                   : "Tạo"}
               </button>
+            </div>
+          ) : (
+            <div>
+
             </div>
           )}
         </div>

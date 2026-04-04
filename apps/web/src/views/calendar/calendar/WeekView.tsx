@@ -95,7 +95,7 @@ export function WeekView({
                 >
                   {format(day, "d")}
                 </div>
-                {dayEntries.length > 3 && (
+                {dayEntries.length > 0 && (
                   <motion.button
                     initial={{ opacity: 0, y: 5 }}
                     animate={{ opacity: 1, y: 0 }}

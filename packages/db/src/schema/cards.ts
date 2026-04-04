@@ -53,6 +53,9 @@ export const activityTypes = [
   "updated_attachment_renamed",
   "deadline_added",
   "deadline_removed",
+  "start_date_added",
+  "start_date_removed",
+  "start_date_changed",
 ] as const;
 
 export type ActivityType = (typeof activityTypes)[number];

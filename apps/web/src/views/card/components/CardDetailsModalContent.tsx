@@ -471,9 +471,9 @@ export default function CardDetailsModalContent({
             </div>
           )}
           <div className="mb-4">
-            <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-light-700 dark:text-dark-700">
+            {card?.startDate && <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-light-700 dark:text-dark-700">
               {t`Start date`}
-            </p>
+            </p>}
             <DueDateSelector
               cardPublicId={cardId}
               dueDate={card?.startDate}
@@ -491,9 +491,9 @@ export default function CardDetailsModalContent({
             />
           </div>
           <div className="mb-4">
-            <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-light-700 dark:text-dark-700">
+            {card?.dueDate && <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-light-700 dark:text-dark-700">
               {t`Due date`}
-            </p>
+            </p>}
             <DueDateSelector
               cardPublicId={cardId}
               dueDate={card?.dueDate}

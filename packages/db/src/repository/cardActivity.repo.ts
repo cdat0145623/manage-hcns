@@ -95,6 +95,8 @@ export const bulkCreate = async (
     toDueDate?: Date;
     sourceBoardId?: number;
     attachmentId?: number;
+    oldValue?: string;
+    newValue?: string;
   }[],
 ) => {
   const activitiesWithPublicIds = activityInputs.map((activity) => ({
@@ -180,6 +182,8 @@ export const getPaginatedActivities = async (
       toDescription: true,
       fromDueDate: true,
       toDueDate: true,
+      oldValue: true,
+      newValue: true,
     },
     where: and(
       eq(cardActivities.cardId, cardId),

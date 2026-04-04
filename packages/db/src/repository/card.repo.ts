@@ -207,6 +207,7 @@ export const update = async (
       title: cards.title,
       description: cards.description,
       dueDate: cards.dueDate,
+      startDate: cards.startDate,
     });
 
   return result;
@@ -242,6 +243,7 @@ export const getByPublicId = (db: dbClient, cardPublicId: string) => {
       description: true,
       listId: true,
       dueDate: true,
+      startDate: true,
     },
     where: eq(cards.publicId, cardPublicId),
   });
@@ -817,6 +819,7 @@ export const reorder = async (
         title: true,
         description: true,
         dueDate: true,
+        startDate: true,
       },
       where: eq(cards.id, card.id),
     });

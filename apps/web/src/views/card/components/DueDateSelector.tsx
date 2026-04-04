@@ -67,8 +67,8 @@ export function DueDateSelector({
     if (!buttonRef.current) return;
     const rect = buttonRef.current.getBoundingClientRect();
     setDropdownPos({
-      top: rect.bottom + window.scrollY + 4,
-      left: rect.left + window.scrollX,
+      top: rect.bottom + window.scrollY + rect.width / 2 - 160,
+      left: rect.left + window.scrollX + 40,
     });
     setIsOpen(true);
   };
@@ -80,8 +80,8 @@ export function DueDateSelector({
       if (!buttonRef.current) return;
       const rect = buttonRef.current.getBoundingClientRect();
       setDropdownPos({
-        top: rect.bottom + window.scrollY + 4,
-        left: rect.left + window.scrollX,
+        top: rect.bottom + window.scrollY + rect.width / 2 - 160,
+        left: rect.left + window.scrollX + 40,
       });
     };
     window.addEventListener("scroll", reposition, true);
@@ -151,36 +151,36 @@ export function DueDateSelector({
   };
 
   const handleTimeChange = (type: "hour" | "minute", value: string) => {
-  const numVal = value.replace(/\D/g, "").slice(0, 2);
-  
-  if (type === "hour") {
-    setHour(numVal);
-    if (type === "hour" && numVal.length === 2) {
-      minuteRef.current?.focus();
-      minuteRef.current?.select();
+    const numVal = value.replace(/\D/g, "").slice(0, 2);
+    
+    if (type === "hour") {
+      setHour(numVal);
+      if (type === "hour" && numVal.length === 2) {
+        minuteRef.current?.focus();
+        minuteRef.current?.select();
+      }
+    } else {
+      setMinute(numVal);
     }
-  } else {
-    setMinute(numVal);
-  }
 
-  if (!dueDate) return;
+    if (!dueDate) return;
 
-  // Chỉ update date khi đã nhập đủ 2 chữ số
-  if (numVal.length < 2) return;
+    // Chỉ update date khi đã nhập đủ 2 chữ số
+    if (numVal.length < 2) return;
 
-  const h =
-    type === "hour"
-      ? Math.min(23, parseInt(numVal, 10))
-      : Math.min(23, parseInt(hour, 10) || 0);
-  const m =
-    type === "minute"
-      ? Math.min(59, parseInt(numVal, 10))
-      : Math.min(59, parseInt(minute, 10) || 0);
+    const h =
+      type === "hour"
+        ? Math.min(23, parseInt(numVal, 10))
+        : Math.min(23, parseInt(hour, 10) || 0);
+    const m =
+      type === "minute"
+        ? Math.min(59, parseInt(numVal, 10))
+        : Math.min(59, parseInt(minute, 10) || 0);
 
-  const updated = new Date(dueDate);
-  updated.setHours(h, m, 0, 0);
-  onDateSelect?.(updated);
-};
+    const updated = new Date(dueDate);
+    updated.setHours(h, m, 0, 0);
+    onDateSelect?.(updated);
+  };
 
 const handleBlurPad = (type: "hour" | "minute") => {
   // Khi blur: pad + commit luôn dù chưa đủ 2 chữ số
@@ -233,7 +233,7 @@ const handleBlurPad = (type: "hour" | "minute") => {
             <button
               type="button"
               onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}
-              className="flex h-6 w-6 items-center justify-center rounded text-light-700 hover:bg-light-100 dark:text-dark-700 dark:hover:bg-dark-200"
+              className="flex h-6 w-6 items-center justify-center rounded text-neutral-900 hover:bg-light-100 dark:text-dark-700 dark:hover:bg-dark-200"
             >
               <HiChevronRight className="h-3.5 w-3.5" />
             </button>

@@ -47,7 +47,9 @@ export function MonthView({
   );
 
   const getEntriesForDay = (day: Date) => {
-    return entries.filter((entry) => isSameDay(new Date(entry.date), day));
+    return entries
+      .filter((entry) => isSameDay(new Date(entry.date), day))
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
   };
 
   return (

@@ -17,6 +17,7 @@ import {
   createCardWebhookPayload,
   sendWebhooksForWorkspace,
 } from "../utils/webhook";
+import { parseString } from "rrule/dist/esm/parsestring";
 
 export const cardRouter = createTRPCRouter({
   create: protectedProcedure
@@ -936,11 +937,12 @@ export const cardRouter = createTRPCRouter({
             description: string | null;
             publicId: string;
             dueDate: Date | null;
+            startDate: Date | null;
           }
         | undefined;
 
       const previousDueDate = existingCard.dueDate;
-
+      const previousStartDate = existingCard.startDate;
       if (
         input.title ||
         input.description ||
@@ -994,14 +996,14 @@ export const cardRouter = createTRPCRouter({
           toDescription: input.description,
         });
 
-        sendMentionEmails({
-          db: ctx.db,
-          cardPublicId: input.cardPublicId,
-          commentHtml: input.description,
-          commenterUserId: userId,
-        }).catch((error) => {
-          console.error("Failed to send mention emails:", error);
-        });
+        // sendMentionEmails({
+        //   db: ctx.db,
+        //   cardPublicId: input.cardPublicId,
+        //   commentHtml: input.description,
+        //   commenterUserId: userId,
+        // }).catch((error) => {
+        //   console.error("Failed to send mention emails:", error);
+        // });
       }
 
       if (
@@ -1027,6 +1029,32 @@ export const cardRouter = createTRPCRouter({
           createdBy: userId,
           fromDueDate: previousDueDate ?? undefined,
           toDueDate: input.dueDate ?? undefined,
+        });
+      }
+
+      if (
+        input.startDate !== undefined &&
+        previousStartDate?.getTime() !== input.startDate?.getTime()
+      ) {
+        let activityType:
+          | "start_date_added"
+          | "start_date_changed"
+          | "start_date_removed";
+
+        if (!previousStartDate) {
+          activityType = "start_date_added";
+        } else if (!input.startDate) {
+          activityType = "start_date_removed";
+        } else {
+          activityType = "start_date_changed";
+        }
+
+        activities.push({
+          type: activityType,
+          cardId: result.id,
+          createdBy: userId,
+          oldValue: previousStartDate?.toLocaleString(),
+          newValue: input.startDate?.toLocaleString(),
         });
       }
 

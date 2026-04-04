@@ -70,7 +70,7 @@ export function DayTasksPopover({
           <div className="flex flex-col gap-3">
             {entries.length > 0 ? (
               entries.map((entry, idx) => (
-                <div key={entry.id} className="min-h-[40px]">
+                <div key={entry.id} className="min-h-[20px]">
                    <CalendarTask
                     entry={entry}
                     onClick={(clickedEntry) => {

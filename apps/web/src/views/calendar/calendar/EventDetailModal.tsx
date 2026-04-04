@@ -5,8 +5,14 @@ import { authClient } from "@kan/auth/client";
 
 import type { EditableEntry } from "./CreateEventModal";
 import { api } from "~/utils/api";
-import { usePopup } from "~/providers/popup";
+import { useModal } from "~/providers/modal";
 import Modal from "../../../components/modal";
+import ActivityList from "../../card/components/ActivityList";
+import { AttachmentThumbnails } from "../../card/components/AttachmentThumbnails";
+import { AttachmentUpload } from "../../card/components/AttachmentUpload";
+import NewCommentForm from "../../card/components/NewCommentForm";
+import { DeleteCommentConfirmation } from "../../card/components/DeleteCommentConfirmation";
+import { usePopup } from "~/providers/popup";
 
 interface EventDetailModalProps {
   isVisible: boolean;
@@ -99,7 +105,13 @@ export function EventDetailModal({
   const { data: session } = authClient.useSession();
   const utils = api.useUtils();
   const { showPopup } = usePopup();
+  const { modalContentType, isOpen: isSubModalOpen, entityId } = useModal();
   const [isUpdating, setIsUpdating] = useState(false);
+
+  const { data: attachments } = api.attachment.getByTaskInstanceId.useQuery(
+    { taskInstanceId: entry?.instanceId as string },
+    { enabled: !!entry?.instanceId && entry?.type === "INSTANCE" && isVisible }
+  );
 
   const createInstance = api.taskInstance.create.useMutation({
     onSuccess: () => {
@@ -147,7 +159,6 @@ export function EventDetailModal({
       });
     } catch (error: any) {
       console.error("Caught error in handleCreateInstance:", error);
-      // More aggressive check for ANY database constraint or duplicate error
       const isDuplicate = 
         error.message?.toLowerCase().includes("unique constraint") || 
         error.message?.toLowerCase().includes("duplicate") ||
@@ -189,7 +200,6 @@ export function EventDetailModal({
     setIsUpdating(true);
     try {
       if (isVirtual) {
-        // Create the instance with the chosen status
         await createInstance.mutateAsync({
           taskMasterId: entry.masterId,
           targetDate: new Date(entry.date),
@@ -197,7 +207,6 @@ export function EventDetailModal({
           status: newStatus,
         });
       } else {
-        // Update existing instance - instanceId is guaranteed when not virtual
         await updateInstance.mutateAsync({
           id: entry.instanceId as string,
           taskMasterId: entry.masterId,
@@ -324,17 +333,12 @@ export function EventDetailModal({
             </p>
           )}
 
-          {isVirtual && (
-            <div className="flex items-start gap-2.5 rounded-xl bg-amber-50 p-3.5 dark:bg-amber-900/20">
-              <span className="mt-0.5 flex-shrink-0 text-base">⚡</span>
-              <p className="text-[12px] leading-relaxed text-amber-700 dark:text-amber-400">
-                This is a virtual instance generated from a recurring schedule. Selecting any status will save it as a real record.
-              </p>
-            </div>
-          )}
-
-          {/* Status Selector */}
-          <div className="space-y-2.5">
+          <div className="flex flex-col space-y-2.5">
+            {entry.type === "INSTANCE" && (
+              <div className="mt-2">
+                <AttachmentUpload taskInstanceId={entry.instanceId as string} />
+              </div>
+            )}
             <div className="flex items-center justify-end">
               {entry.status === "pending" ? (
                 <motion.button
@@ -357,6 +361,15 @@ export function EventDetailModal({
               )}
             </div>
           </div>
+
+          {entry.type === "INSTANCE" && attachments && attachments.length > 0 && (
+            <div className="mt-4">
+              <AttachmentThumbnails
+                attachments={attachments}
+                taskInstanceId={entry.instanceId as string}
+              />
+            </div>
+          )}
         </div>) : (
         <motion.div
           initial={{ opacity: 0, scale: 0.96, y: 16 }}
@@ -415,33 +428,64 @@ export function EventDetailModal({
 
           {isVirtual && (
             <div className="rounded-xl bg-amber-50 p-3 text-[12px] text-amber-700 dark:bg-amber-900/20 dark:text-amber-400">
-              ⚠️ Đây là công việc ảo được tạo tự động từ lịch lặp. Nhấn <strong>Tạo</strong> để tạo công việc.
+              ⚠️ This is a virtual task automatically created from the recurring schedule. Click <strong>Create</strong> to create the task.
             </div>
           )}
         </div>
         </motion.div>
         )}
 
-        {/* Footer */}
-        <div className="flex flex-shrink-0 justify-center gap-3 border-t border-light-200 bg-light-50 px-7 py-4 dark:border-dark-300 dark:bg-dark-200">
-          {isVirtual ? (
-            <div className="flex items-center gap-2">
-              <button
-                onClick={handleCreateInstance}
-                disabled={createInstance.isPending || updateInstance.isPending}
-                className="w-full rounded-xl bg-blue-600 px-6 py-3 text-base font-bold text-white shadow-md transition-all hover:bg-blue-700 hover:shadow-lg active:scale-[0.98] disabled:opacity-50 dark:bg-blue-500 dark:hover:bg-blue-600"
-              >
-                {createInstance.isPending || updateInstance.isPending
-                  ? "Đang xử lý..."
-                  : "Tạo"}
-              </button>
+        {/* Footer - Activity & Comments */}
+        {entry.type === "INSTANCE" ? (
+            <div className="border-t border-light-200 bg-light-50 p-6 dark:border-dark-300 dark:bg-dark-200 max-h-[500px] overflow-y-auto">
+                <div className="mb-6">
+                    <h3 className="text-sm font-bold text-neutral-900 dark:text-white mb-4">Activity</h3>
+                    <ActivityList 
+                        taskInstanceId={entry.instanceId as string} 
+                        isLoading={false}
+                        includedTypes={[
+                            "updated_attachment_added", 
+                            "updated_attachment_renamed", 
+                            "updated_attachment_removed", 
+                            "comment", 
+                            "updated_comment_added", 
+                            "updated_comment_updated", 
+                            "updated_comment_deleted"
+                        ]}
+                    />
+                </div>
+                <div>
+                    <h3 className="text-sm font-bold text-neutral-900 dark:text-white mb-4">Add Comment</h3>
+                    <NewCommentForm 
+                        taskInstanceId={entry.instanceId as string}
+                        workspaceMembers={[]} // Optional for now
+                    />
+                </div>
             </div>
-          ) : (
-            <div>
+        ) : (
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleCreateInstance}
+              disabled={createInstance.isPending || updateInstance.isPending}
+              className="w-full rounded-xl bg-blue-600 px-6 py-3 text-base font-bold text-white shadow-md transition-all hover:bg-blue-700 hover:shadow-lg active:scale-[0.98] disabled:opacity-50 dark:bg-blue-500 dark:hover:bg-blue-600"
+            >
+              {createInstance.isPending || updateInstance.isPending
+                ? "Đang xử lý..."
+                : "Tạo"}
+            </button>
+          </div>
+        )}
 
-            </div>
-          )}
-        </div>
+        {/* Sub-modal for deleting comments */}
+        <Modal
+            modalSize="sm"
+            isVisible={isSubModalOpen && modalContentType === "DELETE_COMMENT"}
+        >
+            <DeleteCommentConfirmation
+                taskInstanceId={entry.instanceId as string}
+                commentPublicId={entityId}
+            />
+        </Modal>
       </motion.div>
     </Modal>
   );

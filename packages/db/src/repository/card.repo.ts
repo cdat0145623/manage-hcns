@@ -8,17 +8,18 @@ import {
   inArray,
   isNull,
   sql,
+  isNotNull,
 } from "drizzle-orm";
 
 import type { dbClient } from "@kan/db/client";
 import {
   cardActivities,
-  cardAttachments,
   cards,
   cardsToLabels,
   cardToWorkspaceMembers,
   checklistItems,
   checklists,
+  fileActivityLog,
   labels,
   lists,
   workspaceMembers,
@@ -444,17 +445,21 @@ export const getWithListAndMembersByPublicId = async (
           },
         },
       },
-      attachments: {
+      fileActivities: {
         columns: {
           publicId: true,
-          contentType: true,
-          s3Key: true,
-          originalFilename: true,
-          size: true,
+          mimeType: true,
+          newFileUrl: true,
+          fileName: true,
+          fileSize: true,
           createdAt: true,
+          activityType: true,
         },
-        where: isNull(cardAttachments.deletedAt),
-        orderBy: asc(cardAttachments.createdAt),
+        orderBy: asc(fileActivityLog.createdAt),
+        where: and(
+          isNull(fileActivityLog.deletedAt),
+          isNotNull(fileActivityLog.newFileUrl),
+        ),
       },
       checklists: {
         columns: {
@@ -631,6 +636,24 @@ export const getWithListAndMembersByPublicId = async (
 
   if (!card) return null;
 
+  // Filter for active attachments: group by publicId and take the latest activity. 
+  // If it's not 'file_deleted', it's an active attachment.
+  const latestFiles = new Map<string, typeof card.fileActivities[0]>();
+  for (const activity of card.fileActivities) {
+    latestFiles.set(activity.publicId, activity);
+  }
+
+  const activeAttachments = Array.from(latestFiles.values())
+    .filter((f) => f.activityType !== "file_deleted" || f.newFileUrl)
+    .map((f) => ({
+      publicId: f.publicId,
+      mimeType: f.mimeType ?? "",
+      newFileUrl: f.newFileUrl ?? "",
+      fileName: f.fileName ?? "",
+      fileSize: f.fileSize ?? 0,
+      createdAt: f.createdAt,
+    }));
+
   const formattedResult = {
     ...card,
     labels: card.labels.map((label) => label.label),
@@ -638,6 +661,7 @@ export const getWithListAndMembersByPublicId = async (
     activities: card.activities.filter(
       (activity) => !activity.comment?.deletedAt,
     ),
+    attachments: activeAttachments,
   };
 
   return formattedResult;

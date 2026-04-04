@@ -1,11 +1,13 @@
 import { eq } from "drizzle-orm";
 import * as taskInstanceRepo from "@kan/db/repository/taskInstance.repo";
 import * as cardActivityRepo from "@kan/db/repository/cardActivity.repo";
+import * as cardCommentRepo from "@kan/db/repository/cardComment.repo";
 import * as taskMasterRepo from "@kan/db/repository/taskMaster.repo";
 import {protectedProcedure, createTRPCRouter} from "../trpc";
 import {z} from "zod";
 import {statusTypeEnum} from "@kan/db/schema";
 import { TRPCError } from "@trpc/server";
+import { assertCanDelete, assertCanEdit } from "../utils/permissions";
 
 const statusTypeEnumSchema = z.enum(statusTypeEnum.enumValues); 
 
@@ -144,23 +146,15 @@ export const taskInstanceRouter = createTRPCRouter({
                             ),
                     });
 
-                    const normalizeToMidnight = (date: Date) => {
-                        const d = new Date(date);
-                        d.setUTCHours(0, 0, 0, 0);
-                        return d.getTime();
-                    };
-
                     const existingTaskInstanceMap = new Map(
                         existingTaskInstances.map((taskInstance) => [
-                            normalizeToMidnight(taskInstance.targetDate!),
-                            taskInstance,
-                        ]),
+                            taskInstance.targetDate!.toISOString(),
+                            taskInstance
+                        ])
                     );
 
                     const newVirtualTaskInstances = virtualTaskInstances.map((virtualInstance) => {
-                        const existing = existingTaskInstanceMap.get(
-                            normalizeToMidnight(virtualInstance.targetDate!),
-                        );
+                        const existing = existingTaskInstanceMap.get(virtualInstance.targetDate!.toISOString());
                         
                         const taskMasterInfo = {
                             name: taskMaster.name,
@@ -379,5 +373,157 @@ export const taskInstanceRouter = createTRPCRouter({
             message: `Invalid type`,
             code: "BAD_REQUEST",
         });
-    })
-})
+    }),
+
+    addComment: protectedProcedure
+        .meta({
+            openapi: {
+                summary: "Add a comment to a task instance",
+                method: "POST",
+                path: "/task-instance/{id}/comments",
+                tags: ["taskInstance"],
+                protect: true,
+            },
+        })
+        .input(z.object({
+            id: z.string().uuid(),
+            comment: z.string().min(1),
+        }))
+        .mutation(async ({ ctx, input }) => {
+            const userId = ctx.user?.id;
+            if (!userId) throw new TRPCError({ code: "UNAUTHORIZED" });
+
+            const taskInstance = await ctx.db.query.taskInstances.findFirst({
+                where: (t, { eq }) => eq(t.id, input.id),
+            });
+
+            if (!taskInstance) throw new TRPCError({ code: "NOT_FOUND" });
+
+            const newComment = await cardCommentRepo.create(ctx.db, {
+                comment: input.comment,
+                createdBy: userId,
+                taskInstanceId: taskInstance.id,
+            });
+
+            if (!newComment?.id) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+            await cardActivityRepo.bulkCreateForTaskInstance(ctx.db, [{
+                type: "updated_comment_added" as const,
+                taskInstanceId: taskInstance.id,
+                commentId: newComment.id,
+                toComment: newComment.comment,
+                createdBy: userId,
+            }]);
+
+            return newComment;
+        }),
+
+    getActivities: protectedProcedure
+        .meta({
+            openapi: {
+                summary: "Get paginated task instance activities",
+                method: "GET",
+                path: "/task-instance/{id}/activities",
+                tags: ["taskInstance"],
+                protect: true,
+            },
+        })
+        .input(z.object({
+            id: z.string().uuid(),
+            limit: z.number().min(1).max(100).optional().default(10),
+            cursor: z.string().datetime().optional(),
+        }))
+        .query(async ({ ctx, input }) => {
+            const userId = ctx.user?.id;
+            if (!userId) throw new TRPCError({ code: "UNAUTHORIZED" });
+
+            return await cardActivityRepo.getPaginatedActivitiesForTaskInstance(
+                ctx.db,
+                input.id,
+                {
+                    limit: input.limit,
+                    cursor: input.cursor ? new Date(input.cursor) : undefined,
+                }
+            );
+        }),
+
+    deleteComment: protectedProcedure
+        .meta({
+            openapi: {
+                summary: "Delete a comment from a task instance",
+                method: "DELETE",
+                path: "/task-instance/{id}/comments/{commentPublicId}",
+                tags: ["taskInstance"],
+            },
+        })
+        .input(z.object({
+            id: z.string().uuid(),
+            commentPublicId: z.string().min(12),
+        }))
+        .mutation(async ({ ctx, input }) => {
+            const userId = ctx.user?.id;
+            if (!userId) throw new TRPCError({ code: "UNAUTHORIZED" });
+
+            const existingComment = await cardCommentRepo.getByPublicId(ctx.db, input.commentPublicId);
+            if (!existingComment) throw new TRPCError({ code: "NOT_FOUND" });
+
+            if (existingComment.createdBy !== userId) throw new TRPCError({ code: "UNAUTHORIZED" });
+
+            const deletedComment = await cardCommentRepo.softDelete(ctx.db, {
+                commentId: existingComment.id,
+                deletedAt: new Date(),
+                deletedBy: userId,
+            });
+
+            if (!deletedComment) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+            await cardActivityRepo.bulkCreateForTaskInstance(ctx.db, [{
+                type: "updated_comment_deleted" as const,
+                taskInstanceId: input.id,
+                commentId: existingComment.id,
+                createdBy: userId,
+            }]);
+
+            return deletedComment;
+        }),
+
+    updateComment: protectedProcedure
+        .meta({
+            openapi: {
+                summary: "Update a comment from a task instance",
+                method: "PUT",
+                path: "/task-instance/{id}/comments/{commentPublicId}",
+                tags: ["taskInstance"],
+            },
+        })
+        .input(z.object({
+            id: z.string().uuid(),
+            commentPublicId: z.string().min(12),
+            comment: z.string().min(1),
+        }))
+        .mutation(async ({ ctx, input }) => {
+            const userId = ctx.user?.id;
+            if (!userId) throw new TRPCError({ code: "UNAUTHORIZED" });
+
+            const existingComment = await cardCommentRepo.getByPublicId(ctx.db, input.commentPublicId);
+            if (!existingComment) throw new TRPCError({ code: "NOT_FOUND" });
+
+            if (existingComment.createdBy !== userId) throw new TRPCError({ code: "UNAUTHORIZED" });
+
+            const updatedComment = await cardCommentRepo.update(ctx.db, {
+                id: existingComment.id,
+                comment: input.comment,
+            });
+
+            if (!updatedComment) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+            await cardActivityRepo.bulkCreateForTaskInstance(ctx.db, [{
+                type: "updated_comment_updated" as const,
+                taskInstanceId: input.id,
+                commentId: existingComment.id,
+                createdBy: userId,
+            }]);
+
+            return updatedComment;
+        }),
+});

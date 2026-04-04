@@ -4,43 +4,46 @@ import Button from "~/components/Button";
 import { useModal } from "~/providers/modal";
 import { usePopup } from "~/providers/popup";
 import { api } from "~/utils/api";
-import { invalidateCard } from "~/utils/cardInvalidation";
+import { invalidateCard, invalidateTaskInstance } from "~/utils/cardInvalidation";
 
 interface DeleteCommentConfirmationProps {
-  cardPublicId: string;
+  cardPublicId?: string;
+  taskInstanceId?: string;
   commentPublicId: string;
 }
 
 export function DeleteCommentConfirmation({
   cardPublicId,
+  taskInstanceId,
   commentPublicId,
 }: DeleteCommentConfirmationProps) {
   const { closeModal } = useModal();
   const utils = api.useUtils();
   const { showPopup } = usePopup();
 
-  const queryParams = {
-    cardPublicId,
-  };
-
-  const deleteCommentMutation = api.card.deleteComment.useMutation({
+  const deleteCardCommentMutation = api.card.deleteComment.useMutation({
     onMutate: async (args) => {
       closeModal();
-      await utils.card.byId.cancel();
-      const currentState = utils.card.byId.getData(queryParams);
+      if (cardPublicId) {
+        const queryParams = { cardPublicId };
+        await utils.card.byId.cancel(queryParams);
+        const currentState = utils.card.byId.getData(queryParams);
 
-      utils.card.byId.setData(queryParams, (oldCard) => {
-        if (!oldCard) return oldCard;
-        const updatedActivities = oldCard.activities.filter(
-          (activity) => activity.comment?.publicId !== args.commentPublicId,
-        );
-        return { ...oldCard, activities: updatedActivities };
-      });
+        utils.card.byId.setData(queryParams, (oldCard) => {
+          if (!oldCard) return oldCard;
+          const updatedActivities = oldCard.activities.filter(
+            (activity) => activity.comment?.publicId !== args.commentPublicId,
+          );
+          return { ...oldCard, activities: updatedActivities };
+        });
 
-      return { previousState: currentState };
+        return { previousState: currentState };
+      }
     },
     onError: (_error, _newList, context) => {
-      utils.card.byId.setData(queryParams, context?.previousState);
+      if (cardPublicId) {
+        utils.card.byId.setData({ cardPublicId }, context?.previousState);
+      }
       showPopup({
         header: t`Unable to delete comment`,
         message: t`Please try again later, or contact customer support.`,
@@ -48,15 +51,40 @@ export function DeleteCommentConfirmation({
       });
     },
     onSettled: async () => {
-      await invalidateCard(utils, cardPublicId);
+      if (cardPublicId) await invalidateCard(utils, cardPublicId);
     },
   });
 
+  const deleteTaskCommentMutation = api.taskInstance.deleteComment.useMutation({
+    onMutate: () => {
+        closeModal();
+    },
+    onError: () => {
+      showPopup({
+        header: t`Unable to delete comment`,
+        message: t`Please try again later, or contact customer support.`,
+        icon: "error",
+      });
+    },
+    onSettled: async () => {
+      if (taskInstanceId) await invalidateTaskInstance(utils, taskInstanceId);
+    },
+  });
+
+  const isPending = deleteCardCommentMutation.isPending || deleteTaskCommentMutation.isPending;
+
   const handleDeleteComment = () => {
-    deleteCommentMutation.mutate({
-      cardPublicId,
-      commentPublicId,
-    });
+    if (cardPublicId) {
+      deleteCardCommentMutation.mutate({
+        cardPublicId,
+        commentPublicId,
+      });
+    } else if (taskInstanceId) {
+      deleteTaskCommentMutation.mutate({
+        id: taskInstanceId,
+        commentPublicId,
+      });
+    }
   };
 
   return (
@@ -78,7 +106,7 @@ export function DeleteCommentConfirmation({
         </button>
         <Button
           onClick={handleDeleteComment}
-          isLoading={deleteCommentMutation.isPending}
+          isLoading={isPending}
         >
           {t`Delete`}
         </Button>

@@ -8,9 +8,15 @@ import Button from "~/components/Button";
 import { useModal } from "~/providers/modal";
 import { usePopup } from "~/providers/popup";
 import { api } from "~/utils/api";
-import { invalidateCard } from "~/utils/cardInvalidation";
+import { invalidateCard, invalidateTaskInstance } from "~/utils/cardInvalidation";
 
-export function AttachmentUpload({ cardPublicId }: { cardPublicId: string }) {
+export function AttachmentUpload({ 
+  cardPublicId,
+  taskInstanceId,
+}: { 
+  cardPublicId?: string;
+  taskInstanceId?: string;
+}) {
   const { openModal } = useModal();
   const { showPopup } = usePopup();
   const utils = api.useUtils();
@@ -38,6 +44,7 @@ export function AttachmentUpload({ cardPublicId }: { cardPublicId: string }) {
       // Step 1: Generate Presigned URL
       const { url, key: s3Key } = await generateUrl.mutateAsync({
         cardPublicId,
+        taskInstanceId,
         filename: file.name,
         contentType: file.type || "application/octet-stream",
         size: file.size,
@@ -71,6 +78,7 @@ export function AttachmentUpload({ cardPublicId }: { cardPublicId: string }) {
       // Step 3: Confirm upload in DB
       await confirmUpload.mutateAsync({
         cardPublicId,
+        taskInstanceId,
         s3Key,
         filename: s3Key.split("/").pop() ?? file.name,
         originalFilename: file.name,
@@ -78,7 +86,11 @@ export function AttachmentUpload({ cardPublicId }: { cardPublicId: string }) {
         size: file.size,
       });
 
-      void invalidateCard(utils, cardPublicId);
+      if (cardPublicId) {
+        void invalidateCard(utils, cardPublicId);
+      } else if (taskInstanceId) {
+        void invalidateTaskInstance(utils, taskInstanceId);
+      }
       showPopup({
         header: t`Attachment uploaded`,
         message: t`Your file has been uploaded to MinIO successfully.`,

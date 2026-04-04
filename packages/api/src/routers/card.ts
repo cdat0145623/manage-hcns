@@ -649,11 +649,10 @@ export const cardRouter = createTRPCRouter({
         > & {
           attachments: {
             publicId: string;
-            contentType: string;
-            s3Key: string;
-            originalFilename: string | null;
-            size?: number | null;
-            url: string | null;
+            mimeType: string;
+            newFileUrl: string;
+            fileName: string;
+            fileSize: number;
             createdAt: Date;
           }[];
         }
@@ -697,14 +696,13 @@ export const cardRouter = createTRPCRouter({
       // Generate URLs for all attachments
       const attachmentsWithUrls = await Promise.all(
         result.attachments.map(async (attachment) => {
-          const url = await generateAttachmentUrl(attachment.s3Key);
+          // const url = await generateAttachmentUrl(attachment.newFileUrl);
           return {
             publicId: attachment.publicId,
-            contentType: attachment.contentType,
-            s3Key: attachment.s3Key,
-            originalFilename: attachment.originalFilename,
-            size: attachment.size,
-            url,
+            mimeType: attachment.mimeType,
+            newFileUrl: attachment.newFileUrl,
+            fileName: attachment.fileName,
+            fileSize: attachment.fileSize,
             createdAt: (attachment as unknown as { createdAt: Date }).createdAt,
           };
         }),

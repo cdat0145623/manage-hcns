@@ -304,7 +304,7 @@ export const getActivityText = ({
   }
 
   if (type === "updated_attachment_removed") {
-    const filename = attachmentName ?? fromTitle;
+    const filename = attachmentName ?? toTitle;
     if (!filename) return baseText;
     return (
       <Trans>
@@ -406,14 +406,18 @@ const ACTIVITIES_PAGE_SIZE = 20;
 
 const ActivityList = ({
   cardPublicId,
+  taskInstanceId,
   isLoading: cardIsLoading,
   isAdmin: _isAdmin,
   isViewOnly,
+  includedTypes,
 }: {
-  cardPublicId: string;
+  cardPublicId?: string;
+  taskInstanceId?: string;
   isLoading: boolean;
   isAdmin?: boolean;
   isViewOnly?: boolean;
+  includedTypes?: ActivityType[];
 }) => {
   const { dateLocale } = useLocalisation();
   const { data: sessionData } = authClient.useSession();
@@ -431,15 +435,25 @@ const ActivityList = ({
     data: firstPageData,
     isFetching: isFetchingFirst,
     dataUpdatedAt,
-  } = api.card.getActivities.useQuery(
-    {
-      cardPublicId,
-      limit: ACTIVITIES_PAGE_SIZE,
-    },
-    {
-      enabled: !!cardPublicId && cardPublicId.length >= 12,
-    },
-  );
+  } = (taskInstanceId 
+    ? api.taskInstance.getActivities.useQuery(
+        {
+          id: taskInstanceId,
+          limit: ACTIVITIES_PAGE_SIZE,
+        },
+        {
+          enabled: !!taskInstanceId,
+        },
+      )
+    : api.card.getActivities.useQuery(
+        {
+          cardPublicId: cardPublicId!,
+          limit: ACTIVITIES_PAGE_SIZE,
+        },
+        {
+          enabled: !!cardPublicId && cardPublicId.length >= 12,
+        },
+      )) as { data: GetCardActivitiesOutput | undefined, isFetching: boolean, dataUpdatedAt: number };
 
   useEffect(() => {
     if (firstPageData && dataUpdatedAt !== lastDataUpdatedAtRef.current) {
@@ -459,11 +473,17 @@ const ActivityList = ({
             if (!lastActivity) break;
 
             const nextCursor = new Date(lastActivity.createdAt).toISOString();
-            const nextPage = await utils.card.getActivities.fetch({
-              cardPublicId,
-              limit: ACTIVITIES_PAGE_SIZE,
-              cursor: nextCursor,
-            });
+            const nextPage = (taskInstanceId 
+                ? await utils.taskInstance.getActivities.fetch({
+                    id: taskInstanceId,
+                    limit: ACTIVITIES_PAGE_SIZE,
+                    cursor: nextCursor,
+                })
+                : await utils.card.getActivities.fetch({
+                    cardPublicId: cardPublicId!,
+                    limit: ACTIVITIES_PAGE_SIZE,
+                    cursor: nextCursor,
+                })) as GetCardActivitiesOutput;
 
             const existingIds = new Set(
               currentActivities.map((a) => a.publicId),
@@ -500,11 +520,17 @@ const ActivityList = ({
     setIsLoadingMore(true);
     try {
       const nextCursor = new Date(lastActivity.createdAt).toISOString();
-      const nextPage = await utils.card.getActivities.fetch({
-        cardPublicId,
-        limit: ACTIVITIES_PAGE_SIZE,
-        cursor: nextCursor,
-      });
+      const nextPage = (taskInstanceId 
+        ? await utils.taskInstance.getActivities.fetch({
+            id: taskInstanceId,
+            limit: ACTIVITIES_PAGE_SIZE,
+            cursor: nextCursor,
+        })
+        : await utils.card.getActivities.fetch({
+            cardPublicId: cardPublicId!,
+            limit: ACTIVITIES_PAGE_SIZE,
+            cursor: nextCursor,
+        })) as GetCardActivitiesOutput;
 
       const existingIds = new Set(allActivities.map((a) => a.publicId));
       const newActivities = nextPage.activities.filter(
@@ -527,7 +553,9 @@ const ActivityList = ({
 
   return (
     <div className="flex max-h-[350px] flex-col overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-light-400 dark:scrollbar-thumb-dark-300 space-y-4 pt-4">
-      {allActivities.map((activity, index) => {
+      {allActivities
+        .filter((activity) => !includedTypes || includedTypes.includes(activity.type))
+        .map((activity, index) => {
         const activityText = getActivityText({
           type: activity.type,
           toTitle: activity.toTitle,
@@ -555,6 +583,7 @@ const ActivityList = ({
               key={activity.publicId}
               publicId={activity.comment?.publicId}
               cardPublicId={cardPublicId}
+              taskInstanceId={taskInstanceId}
               name={activity.user?.name ?? ""}
               email={activity.user?.email ?? ""}
               image={activity.user?.image ?? null}

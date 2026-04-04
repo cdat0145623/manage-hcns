@@ -148,7 +148,7 @@ export async function testS3() {
 
     if (process.env.NEXT_PUBLIC_KAN_ENV !== "cloud") {
       const endpoint = process.env.S3_ENDPOINT ?? "http://localhost:9000";
-      const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3001";
       const proxiedUrl = url.replace(endpoint, `${appUrl}/api/minio`);
       console.log("\n🔗 Proxied URL (via Middleware):");
       console.log(proxiedUrl);

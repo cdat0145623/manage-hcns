@@ -19,15 +19,15 @@ import {
 
 import { usePopup } from "~/providers/popup";
 import { api } from "~/utils/api";
-import { invalidateCard } from "~/utils/cardInvalidation";
+import { invalidateCard, invalidateTaskInstance } from "~/utils/cardInvalidation";
+import { skipToken } from "@tanstack/react-query";
 
 interface Attachment {
   publicId: string;
-  contentType: string;
-  url: string | null;
-  originalFilename: string | null;
-  s3Key: string;
-  size?: number | null;
+  mimeType: string;
+  newFileUrl: string;
+  fileName: string;
+  fileSize: number;
   createdAt: Date;
 }
 
@@ -55,10 +55,12 @@ function getFileIcon(contentType: string) {
 export function AttachmentThumbnails({
   attachments,
   cardPublicId,
+  taskInstanceId,
   isReadOnly = false,
 }: {
   attachments?: Attachment[];
-  cardPublicId: string;
+  cardPublicId?: string;
+  taskInstanceId?: string;
   isReadOnly?: boolean;
 }) {
   const { showPopup } = usePopup();
@@ -66,37 +68,37 @@ export function AttachmentThumbnails({
   const imageAttachments =
     attachments?.filter(
       (attachment) =>
-        attachment.contentType.startsWith("image/") && attachment.url,
+        attachment.mimeType?.startsWith("image/") && attachment.newFileUrl,
     ) ?? [];
 
   const nonImageAttachments =
     attachments?.filter(
       (attachment) =>
-        !attachment.contentType.startsWith("image/") && attachment.url,
+        !attachment.mimeType?.startsWith("image/") && attachment.newFileUrl,
     ) ?? [];
 
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
 
   const deleteAttachment = api.attachment.delete.useMutation({
     onMutate: async (args) => {
-      if (isReadOnly) return;
+    if (isReadOnly || !cardPublicId) return;
 
-      await utils.card.byId.cancel({ cardPublicId });
-      const currentState = utils.card.byId.getData({ cardPublicId });
+    await utils.card.byId.cancel({ cardPublicId });
+    const currentState = utils.card.byId.getData({ cardPublicId });
 
-      utils.card.byId.setData({ cardPublicId }, (oldCard) => {
-        if (!oldCard) return oldCard;
-        const updatedAttachments = oldCard.attachments.filter(
-          (attachment) => attachment.publicId !== args.attachmentPublicId,
-        );
-        return { ...oldCard, attachments: updatedAttachments };
-      });
+    utils.card.byId.setData({ cardPublicId }, (oldCard) => {
+      if (!oldCard) return oldCard;
+      const updatedAttachments = oldCard.attachments.filter(
+        (attachment) => attachment.publicId !== args.attachmentPublicId,
+      );
+      return { ...oldCard, attachments: updatedAttachments };
+    });
 
-      return { previousState: currentState };
-    },
-    onError: (_error, _args, context) => {
-      if (isReadOnly) return;
-      utils.card.byId.setData({ cardPublicId }, context?.previousState);
+    return { previousState: currentState };
+  },
+  onError: (_error, _args, context) => {
+    if (isReadOnly || !cardPublicId) return;
+    utils.card.byId.setData({ cardPublicId }, context?.previousState);
       showPopup({
         header: t`Unable to delete attachment`,
         message: t`Please try again later, or contact customer support.`,
@@ -110,7 +112,11 @@ export function AttachmentThumbnails({
     },
     onSettled: async () => {
       if (isReadOnly) return;
-      await invalidateCard(utils, cardPublicId);
+      if (cardPublicId) {
+        await invalidateCard(utils, cardPublicId);
+      } else if (taskInstanceId) {
+        await invalidateTaskInstance(utils, taskInstanceId);
+      }
     },
   });
 
@@ -165,7 +171,7 @@ export function AttachmentThumbnails({
   };
 
   const handleDownload = (attachment: Attachment) => {
-    if (!attachment.url) {
+    if (!attachment.newFileUrl) {
       showPopup({
         header: t`Download failed`,
         message: t`No download URL available for this attachment.`,
@@ -174,7 +180,7 @@ export function AttachmentThumbnails({
       return;
     }
 
-    const downloadUrl = `/api/download/attatchment?url=${encodeURIComponent(attachment.url)}&filename=${encodeURIComponent(attachment.originalFilename ?? "attachment")}`;
+    const downloadUrl = `/api/download/attatchment?url=${encodeURIComponent(attachment.newFileUrl)}&filename=${encodeURIComponent(attachment.fileName ?? "attachment")}`;
 
     const link = document.createElement("a");
     link.href = downloadUrl;
@@ -190,15 +196,15 @@ export function AttachmentThumbnails({
     <>
       <div className="mb-3 flex flex-wrap gap-2 pt-1">
         {imageAttachments.map((attachment, index) => {
-          if (!attachment.url) return null;
+          if (!attachment.newFileUrl) return null;
           return (
             <AttachmentThumbnail
               key={attachment.publicId}
               attachment={{
                 publicId: attachment.publicId,
-                url: attachment.url,
-                originalFilename: attachment.originalFilename ?? "",
-                contentType: attachment.contentType,
+                url: attachment.newFileUrl,
+                originalFilename: attachment.fileName ?? "",
+                contentType: attachment.mimeType ?? "",
               }}
               onClick={() => openViewer(index)}
               isImage={true}
@@ -210,12 +216,13 @@ export function AttachmentThumbnails({
       {nonImageAttachments.length > 0 && (
         <div className="mb-3 flex flex-col gap-2">
           {nonImageAttachments.map((attachment) => {
-            if (!attachment.url) return null;
+            if (!attachment.newFileUrl) return null;
             return (
               <FileListItem
                 key={attachment.publicId}
                 attachment={attachment}
                 cardPublicId={cardPublicId}
+                taskInstanceId={taskInstanceId}
                 isReadOnly={isReadOnly}
                 onDownload={() => handleDownload(attachment)}
                 onDelete={
@@ -362,13 +369,13 @@ export function AttachmentThumbnails({
                   className="relative w-full max-w-7xl"
                   onClick={(e) => e.stopPropagation()}
                 >
-                  {selectedAttachment?.url && (
+                  {selectedAttachment?.newFileUrl && (
                     <div className="relative">
                       <div className="relative mx-auto max-h-[90vh] w-full">
                         <Image
-                          src={selectedAttachment.url}
+                          src={selectedAttachment.newFileUrl}
                           alt={
-                            selectedAttachment.originalFilename ?? "Attachment"
+                            selectedAttachment.fileName ?? "Attachment"
                           }
                           width={1920}
                           height={1080}
@@ -443,38 +450,42 @@ function formatFileSize(bytes: number | null | undefined): string {
 function FileListItem({
   attachment,
   cardPublicId,
+  taskInstanceId,
   isReadOnly,
   onDownload,
   onDelete,
 }: {
   attachment: Attachment;
-  cardPublicId: string;
+  cardPublicId?: string;
+  taskInstanceId?: string;
   isReadOnly?: boolean;
   onDownload: () => void;
   onDelete?: () => void;
 }) {
-  const Icon = getFileIcon(attachment.contentType);
+  const Icon = getFileIcon(attachment.mimeType);
   const [isRenaming, setIsRenaming] = useState(false);
-  const [newName, setNewName] = useState(attachment.originalFilename ?? "");
+  const [newName, setNewName] = useState(attachment.fileName ?? "");
   const utils = api.useUtils();
   const { showPopup } = usePopup();
 
   const renameAttachment = api.attachment.update.useMutation({
     onMutate: async (args) => {
-      await utils.card.byId.cancel({ cardPublicId });
-      const previousCard = utils.card.byId.getData({ cardPublicId });
-      if (previousCard) {
-        utils.card.byId.setData({ cardPublicId }, {
-          ...previousCard,
-          attachments: previousCard.attachments.map(att => 
-            att.publicId === args.attachmentPublicId ? { ...att, originalFilename: args.originalFilename } : att
-          )
-        });
+      if (cardPublicId) {
+        await utils.card.byId.cancel({ cardPublicId });
+        const previousCard = utils.card.byId.getData({ cardPublicId });
+        if (previousCard) {
+          utils.card.byId.setData({ cardPublicId }, {
+            ...previousCard,
+            attachments: previousCard.attachments.map(att => 
+              att.publicId === args.attachmentPublicId ? { ...att, originalFilename: args.originalFilename } : att
+            )
+          });
+        }
+        return { previousCard };
       }
-      return { previousCard };
     },
     onError: (err, newAttachment, context) => {
-      if (context?.previousCard) {
+      if (cardPublicId && context?.previousCard) {
         utils.card.byId.setData({ cardPublicId }, context.previousCard);
       }
       showPopup({
@@ -484,14 +495,18 @@ function FileListItem({
       });
     },
     onSettled: () => {
-      void utils.card.byId.invalidate({ cardPublicId });
+      if (cardPublicId) {
+        void utils.card.byId.invalidate({ cardPublicId });
+      } else if (taskInstanceId) {
+        void invalidateTaskInstance(utils, taskInstanceId);
+      }
     },
   });
 
   const handleRenameSubmit = () => {
-    if (!newName.trim() || newName === attachment.originalFilename) {
+    if (!newName.trim() || newName === attachment.fileName) {
       setIsRenaming(false);
-      setNewName(attachment.originalFilename ?? "");
+      setNewName(attachment.fileName ?? "");
       return;
     }
     renameAttachment.mutate({
@@ -516,7 +531,8 @@ function FileListItem({
         <Icon className="h-6 w-6 text-light-700 dark:text-dark-700" />
       </div>
       <div className="min-w-0 flex-1 truncate text-sm text-light-1000 dark:text-dark-1000">
-        {isRenaming ? (
+        {attachment.fileName ?? "File"}
+        {/* {isRenaming ? (
           <input
             type="text"
             value={newName}
@@ -541,14 +557,14 @@ function FileListItem({
           >
             {attachment.originalFilename ?? "File"}
           </span>
-        )}
+        )} */}
       </div>
       <div className="flex items-center gap-2 opacity-100 sm:opacity-0 transition-opacity sm:group-hover:opacity-100">
         <div className="flex flex-col items-end text-xs text-light-500 dark:text-dark-900 pr-2">
           <span>
-            {attachment.size != null &&
-              !isNaN(attachment.size) &&
-              `${formatFileSize(attachment.size)}`}
+            {attachment.fileSize != null &&
+              !isNaN(attachment.fileSize) &&
+              `${formatFileSize(attachment.fileSize)}`}
           </span>
           <span className="text-[10px]">{formattedDate}</span>
         </div>
@@ -559,11 +575,11 @@ function FileListItem({
               onDownload();
             }}
             className="flex-shrink-0 rounded-full bg-light-100 p-1.5 text-light-1000 transition-colors hover:bg-light-200 focus:outline-none dark:bg-dark-100 dark:text-dark-950 dark:hover:bg-dark-300"
-            aria-label={`Download ${attachment.originalFilename}`}
+            aria-label={`Download ${attachment.fileName}`}
           >
             <HiArrowDownTray className="h-4 w-4" />
           </button>
-          {!isReadOnly && !isRenaming && (
+          {/* {!isReadOnly && !isRenaming && (
             <button
               onClick={(e) => {
                 e.stopPropagation();
@@ -574,7 +590,7 @@ function FileListItem({
             >
               <HiPencil className="h-4 w-4" />
             </button>
-          )}
+          )} */}
           {onDelete && (
             <button
               onClick={(e) => {
@@ -582,7 +598,7 @@ function FileListItem({
                 onDelete();
               }}
               className="flex-shrink-0 rounded-full bg-light-200 p-1.5 text-red-500 transition-colors hover:bg-red-100 focus:outline-none dark:bg-red-900/20 dark:hover:bg-red-900/40"
-              aria-label={`Delete ${attachment.originalFilename}`}
+              aria-label={`Delete ${attachment.fileName}`}
             >
               <HiOutlineTrash className="h-4 w-4" />
             </button>

@@ -17,13 +17,13 @@ import type { BoardVisibilityStatus } from "@kan/db/schema";
 import {
   boards,
   cardActivities,
-  cardAttachments,
   cards,
   cardsToLabels,
   cardToWorkspaceMembers,
   checklistItems,
   checklists,
   comments,
+  fileActivityLog,
   labels,
   lists,
   userBoardFavorites,
@@ -288,12 +288,17 @@ export const getByPublicId = async (
                   },
                 },
               },
-              attachments: {
+              fileActivities: {
                 columns: {
                   publicId: true,
+                  mimeType: true,
+                  newFileUrl: true,
+                  fileName: true,
+                  fileSize: true,
+                  createdAt: true,
+                  activityType: true,
                 },
-                where: isNull(cardAttachments.deletedAt),
-                orderBy: asc(cardAttachments.createdAt),
+                orderBy: asc(fileActivityLog.createdAt),
               },
               checklists: {
                 columns: {
@@ -364,13 +369,33 @@ export const getByPublicId = async (
     userFavorites: undefined,
     lists: board.lists.map((list) => ({
       ...list,
-      cards: list.cards.map((card) => ({
-        ...card,
-        labels: card.labels.map((label) => label.label),
-        members: card.members
-          .map((member) => member.member)
-          .filter((member) => member.deletedAt === null),
-      })),
+      cards: list.cards.map((card) => {
+        // Filter for active attachments: group by publicId and take the latest activity.
+        const latestFiles = new Map<string, typeof card.fileActivities[0]>();
+        for (const activity of card.fileActivities) {
+          latestFiles.set(activity.publicId, activity);
+        }
+
+        const activeAttachments = Array.from(latestFiles.values())
+          .filter((f) => f.activityType !== "file_deleted")
+          .map((f) => ({
+            publicId: f.publicId,
+            contentType: f.mimeType ?? "",
+            s3Key: f.newFileUrl ?? "",
+            originalFilename: f.fileName,
+            size: f.fileSize,
+            createdAt: f.createdAt,
+          }));
+
+        return {
+          ...card,
+          labels: card.labels.map((label) => label.label),
+          members: card.members
+            .map((member) => member.member)
+            .filter((member) => member.deletedAt === null),
+          attachments: activeAttachments,
+        };
+      }),
     })),
   };
 
@@ -463,12 +488,17 @@ export const getBySlug = async (
                   },
                 },
               },
-              attachments: {
+              fileActivities: {
                 columns: {
                   publicId: true,
+                  mimeType: true,
+                  newFileUrl: true,
+                  fileName: true,
+                  fileSize: true,
+                  createdAt: true,
+                  activityType: true,
                 },
-                where: isNull(cardAttachments.deletedAt),
-                orderBy: asc(cardAttachments.createdAt),
+                orderBy: asc(fileActivityLog.createdAt),
               },
               comments: {
                 columns: {
@@ -538,10 +568,30 @@ export const getBySlug = async (
     ...board,
     lists: board.lists.map((list) => ({
       ...list,
-      cards: list.cards.map((card) => ({
-        ...card,
-        labels: card.labels.map((label) => label.label),
-      })),
+      cards: list.cards.map((card) => {
+        // Filter for active attachments
+        const latestFiles = new Map<string, typeof card.fileActivities[0]>();
+        for (const activity of card.fileActivities) {
+          latestFiles.set(activity.publicId, activity);
+        }
+
+        const activeAttachments = Array.from(latestFiles.values())
+          .filter((f) => f.activityType !== "file_deleted")
+          .map((f) => ({
+            publicId: f.publicId,
+            contentType: f.mimeType ?? "",
+            s3Key: f.newFileUrl ?? "",
+            originalFilename: f.fileName,
+            size: f.fileSize,
+            createdAt: f.createdAt,
+          }));
+
+        return {
+          ...card,
+          labels: card.labels.map((label) => label.label),
+          attachments: activeAttachments,
+        };
+      }),
     })),
   };
 

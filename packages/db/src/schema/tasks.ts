@@ -95,8 +95,9 @@ export const fileActivityLog = pgTable(
   "file_activity_log",
   {
     id: uuid("id")
-    .primaryKey()
-    .default(sql`uuid_generate_v4()`),
+      .primaryKey()
+      .default(sql`uuid_generate_v4()`),
+    publicId: varchar("publicId", { length: 12 }).notNull().unique(),
     taskInstanceId: uuid("taskInstanceId").references(() => taskInstances.id),
     cardId: bigint("cardId", { mode: "number" }).references(() => cards.id),
     activityType: fileActivityTypeEnum("activityType").notNull(),
@@ -111,6 +112,10 @@ export const fileActivityLog = pgTable(
       .references(() => users.id),
     createdAt: timestamp("createdAt").notNull().defaultNow(),
     updatedAt: timestamp("updatedAt").notNull().defaultNow(),
+    deletedAt: timestamp("deletedAt"),
+    deletedBy: uuid("deletedBy").references(() => users.id, {
+      onDelete: "restrict",
+    }),
   },
   (t) => [
     index("file_activity_task_instance_idx").on(t.taskInstanceId),

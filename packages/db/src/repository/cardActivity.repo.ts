@@ -4,11 +4,11 @@ import type { dbClient } from "@kan/db/client";
 import type { ActivityType } from "@kan/db/schema";
 import {
   cardActivities,
-  cardAttachments,
   cards,
   checklistItems,
   checklists,
   comments,
+  fileActivityLog,
   labels,
   lists,
 } from "@kan/db/schema";
@@ -42,7 +42,7 @@ export const create = async (
     fromDueDate?: Date;
     toDueDate?: Date;
     sourceBoardId?: number;
-    attachmentId?: number;
+    attachmentId?: string;
   },
 ) => {
   const [result] = await db
@@ -94,7 +94,7 @@ export const bulkCreate = async (
     fromDueDate?: Date;
     toDueDate?: Date;
     sourceBoardId?: number;
-    attachmentId?: number;
+    attachmentId?: string;
     oldValue?: string;
     newValue?: string;
   }[],
@@ -133,9 +133,12 @@ export const bulkCreateForTaskInstance = async (
     fromDueDate?: Date;
     toDueDate?: Date;
     sourceBoardId?: number;
-    attachmentId?: number;
+    attachmentId?: string;
     oldValue?: string;
     newValue?: string;
+    commentId?: number;
+    fromComment?: string;
+    toComment?: string;
   }[],
 ) => {
   const activitiesWithPublicIds = activityInputs.map((activity) => ({
@@ -249,8 +252,96 @@ export const getPaginatedActivities = async (
       attachment: {
         columns: {
           publicId: true,
-          filename: true,
-          originalFilename: true,
+          fileName: true,
+          newFileUrl: true,
+        },
+      },
+    },
+    orderBy: asc(cardActivities.createdAt), // required for merging and pagination
+    limit: limit + 1, // fetch one extra to check if there are more
+  });
+
+  const hasMore = activities.length > limit;
+  const items = activities.slice(0, limit);
+  const nextCursor = hasMore ? items[items.length - 1]?.createdAt : undefined;
+
+  return {
+    activities: items,
+    hasMore,
+    nextCursor,
+  };
+};
+
+export const getPaginatedActivitiesForTaskInstance = async (
+  db: dbClient,
+  taskInstanceId: string,
+  options?: {
+    limit?: number;
+    cursor?: Date; // createdAt cursor for pagination
+  },
+) => {
+  const limit = options?.limit ?? 20;
+  const cursor = options?.cursor;
+
+  const validComments = await db
+    .select({ id: comments.id })
+    .from(comments)
+    .where(
+      and(
+        eq(comments.taskInstanceId, taskInstanceId),
+        isNull(comments.deletedAt),
+      ),
+    );
+
+  const validCommentIds = validComments.map((comment) => comment.id);
+
+  const activities = await db.query.cardActivities.findMany({
+    columns: {
+      publicId: true,
+      type: true,
+      createdAt: true,
+      fromIndex: true,
+      toIndex: true,
+      fromTitle: true,
+      toTitle: true,
+      fromDescription: true,
+      toDescription: true,
+      fromDueDate: true,
+      toDueDate: true,
+      oldValue: true,
+      newValue: true,
+    },
+    where: and(
+      eq(cardActivities.taskInstanceId, taskInstanceId),
+      cursor ? gt(cardActivities.createdAt, cursor) : undefined,
+      or(
+        isNull(cardActivities.commentId),
+        inArray(cardActivities.commentId, validCommentIds),
+      ),
+    ),
+    with: {
+      user: {
+        columns: {
+          id: true,
+          name: true,
+          email: true,
+          image: true,
+        },
+      },
+      comment: {
+        columns: {
+          publicId: true,
+          comment: true,
+          createdBy: true,
+          updatedAt: true,
+          deletedAt: true,
+        },
+      },
+      attachment: {
+        columns: {
+          publicId: true,
+          fileName: true,
+          newFileUrl: true,
         },
       },
     },
@@ -361,8 +452,8 @@ export const getPaginatedBoardActivities = async (
       attachment: {
         columns: {
           publicId: true,
-          filename: true,
-          originalFilename: true,
+          fileName: true,
+          newFileUrl: true,
         },
       },
       card: {

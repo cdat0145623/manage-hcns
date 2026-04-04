@@ -1,4 +1,4 @@
-import { count, eq, isNull } from "drizzle-orm";
+import { count, eq, isNull, and, desc } from "drizzle-orm";
 
 import type { dbClient } from "@kan/db/client";
 import { comments } from "@kan/db/schema";
@@ -16,7 +16,8 @@ export const getCount = async (db: dbClient) => {
 export const create = async (
   db: dbClient,
   commentInput: {
-    cardId: number;
+    cardId?: number;
+    taskInstanceId?: string;
     comment: string;
     createdBy: string;
   },
@@ -28,6 +29,7 @@ export const create = async (
       comment: commentInput.comment,
       createdBy: commentInput.createdBy,
       cardId: commentInput.cardId,
+      taskInstanceId: commentInput.taskInstanceId,
     })
     .returning({
       id: comments.id,
@@ -88,4 +90,42 @@ export const softDelete = async (
     .returning({ id: comments.id });
 
   return result;
+};
+
+export const getAllByTaskInstanceId = async (db: dbClient, taskInstanceId: string) => {
+  return db.query.comments.findMany({
+    where: and(
+      eq(comments.taskInstanceId, taskInstanceId),
+      isNull(comments.deletedAt),
+    ),
+    with: {
+      createdBy: {
+        columns: {
+          id: true,
+          name: true,
+          image: true,
+        },
+      },
+    },
+    orderBy: desc(comments.createdAt),
+  });
+};
+
+export const getAllByCardId = async (db: dbClient, cardId: number) => {
+  return db.query.comments.findMany({
+    where: and(
+      eq(comments.cardId, cardId),
+      isNull(comments.deletedAt),
+    ),
+    with: {
+      createdBy: {
+        columns: {
+          id: true,
+          name: true,
+          image: true,
+        },
+      },
+    },
+    orderBy: desc(comments.createdAt),
+  });
 };

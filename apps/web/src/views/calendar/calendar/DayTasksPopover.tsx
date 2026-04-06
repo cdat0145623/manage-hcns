@@ -51,10 +51,10 @@ export function DayTasksPopover({
         <div className="flex items-center justify-between border-b border-neutral-100 p-5 dark:border-white/5">
           <div className="flex flex-col">
             <span className="text-[10px] font-black uppercase tracking-[0.2em] text-neutral-400">
-              {format(day, "EEEE")}
+              {["Chủ Nhật", "Thứ Hai", "Thứ Ba", "Thứ Tư", "Thứ Năm", "Thứ Sáu", "Thứ Bảy"][day.getDay()]}
             </span>
             <span className="text-xl font-black text-neutral-900 dark:text-white">
-              {format(day, "MMMM d")}
+              Tháng {day.getMonth() + 1} {format(day, "d")}
             </span>
           </div>
           <button
@@ -85,7 +85,7 @@ export function DayTasksPopover({
             ) : (
               <div className="flex flex-col items-center justify-center py-10 text-center">
                 <span className="text-sm font-bold text-neutral-300 dark:text-neutral-600">
-                  No tasks for this day
+                  Không có nhiệm vụ nào trong ngày
                 </span>
               </div>
             )}

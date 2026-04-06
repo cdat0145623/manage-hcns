@@ -80,7 +80,7 @@ export function WeekView({
                 onClick={() => onCellClick(day)}
               >
                 <span className="text-neutral-600 text-[10px] font-black uppercase tracking-[0.2em]">
-                  {format(day, "EEE")}
+                  {["CN", "T2", "T3", "T4", "T5", "T6", "T7"][day.getDay()]}
                 </span>
                 <div
                   onClick={(e) => {
@@ -111,7 +111,7 @@ export function WeekView({
                       <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-blue-400 opacity-75"></span>
                       <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-blue-500"></span>
                     </span>
-                    {dayEntries.length} tasks
+                    {dayEntries.length} nhiệm vụ
                   </motion.button>
                 )}
               </div>
@@ -166,7 +166,7 @@ export function WeekView({
                     <div className="relative flex items-center">
                       <div className="absolute -left-[54px] z-40 rounded-full bg-rose-500/10 px-1.5 py-0.5 backdrop-blur-sm ring-1 ring-rose-500/20">
                         <span className="text-[9px] font-black uppercase tracking-tighter text-rose-600 dark:text-rose-400">
-                          Now
+                          Hiện tại
                         </span>
                       </div>
                       <div className="h-2.5 w-2.5 rounded-full bg-rose-500 shadow-[0_0_10px_rgba(244,63,94,0.6)] ring-4 ring-rose-500/20" />

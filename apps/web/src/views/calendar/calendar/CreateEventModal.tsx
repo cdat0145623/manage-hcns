@@ -84,15 +84,15 @@ const minutesToTime = (mins: number) => {
 };
 
 const DAY_NAMES = [
-  "Sunday",
-  "Monday",
-  "Tuesday",
-  "Wednesday",
-  "Thursday",
-  "Friday",
-  "Saturday",
+  "Chủ Nhật",
+  "Thứ Hai",
+  "Thứ Ba",
+  "Thứ Tư",
+  "Thứ Năm",
+  "Thứ Sáu",
+  "Thứ Bảy",
 ];
-const NTH_LABELS = ["first", "second", "third", "fourth", "fifth"];
+const NTH_LABELS = ["thứ nhất", "thứ hai", "thứ ba", "thứ tư", "thứ năm"];
 
 function ordinalSuffix(n: number) {
   if (n >= 11 && n <= 13) return "th";
@@ -334,20 +334,20 @@ export function CreateEventModal({
     const dateNum = getDate(currentDate);
     const nthLabel = getNthWeekdayLabel(currentDate);
     return [
-      { value: "NONE" as RecurrenceType, label: "Does not repeat", icon: "🚫" },
+      { value: "NONE" as RecurrenceType, label: "Không lặp", icon: "🚫" },
       {
         value: "WEEKLY" as RecurrenceType,
-        label: `Weekly on ${dayName}`,
+        label: `Hàng tuần vào ${dayName}`,
         icon: "🗓️",
       },
       {
         value: "MONTHLY_DATE" as RecurrenceType,
-        label: `Monthly on the ${dateNum}${ordinalSuffix(dateNum)}`,
+        label: `Hàng tháng vào ngày ${dateNum}`,
         icon: "📆",
       },
       {
         value: "MONTHLY_DAY" as RecurrenceType,
-        label: `Monthly on the ${nthLabel}`,
+        label: `Hàng tháng vào ${nthLabel}`,
         icon: "🔄",
       },
     ];
@@ -384,9 +384,9 @@ export function CreateEventModal({
 
   const handleSave = (updateType?: "single" | "all") => {
     setHasAttemptedSave(true);
-    if (!title.trim()) return alert("Please enter a title.");
+    if (!title.trim()) return alert("Để thiếu tiêu đề.");
     if (recurrence === "UNSELECTED") {
-      return alert("Please select a repeat option.");
+      return alert("Để chọn tuỳ chọn lặp lại.");
     }
 
     if (isEditMode && editEntry?.masterId && !updateType) {
@@ -535,11 +535,11 @@ export function CreateEventModal({
                 <span className="text-xl">{isEditMode ? "✏️" : "✨"}</span>
                 <div>
                   <h2 className="text-lg font-black tracking-tight text-neutral-900 dark:text-white">
-                    {isEditMode ? "Edit" : "New"}
+                    {isEditMode ? "Chỉnh sửa" : "Tạo mới"}
                   </h2>
                   {isEditMode && editEntry && (
                     <p className="text-[11px] text-neutral-400 dark:text-neutral-500">
-                      Editing &ldquo;{editEntry.title}&rdquo;
+                      Đang sửa &ldquo;{editEntry.title}&rdquo;
                     </p>
                   )}
                 </div>
@@ -567,23 +567,23 @@ export function CreateEventModal({
 
           <div className="flex-1 space-y-5 overflow-y-auto px-7 py-6">
             <div className="space-y-1.5">
-              <Label>Event Title *</Label>
+              <Label>Tiêu đề sự kiện *</Label>
               <input
                 type="text"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                placeholder="Add title"
+                placeholder="Nhập tiêu đề"
                 autoFocus
                 className="w-full rounded-xl border border-neutral-200/70 bg-neutral-50/50 px-4 py-3 text-base font-semibold text-neutral-900 placeholder-neutral-400 shadow-[inset_0_2px_4px_rgba(0,0,0,0.02)] transition-all hover:bg-neutral-50 focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-[3px] focus:ring-blue-500/10 dark:border-dark-400/50 dark:bg-dark-300/50 dark:text-white dark:focus:bg-dark-200"
               />
             </div>
 
             <div className="space-y-1.5">
-              <Label>Description</Label>
+              <Label>Mô tả</Label>
               <textarea
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                placeholder="Add description (optional)"
+                placeholder="Nhập mô tả (tùy chọn)"
                 rows={2}
                 className="w-full resize-none rounded-xl border border-neutral-200/70 bg-neutral-50/50 px-4 py-3 text-sm text-neutral-900 placeholder-neutral-400 shadow-[inset_0_2px_4px_rgba(0,0,0,0.02)] transition-all hover:bg-neutral-50 focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-[3px] focus:ring-blue-500/10 dark:border-dark-400/50 dark:bg-dark-300/50 dark:text-white dark:focus:bg-dark-200"
               />
@@ -765,7 +765,7 @@ export function CreateEventModal({
               </div>
 
               <div className="space-y-2">
-                <Label>Repeat</Label>
+                <Label>Lặp lại</Label>
                 <div className="relative">
                   <select
                     value={recurrence}
@@ -776,7 +776,7 @@ export function CreateEventModal({
                     style={{ backgroundImage: "none" }}
                   >
                     <option value="UNSELECTED" disabled hidden>
-                      Select repeating option...
+                      Chọn tuỳ chọn lặp lại...
                     </option>
                     {recurrenceOptions.map((opt) => (
                       <option key={opt.value} value={opt.value}>
@@ -820,7 +820,7 @@ export function CreateEventModal({
             </motion.div>
 
             <div className="space-y-2.5">
-              <Label>Assign to</Label>
+              <Label>Giao việc cho</Label>
 
               <div className="relative">
                 <select
@@ -830,7 +830,7 @@ export function CreateEventModal({
                   style={{ backgroundImage: "none" }}
                 >
                   <option value="" disabled hidden>
-                    Select user...
+                    Chọn người dùng...
                   </option>
                   {users?.map((user) => (
                     <option key={user.id} value={user.id}>
@@ -858,12 +858,12 @@ export function CreateEventModal({
 
             <div className="rounded-xl bg-neutral-50 p-4 dark:bg-dark-200">
               <p className="mb-2 text-[10px] font-black uppercase tracking-[0.15em] text-neutral-400">
-                Summary
+                Tóm tắt
               </p>
               <p className="text-sm font-bold text-neutral-900 dark:text-white">
                 {title || (
                   <span className="font-normal italic text-neutral-400">
-                    Untitled Event
+                    Sự kiện chưa đặt tên
                   </span>
                 )}
               </p>
@@ -892,7 +892,7 @@ export function CreateEventModal({
                     ))}
                   </div>
                   <span className="text-xs text-neutral-500 dark:text-neutral-400">
-                    {attendees.length} guest{attendees.length !== 1 ? "s" : ""}
+                    {attendees.length} khách{attendees.length !== 1 ? "" : ""}
                   </span>
                 </div>
               )}
@@ -904,7 +904,7 @@ export function CreateEventModal({
               onClick={onClose}
               className="flex-1 rounded-xl bg-neutral-100 px-6 py-3 text-sm font-bold text-neutral-600 transition-all hover:bg-neutral-200 dark:bg-dark-300 dark:text-dark-200 dark:hover:bg-dark-400"
             >
-              Cancel
+              Hủy
             </button>
             <button
               onClick={() => handleSave()}
@@ -914,7 +914,7 @@ export function CreateEventModal({
                   : "bg-blue-500 hover:bg-blue-600"
               }`}
             >
-              {isEditMode ? "Update" : "Save"}
+              {isEditMode ? "Cập nhật" : "Lưu"}
             </button>
           </div>
         </motion.div>
@@ -955,7 +955,7 @@ export function CreateEventModal({
                   </svg>
                 </div>
                 <h3 className="text-lg font-black text-neutral-900 dark:text-white">
-                  Update recurring task
+                  Cập nhật nhiệm vụ lặp lại
                 </h3>
                 <p className="mt-1.5 text-center text-sm text-neutral-500 dark:text-neutral-400">
                   <span className="font-semibold text-neutral-700 dark:text-neutral-200">
@@ -1027,10 +1027,10 @@ export function CreateEventModal({
                   </div>
                   <div>
                     <p className="text-sm font-black text-blue-700 dark:text-blue-400">
-                      All occurrences
+                      Tất cả các lần
                     </p>
                     <p className="text-xs text-blue-400/80">
-                      Update all dates in the recurring schedule
+                      Cập nhật tất cả ngày trong lịch lặp lại
                     </p>
                   </div>
                 </motion.button>
@@ -1039,7 +1039,7 @@ export function CreateEventModal({
                   onClick={() => setShowUpdateConfirm(false)}
                   className="mt-1 rounded-xl py-2 text-sm font-bold text-neutral-400 transition-all hover:text-neutral-600 dark:hover:text-neutral-200"
                 >
-                  Cancel
+                     Hủy
                 </button>
               </div>
             </motion.div>

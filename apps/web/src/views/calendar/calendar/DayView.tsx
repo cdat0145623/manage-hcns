@@ -28,7 +28,9 @@ export function DayView({
     () =>
       entries
         .filter((entry) => isSameDay(new Date(entry.date), currentDate))
-        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()),
+        .sort(
+          (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime(),
+        ),
     [entries, currentDate],
   );
   const overlapInfoMap = useMemo(
@@ -54,10 +56,20 @@ export function DayView({
     <div className="flex h-full flex-col overflow-hidden">
       <div className="flex border-b border-light-300 bg-light-100/50 transition-all dark:border-dark-300 dark:bg-dark-200/50">
         <div className="w-20 flex-shrink-0 border-r border-light-300 dark:border-dark-300" />
-        <div className="flex flex-col items-start gap-1 p-2 ">
+        <div className="flex flex-col items-start gap-1 p-2">
           <div className="flex items-center gap-2">
             <span className="text-xs font-black uppercase tracking-[0.2em] text-neutral-600">
-              {format(currentDate, "EEEE")}
+              {
+                [
+                  "Chủ Nhật",
+                  "Thứ Hai",
+                  "Thứ Ba",
+                  "Thứ Tư",
+                  "Thứ Năm",
+                  "Thứ Sáu",
+                  "Thứ Bảy",
+                ][currentDate.getDay()]
+              }
             </span>
           </div>
           <div className="mt-2 flex items-center gap-4">
@@ -83,11 +95,11 @@ export function DayView({
                   onClick={() => setPopoverDay(currentDate)}
                   className="mt-3 flex w-fit items-center gap-2 rounded-xl bg-blue-50 px-3 py-1.5 text-[10px] font-black uppercase tracking-wider text-blue-600 ring-1 ring-blue-500/20 transition-all hover:bg-blue-100 dark:bg-blue-900/30 dark:text-blue-400"
                 >
-                   <span className="relative flex h-2 w-2">
+                  <span className="relative flex h-2 w-2">
                     <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-blue-400 opacity-75"></span>
                     <span className="relative inline-flex h-2 w-2 rounded-full bg-blue-500"></span>
                   </span>
-                  View All {dayEntries.length} Tasks
+                  Xem tất cả {dayEntries.length} nhiệm vụ
                 </motion.button>
               )}
             </div>
@@ -131,7 +143,7 @@ export function DayView({
                 <div className="relative flex items-center">
                   <div className="absolute -left-[54px] z-40 rounded-full bg-rose-500/10 px-1.5 py-0.5 ring-1 ring-rose-500/20 backdrop-blur-sm">
                     <span className="text-[9px] font-black uppercase tracking-tighter text-rose-600 dark:text-rose-400">
-                      Now
+                      Hiện tại
                     </span>
                   </div>
                   <div className="h-2.5 w-2.5 rounded-full bg-rose-500 shadow-[0_0_10px_rgba(244,63,94,0.6)] ring-4 ring-rose-500/20" />
@@ -162,20 +174,27 @@ export function DayView({
                   </div>
 
                   {(() => {
-                    const renderedEntries = dayEntries.filter(e => (overlapInfoMap.get(e.id)?.overlapIndex ?? 0) < 2);
-                    const hiddenEntries = dayEntries.filter(e => (overlapInfoMap.get(e.id)?.overlapIndex ?? 0) >= 2);
+                    const renderedEntries = dayEntries.filter(
+                      (e) => (overlapInfoMap.get(e.id)?.overlapIndex ?? 0) < 2,
+                    );
+                    const hiddenEntries = dayEntries.filter(
+                      (e) => (overlapInfoMap.get(e.id)?.overlapIndex ?? 0) >= 2,
+                    );
                     const hiddenCount = hiddenEntries.length;
-                    
+
                     // Calculate Y position for badge: position at the top of the first hidden task
                     const firstHidden = hiddenEntries[0];
                     const hourHeight = 96;
                     const badgeTop = firstHidden
                       ? (() => {
                           const d = new Date(firstHidden.date);
-                          return d.getHours() * hourHeight + (d.getMinutes() * hourHeight) / 60;
+                          return (
+                            d.getHours() * hourHeight +
+                            (d.getMinutes() * hourHeight) / 60
+                          );
                         })()
                       : 8;
-                    
+
                     return (
                       <>
                         {renderedEntries.map((entry, index) => {
@@ -187,7 +206,10 @@ export function DayView({
                               onClick={onTaskClick}
                               variant="DETAILED"
                               isPositioned={true}
-                              totalOverlap={Math.min(overlapInfo?.totalOverlap ?? 1, 2)}
+                              totalOverlap={Math.min(
+                                overlapInfo?.totalOverlap ?? 1,
+                                2,
+                              )}
                               overlapIndex={overlapInfo?.overlapIndex}
                               index={index}
                               isDraggable={false}
@@ -212,7 +234,7 @@ export function DayView({
                               <span className="relative inline-flex h-2 w-2 rounded-full bg-blue-500"></span>
                             </span>
                             <span className="text-[10px] font-bold text-blue-600 dark:text-blue-400">
-                              +{hiddenCount} more
+                              +{hiddenCount} khác
                             </span>
                           </motion.button>
                         )}

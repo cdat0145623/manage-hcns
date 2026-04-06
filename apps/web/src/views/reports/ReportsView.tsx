@@ -146,14 +146,14 @@ function FilterSelector<T>({
 
   return (
     <div className="flex flex-col gap-1.5">
-      <label className="pl-1 text-[9px] font-black uppercase tracking-[0.25em] text-light-500/70 dark:text-dark-700/50">
+      <label className="pl-1 text-[9px] font-black uppercase tracking-[0.25em] text-neutral-500 dark:text-neutral-400">
         {label}
       </label>
       <Listbox value={value} onChange={onChange}>
         <div className="relative">
-          <Listbox.Button className="relative flex w-full items-center gap-2.5 rounded-xl border border-light-200/50 bg-light-50/50 py-2.5 pl-3.5 pr-9 text-left text-[13px] text-neutral-900 transition-all hover:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/10 dark:border-dark-400/30 dark:bg-dark-300/30 dark:text-dark-950 dark:hover:bg-dark-300/60">
+          <Listbox.Button className="relative flex w-full items-center gap-2.5 rounded-xl border border-neutral-200 bg-white py-2.5 pl-3.5 pr-9 text-left text-[13px] text-neutral-900 shadow-sm transition-all hover:border-indigo-300 hover:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/10 dark:border-neutral-700 dark:bg-neutral-800 dark:text-white dark:hover:border-neutral-600 dark:hover:bg-neutral-800/80">
             {icon && (
-              <span className="text-indigo-500/70 dark:text-indigo-400/70">
+              <span className="text-indigo-600 dark:text-indigo-400">
                 {icon}
               </span>
             )}
@@ -161,7 +161,7 @@ function FilterSelector<T>({
               {selected?.label}
             </span>
             <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2.5">
-              <HiChevronDown className="h-3.5 w-3.5 text-light-400" />
+              <HiChevronDown className="h-3.5 w-3.5 text-neutral-400" />
             </span>
           </Listbox.Button>
           <Transition
@@ -582,7 +582,7 @@ export default function ReportsView() {
   }));
 
   const monthOptions = Array.from({ length: 12 }, (_, i) => ({
-    label: new Date(0, i).toLocaleString("default", { month: "long" }),
+    label: `Tháng ${i + 1}`,
     value: i + 1,
   }));
 
@@ -592,13 +592,13 @@ export default function ReportsView() {
   }));
 
   const viewModeOptions = [
-    { label: t`Week`, value: "week" as const },
-    { label: t`Month`, value: "month" as const },
-    { label: t`Year`, value: "year" as const },
+    { label: "Tuần", value: "week" as const },
+    { label: "Tháng", value: "month" as const },
+    { label: "Năm", value: "year" as const },
   ];
 
   const weekOptions = Array.from({ length: 52 }, (_, i) => ({
-    label: t`Week ${i + 1}`,
+    label: `Tuần ${i + 1}`,
     value: i + 1,
   }));
 
@@ -702,7 +702,9 @@ export default function ReportsView() {
             ? Math.round((group.missedCount / group.totalCount) * 10000) / 100
             : 0;
         const pendingRate =
-          group.totalCount > 0 ? Math.max(0, 100 - completionRate - missedRate) : 0;
+          group.totalCount > 0
+            ? Math.max(0, 100 - completionRate - missedRate)
+            : 0;
         return { ...group, completionRate, missedRate, pendingRate };
       }),
     };
@@ -765,18 +767,20 @@ export default function ReportsView() {
               </div>
             </div>
             <div>
-              <h1 className="text-5xl font-black tracking-tighter text-neutral-900 dark:text-dark-1000">
-                {t`Dashboard`}
+              <h1 className="whitespace-nowrap text-3xl font-black tracking-tight text-neutral-900 dark:text-dark-1000">
+                Bảng điều khiển
               </h1>
               <div className="mt-2 flex items-center gap-2">
                 <div className="h-4 rounded-full bg-indigo-500/10 px-2 text-[10px] font-extrabold uppercase tracking-widest text-indigo-600 dark:bg-indigo-500/20 dark:text-indigo-400">
                   {users?.find((u) => u.id === selectedUserId)?.name ||
                     workspace.name}
                 </div>
-                <div className="h-1.5 w-1.5 rounded-full bg-light-300 dark:bg-dark-600" />
-                <p className="text-[11px] font-bold uppercase tracking-widest text-light-500/80 dark:text-dark-700/60">
-                  {t`Insights & Metrics`}
-                </p>
+
+                <div className="inline-flex items-center gap-1.5 rounded-md bg-indigo-50/50 px-2 py-0.5 ring-1 ring-indigo-500/10 dark:bg-indigo-900/20 dark:ring-indigo-400/20">
+                  <p className="text-[10px] font-bold tracking-wide text-indigo-600/80 dark:text-indigo-400">
+                    Thông số & chỉ số
+                  </p>
+                </div>
               </div>
             </div>
           </div>
@@ -784,21 +788,21 @@ export default function ReportsView() {
           <div className="rounded-[28px] border border-light-200/60 bg-white/40 p-5 shadow-2xl ring-1 ring-light-100/50 backdrop-blur-3xl dark:border-dark-400/30 dark:bg-dark-200/30">
             <div className="grid grid-cols-2 gap-x-4 gap-y-4 sm:min-w-[700px] lg:grid-cols-5">
               <FilterSelector
-                label={t`Employee`}
+                label="Nhân viên"
                 options={memberOptions}
                 value={selectedUserId}
                 onChange={setSelectedUserId}
                 icon={<HiUser size={18} />}
               />
               <FilterSelector
-                label={t`Board`}
+                label="Bảng"
                 options={boardOptions}
                 value={boardPublicId}
                 onChange={setBoardPublicId}
                 icon={<HiTableCells size={18} />}
               />
               <FilterSelector
-                label={t`View Mode`}
+                label="Chế độ xem"
                 options={viewModeOptions}
                 value={viewMode}
                 onChange={setViewMode}
@@ -806,7 +810,7 @@ export default function ReportsView() {
               />
               {viewMode === "month" ? (
                 <FilterSelector
-                  label={t`Month`}
+                  label="Tháng"
                   options={monthOptions}
                   value={month}
                   onChange={setMonth}
@@ -814,7 +818,7 @@ export default function ReportsView() {
                 />
               ) : viewMode === "week" ? (
                 <FilterSelector
-                  label={t`Week`}
+                  label="Tuần"
                   options={weekOptions}
                   value={week}
                   onChange={setWeek}
@@ -822,12 +826,14 @@ export default function ReportsView() {
                 />
               ) : (
                 <div className="flex flex-col gap-2 opacity-30">
-                  <label className="text-[10px] font-extrabold uppercase tracking-[0.2em] text-light-500/80">{t`Fixed View`}</label>
+                  <label className="text-[10px] font-extrabold uppercase tracking-[0.2em] text-light-500/80">
+                    Chế độ cố định
+                  </label>
                   <div className="h-11 rounded-2xl border border-dashed border-light-300" />
                 </div>
               )}
               <FilterSelector
-                label={t`Year`}
+                label="Năm"
                 options={yearOptions}
                 value={year}
                 onChange={setYear}
@@ -846,13 +852,13 @@ export default function ReportsView() {
           ) : (
             <>
               <StatCard
-                label={t`Total Cards`}
+                label="Tổng thẻ"
                 value={totalCards}
                 icon={<HiRectangleStack size={28} />}
                 color="indigo"
               />
               <StatCard
-                label={t`On-Time Rate`}
+                label="Tỷ lệ đúng giờ"
                 value={metrics?.kanban?.deadlineCompletionRate?.rate || 0}
                 suffix="%"
                 icon={<HiClock size={28} />}
@@ -860,7 +866,7 @@ export default function ReportsView() {
                 delay={100}
               />
               <StatCard
-                label={t`Completed`}
+                label="Hoàn thành"
                 value={calendarMetrics?.taskCompletionRate?.rate || 0}
                 suffix="%"
                 icon={<HiCheckCircle size={28} />}
@@ -868,7 +874,7 @@ export default function ReportsView() {
                 delay={200}
               />
               <StatCard
-                label={t`Calendar Rate`}
+                label="Tỷ lệ lịch"
                 value={calendarMetrics?.deadlineCompletionRate?.rate || 0}
                 suffix="%"
                 icon={<HiClipboardDocumentList size={28} />}
@@ -883,7 +889,7 @@ export default function ReportsView() {
         <div className="grid grid-cols-1 gap-10 lg:grid-cols-2">
           {/* Kanban Segment */}
           <DashboardCard
-            title={t`Board Distribution`}
+            title="Phân bố bảng"
             icon={<HiChartPie size={20} />}
             delay={200}
           >
@@ -965,7 +971,7 @@ export default function ReportsView() {
           </DashboardCard>
 
           <DashboardCard
-            title={t`Kanban Deadline Metrics`}
+            title="Thước đo thời hạn Kanban"
             icon={<HiClock size={20} />}
             delay={300}
           >
@@ -980,7 +986,7 @@ export default function ReportsView() {
                 totalCount={
                   metrics?.kanban?.deadlineCompletionRate?.totalCards || 0
                 }
-                label={t`Cards On Time`}
+                label="Thẻ đúng hạn"
                 theme="indigo"
               />
             )}
@@ -988,7 +994,7 @@ export default function ReportsView() {
 
           {/* Calendar Segment */}
           <DashboardCard
-            title={t`Calendar Task Completion`}
+            title="Hoàn thành nhiệm vụ lịch"
             icon={<HiCheckCircle size={20} />}
             delay={400}
           >
@@ -1001,14 +1007,14 @@ export default function ReportsView() {
                 totalCount={
                   calendarMetrics?.taskCompletionRate?.totalCount || 0
                 }
-                label={t`Completed Tasks`}
+                label="Nhiệm vụ đã xong"
                 theme="emerald"
               />
             )}
           </DashboardCard>
 
           <DashboardCard
-            title={t`Calendar Deadline Metrics`}
+            title="Thước đo thời hạn lịch"
             icon={<HiClipboardDocumentList size={20} />}
             delay={500}
           >
@@ -1023,7 +1029,7 @@ export default function ReportsView() {
                 totalCount={
                   calendarMetrics?.deadlineCompletionRate?.totalCount || 0
                 }
-                label={t`Tasks On Time`}
+                label="Nhiệm vụ đúng giờ"
                 theme="sky"
               />
             )}
@@ -1032,7 +1038,7 @@ export default function ReportsView() {
           {/* Detailed Performance Section */}
           <div className="lg:col-span-2">
             <DashboardCard
-              title={t`Detailed Task Performance`}
+              title="Hiệu suất nhiệm vụ chi tiết"
               icon={<HiChartBar size={20} />}
               delay={600}
             >
@@ -1132,7 +1138,7 @@ export default function ReportsView() {
                         )}
                       />
                       <Bar
-                        name={t`Pending`}
+                        name="Chờ"
                         dataKey="pendingRate"
                         stackId="stack"
                         fill="url(#pendingGradient)"
@@ -1140,7 +1146,7 @@ export default function ReportsView() {
                         isAnimationActive={false}
                       />
                       <Bar
-                        name={t`Done`}
+                        name="Hoàn thành"
                         dataKey="completionRate"
                         stackId="stack"
                         fill="url(#doneGradient)"
@@ -1148,7 +1154,7 @@ export default function ReportsView() {
                         isAnimationActive={false}
                       />
                       <Bar
-                        name={t`Missed`}
+                        name="Bỏ lỡ"
                         dataKey="missedRate"
                         stackId="stack"
                         fill="url(#missedGradient)"

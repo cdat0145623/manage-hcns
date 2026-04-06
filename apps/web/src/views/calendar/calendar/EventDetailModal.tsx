@@ -190,8 +190,8 @@ export function EventDetailModal({
     const userId = session?.user?.id;
     if (!userId) {
       showPopup({
-        header: "Authentication required",
-        message: "You must be logged in to update tasks.",
+        header: "Yêu cầu xác thực",
+        message: "Bạn cần đăng nhập để cập nhật nhiệm vụ.",
         icon: "info",
       });
       return;
@@ -263,7 +263,7 @@ export function EventDetailModal({
                 {statusConfig.icon}
               </div>
               <h2 className="text-lg font-black tracking-tight text-neutral-900 dark:text-white">
-                Task Details
+                Chi tiết nhiệm vụ
               </h2>
             </div>
             <div className="flex gap-1">
@@ -347,7 +347,7 @@ export function EventDetailModal({
                   onClick={() => handleStatusChange("done")}
                   className="group relative flex flex-col items-center gap-1.5 overflow-hidden rounded-2xl border-2 border-neutral-300 bg-white px-3 py-3.5 text-center text-neutral-900 shadow-sm transition-all duration-200 hover:border-neutral-400 hover:bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100 dark:hover:border-neutral-600 dark:hover:bg-neutral-800"
                 >
-                  <span className="text-[12px] font-black tracking-widest">Mark completed</span>
+                  <span className="text-[12px] font-black tracking-widest">Hoàn thành</span>
                 </motion.button>
               ) : (
                 <motion.button
@@ -356,7 +356,7 @@ export function EventDetailModal({
                   onClick={() => handleStatusChange("pending")}
                   className="group relative flex flex-col items-center gap-1.5 overflow-hidden rounded-2xl border-2 border-neutral-300 bg-white px-3 py-3.5 text-center text-neutral-900 shadow-sm transition-all duration-200 hover:border-neutral-400 hover:bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100 dark:hover:border-neutral-600 dark:hover:bg-neutral-800"
                 >
-                  <span className="text-[12px] font-black tracking-widest">Mark in-progress</span>
+                  <span className="text-[12px] font-black tracking-widest">Đang tiến hành</span>
                 </motion.button>
               )}
             </div>
@@ -428,7 +428,7 @@ export function EventDetailModal({
 
           {isVirtual && (
             <div className="rounded-xl bg-amber-50 p-3 text-[12px] text-amber-700 dark:bg-amber-900/20 dark:text-amber-400">
-              ⚠️ This is a virtual task automatically created from the recurring schedule. Click <strong>Create</strong> to create the task.
+              ⚠️ Đây là nhiệm vụ ảo được tạo tự động từ lịch lặp lại. Nhấp <strong>Tạo</strong> để tạo nhiệm vụ.
             </div>
           )}
         </div>
@@ -439,7 +439,7 @@ export function EventDetailModal({
         {entry.type === "INSTANCE" ? (
             <div className="border-t border-light-200 bg-light-50 p-6 dark:border-dark-300 dark:bg-dark-200 max-h-[500px] overflow-y-auto">
                 <div className="mb-6">
-                    <h3 className="text-sm font-bold text-neutral-900 dark:text-white mb-4">Activity</h3>
+                    <h3 className="text-sm font-bold text-neutral-900 dark:text-white mb-4">Hoạt động</h3>
                     <ActivityList 
                         taskInstanceId={entry.instanceId as string} 
                         isLoading={false}
@@ -455,7 +455,7 @@ export function EventDetailModal({
                     />
                 </div>
                 <div>
-                    <h3 className="text-sm font-bold text-neutral-900 dark:text-white mb-4">Add Comment</h3>
+                    <h3 className="text-sm font-bold text-neutral-900 dark:text-white mb-4">Thêm bình luận</h3>
                     <NewCommentForm 
                         taskInstanceId={entry.instanceId as string}
                         workspaceMembers={[]} // Optional for now

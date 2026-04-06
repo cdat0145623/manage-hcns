@@ -92,8 +92,8 @@ export function Calendar() {
       void utils.taskInstance.getVirtual.invalidate();
       setIsDetailOpen(false);
       showPopup({
-        header: t`Event Deleted`,
-        message: t`The event has been removed from your calendar.`,
+        header: t`Đã xóa sự kiện`,
+        message: t`Sự kiện đã được xóa khỏi lịch của bạn.`,
         icon: "success",
       });
     },
@@ -106,15 +106,15 @@ export function Calendar() {
 
       if (isDuplicate) {
         showPopup({
-          header: "Conflict detected",
+          header: "Phát hiện xung đột",
           message:
-            "This data was already changed elsewhere. The calendar will refresh automatically.",
+            "Dữ liệu này đã bị thay đổi ở nơi khác. Lịch sẽ tự động làm mới.",
           icon: "info",
         });
       } else {
         showPopup({
-          header: "Error",
-          message: error.message || "Unable to delete the event.",
+          header: "Lỗi",
+          message: error.message || "Không thể xóa sự kiện.",
           icon: "error",
         });
       }
@@ -166,9 +166,9 @@ export function Calendar() {
       // BUG-2 FIX: Virtual tasks have no real instance — cannot delete "single"
       if (entry.type === "VIRTUAL") {
         showPopup({
-          header: "Cannot delete virtual task",
+          header: "Không thể xóa nhiệm vụ ảo",
           message:
-            "This task has no saved instance. Delete the entire recurring series instead.",
+            "Nhiệm vụ này không có trường hợp thực. Hãy xóa toàn bộ chuỗi lặp lại.",
           icon: "info",
         });
         setDeleteConfirmEntry(null);
@@ -235,8 +235,8 @@ export function Calendar() {
 
       if (draggableId.startsWith("virtual_") || draggableId.startsWith("v_")) {
         showPopup({
-          header: t`Cannot move virtual task`,
-          message: t`Please create the task instance first before moving it.`,
+          header: t`Không thể di chuyển nhiệm vụ ảo`,
+          message: t`Vui lòng tạo instance trước khi di chuyển.`,
           icon: "info",
         });
         return;
@@ -453,7 +453,7 @@ export function Calendar() {
                   </svg>
                 </div>
                 <h3 className="text-lg font-black text-neutral-900 dark:text-white">
-                  Delete task
+                  Xóa nhiệm vụ
                 </h3>
                 <p className="mt-1.5 text-center text-sm text-neutral-500 dark:text-neutral-400">
                   <span className="font-semibold text-neutral-700 dark:text-neutral-200">
@@ -528,10 +528,10 @@ export function Calendar() {
                   </div>
                   <div>
                     <p className="text-sm font-black text-red-700 dark:text-red-400">
-                      All occurrences
+                      Tất cả các lần
                     </p>
                     <p className="text-xs text-red-400/80">
-                      Remove all dates in the recurring schedule
+                      Xóa tất cả ngày trong lịch lặp lại
                     </p>
                   </div>
                 </motion.button>
@@ -540,7 +540,7 @@ export function Calendar() {
                   onClick={() => setDeleteConfirmEntry(null)}
                   className="mt-1 rounded-xl py-2 text-sm font-bold text-neutral-400 transition-all hover:text-neutral-600 dark:hover:text-neutral-200"
                 >
-                  Cancel
+                  Hủy
                 </button>
               </div>
             </motion.div>

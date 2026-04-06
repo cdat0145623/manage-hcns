@@ -99,7 +99,7 @@ export default function SideNavigation({
     keyboardShortcut: KeyboardShortcut;
   }[] = [
     {
-      name: t`Dashboard`,
+      name: "Tổng quan",
       href: "/reports",
       icon: isDarkMode ? activityLogsIconDark : activityLogsIconLight,
       keyboardShortcut: {
@@ -111,7 +111,7 @@ export default function SideNavigation({
       },
     },
     {
-      name: t`Boards`,
+      name: "Bảng",
       href: "/boards",
       icon: isDarkMode ? boardsIconDark : boardsIconLight,
       keyboardShortcut: {
@@ -124,7 +124,7 @@ export default function SideNavigation({
 
     },
     {
-      name: t`Calendar`,
+      name: "Lịch",
       href: "/calendar",
       icon: isDarkMode ? activityLogsIconDark : activityLogsIconLight,
       keyboardShortcut: {
@@ -136,7 +136,7 @@ export default function SideNavigation({
       },
     },
     {
-      name: t`Templates`,
+      name: "Mẫu bảng",
       href: "/templates",
       icon: isDarkMode ? templatesIconDark : templatesIconLight,
       keyboardShortcut: {
@@ -148,7 +148,7 @@ export default function SideNavigation({
       },
     },
     {
-      name: t`Members`,
+      name: "Thành viên",
       href: "/members",
       icon: isDarkMode ? membersIconDark : membersIconLight,
       keyboardShortcut: {
@@ -160,7 +160,7 @@ export default function SideNavigation({
       },
     },
     {
-      name: t`Settings`,
+      name: "Cài đặt",
       href: "/settings",
       icon: isDarkMode ? settingsIconDark : settingsIconLight,
       keyboardShortcut: {

@@ -24,7 +24,7 @@ interface MonthViewProps {
   onViewDay: (date: Date) => void;
 }
 
-const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const WEEKDAYS = ["CN", "T2", "T3", "T4", "T5", "T6", "T7"];
 
 export function MonthView({
   currentDate,
@@ -147,7 +147,7 @@ export function MonthView({
                         }}
                         className="mt-1 flex w-full items-center justify-center rounded-md py-0.5 text-[9px] font-black text-neutral-400 hover:bg-neutral-100 dark:text-neutral-500 dark:hover:bg-neutral-800"
                       >
-                        +{dayEntries.length - 3} more
+                        +{dayEntries.length - 3} nhiệm vụ khác
                       </button>
                     )}
                     {provided.placeholder}

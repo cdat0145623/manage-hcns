@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unnecessary-condition */
 import { t } from "@lingui/core/macro";
 import {
   addMonths,
@@ -68,7 +69,7 @@ export function DueDateSelector({
     const rect = buttonRef.current.getBoundingClientRect();
     setDropdownPos({
       top: rect.bottom + window.scrollY + rect.width / 2 - 160,
-      left: rect.left + window.scrollX + 40,
+      left: rect.left + window.scrollX + 170,
     });
     setIsOpen(true);
   };
@@ -152,7 +153,7 @@ export function DueDateSelector({
 
   const handleTimeChange = (type: "hour" | "minute", value: string) => {
     const numVal = value.replace(/\D/g, "").slice(0, 2);
-    
+
     if (type === "hour") {
       setHour(numVal);
       if (type === "hour" && numVal.length === 2) {
@@ -182,28 +183,26 @@ export function DueDateSelector({
     onDateSelect?.(updated);
   };
 
-const handleBlurPad = (type: "hour" | "minute") => {
-  // Khi blur: pad + commit luôn dù chưa đủ 2 chữ số
-  const h =
-    type === "hour"
-      ? Math.min(23, parseInt(hour || "0", 10))
-      : Math.min(23, parseInt(hour || "0", 10));
-  const m =
-    type === "minute"
-      ? Math.min(59, parseInt(minute || "0", 10))
-      : Math.min(59, parseInt(minute || "0", 10));
+  const handleBlurPad = (type: "hour" | "minute") => {
+    // Khi blur: pad + commit luôn dù chưa đủ 2 chữ số
+    const h =
+      type === "hour"
+        ? Math.min(23, parseInt(hour || "0", 10))
+        : Math.min(23, parseInt(hour || "0", 10));
+    const m =
+      type === "minute"
+        ? Math.min(59, parseInt(minute || "0", 10))
+        : Math.min(59, parseInt(minute || "0", 10));
 
-  if (type === "hour")
-    setHour(String(h).padStart(2, "0"));
-  else
-    setMinute(String(m).padStart(2, "0"));
+    if (type === "hour") setHour(String(h).padStart(2, "0"));
+    else setMinute(String(m).padStart(2, "0"));
 
-  if (!dueDate) return;
+    if (!dueDate) return;
 
-  const updated = new Date(dueDate);
-  updated.setHours(h, m, 0, 0);
-  onDateSelect?.(updated);
-};
+    const updated = new Date(dueDate);
+    updated.setHours(h, m, 0, 0);
+    onDateSelect?.(updated);
+  };
 
   const handleClear = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -326,7 +325,9 @@ const handleBlurPad = (type: "hour" | "minute") => {
         ref={buttonRef}
         type="button"
         onClick={() =>
-          !disabled && !isLoading && (isOpen ? setIsOpen(false) : openDropdown())
+          !disabled &&
+          !isLoading &&
+          (isOpen ? setIsOpen(false) : openDropdown())
         }
         disabled={isLoading || disabled}
         className={`flex h-full w-full items-center rounded-[5px] border-[1px] border-light-50 py-1 pl-2 text-left text-xs text-neutral-900 dark:border-dark-50 dark:text-dark-1000 ${

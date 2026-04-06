@@ -1,4 +1,4 @@
-import { addDays, addMonths, addWeeks, format, subDays, subMonths, subWeeks, startOfWeek, endOfWeek, isSameMonth } from "date-fns";
+import { addDays, addMonths, addWeeks, format, subDays, subMonths, subWeeks, startOfWeek, endOfWeek } from "date-fns";
 import { motion } from "framer-motion";
 import { HiOutlineChevronLeft, HiOutlineChevronRight } from "react-icons/hi2";
 
@@ -36,19 +36,17 @@ export function CalendarHeader({
       <div className="flex items-center space-x-4 pl-2">
         <h2 className="text-xl font-bold text-neutral-900 dark:text-white">
           {viewMode === "MONTH" ? (
-            format(currentDate, "MMMM yyyy")
+            `Tháng ${currentDate.getMonth() + 1} ${currentDate.getFullYear()}`
           ) : viewMode === "WEEK" ? (
             <>
-              {format(startOfWeek(currentDate), "MMM d")} —{" "}
-              {format(
+              Tháng {startOfWeek(currentDate).getMonth() + 1} {format(startOfWeek(currentDate), "d")} —{" "}
+              Tháng {endOfWeek(currentDate).getMonth() + 1} {format(
                 endOfWeek(currentDate),
-                isSameMonth(startOfWeek(currentDate), endOfWeek(currentDate))
-                  ? "d, yyyy"
-                  : "MMM d, yyyy"
+                "d, yyyy"
               )}
             </>
           ) : (
-            format(currentDate, "MMMM d, yyyy")
+            `Tháng ${currentDate.getMonth() + 1} ${format(currentDate, "d, yyyy")}`
           )}
         </h2>
         <div className="flex items-center gap-1.5 rounded-full bg-neutral-100/80 p-1 dark:bg-neutral-800/80 shadow-inner">
@@ -66,7 +64,7 @@ export function CalendarHeader({
             onClick={onToday}
             className="px-4 py-1 text-sm font-black uppercase tracking-tighter text-neutral-700 transition-all hover:text-blue-600 dark:text-neutral-300 dark:hover:text-white"
           >
-            Today
+            Hôm nay
           </motion.button>
           <motion.button
             whileHover={{ scale: 1.1 }}
@@ -80,7 +78,9 @@ export function CalendarHeader({
       </div>
 
       <div className="flex items-center gap-1 rounded-full bg-neutral-100/80 p-1 dark:bg-neutral-800/80 shadow-inner">
-        {(["DAY", "WEEK", "MONTH"] as ViewMode[]).map((mode) => (
+        {(["DAY", "WEEK", "MONTH"] as ViewMode[]).map((mode) => {
+          const modeLabel: Record<ViewMode, string> = { DAY: "Ngày", WEEK: "Tuần", MONTH: "Tháng" };
+          return (
           <motion.button
             key={mode}
             whileHover={viewMode !== mode ? { scale: 1.05, backgroundColor: "rgba(255,255,255,0.8)" } : {}}
@@ -92,9 +92,10 @@ export function CalendarHeader({
                 : "text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-white"
             }`}
           >
-            {mode}
+            {modeLabel[mode]}
           </motion.button>
-        ))}
+          );
+        })}
       </div>
     </div>
   );

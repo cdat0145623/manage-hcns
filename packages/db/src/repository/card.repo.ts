@@ -9,6 +9,9 @@ import {
   isNull,
   sql,
   isNotNull,
+  or,
+  gte,
+  lt,
 } from "drizzle-orm";
 
 import type { dbClient } from "@kan/db/client";
@@ -23,6 +26,9 @@ import {
   labels,
   lists,
   workspaceMembers,
+  boards,
+  comments,
+  userBoardFavorites,
 } from "@kan/db/schema";
 import { generateUID } from "@kan/shared/utils";
 
@@ -1002,4 +1008,234 @@ export const getWorkspaceAndCardIdByCardPublicId = async (
         boardName: result.list.board.name,
       }
     : null;
+};
+
+export const getByUserId = async (db: dbClient, userId?: string) => {
+  let cardIds: string[] = [];
+  const filterCards = await db
+    .select({
+      publicId: cards.publicId,
+      createdAt: cards.createdAt,
+      dueDate: cards.dueDate,
+      startDate: cards.startDate,
+    })
+    .from(cards)
+    .innerJoin(cardToWorkspaceMembers, eq(cards.id, cardToWorkspaceMembers.cardId))
+    .innerJoin(workspaceMembers, eq(cardToWorkspaceMembers.workspaceMemberId, workspaceMembers.id))
+    .where(and(
+      userId ? eq(workspaceMembers.userId, userId) : undefined,
+      isNull(cards.deletedAt),
+      or(
+        eq(cards.status, "pending" as const),
+        eq(cards.status, "missed" as const)
+      )
+    ));
+
+  cardIds = filterCards.map((card) => card.publicId);
+  const board = await db.query.boards.findMany({
+    columns: {
+      publicId: true,
+      name: true,
+      slug: true,
+      visibility: true,
+      isArchived: true,
+    },
+    with: {
+      userFavorites: {
+        where: userId ? eq(userBoardFavorites.userId, userId) : undefined,
+        columns: {
+          userId: true,
+        },
+      },
+      workspace: {
+        columns: {
+          publicId: true,
+        },
+        with: {
+          members: {
+            columns: {
+              publicId: true,
+              email: true,
+              status: true,
+            },
+            with: {
+              user: {
+                columns: {
+                  name: true,
+                  email: true,
+                  image: true,
+                },
+              },
+            },
+            where: isNull(workspaceMembers.deletedAt),
+          },
+        },
+      },
+      labels: {
+        columns: {
+          publicId: true,
+          name: true,
+          colourCode: true,
+        },
+        where: isNull(labels.deletedAt),
+      },
+      lists: {
+        columns: {
+          publicId: true,
+          name: true,
+          boardId: true,
+          index: true,
+        },
+        with: {
+          cards: {
+            columns: {
+              publicId: true,
+              title: true,
+              description: true,
+              listId: true,
+              index: true,
+              dueDate: true,
+              startDate: true,
+              status: true,
+            },
+            with: {
+              labels: {
+                with: {
+                  label: {
+                    columns: {
+                      publicId: true,
+                      name: true,
+                      colourCode: true,
+                    },
+                  },
+                },
+              },
+              members: {
+                with: {
+                  member: {
+                    columns: {
+                      publicId: true,
+                      email: true,
+                      deletedAt: true,
+                    },
+                    with: {
+                      user: {
+                        columns: {
+                          name: true,
+                          email: true,
+                          image: true,
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+              fileActivities: {
+                columns: {
+                  publicId: true,
+                  mimeType: true,
+                  newFileUrl: true,
+                  fileName: true,
+                  fileSize: true,
+                  createdAt: true,
+                  activityType: true,
+                },
+                orderBy: asc(fileActivityLog.createdAt),
+              },
+              checklists: {
+                columns: {
+                  publicId: true,
+                  name: true,
+                  index: true,
+                },
+                where: isNull(checklists.deletedAt),
+                orderBy: asc(checklists.index),
+                with: {
+                  items: {
+                    columns: {
+                      publicId: true,
+                      title: true,
+                      completed: true,
+                      index: true,
+                    },
+                    where: isNull(checklistItems.deletedAt),
+                    orderBy: asc(checklistItems.index),
+                  },
+                },
+              },
+              comments: {
+                columns: {
+                  publicId: true,
+                },
+                where: isNull(comments.deletedAt),
+                limit: 1,
+              },
+            },
+            where: and(
+              cardIds.length > 0 ? inArray(cards.publicId, cardIds) : undefined,
+              isNull(cards.deletedAt),
+              // buildDueDateWhere(filters.dueDate),
+            ),
+            orderBy: [asc(cards.index)],
+          },
+        },
+        where: isNull(lists.deletedAt),
+        orderBy: [asc(lists.index)],
+      },
+      allLists: {
+        columns: {
+          publicId: true,
+          name: true,
+        },
+        where: isNull(lists.deletedAt),
+        orderBy: [asc(lists.index)],
+      },
+    },
+    where: and(
+      // eq(boards.publicId, boardPublicId),
+      isNull(boards.deletedAt),
+      eq(boards.type, "regular"),
+    ),
+    });
+
+  if (!board || board.length === 0) return null;
+
+  const formattedResult = board.map((b) => ({
+    ...b,
+    favorite: b.userFavorites.length > 0,
+    userFavorites: undefined,
+    lists: b.lists.map((list) => ({
+      ...list,
+      cards: list.cards.map((card) => {
+        const latestFiles = new Map<string, typeof card.fileActivities[0]>();
+        for (const activity of card.fileActivities) {
+          latestFiles.set(activity.publicId, activity);
+        }
+
+        const activeAttachments = Array.from(latestFiles.values())
+          .filter((f) => f.activityType !== "file_deleted")
+          .map((f) => ({
+            publicId: f.publicId,
+            contentType: f.mimeType ?? "",
+            s3Key: f.newFileUrl ?? "",
+            originalFilename: f.fileName,
+            size: f.fileSize,
+            createdAt: f.createdAt,
+          }));
+
+        return {
+          ...card,
+          labels: card.labels.map((label) => label.label),
+          members: card.members
+            .map((member) => member.member)
+            .filter((member) => member.deletedAt === null),
+          attachments: activeAttachments,
+        };
+      }),
+    }))
+    .filter((list) => list.cards.length > 0),
+  }))
+  .filter((b) => b.lists.some((list) => list.cards.length > 0));
+
+  return {filterCards, formattedResult};
 };

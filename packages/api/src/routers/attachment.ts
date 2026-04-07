@@ -98,7 +98,10 @@ export const attachmentRouter = createTRPCRouter({
         }
       }
 
-      const bucket = process.env.NEXT_PUBLIC_ATTACHMENTS_BUCKET_NAME;
+      let bucket = process.env.NEXT_PUBLIC_ATTACHMENTS_BUCKET_NAME || "my-app";
+      if (input.contentType.startsWith("image/")) {
+        bucket = process.env.NEXT_PUBLIC_AVATAR_BUCKET_NAME || "images";
+      }
       if (!bucket)
         throw new TRPCError({
           message: `Attachments bucket not configured`,
@@ -120,8 +123,9 @@ export const attachmentRouter = createTRPCRouter({
       );
 
       if (process.env.NEXT_PUBLIC_KAN_ENV !== "cloud") {
-        const endpoint = process.env.S3_ENDPOINT ?? "http://localhost:9000";
-        const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3001";
+        const endpoint = (process.env.S3_ENDPOINT ?? "http://localhost:9000").replace(/\/$/, "");
+        const appUrl = (process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3001").replace(/\/$/, "");
+        
         if (url.startsWith(endpoint)) {
           url = url.replace(endpoint, `${appUrl}/api/minio`);
         }

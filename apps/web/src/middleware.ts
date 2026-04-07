@@ -12,15 +12,14 @@ export async function middleware(request: NextRequest) {
   }
 
   const attachmentsBucket = env("NEXT_PUBLIC_ATTACHMENTS_BUCKET_NAME") ?? "attachments";
-  const avatarBucket = env("NEXT_PUBLIC_AVATAR_BUCKET_NAME") ?? "avatars";
+  const avatarBucket = env("NEXT_PUBLIC_AVATAR_BUCKET_NAME") ?? "images";
 
   if (
     url.pathname.startsWith(`/${attachmentsBucket}/`) ||
     url.pathname.startsWith(`/${avatarBucket}/`)
   ) {
-    const storageUrl = env("NEXT_PUBLIC_STORAGE_URL") ?? "http://localhost:9000";
-    const base = storageUrl.endsWith("/") ? storageUrl.slice(0, -1) : storageUrl;
-    return NextResponse.rewrite(new URL(`${base}${url.pathname}`));
+    const path = url.pathname.slice(1).split("/"); // Bo dau / dau tien roi split
+    return proxyToMinio(request, path);
   }
 
   return NextResponse.next();

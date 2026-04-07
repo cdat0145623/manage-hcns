@@ -19,6 +19,7 @@ export const getById = async (db: dbClient, userId: string) => {
       username: true,
       image: true,
       stripeCustomerId: true,
+      role: true,
     },
     with: {
       apiKeys: {

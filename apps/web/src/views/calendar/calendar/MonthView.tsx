@@ -7,6 +7,9 @@ import {
   isToday,
   startOfMonth,
   startOfWeek,
+  isAfter,
+  isBefore,
+  endOfMonth,
 } from "date-fns";
 import { AnimatePresence, motion } from "framer-motion";
 import { useMemo, useState } from "react";
@@ -15,6 +18,14 @@ import type { CalendarEntry } from "~/hooks/useRecurrence";
 import { StrictModeDroppable as Droppable } from "~/components/StrictModeDroppable";
 import { CalendarTask } from "./CalendarTask";
 import { DayTasksPopover } from "./DayTasksPopover";
+import { DayCardPopover } from "./DayCardPopover";
+
+interface Card {
+  publicId: string;
+  dueDate: Date | null;
+  startDate: Date | null;
+  createdAt: Date;
+}
 
 interface MonthViewProps {
   currentDate: Date;
@@ -22,6 +33,9 @@ interface MonthViewProps {
   onTaskClick: (entry: CalendarEntry) => void;
   onCellClick: (date: Date) => void;
   onViewDay: (date: Date) => void;
+  onCardClick: (card: any) => void;
+  cards: Card[];
+  formattedResult: any[];
 }
 
 const WEEKDAYS = ["CN", "T2", "T3", "T4", "T5", "T6", "T7"];
@@ -32,8 +46,12 @@ export function MonthView({
   onTaskClick,
   onCellClick,
   onViewDay,
+  onCardClick,
+  cards,
+  formattedResult,
 }: MonthViewProps) {
   const monthStart = startOfMonth(currentDate);
+  const [popoverCard, setPopoverCard] = useState<Date | null>(null);
   const [popoverDay, setPopoverDay] = useState<Date | null>(null);
 
   const calendarStart = startOfWeek(monthStart);
@@ -50,6 +68,34 @@ export function MonthView({
     return entries
       .filter((entry) => isSameDay(new Date(entry.date), day))
       .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  };
+
+  const getCardsForDay = (day: Date) => {
+    const cardMetas = cards.filter((card) => 
+      isAfter(card.dueDate ?? endOfMonth(day), day) && 
+      isBefore(card.startDate || card.createdAt, day)
+    );
+
+    // Resolve full card data from formattedResult
+    const fullCards: any[] = [];
+    formattedResult.forEach((board: any) => {
+      board.lists.forEach((list: any) => {
+        list.cards.forEach((card: any) => {
+          if (cardMetas.some(m => m.publicId === card.publicId)) {
+            fullCards.push({
+              ...card,
+              boardName: board.name,
+              listName: list.name,
+            });
+          }
+        });
+      });
+    });
+
+    return fullCards.sort((a, b) => 
+      (new Date(a.dueDate ?? endOfMonth(day)).getTime()) - 
+      (new Date(b.dueDate ?? endOfMonth(day)).getTime())
+    );
   };
 
   return (
@@ -71,6 +117,7 @@ export function MonthView({
           const isDayToday = isToday(day);
           const dayEntries = getEntriesForDay(day);
           const droppableId = `droppable-${format(day, "yyyy-MM-dd")}`;
+          const dayCards = getCardsForDay(day);
 
           return (
             <motion.div
@@ -129,28 +176,39 @@ export function MonthView({
                   <div
                     ref={provided.innerRef}
                     {...provided.droppableProps}
-                    className="flex-1 space-y-1 overflow-y-auto overflow-x-hidden"
+                    className="flex-1 flex flex-col items-center align-center justify-center space-y-1 overflow-y-auto overflow-x-hidden"
                   >
-                    {dayEntries.slice(0, 3).map((entry, idx) => (
+                    {/* {dayEntries.slice(0, 3).map((entry, idx) => (
                       <CalendarTask
                         key={entry.id}
                         entry={entry}
                         onClick={onTaskClick}
                         index={idx}
                       />
-                    ))}
-                    {dayEntries.length > 3 && (
+                    ))} */}
+                    {isCurrentMonth && dayEntries.length > 0 && (
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
                           setPopoverDay(day);
                         }}
-                        className="mt-1 flex w-full items-center justify-center rounded-md py-0.5 text-[9px] font-black text-neutral-400 hover:bg-neutral-100 dark:text-neutral-500 dark:hover:bg-neutral-800"
+                        className="mt-1.5 gap-1.5 rounded-full bg-blue-50 px-2 py-0.5 text-[9px] font-black text-blue-600 ring-1 ring-blue-500/20 transition-all hover:bg-blue-100 dark:bg-blue-900/30 dark:text-blue-400"
                       >
-                        +{dayEntries.length - 3} nhiệm vụ khác
+                        {dayEntries.length} công việc hằng ngày
                       </button>
                     )}
                     {provided.placeholder}
+                    {isCurrentMonth && dayCards.length > 0 && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setPopoverCard(day);
+                        }}
+                        className="mt-1.5 gap-1.5 rounded-full bg-amber-50 px-2 py-0.5 text-[9px] font-black text-amber-600 ring-1 ring-amber-500/20 transition-all hover:bg-amber-100 dark:bg-amber-900/30 dark:text-amber-400"
+                      >
+                        {dayCards.length} công việc khác
+                      </button>
+                    )}
                   </div>
                 )}
               </Droppable>
@@ -166,6 +224,17 @@ export function MonthView({
             entries={getEntriesForDay(popoverDay)}
             onClose={() => setPopoverDay(null)}
             onTaskClick={onTaskClick}
+          />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {popoverCard && (
+          <DayCardPopover
+            day={popoverCard}
+            cards={getCardsForDay(popoverCard)}
+            onClose={() => setPopoverCard(null)}
+            onCardClick={onCardClick}
           />
         )}
       </AnimatePresence>

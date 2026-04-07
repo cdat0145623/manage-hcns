@@ -7,7 +7,7 @@
 import type { DropResult } from "react-beautiful-dnd";
 import { t } from "@lingui/macro";
 import { AnimatePresence, motion } from "framer-motion";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { DragDropContext } from "react-beautiful-dnd";
 import { isSameMonth, startOfMonth } from "date-fns";
 
@@ -27,6 +27,8 @@ import { EventDetailModal } from "./calendar/EventDetailModal";
 import { MonthView } from "./calendar/MonthView";
 import { SuccessModal } from "./calendar/SuccessModal";
 import { WeekView } from "./calendar/WeekView";
+import CardDetailsModalContent from "../card/components/CardDetailsModalContent";
+import Modal from "~/components/modal";
 
 function toEditableEntry(entry: CalendarEntry): EditableEntry {
   const date = new Date(entry.date);
@@ -67,8 +69,52 @@ export function Calendar() {
     prevDateRef.current = currentDate;
   }, [currentDate]);
 
+  const { data: currentUser } = api.user.getUser.useQuery();
+  const { data: allUsers } = api.user.getAll.useQuery();
+  const [selectedUserId, setSelectedUserId] = useState<string | undefined>(undefined);
+
+  const displayUsers = useMemo(() => {
+    if (!currentUser) return [];
+
+    if (currentUser.role === "ADMIN") {
+      const baseUsers = allUsers || [];
+      const isSelfInList = baseUsers.some((u) => u.id === currentUser.id);
+      if (!isSelfInList) {
+        return [
+          {
+            id: currentUser.id,
+            name: `${currentUser.name} (Tôi)`,
+            email: currentUser.email,
+            username: currentUser.username,
+          },
+          ...baseUsers,
+        ];
+      }
+      return baseUsers;
+    }
+
+    return [
+      {
+        id: currentUser.id,
+        name: currentUser.name,
+        email: currentUser.email,
+        username: currentUser.username,
+      },
+    ];
+  }, [currentUser, allUsers]);
+
+  useEffect(() => {
+    if (displayUsers.length > 0 && !selectedUserId) {
+      if (currentUser?.role !== "ADMIN") {
+        setSelectedUserId(currentUser?.id);
+      } else {
+        setSelectedUserId(displayUsers[0]?.id);
+      }
+    }
+  }, [displayUsers, currentUser, selectedUserId]);
+
   const [viewMode, setViewMode] = useState<ViewMode>("MONTH");
-  const { calendarEntries, moveTask } = useRecurrence(currentDate);
+  const { calendarEntries, cards, formattedResult, moveTask } = useRecurrence(currentDate, selectedUserId);
   const { showPopup } = usePopup();
   const utils = api.useUtils();
 
@@ -86,6 +132,14 @@ export function Calendar() {
   // Custom delete confirmation (replaces window.confirm)
   const [deleteConfirmEntry, setDeleteConfirmEntry] =
     useState<EditableEntry | null>(null);
+
+  const [activeCardId, setActiveCardId] = useState<string | null>(null);
+  const [isCardModalOpen, setIsCardModalOpen] = useState(false);
+
+  const handleCardClick = (card: any) => {
+    setActiveCardId(card.publicId);
+    setIsCardModalOpen(true);
+  };
 
   const deleteMutation = api.taskInstance.delete.useMutation({
     onSuccess: () => {
@@ -164,16 +218,16 @@ export function Calendar() {
     // If no type is provided, show custom confirmation modal
     if (!deleteType) {
       // BUG-2 FIX: Virtual tasks have no real instance — cannot delete "single"
-      if (entry.type === "VIRTUAL") {
-        showPopup({
-          header: "Không thể xóa nhiệm vụ ảo",
-          message:
-            "Nhiệm vụ này không có trường hợp thực. Hãy xóa toàn bộ chuỗi lặp lại.",
-          icon: "info",
-        });
-        setDeleteConfirmEntry(null);
-        return;
-      }
+      // if (entry.type === "VIRTUAL") {
+      //   showPopup({
+      //     header: "Không thể xóa công việc ảo",
+      //     message:
+      //       "Công việc này không có trường hợp thực. Hãy xóa toàn bộ chuỗi lặp lại.",
+      //     icon: "info",
+      //   });
+      //   setDeleteConfirmEntry(null);
+      //   return;
+      // }
       setDeleteConfirmEntry(entry);
       return;
     }
@@ -235,7 +289,7 @@ export function Calendar() {
 
       if (draggableId.startsWith("virtual_") || draggableId.startsWith("v_")) {
         showPopup({
-          header: t`Không thể di chuyển nhiệm vụ ảo`,
+          header: t`Không thể di chuyển công việc ảo`,
           message: t`Vui lòng tạo instance trước khi di chuyển.`,
           icon: "info",
         });
@@ -252,6 +306,9 @@ export function Calendar() {
         <CalendarHeader
           currentDate={currentDate}
           setCurrentDate={setCurrentDate}
+          selectedUserId={selectedUserId}
+          setSelectedUserId={setSelectedUserId}
+          users={displayUsers}
           viewMode={viewMode}
           setViewMode={(mode) => {
             setDirection(0);
@@ -308,6 +365,9 @@ export function Calendar() {
                     onTaskClick={handleTaskClick}
                     onCellClick={handleCellClick}
                     onViewDay={handleViewDay}
+                    onCardClick={handleCardClick}
+                    cards={cards || []}
+                    formattedResult={formattedResult || []}
                   />
                 </motion.div>
               )}
@@ -343,8 +403,11 @@ export function Calendar() {
                     currentDate={currentDate}
                     entries={calendarEntries}
                     onTaskClick={handleTaskClick}
+                    onCardClick={handleCardClick}
                     onCellClick={handleCellClick}
                     onViewDay={handleViewDay}
+                    cards={cards || []}
+                    formattedResult={formattedResult || []}
                   />
                 </motion.div>
               )}
@@ -379,8 +442,11 @@ export function Calendar() {
                   <DayView
                     currentDate={currentDate}
                     entries={calendarEntries}
+                    onCardClick={handleCardClick}
                     onTaskClick={handleTaskClick}
                     onCellClick={handleCellClick}
+                    cards={cards || []}
+                    formattedResult={formattedResult || []}
                   />
                 </motion.div>
               )}
@@ -453,14 +519,12 @@ export function Calendar() {
                   </svg>
                 </div>
                 <h3 className="text-lg font-black text-neutral-900 dark:text-white">
-                  Xóa nhiệm vụ
+                  Xóa công việc
                 </h3>
                 <p className="mt-1.5 text-center text-sm text-neutral-500 dark:text-neutral-400">
                   <span className="font-semibold text-neutral-700 dark:text-neutral-200">
                     "{deleteConfirmEntry.title}"
-                  </span>{" "}
-                  is a recurring task. Which occurrences would you like to
-                  delete?
+                  </span>
                 </p>
               </div>
 
@@ -547,6 +611,17 @@ export function Calendar() {
           </div>
         )}
       </AnimatePresence>
+      <Modal
+        isVisible={isCardModalOpen}
+        centered
+        // onClose={() => setIsCardModalOpen(false)}
+        modalSize="lg"
+      >
+        <CardDetailsModalContent
+          cardId={activeCardId || ""}
+          onClose={() => setIsCardModalOpen(false)}
+        />
+      </Modal>
     </div>
   );
 }

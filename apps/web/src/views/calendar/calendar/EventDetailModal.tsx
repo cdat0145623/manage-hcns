@@ -191,7 +191,7 @@ export function EventDetailModal({
     if (!userId) {
       showPopup({
         header: "Yêu cầu xác thực",
-        message: "Bạn cần đăng nhập để cập nhật nhiệm vụ.",
+        message: "Bạn cần đăng nhập để cập nhật công việc.",
         icon: "info",
       });
       return;
@@ -263,7 +263,7 @@ export function EventDetailModal({
                 {statusConfig.icon}
               </div>
               <h2 className="text-lg font-black tracking-tight text-neutral-900 dark:text-white">
-                Chi tiết nhiệm vụ
+                Chi tiết công việc
               </h2>
             </div>
             <div className="flex gap-1">
@@ -347,7 +347,7 @@ export function EventDetailModal({
                   onClick={() => handleStatusChange("done")}
                   className="group relative flex flex-col items-center gap-1.5 overflow-hidden rounded-2xl border-2 border-neutral-300 bg-white px-3 py-3.5 text-center text-neutral-900 shadow-sm transition-all duration-200 hover:border-neutral-400 hover:bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100 dark:hover:border-neutral-600 dark:hover:bg-neutral-800"
                 >
-                  <span className="text-[12px] font-black tracking-widest">Hoàn thành</span>
+                  <span className="text-[12px] font-black tracking-widest">Đánh dấu đã hoàn thành</span>
                 </motion.button>
               ) : (
                 <motion.button
@@ -356,7 +356,7 @@ export function EventDetailModal({
                   onClick={() => handleStatusChange("pending")}
                   className="group relative flex flex-col items-center gap-1.5 overflow-hidden rounded-2xl border-2 border-neutral-300 bg-white px-3 py-3.5 text-center text-neutral-900 shadow-sm transition-all duration-200 hover:border-neutral-400 hover:bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100 dark:hover:border-neutral-600 dark:hover:bg-neutral-800"
                 >
-                  <span className="text-[12px] font-black tracking-widest">Đang tiến hành</span>
+                  <span className="text-[12px] font-black tracking-widest">Đánh dấu chưa hoàn thành</span>
                 </motion.button>
               )}
             </div>
@@ -428,7 +428,7 @@ export function EventDetailModal({
 
           {isVirtual && (
             <div className="rounded-xl bg-amber-50 p-3 text-[12px] text-amber-700 dark:bg-amber-900/20 dark:text-amber-400">
-              ⚠️ Đây là nhiệm vụ ảo được tạo tự động từ lịch lặp lại. Nhấp <strong>Tạo</strong> để tạo nhiệm vụ.
+              ⚠️ Đây là công việc ảo được tạo tự động từ lịch lặp lại. Nhấp <strong>Tạo</strong> để tạo công việc.
             </div>
           )}
         </div>
@@ -463,11 +463,11 @@ export function EventDetailModal({
                 </div>
             </div>
         ) : (
-          <div className="flex items-center gap-2">
+          <div className="flex items-center justify-center gap-2 m-2">
             <button
               onClick={handleCreateInstance}
               disabled={createInstance.isPending || updateInstance.isPending}
-              className="w-full rounded-xl bg-blue-600 px-6 py-3 text-base font-bold text-white shadow-md transition-all hover:bg-blue-700 hover:shadow-lg active:scale-[0.98] disabled:opacity-50 dark:bg-blue-500 dark:hover:bg-blue-600"
+              className="rounded-xl bg-blue-600 px-6 py-3 text-base font-bold text-white shadow-md transition-all hover:bg-blue-700 hover:shadow-lg active:scale-[0.98] disabled:opacity-50 dark:bg-blue-500 dark:hover:bg-blue-600"
             >
               {createInstance.isPending || updateInstance.isPending
                 ? "Đang xử lý..."

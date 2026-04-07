@@ -169,7 +169,7 @@ export function CalendarTask({
         )}
 
         {variant === "SUMMARY" ? (
-          <div className="pointer-events-none ml-1 flex flex-row h-full align-center items-center justify-between w-full items-center gap-2 overflow-hidden">
+          <div className="pointer-events-none ml-1 flex flex-row h-full align-center items-center justify-start w-full items-center gap-2 overflow-hidden">
             <span className="truncate leading-none">
               {entry.title || "(No title)"}
             </span>
@@ -178,7 +178,7 @@ export function CalendarTask({
             </span>
           </div>
         ) : (
-          <div className="pointer-events-none ml-1 flex flex-row h-full align-center items-center justify-between overflow-hidden">
+          <div className="pointer-events-none ml-1 flex flex-row h-full align-center items-center justify-start gap-2 overflow-hidden">
             {/* <div className="flex items-start justify-between"> */}
               <span className="truncate text-xs font-black leading-tight">
                 {entry.title || "(No title)"}

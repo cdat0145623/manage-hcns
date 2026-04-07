@@ -41,7 +41,7 @@ export interface CalendarEntry {
   duration: number;
 }
 
-export function useRecurrence(currentDate: Date) {
+export function useRecurrence(currentDate: Date, selectedUserId: string | undefined) {
   const monthStart = startOfMonth(currentDate);
   const monthEnd = endOfMonth(currentDate); // Buffer
 
@@ -49,6 +49,7 @@ export function useRecurrence(currentDate: Date) {
   const { data: virtualTasks } = api.taskInstance.getVirtual.useQuery({
     from: monthStart,
     to: monthEnd,
+    targetUser: selectedUserId === "all" ? undefined : selectedUserId,
   });
 
   const utils = api.useUtils();
@@ -87,10 +88,6 @@ export function useRecurrence(currentDate: Date) {
     });
   }, [virtualTasks]);
 
-  const createInstance = (masterId: string, date: Date) => {
-    // Không dùng array local nữa vì UI sẽ tự động update qua API Invalidate
-  };
-
   const moveTask = (instanceId: string, newDate: Date) => {
     const entry = calendarEntries.find((e: CalendarEntry) => e.id === instanceId);
     if (!entry) return;
@@ -104,5 +101,7 @@ export function useRecurrence(currentDate: Date) {
     });
   };
 
-  return { calendarEntries, createInstance, moveTask, masters: [] };
+  const data = api.card.getByUserId.useQuery({ userId: selectedUserId });
+
+  return { calendarEntries, cards: data.data?.filterCards, formattedResult: data.data?.formattedResult , moveTask };
 }

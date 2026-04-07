@@ -1217,4 +1217,23 @@ export const cardRouter = createTRPCRouter({
 
       return { success: true };
     }),
+  getByUserId: publicProcedure
+    .meta({
+      openapi: {
+        summary: "Get cards by user ID",
+        method: "GET",
+        path: "/cards/user/{userId}",
+        description: "Gets all cards for a specific user",
+        tags: ["Cards"],
+      },
+    })
+    .input(
+      z.object({
+        userId: z.string().optional(),
+      }),
+    )
+    .output(z.custom<Awaited<ReturnType<typeof cardRepo.getByUserId>>>())
+    .query(async ({ ctx, input }) => {
+      return cardRepo.getByUserId(ctx.db, input.userId);
+    }),
 });

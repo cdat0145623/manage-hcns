@@ -955,14 +955,12 @@ export function CreateEventModal({
                   </svg>
                 </div>
                 <h3 className="text-lg font-black text-neutral-900 dark:text-white">
-                  Cập nhật nhiệm vụ lặp lại
+                  Cập nhật công việc lặp lại
                 </h3>
                 <p className="mt-1.5 text-center text-sm text-neutral-500 dark:text-neutral-400">
                   <span className="font-semibold text-neutral-700 dark:text-neutral-200">
                     "{title}"
-                  </span>{" "}
-                  is a recurring task. Which occurrences would you like to
-                  update?
+                  </span>
                 </p>
               </div>
 

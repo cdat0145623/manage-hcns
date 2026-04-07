@@ -2,11 +2,14 @@ import {
   addHours,
   eachDayOfInterval,
   endOfWeek,
+  endOfMonth,
   format,
   isSameDay,
   isToday,
   startOfDay,
   startOfWeek,
+  isAfter,
+  isBefore
 } from "date-fns";
 import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
@@ -15,13 +18,24 @@ import { StrictModeDroppable as Droppable } from "~/components/StrictModeDroppab
 import { CalendarTask } from "./CalendarTask";
 import { DayTasksPopover } from "./DayTasksPopover";
 import { calculateOverlap } from "~/utils/calendar";
+import { DayCardPopover } from "./DayCardPopover";
+
+interface Card {
+  publicId: string;
+  dueDate: Date | null;
+  startDate: Date | null;
+  createdAt: Date;
+}
 
 interface WeekViewProps {
   currentDate: Date;
   entries: CalendarEntry[];
   onTaskClick: (entry: CalendarEntry) => void;
+  onCardClick: (card: any) => void;
   onCellClick: (date: Date) => void;
   onViewDay: (date: Date) => void;
+  cards: Card[];
+  formattedResult: any[];
 }
 
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
@@ -30,12 +44,16 @@ export function WeekView({
   currentDate,
   entries,
   onTaskClick,
+  onCardClick,
   onCellClick,
   onViewDay,
+  cards,
+  formattedResult,
 }: WeekViewProps) {
   const weekStart = startOfWeek(currentDate);
   const weekEnd = endOfWeek(currentDate);
   const [popoverDay, setPopoverDay] = useState<Date | null>(null);
+  const [popoverCard, setPopoverCard] = useState<Date | null>(null);
 
   const days = useMemo(
     () => eachDayOfInterval({ start: weekStart, end: weekEnd }),
@@ -62,6 +80,34 @@ export function WeekView({
     onCellClick(clickedDate);
   };
 
+  const getCardsForDay = (day: Date) => {
+    const cardMetas = cards.filter((card) => 
+      isAfter(card.dueDate ?? endOfMonth(day), day) && 
+      isBefore(card.startDate || card.createdAt, day)
+    );
+
+    // Resolve full card data from formattedResult
+    const fullCards: any[] = [];
+    formattedResult.forEach((board: any) => {
+      board.lists.forEach((list: any) => {
+        list.cards.forEach((card: any) => {
+          if (cardMetas.some(m => m.publicId === card.publicId)) {
+            fullCards.push({
+              ...card,
+              boardName: board.name,
+              listName: list.name,
+            });
+          }
+        });
+      });
+    });
+
+    return fullCards.sort((a, b) => 
+      (new Date(a.dueDate ?? endOfMonth(day)).getTime()) - 
+      (new Date(b.dueDate ?? endOfMonth(day)).getTime())
+    );
+  };
+
   return (
     <div className="flex h-full flex-col overflow-hidden">
       <div className="flex border-b border-light-300 bg-light-200/50 pr-4 transition-all dark:border-dark-300 dark:bg-dark-200/50">
@@ -69,10 +115,11 @@ export function WeekView({
         <div className="flex flex-1">
           {days.map((day) => {
             const dayEntries = getEntriesForDay(day);
+            const dayCards = getCardsForDay(day);
             return (
               <div
                 key={day.toISOString()}
-                className={`flex flex-1 cursor-pointer flex-col items-center justify-center p-2 transition-all ${
+                className={`flex flex-1 cursor-pointer flex-col items-center justify-start p-2 transition-all ${
                   isToday(day)
                     ? "relative"
                     : "text-neutral-500 dark:text-neutral-600"
@@ -95,25 +142,46 @@ export function WeekView({
                 >
                   {format(day, "d")}
                 </div>
-                {dayEntries.length > 0 && (
-                  <motion.button
-                    initial={{ opacity: 0, y: 5 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    whileHover={{ scale: 1.1 }}
-                    whileTap={{ scale: 0.9 }}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setPopoverDay(day);
-                    }}
-                    className="mt-1.5 flex items-center gap-1.5 rounded-full bg-blue-50 px-2 py-0.5 text-[9px] font-black text-blue-600 ring-1 ring-blue-500/20 transition-all hover:bg-blue-100 dark:bg-blue-900/30 dark:text-blue-400"
-                  >
-                    <span className="relative flex h-1.5 w-1.5">
-                      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-blue-400 opacity-75"></span>
-                      <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-blue-500"></span>
-                    </span>
-                    {dayEntries.length} nhiệm vụ
-                  </motion.button>
-                )}
+                <div className="flex flex-col gap-1 items-center justify-center">
+                  {dayEntries.length > 0 && (
+                    <motion.button
+                      initial={{ opacity: 0, y: 5 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      whileHover={{ scale: 1.1 }}
+                      whileTap={{ scale: 0.9 }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setPopoverDay(day);
+                      }}
+                      className="mt-1.5 gap-1.5 rounded-full bg-blue-50 px-2 py-0.5 text-[9px] font-black text-blue-600 ring-1 ring-blue-500/20 transition-all hover:bg-blue-100 dark:bg-blue-900/30 dark:text-blue-400"
+                    >
+                      {/* <span className="relative flex h-1.5 w-1.5">
+                        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-blue-400 opacity-75"></span>
+                        <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-blue-500"></span>
+                      </span> */}
+                      {dayEntries.length} công việc hằng ngày
+                    </motion.button>
+                  )}
+                  {dayCards.length > 0 && (
+                    <motion.button
+                      initial={{ opacity: 0, y: 5 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      whileHover={{ scale: 1.1 }}
+                      whileTap={{ scale: 0.9 }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setPopoverCard(day);
+                      }}
+                      className="mt-1.5 gap-1.5 rounded-full bg-amber-50 px-2 py-0.5 text-[9px] font-black text-amber-600 ring-1 ring-amber-500/20 transition-all hover:bg-amber-100 dark:bg-amber-900/30 dark:text-amber-400"
+                    >
+                      {/* <span className="relative flex h-1.5 w-1.5">
+                        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-blue-400 opacity-75"></span>
+                        <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-blue-500"></span>
+                      </span> */}
+                      {dayCards.length} công việc khác
+                    </motion.button>
+                  )}
+                  </div>
               </div>
             );
           })}
@@ -269,6 +337,16 @@ export function WeekView({
             entries={getEntriesForDay(popoverDay)}
             onClose={() => setPopoverDay(null)}
             onTaskClick={onTaskClick}
+          />
+        )}
+      </AnimatePresence>
+      <AnimatePresence>
+        {popoverCard && (
+          <DayCardPopover
+            day={popoverCard}
+            cards={getCardsForDay(popoverCard)}
+            onClose={() => setPopoverCard(null)}
+            onCardClick={onCardClick}
           />
         )}
       </AnimatePresence>

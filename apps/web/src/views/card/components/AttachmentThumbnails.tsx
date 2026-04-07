@@ -21,6 +21,7 @@ import { usePopup } from "~/providers/popup";
 import { api } from "~/utils/api";
 import { invalidateCard, invalidateTaskInstance } from "~/utils/cardInvalidation";
 import { skipToken } from "@tanstack/react-query";
+import { getAttachmentUrl } from "~/utils/helpers";
 
 interface Attachment {
   publicId: string;
@@ -192,6 +193,7 @@ export function AttachmentThumbnails({
   const selectedAttachment =
     selectedIndex !== null ? imageAttachments[selectedIndex] : null;
 
+  console.log("selectedAttachment", selectedAttachment);
   return (
     <>
       <div className="mb-3 flex flex-wrap gap-2 pt-1">
@@ -202,7 +204,7 @@ export function AttachmentThumbnails({
               key={attachment.publicId}
               attachment={{
                 publicId: attachment.publicId,
-                url: attachment.newFileUrl,
+                url: getAttachmentUrl(attachment.newFileUrl, attachment.mimeType),
                 originalFilename: attachment.fileName ?? "",
                 contentType: attachment.mimeType ?? "",
               }}
@@ -372,15 +374,12 @@ export function AttachmentThumbnails({
                   {selectedAttachment?.newFileUrl && (
                     <div className="relative">
                       <div className="relative mx-auto max-h-[90vh] w-full">
-                        <Image
-                          src={selectedAttachment.newFileUrl}
+                        <img
+                          src={getAttachmentUrl(selectedAttachment.newFileUrl, selectedAttachment.mimeType)}
                           alt={
                             selectedAttachment.fileName ?? "Attachment"
                           }
-                          width={1920}
-                          height={1080}
                           className="mx-auto max-h-[90vh] w-auto object-contain"
-                          unoptimized
                         />
                       </div>
 

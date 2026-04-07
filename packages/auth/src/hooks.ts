@@ -79,7 +79,7 @@ export function createDatabaseHooks(db: dbClient) {
 
               await client.send(
                 new PutObjectCommand({
-                  Bucket: env("NEXT_PUBLIC_AVATAR_BUCKET_NAME") ?? "",
+                  Bucket: env("NEXT_PUBLIC_AVATAR_BUCKET_NAME") ?? "images",
                   Key: key,
                   Body: imageBuffer,
                   ContentType: `image/${!allowedFileExtensions.includes(fileExtension) ? "jpeg" : fileExtension}`,

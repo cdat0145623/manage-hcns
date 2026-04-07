@@ -1,4 +1,4 @@
-import { addHours, format, isSameDay, isToday, startOfDay } from "date-fns";
+import { addHours, format, isSameDay, isToday, startOfDay, isAfter, isBefore, endOfMonth } from "date-fns";
 import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useMemo, useState } from "react";
 
@@ -7,12 +7,24 @@ import { StrictModeDroppable as Droppable } from "~/components/StrictModeDroppab
 import { calculateOverlap } from "~/utils/calendar";
 import { CalendarTask } from "./CalendarTask";
 import { DayTasksPopover } from "./DayTasksPopover";
+import { DayCardPopover } from "./DayCardPopover";
+import { CalendarCard } from "./CalendarCard";
+
+interface Card {
+  publicId: string;
+  dueDate: Date | null;
+  startDate: Date | null;
+  createdAt: Date;
+}
 
 interface DayViewProps {
   currentDate: Date;
   entries: CalendarEntry[];
   onTaskClick: (entry: CalendarEntry) => void;
   onCellClick: (date: Date) => void;
+  onCardClick: (card: any) => void;
+  cards: Card[];
+  formattedResult: any[];
 }
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
 
@@ -21,9 +33,14 @@ export function DayView({
   entries,
   onTaskClick,
   onCellClick,
+  onCardClick,
+  cards,
+  formattedResult,
 }: DayViewProps) {
   const isDayToday = isToday(currentDate);
   const [popoverDay, setPopoverDay] = useState<Date | null>(null);
+  const [popoverCard, setPopoverCard] = useState<Date | null>(null);
+
   const dayEntries = useMemo(
     () =>
       entries
@@ -52,6 +69,35 @@ export function DayView({
     clickedDate.setHours(hour, 0, 0, 0);
     onCellClick(clickedDate);
   };
+
+  const dayCards = useMemo(() => {
+    const cardMetas = cards.filter((card) => 
+      isAfter(card.dueDate ?? endOfMonth(currentDate), currentDate) && 
+      isBefore(card.startDate || card.createdAt, currentDate)
+    );
+
+    // Resolve full card data from formattedResult
+    const fullCards: any[] = [];
+    formattedResult.forEach((board: any) => {
+      board.lists.forEach((list: any) => {
+        list.cards.forEach((card: any) => {
+          if (cardMetas.some(m => m.publicId === card.publicId)) {
+            fullCards.push({
+              ...card,
+              boardName: board.name,
+              listName: list.name,
+            });
+          }
+        });
+      });
+    });
+
+    return fullCards.sort((a, b) => 
+      (new Date(a.dueDate ?? endOfMonth(currentDate)).getTime()) - 
+      (new Date(b.dueDate ?? endOfMonth(currentDate)).getTime())
+    );
+  }, [cards, formattedResult, currentDate]);
+
   return (
     <div className="flex h-full flex-col overflow-hidden">
       <div className="flex border-b border-light-300 bg-light-100/50 transition-all dark:border-dark-300 dark:bg-dark-200/50">
@@ -86,22 +132,43 @@ export function DayView({
               <span className="text-lg font-black text-neutral-900 dark:text-white">
                 {format(currentDate, "MMMM yyyy")}
               </span>
-              {dayEntries.length > 0 && (
-                <motion.button
-                  initial={{ opacity: 0, x: -10 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={() => setPopoverDay(currentDate)}
-                  className="mt-3 flex w-fit items-center gap-2 rounded-xl bg-blue-50 px-3 py-1.5 text-[10px] font-black uppercase tracking-wider text-blue-600 ring-1 ring-blue-500/20 transition-all hover:bg-blue-100 dark:bg-blue-900/30 dark:text-blue-400"
-                >
-                  <span className="relative flex h-2 w-2">
-                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-blue-400 opacity-75"></span>
-                    <span className="relative inline-flex h-2 w-2 rounded-full bg-blue-500"></span>
-                  </span>
-                  Xem tất cả {dayEntries.length} nhiệm vụ
-                </motion.button>
-              )}
+              <div className="flex flex-col gap-1 items-center justify-center">
+                {dayEntries.length > 0 && (
+                  <motion.button
+                    initial={{ opacity: 0, x: 5 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    whileHover={{ scale: 1.1 }}
+                    whileTap={{ scale: 0.9 }}
+                    onClick={() => setPopoverDay(currentDate)}
+                    className="mt-1.5 gap-1.5 rounded-full bg-blue-50 px-2 py-0.5 text-[9px] font-black text-blue-600 ring-1 ring-blue-500/20 transition-all hover:bg-blue-100 dark:bg-blue-900/30 dark:text-blue-400"
+                  >
+                    {/* <span className="relative flex h-2 w-2">
+                      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-blue-400 opacity-75"></span>
+                      <span className="relative inline-flex h-2 w-2 rounded-full bg-blue-500"></span>
+                    </span> */}
+                    {dayEntries.length} công việc hằng ngày
+                  </motion.button>
+                )}
+                {dayCards.length > 0 && (
+                  <motion.button
+                    initial={{ opacity: 0, y: 5 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    whileHover={{ scale: 1.1 }}
+                    whileTap={{ scale: 0.9 }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setPopoverCard(currentDate);
+                    }}
+                    className="mt-1.5 gap-1.5 rounded-full bg-amber-50 px-2 py-0.5 text-[9px] font-black text-amber-600 ring-1 ring-amber-500/20 transition-all hover:bg-amber-100 dark:bg-amber-900/30 dark:text-amber-400"
+                  >
+                    {/* <span className="relative flex h-1.5 w-1.5">
+                      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-blue-400 opacity-75"></span>
+                      <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-blue-500"></span>
+                    </span> */}
+                    {dayCards.length} công việc khác
+                  </motion.button>
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -247,7 +314,21 @@ export function DayView({
             </Droppable>
           </div>
         </div>
+        <div className="flex flex-col gap-2 p-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-bold">Các công việc khác</h3>
+          </div>
+          {dayCards.map((card) => (
+            <CalendarCard
+              key={card.publicId}
+              card={card}
+              onClick={onCardClick}
+              variant="DETAILED"
+            />
+          ))}
+        </div>
       </div>
+      
       <AnimatePresence>
         {popoverDay && (
           <DayTasksPopover
@@ -255,6 +336,16 @@ export function DayView({
             entries={dayEntries}
             onClose={() => setPopoverDay(null)}
             onTaskClick={onTaskClick}
+          />
+        )}
+      </AnimatePresence>
+      <AnimatePresence>
+        {popoverCard && (
+          <DayCardPopover
+            day={popoverCard}
+            cards={dayCards}
+            onClose={() => setPopoverCard(null)}
+            onCardClick={onCardClick}
           />
         )}
       </AnimatePresence>

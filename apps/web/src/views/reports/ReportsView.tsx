@@ -994,7 +994,7 @@ export default function ReportsView() {
 
           {/* Calendar Segment */}
           <DashboardCard
-            title="Hoàn thành nhiệm vụ lịch"
+            title="Hoàn thành công việc lịch"
             icon={<HiCheckCircle size={20} />}
             delay={400}
           >
@@ -1007,7 +1007,7 @@ export default function ReportsView() {
                 totalCount={
                   calendarMetrics?.taskCompletionRate?.totalCount || 0
                 }
-                label="Nhiệm vụ đã xong"
+                label="Công việc đã xong"
                 theme="emerald"
               />
             )}
@@ -1038,7 +1038,7 @@ export default function ReportsView() {
           {/* Detailed Performance Section */}
           <div className="lg:col-span-2">
             <DashboardCard
-              title="Hiệu suất nhiệm vụ chi tiết"
+              title="Hiệu suất công việc chi tiết"
               icon={<HiChartBar size={20} />}
               delay={600}
             >

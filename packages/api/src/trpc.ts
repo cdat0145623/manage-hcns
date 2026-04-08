@@ -244,3 +244,11 @@ export const adminProtectedProcedure = t.procedure
       path: "/admin/protected",
     },
   });
+
+export const adminProcedure = publicProcedure.use(({ ctx, next }) => {
+  const apiKey = ctx.headers.get("x-admin-api-key");
+  if (!apiKey || apiKey !== process.env.ADMIN_API_KEY) {
+    throw new TRPCError({ code: "UNAUTHORIZED" });
+  }
+  return next({ ctx });
+});

@@ -6,29 +6,28 @@ import {
   eq,
   gt,
   inArray,
-  isNull,
-  sql,
   isNotNull,
+  isNull,
   or,
-  gte,
-  lt,
+  sql,
 } from "drizzle-orm";
 
 import type { dbClient } from "@kan/db/client";
+import type { TaskStatus } from "@kan/db/repository/taskInstance.repo";
 import {
+  boards,
   cardActivities,
   cards,
   cardsToLabels,
   cardToWorkspaceMembers,
   checklistItems,
   checklists,
+  comments,
   fileActivityLog,
   labels,
   lists,
-  workspaceMembers,
-  boards,
-  comments,
   userBoardFavorites,
+  workspaceMembers,
 } from "@kan/db/schema";
 import { generateUID } from "@kan/shared/utils";
 
@@ -100,7 +99,11 @@ export const create = async (
         index: index,
         dueDate: cardInput.dueDate ?? null,
       })
-      .returning({ id: cards.id, listId: cards.listId, publicId: cards.publicId });
+      .returning({
+        id: cards.id,
+        listId: cards.listId,
+        publicId: cards.publicId,
+      });
 
     if (!result[0]) throw new Error("Unable to create card");
 
@@ -204,7 +207,8 @@ export const update = async (
       title: cardInput.title,
       description: cardInput.description,
       dueDate: cardInput.dueDate !== undefined ? cardInput.dueDate : undefined,
-      startDate: cardInput.startDate !== undefined ? cardInput.startDate : undefined,
+      startDate:
+        cardInput.startDate !== undefined ? cardInput.startDate : undefined,
       updatedAt: new Date(),
     })
     .where(and(eq(cards.publicId, args.cardPublicId), isNull(cards.deletedAt)))
@@ -215,6 +219,27 @@ export const update = async (
       description: cards.description,
       dueDate: cards.dueDate,
       startDate: cards.startDate,
+    });
+
+  return result;
+};
+
+export const updateStatusById = async (
+  db: dbClient,
+  cardId: number,
+  status: TaskStatus,
+) => {
+  const [result] = await db
+    .update(cards)
+    .set({
+      status,
+      updatedAt: new Date(),
+    })
+    .where(and(eq(cards.id, cardId), isNull(cards.deletedAt)))
+    .returning({
+      id: cards.id,
+      publicId: cards.publicId,
+      status: cards.status,
     });
 
   return result;
@@ -642,9 +667,9 @@ export const getWithListAndMembersByPublicId = async (
 
   if (!card) return null;
 
-  // Filter for active attachments: group by publicId and take the latest activity. 
+  // Filter for active attachments: group by publicId and take the latest activity.
   // If it's not 'file_deleted', it's an active attachment.
-  const latestFiles = new Map<string, typeof card.fileActivities[0]>();
+  const latestFiles = new Map<string, (typeof card.fileActivities)[0]>();
   for (const activity of card.fileActivities) {
     latestFiles.set(activity.publicId, activity);
   }
@@ -1020,16 +1045,24 @@ export const getByUserId = async (db: dbClient, userId?: string) => {
       startDate: cards.startDate,
     })
     .from(cards)
-    .innerJoin(cardToWorkspaceMembers, eq(cards.id, cardToWorkspaceMembers.cardId))
-    .innerJoin(workspaceMembers, eq(cardToWorkspaceMembers.workspaceMemberId, workspaceMembers.id))
-    .where(and(
-      userId ? eq(workspaceMembers.userId, userId) : undefined,
-      isNull(cards.deletedAt),
-      or(
-        eq(cards.status, "pending" as const),
-        eq(cards.status, "missed" as const)
-      )
-    ));
+    .innerJoin(
+      cardToWorkspaceMembers,
+      eq(cards.id, cardToWorkspaceMembers.cardId),
+    )
+    .innerJoin(
+      workspaceMembers,
+      eq(cardToWorkspaceMembers.workspaceMemberId, workspaceMembers.id),
+    )
+    .where(
+      and(
+        userId ? eq(workspaceMembers.userId, userId) : undefined,
+        isNull(cards.deletedAt),
+        or(
+          eq(cards.status, "pending" as const),
+          eq(cards.status, "missed" as const),
+        ),
+      ),
+    );
 
   cardIds = filterCards.map((card) => card.publicId);
   const board = await db.query.boards.findMany({
@@ -1196,46 +1229,51 @@ export const getByUserId = async (db: dbClient, userId?: string) => {
       isNull(boards.deletedAt),
       eq(boards.type, "regular"),
     ),
-    });
+  });
 
   if (!board || board.length === 0) return null;
 
-  const formattedResult = board.map((b) => ({
-    ...b,
-    favorite: b.userFavorites.length > 0,
-    userFavorites: undefined,
-    lists: b.lists.map((list) => ({
-      ...list,
-      cards: list.cards.map((card) => {
-        const latestFiles = new Map<string, typeof card.fileActivities[0]>();
-        for (const activity of card.fileActivities) {
-          latestFiles.set(activity.publicId, activity);
-        }
+  const formattedResult = board
+    .map((b) => ({
+      ...b,
+      favorite: b.userFavorites.length > 0,
+      userFavorites: undefined,
+      lists: b.lists
+        .map((list) => ({
+          ...list,
+          cards: list.cards.map((card) => {
+            const latestFiles = new Map<
+              string,
+              (typeof card.fileActivities)[0]
+            >();
+            for (const activity of card.fileActivities) {
+              latestFiles.set(activity.publicId, activity);
+            }
 
-        const activeAttachments = Array.from(latestFiles.values())
-          .filter((f) => f.activityType !== "file_deleted")
-          .map((f) => ({
-            publicId: f.publicId,
-            contentType: f.mimeType ?? "",
-            s3Key: f.newFileUrl ?? "",
-            originalFilename: f.fileName,
-            size: f.fileSize,
-            createdAt: f.createdAt,
-          }));
+            const activeAttachments = Array.from(latestFiles.values())
+              .filter((f) => f.activityType !== "file_deleted")
+              .map((f) => ({
+                publicId: f.publicId,
+                contentType: f.mimeType ?? "",
+                s3Key: f.newFileUrl ?? "",
+                originalFilename: f.fileName,
+                size: f.fileSize,
+                createdAt: f.createdAt,
+              }));
 
-        return {
-          ...card,
-          labels: card.labels.map((label) => label.label),
-          members: card.members
-            .map((member) => member.member)
-            .filter((member) => member.deletedAt === null),
-          attachments: activeAttachments,
-        };
-      }),
+            return {
+              ...card,
+              labels: card.labels.map((label) => label.label),
+              members: card.members
+                .map((member) => member.member)
+                .filter((member) => member.deletedAt === null),
+              attachments: activeAttachments,
+            };
+          }),
+        }))
+        .filter((list) => list.cards.length > 0),
     }))
-    .filter((list) => list.cards.length > 0),
-  }))
-  .filter((b) => b.lists.some((list) => list.cards.length > 0));
+    .filter((b) => b.lists.some((list) => list.cards.length > 0));
 
-  return {filterCards, formattedResult};
+  return { filterCards, formattedResult };
 };

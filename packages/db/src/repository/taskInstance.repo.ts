@@ -1,12 +1,13 @@
 /* eslint-disable @typescript-eslint/no-unnecessary-condition */
 import { eq } from "drizzle-orm";
+import pkg from "rrule";
 
 import type { dbClient } from "@kan/db/client";
 // eslint-disable-next-line @typescript-eslint/consistent-type-imports
 import { cardActivities, statusTypeEnum, taskInstances } from "@kan/db/schema";
-import pkg from 'rrule';
-const { RRule } = pkg;
 import { generateUID } from "@kan/shared/utils";
+
+const { RRule } = pkg;
 
 export type TaskStatus = (typeof statusTypeEnum.enumValues)[number];
 
@@ -94,15 +95,15 @@ export const generateVirtualTaskInstances = async (params: {
 export const update = async (
   db: dbClient,
   taskInstanceInput: {
-      id: string,
-      userId: string,
-      taskMasterId: string,
-      name?: string,
-      description?: string,
-      targetDate?: Date,
-      actualDate?: Date,
-      status: TaskStatus,
-  }
+    id: string;
+    userId: string;
+    taskMasterId: string;
+    name?: string;
+    description?: string;
+    targetDate?: Date;
+    actualDate?: Date;
+    status: TaskStatus;
+  },
 ) => {
   const oldTaskInstance = await db.query.taskInstances.findFirst({
     where: (t, { eq }) => eq(t.id, taskInstanceInput.id),
@@ -119,9 +120,9 @@ export const update = async (
       actualDate: taskInstanceInput.actualDate,
       status: taskInstanceInput.status,
       updatedAt: new Date(),
-  })
-  .where(eq(taskInstances.id, taskInstanceInput.id))
-  .returning({
+    })
+    .where(eq(taskInstances.id, taskInstanceInput.id))
+    .returning({
       id: taskInstances.id,
       userId: taskInstances.userId,
       taskMasterId: taskInstances.taskMasterId,
@@ -158,17 +159,17 @@ export const deleteSingle = async (
   // KIỂM TRA: Nếu ID bắt đầu bằng "virtual_", đây là công việc lặp lại chưa có trong DB
   let isVirtual = taskInstanceInput.id.startsWith("virtual_");
   const [taskInstance] = await db
-  .update(taskInstances)
-  .set({
+    .update(taskInstances)
+    .set({
       isDeleted: true,
       deleteAt: new Date(),
       deleteBy: taskInstanceInput.userId,
       updatedAt: new Date(),
-  })
-  .where(eq(taskInstances.id, taskInstanceInput.id))
-  .returning({
+    })
+    .where(eq(taskInstances.id, taskInstanceInput.id))
+    .returning({
       id: taskInstances.id,
-  });
+    });
 
   if (isVirtual) {
     // 1. XỬ LÝ CÔNG VIỆC ẢO (VIRTUAL):
@@ -176,7 +177,7 @@ export const deleteSingle = async (
     const parts = taskInstanceInput.id.split("_");
     const masterId = parts[1];
     const timestamp = parts[2];
-    
+
     if (!masterId || !timestamp) {
       throw new Error("Invalid virtual task ID format");
     }
@@ -198,7 +199,11 @@ export const deleteSingle = async (
         status: "pending",
       })
       .onConflictDoUpdate({
-        target: [taskInstances.userId, taskInstances.taskMasterId, taskInstances.targetDate],
+        target: [
+          taskInstances.userId,
+          taskInstances.taskMasterId,
+          taskInstances.targetDate,
+        ],
         set: {
           isDeleted: true,
           deleteAt: new Date(),
@@ -212,7 +217,7 @@ export const deleteSingle = async (
     if (!newInstance) {
       throw new Error("Failed to eliminate virtual task instance");
     }
-    
+
     finalId = newInstance.id; // Lấy ID thật vừa tạo/cập nhật để ghi log activity
   } else {
     // 3. XỬ LÝ CÔNG VIỆC THẬT (DATABASE):
@@ -232,7 +237,7 @@ export const deleteSingle = async (
     if (!updatedInstance) {
       throw new Error("Failed to delete task instance");
     }
-    
+
     finalId = updatedInstance.id;
   }
 
@@ -246,6 +251,26 @@ export const deleteSingle = async (
   });
 
   return { id: finalId };
+};
+
+export const updateStatusById = async (
+  db: dbClient,
+  taskInstanceId: string,
+  status: TaskStatus,
+) => {
+  const [result] = await db
+    .update(taskInstances)
+    .set({
+      status,
+      updatedAt: new Date(),
+    })
+    .where(eq(taskInstances.id, taskInstanceId))
+    .returning({
+      id: taskInstances.id,
+      status: taskInstances.status,
+    });
+
+  return result;
 };
 
 export const deleteAll = async (
@@ -262,8 +287,8 @@ export const deleteAll = async (
       deleteAt: new Date(),
       deleteBy: taskInstanceInput.userId,
       updatedAt: new Date(),
-  })
-  .where(eq(taskInstances.taskMasterId, taskInstanceInput.taskMasterId));
+    })
+    .where(eq(taskInstances.taskMasterId, taskInstanceInput.taskMasterId));
 
   if (!taskInstance) {
     throw new Error("Failed to delete task instance");

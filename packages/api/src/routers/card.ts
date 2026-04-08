@@ -1,4 +1,5 @@
 import { TRPCError } from "@trpc/server";
+import { parseString } from "rrule/dist/esm/parsestring";
 import { z } from "zod";
 
 import * as cardRepo from "@kan/db/repository/card.repo";
@@ -7,17 +8,23 @@ import * as cardCommentRepo from "@kan/db/repository/cardComment.repo";
 import * as labelRepo from "@kan/db/repository/label.repo";
 import * as listRepo from "@kan/db/repository/list.repo";
 import * as workspaceRepo from "@kan/db/repository/workspace.repo";
+import { statusTypeEnum } from "@kan/db/schema";
+import { generateAttachmentUrl, generateAvatarUrl } from "@kan/shared/utils";
 
 import { createTRPCRouter, protectedProcedure, publicProcedure } from "../trpc";
 import { mergeActivities } from "../utils/activities";
 import { sendMentionEmails } from "../utils/notifications";
-import { assertCanDelete, assertCanEdit, assertPermission } from "../utils/permissions";
-import { generateAttachmentUrl, generateAvatarUrl } from "@kan/shared/utils";
+import {
+  assertCanDelete,
+  assertCanEdit,
+  assertPermission,
+} from "../utils/permissions";
 import {
   createCardWebhookPayload,
   sendWebhooksForWorkspace,
 } from "../utils/webhook";
-import { parseString } from "rrule/dist/esm/parsestring";
+
+const statusTypeEnumSchema = z.enum(statusTypeEnum.enumValues);
 
 export const cardRouter = createTRPCRouter({
   create: protectedProcedure
@@ -236,7 +243,12 @@ export const cardRouter = createTRPCRouter({
           code: "NOT_FOUND",
         });
 
-      await assertPermission(ctx.db, userId, card.workspaceId, "comment:create");
+      await assertPermission(
+        ctx.db,
+        userId,
+        card.workspaceId,
+        "comment:create",
+      );
 
       const newComment = await cardCommentRepo.create(ctx.db, {
         comment: input.comment,
@@ -868,6 +880,7 @@ export const cardRouter = createTRPCRouter({
         listPublicId: z.string().min(12).optional(),
         dueDate: z.date().nullable().optional(),
         startDate: z.date().nullable().optional(),
+        status: statusTypeEnumSchema.optional(),
       }),
     )
     .output(z.custom<Awaited<ReturnType<typeof cardRepo.update>>>())
@@ -953,7 +966,9 @@ export const cardRouter = createTRPCRouter({
             ...(input.title && { title: input.title }),
             ...(input.description && { description: input.description }),
             ...(input.dueDate !== undefined && { dueDate: input.dueDate }),
-            ...(input.startDate !== undefined && { startDate: input.startDate }),
+            ...(input.startDate !== undefined && {
+              startDate: input.startDate,
+            }),
           },
           { cardPublicId: input.cardPublicId },
         );

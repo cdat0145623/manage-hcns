@@ -65,6 +65,7 @@ export function NewChecklistForm({
     },
     onSuccess: (data) => {
       setModalState("ADD_CHECKLIST", { createdChecklistId: data.publicId });
+      setTimeout(() => closeModal(), 0);
     },
     onError: (_error, vars, ctx) => {
       if (ctx?.previous)
@@ -90,7 +91,6 @@ export function NewChecklistForm({
   }, []);
 
   const onSubmit = (data: NewChecklistFormInput) => {
-    closeModal();
     reset({
       name: "",
     });
@@ -104,23 +104,26 @@ export function NewChecklistForm({
   return (
     <form onSubmit={handleSubmit(onSubmit)}>
       <div className="px-5 pt-5">
-      {!hideHeader && (
-        <div className="flex w-full items-center justify-between pb-4">
-          <h2 className="text-sm font-bold text-neutral-900 dark:text-dark-1000">
-            {t`Thêm checklist`}
-          </h2>
-          <button
-            type="button"
-            className="rounded p-1 hover:bg-light-200 focus:outline-none dark:hover:bg-dark-300"
-            onClick={(e) => {
-              e.preventDefault();
-              closeModal();
-            }}
-          >
-            <HiXMark size={18} className="text-light-900 dark:text-dark-900" />
-          </button>
-        </div>
-      )}
+        {!hideHeader && (
+          <div className="flex w-full items-center justify-between pb-4">
+            <h2 className="text-sm font-bold text-neutral-900 dark:text-dark-1000">
+              {t`Thêm Checklist`}
+            </h2>
+            <button
+              type="button"
+              className="rounded p-1 hover:bg-light-200 focus:outline-none dark:hover:bg-dark-300"
+              onClick={(e) => {
+                e.preventDefault();
+                closeModal();
+              }}
+            >
+              <HiXMark
+                size={18}
+                className="text-light-900 dark:text-dark-900"
+              />
+            </button>
+          </div>
+        )}
 
         <Input
           id="checklist-name"

@@ -34,7 +34,7 @@ import { useWorkspace } from "~/providers/workspace";
 import { api } from "~/utils/api";
 import { formatToArray } from "~/utils/helpers";
 import CardDetailsModalContent from "../card/components/CardDetailsModalContent";
-import { childModalTypes } from "../card/constants";
+import { cardChildModalTypes } from "../card/constants";
 import BoardActivitySidebar from "./components/BoardActivitySidebar";
 import BoardDropdown from "./components/BoardDropdown";
 import Card from "./components/Card";
@@ -445,7 +445,7 @@ export default function BoardPage({ isTemplate }: { isTemplate?: boolean }) {
           isVisible={
             isOpen &&
             (modalContentType === "CARD_DETAILS" ||
-              childModalTypes.includes(modalContentType))
+              cardChildModalTypes.includes(modalContentType))
           }
         >
           <CardDetailsModalContent

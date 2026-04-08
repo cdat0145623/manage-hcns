@@ -21,6 +21,7 @@ import { api } from "~/utils/api";
 import { invalidateCard } from "~/utils/cardInvalidation";
 import { formatMemberDisplayName, getAvatarUrl } from "~/utils/helpers";
 import { DeleteLabelConfirmation } from "../../../components/DeleteLabelConfirmation";
+import { cardChildModalTypes } from "../constants";
 import ActivityList from "./ActivityList";
 import { AttachmentThumbnails } from "./AttachmentThumbnails";
 import { AttachmentUpload } from "./AttachmentUpload";
@@ -48,35 +49,6 @@ interface CardDetailsModalContentProps {
   onClose: () => void;
 }
 
-import { childModalTypes } from "../constants";
-
-function SideDockedPopup({
-  title,
-  children,
-  onClose,
-}: {
-  title: string;
-  children: React.ReactNode;
-  onClose: () => void;
-}) {
-  return (
-    <div className="absolute left-full top-0 ml-4 z-[60] w-80 rounded-xl border border-white/20 bg-white/70 shadow-2xl backdrop-blur-xl dark:border-dark-600/30 dark:bg-dark-100/70 hidden md:block animate-in fade-in slide-in-from-left-4 duration-300 ease-out">
-      <div className="flex items-center justify-between border-b border-light-200/50 px-5 py-4 dark:border-dark-300/50">
-        <h3 className="text-sm font-bold tracking-tight text-light-900 dark:text-dark-1000">
-          {title}
-        </h3>
-        <button
-          onClick={onClose}
-          className="flex h-7 w-7 items-center justify-center rounded-lg text-light-700 transition-colors hover:bg-light-200/80 dark:text-dark-700 dark:hover:bg-dark-300/80"
-        >
-          <HiXMark className="h-5 w-5" />
-        </button>
-      </div>
-      <div className="p-2">{children}</div>
-    </div>
-  );
-}
-
 export default function CardDetailsModalContent({
   cardId,
   isTemplate,
@@ -94,7 +66,8 @@ export default function CardDetailsModalContent({
   } = useModal();
   const { showPopup } = usePopup();
   const { workspace } = useWorkspace();
-  const { canEditCard, canAttach, canTick, canCreateComment } = usePermissions();
+  const { canEditCard, canAttach, canTick, canCreateComment } =
+    usePermissions();
   const { data: session } = authClient.useSession();
   const [activeChecklistForm, setActiveChecklistForm] = useState<string | null>(
     null,
@@ -168,8 +141,9 @@ export default function CardDetailsModalContent({
 
   const editorWorkspaceMembers =
     workspaceMembers
-      ?.filter((member): member is typeof member & { email: string } =>
-        member.email !== null,
+      ?.filter(
+        (member): member is typeof member & { email: string } =>
+          member.email !== null,
       )
       .map((member) => ({
         publicId: member.publicId,
@@ -248,7 +222,7 @@ export default function CardDetailsModalContent({
   // Open new item form after creating a new checklist
   useEffect(() => {
     if (!card) return;
-    const state = getModalState("ADD_CHECKLIST") as
+    const state = modalStates.ADD_CHECKLIST as
       | { createdChecklistId?: string }
       | undefined;
     const createdId = state?.createdChecklistId;
@@ -256,7 +230,7 @@ export default function CardDetailsModalContent({
       setActiveChecklistForm(createdId);
       clearModalState("ADD_CHECKLIST");
     }
-  }, [card, getModalState, clearModalState]);
+  }, [card, modalStates, clearModalState]);
 
   // Auto-resize title textarea
   useEffect(() => {
@@ -271,40 +245,10 @@ export default function CardDetailsModalContent({
 
   if (!cardId) return null;
 
-  const isSideDocked = modalContentType && childModalTypes.includes(modalContentType);
-
   return (
     <div className="relative">
-      {/* Side-Docked Popups (Desktop only) */}
-      {isOpen && isSideDocked && (
-        <div className="hidden md:block">
-          <SideDockedPopup
-            title={
-              modalContentType === "NEW_LABEL" ? t`Tạo nhãn mới` :
-              modalContentType === "EDIT_LABEL" ? t`Chỉnh sửa nhãn` :
-              modalContentType === "DELETE_LABEL" ? t`Xóa nhãn` :
-              modalContentType === "ADD_CHECKLIST" ? t`Thêm checklist` : ""
-            }
-            onClose={closeModal}
-          >
-            {modalContentType === "NEW_LABEL" && (
-              <LabelForm boardPublicId={boardId ?? ""} refetch={refetchCard} hideHeader />
-            )}
-            {modalContentType === "EDIT_LABEL" && (
-              <LabelForm boardPublicId={boardId ?? ""} refetch={refetchCard} isEdit hideHeader />
-            )}
-            {modalContentType === "DELETE_LABEL" && (
-              <DeleteLabelConfirmation refetch={refetchCard} labelPublicId={entityId} />
-            )}
-            {modalContentType === "ADD_CHECKLIST" && (
-              <NewChecklistForm cardPublicId={cardId} hideHeader />
-            )}
-          </SideDockedPopup>
-        </div>
-      )}
-
       {/* Two-column layout: left (main) + right (sidebar) */}
-      <div className="flex max-h-[85vh] w-full flex-col overflow-hidden rounded-lg md:flex-row shadow-2xl">
+      <div className="flex max-h-[90vh] w-full flex-col overflow-hidden rounded-lg shadow-2xl md:flex-row">
         {/* Header bar */}
         <div className="flex w-full items-center justify-between border-b border-light-300 bg-light-50 px-5 py-3 dark:border-dark-300 dark:bg-dark-100 md:hidden">
           <span className="text-sm font-semibold text-light-900 dark:text-dark-900">
@@ -370,9 +314,12 @@ export default function CardDetailsModalContent({
                     canEdit ? (e) => setValue("description", e) : undefined
                   }
                   onBlur={canEdit ? () => handleSubmit(onSubmit)() : undefined}
-                  workspaceMembers={workspaceMembers?.filter(
-                    (m): m is typeof m & { email: string } => m.email !== null,
-                  ) ?? []}
+                  workspaceMembers={
+                    workspaceMembers?.filter(
+                      (m): m is typeof m & { email: string } =>
+                        m.email !== null,
+                    ) ?? []
+                  }
                   readOnly={!canEdit}
                 />
               </form>
@@ -402,11 +349,15 @@ export default function CardDetailsModalContent({
                   />
                 </div>
               )}
-              {(canAttach && (isCreator || card.members.map((m) => m.user?.id).includes(session?.user.id))) && (
-                <div className="mt-4">
-                  <AttachmentUpload cardPublicId={cardId} />
-                </div>
-              )}
+              {canAttach &&
+                (isCreator ||
+                  card.members
+                    .map((m) => m.user?.id)
+                    .includes(session?.user.id)) && (
+                  <div className="mt-4">
+                    <AttachmentUpload cardPublicId={cardId} />
+                  </div>
+                )}
             </>
           )}
 
@@ -421,20 +372,25 @@ export default function CardDetailsModalContent({
                 isLoading={!card}
                 isAdmin={workspace.role === "ADMIN"}
               />
-              {!isTemplate && (canCreateComment && (isCreator || card.members.map((m) => m.user?.id).includes(session?.user.id))) && (
-                <div className="mt-4">
-                  <NewCommentForm
-                    cardPublicId={cardId}
-                    workspaceMembers={editorWorkspaceMembers}
-                  />
-                </div>
-              )}
+              {!isTemplate &&
+                canCreateComment &&
+                (isCreator ||
+                  card.members
+                    .map((m) => m.user?.id)
+                    .includes(session?.user.id)) && (
+                  <div className="mt-4">
+                    <NewCommentForm
+                      cardPublicId={cardId}
+                      workspaceMembers={editorWorkspaceMembers}
+                    />
+                  </div>
+                )}
             </div>
           )}
         </div>
 
         {/* Right column — sidebar */}
-        <div className="w-full shrink-0 border-t border-light-300 bg-light-50 p-5 dark:border-dark-300 dark:bg-dark-50 md:w-56 md:border-l md:border-t-0">
+        <div className="w-full shrink-0 border-t border-light-300 bg-light-50 p-5 dark:border-dark-300 dark:bg-dark-50 md:w-64 md:border-l md:border-t-0">
           <div className="mb-4">
             <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-light-700 dark:text-dark-700">
               {t`Cột`}
@@ -471,9 +427,11 @@ export default function CardDetailsModalContent({
             </div>
           )}
           <div className="mb-4">
-            {card?.startDate && <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-light-700 dark:text-dark-700">
-              {t`Ngày bắt đầu`}
-            </p>}
+            {card?.startDate && (
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-light-700 dark:text-dark-700">
+                {t`Ngày bắt đầu`}
+              </p>
+            )}
             <DueDateSelector
               cardPublicId={cardId}
               dueDate={card?.startDate}
@@ -492,9 +450,11 @@ export default function CardDetailsModalContent({
             />
           </div>
           <div className="mb-4">
-            {card?.dueDate && <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-light-700 dark:text-dark-700">
-              {t`Ngày hết hạn`}
-            </p>}
+            {card?.dueDate && (
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-light-700 dark:text-dark-700">
+                {t`Ngày hết hạn`}
+              </p>
+            )}
             <DueDateSelector
               cardPublicId={cardId}
               dueDate={card?.dueDate}
@@ -552,26 +512,47 @@ export default function CardDetailsModalContent({
 
       <Modal
         modalSize="sm"
-        isVisible={isOpen && (modalContentType === "NEW_LABEL" || modalContentType === "EDIT_LABEL" || modalContentType === "DELETE_LABEL" || modalContentType === "ADD_CHECKLIST")}
-        className="md:hidden" // Hide on desktop since we have side-docked
+        centered
+        isVisible={isOpen && modalContentType === "NEW_LABEL"}
       >
-        {modalContentType === "NEW_LABEL" && (
-          <LabelForm boardPublicId={boardId ?? ""} refetch={refetchCard} />
-        )}
-        {modalContentType === "EDIT_LABEL" && (
-          <LabelForm boardPublicId={boardId ?? ""} refetch={refetchCard} isEdit />
-        )}
-        {modalContentType === "DELETE_LABEL" && (
-          <DeleteLabelConfirmation refetch={refetchCard} labelPublicId={entityId} />
-        )}
-        {modalContentType === "ADD_CHECKLIST" && (
-          <NewChecklistForm cardPublicId={cardId} />
-        )}
+        <LabelForm boardPublicId={boardId ?? ""} refetch={refetchCard} />
       </Modal>
 
       <Modal
         modalSize="sm"
-        isVisible={isOpen && !isSideDocked && modalContentType === "DELETE_CHECKLIST"}
+        centered
+        isVisible={isOpen && modalContentType === "EDIT_LABEL"}
+      >
+        <LabelForm
+            boardPublicId={boardId ?? ""}
+            refetch={refetchCard}
+            isEdit
+          />
+      </Modal>
+
+      <Modal
+        modalSize="sm"
+        centered
+        isVisible={isOpen && modalContentType === "DELETE_LABEL"}
+      >
+        <DeleteLabelConfirmation
+            refetch={refetchCard}
+            labelPublicId={entityId}
+          />
+      </Modal>
+
+      <Modal
+        modalSize="sm"
+        centered
+        isVisible={isOpen && modalContentType === "ADD_CHECKLIST"}
+      >
+        <NewChecklistForm cardPublicId={cardId} />
+      </Modal>
+
+      <Modal
+        modalSize="sm"
+        centered
+        isVisible={isOpen && modalContentType === "DELETE_CHECKLIST"}
       >
         <DeleteChecklistConfirmation
           cardPublicId={cardId}

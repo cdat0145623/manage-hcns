@@ -62,7 +62,7 @@ export default function CardDropdown({
     ...(canEditCard
       ? [
           {
-            label: t`Thêm checklist`,
+            label: t`Thêm Checklist`,
             action: () => openModal("ADD_CHECKLIST"),
             icon: (
               <HiOutlineCheckCircle className="h-[16px] w-[16px] text-dark-900" />

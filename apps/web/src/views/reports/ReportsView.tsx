@@ -716,7 +716,8 @@ export default function ReportsView() {
     };
   }, [virtualInstances]);
 
-  const pieData = metrics?.kanban?.cardDistributionByList?.data || [];
+  const rawPieData = metrics?.kanban?.cardDistributionByList?.data || [];
+  const pieData = rawPieData.filter((d: any) => d.cardCount > 0);
   const taskProgressData = calendarMetrics?.taskProgressBreakdown?.data || [];
   const totalCards = metrics?.kanban?.cardDistributionByList?.totalCards || 0;
 
@@ -786,7 +787,7 @@ export default function ReportsView() {
           </div>
 
           <div className="rounded-[28px] border border-light-200/60 bg-white/40 p-5 shadow-2xl ring-1 ring-light-100/50 backdrop-blur-3xl dark:border-dark-400/30 dark:bg-dark-200/30">
-            <div className="grid grid-cols-2 gap-x-4 gap-y-4 sm:min-w-[700px] lg:grid-cols-5">
+            <div className="grid grid-cols-2 gap-x-4 gap-y-4 lg:grid-cols-4">
               <FilterSelector
                 label="Nhân viên"
                 options={memberOptions}
@@ -801,14 +802,14 @@ export default function ReportsView() {
                 onChange={setBoardPublicId}
                 icon={<HiTableCells size={18} />}
               />
-              <FilterSelector
+              {/* <FilterSelector
                 label="Chế độ xem"
                 options={viewModeOptions}
                 value={viewMode}
                 onChange={setViewMode}
                 icon={<HiRectangleStack size={18} />}
               />
-              {viewMode === "month" ? (
+              {viewMode === "month" ? ( */}
                 <FilterSelector
                   label="Tháng"
                   options={monthOptions}
@@ -816,7 +817,7 @@ export default function ReportsView() {
                   onChange={setMonth}
                   icon={<HiCalendar size={18} />}
                 />
-              ) : viewMode === "week" ? (
+              {/* ) : viewMode === "week" ? (
                 <FilterSelector
                   label="Tuần"
                   options={weekOptions}
@@ -831,7 +832,7 @@ export default function ReportsView() {
                   </label>
                   <div className="h-11 rounded-2xl border border-dashed border-light-300" />
                 </div>
-              )}
+              )} */}
               <FilterSelector
                 label="Năm"
                 options={yearOptions}
@@ -852,13 +853,13 @@ export default function ReportsView() {
           ) : (
             <>
               <StatCard
-                label="Tổng thẻ"
+                label="Công việc khác"
                 value={totalCards}
                 icon={<HiRectangleStack size={28} />}
                 color="indigo"
               />
               <StatCard
-                label="Tỷ lệ đúng giờ"
+                label="Tỷ lệ đúng hạn (khác)"
                 value={metrics?.kanban?.deadlineCompletionRate?.rate || 0}
                 suffix="%"
                 icon={<HiClock size={28} />}
@@ -866,7 +867,7 @@ export default function ReportsView() {
                 delay={100}
               />
               <StatCard
-                label="Hoàn thành"
+                label="Tỷ lệ hoàn thành (hằng ngày)"
                 value={calendarMetrics?.taskCompletionRate?.rate || 0}
                 suffix="%"
                 icon={<HiCheckCircle size={28} />}
@@ -874,7 +875,7 @@ export default function ReportsView() {
                 delay={200}
               />
               <StatCard
-                label="Tỷ lệ lịch"
+                label="Tỷ lệ đúng hạn (ngày)"
                 value={calendarMetrics?.deadlineCompletionRate?.rate || 0}
                 suffix="%"
                 icon={<HiClipboardDocumentList size={28} />}
@@ -889,7 +890,7 @@ export default function ReportsView() {
         <div className="grid grid-cols-1 gap-10 lg:grid-cols-2">
           {/* Kanban Segment */}
           <DashboardCard
-            title="Phân bố bảng"
+            title="Bảng tỉ lệ"
             icon={<HiChartPie size={20} />}
             delay={200}
           >
@@ -971,7 +972,7 @@ export default function ReportsView() {
           </DashboardCard>
 
           <DashboardCard
-            title="Thước đo thời hạn Kanban"
+            title="Tỉ lệ đúng hạn (công việc khác)"
             icon={<HiClock size={20} />}
             delay={300}
           >
@@ -994,7 +995,7 @@ export default function ReportsView() {
 
           {/* Calendar Segment */}
           <DashboardCard
-            title="Hoàn thành công việc lịch"
+            title="Tỉ lệ hoàn thành (công việc hằng ngày)"
             icon={<HiCheckCircle size={20} />}
             delay={400}
           >
@@ -1014,7 +1015,7 @@ export default function ReportsView() {
           </DashboardCard>
 
           <DashboardCard
-            title="Thước đo thời hạn lịch"
+            title="Tỉ lệ đúng hạn (công việc hằng ngày)"
             icon={<HiClipboardDocumentList size={20} />}
             delay={500}
           >
@@ -1038,7 +1039,7 @@ export default function ReportsView() {
           {/* Detailed Performance Section */}
           <div className="lg:col-span-2">
             <DashboardCard
-              title="Hiệu suất công việc chi tiết"
+              title="Chi tiết hiệu suất (công việc hằng ngày)"
               icon={<HiChartBar size={20} />}
               delay={600}
             >

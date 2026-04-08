@@ -13,7 +13,7 @@ export function DeleteChecklistConfirmation({
   cardPublicId: string;
   checklistPublicId: string;
 }) {
-  const { closeModal } = useModal();
+  const { closeModal, closeModals } = useModal();
   const { showPopup } = usePopup();
   const utils = api.useUtils();
 
@@ -40,7 +40,7 @@ export function DeleteChecklistConfirmation({
       });
     },
     onSettled: async () => {
-      closeModal();
+      closeModals(2);
       await invalidateCard(utils, cardPublicId);
     },
   });

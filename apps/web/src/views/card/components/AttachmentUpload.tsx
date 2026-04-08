@@ -210,7 +210,7 @@ export function AttachmentUpload({
           }
           onClick={() => openModal("ADD_CHECKLIST")}
         >
-          {t`Thêm checklist`}
+          {t`Thêm Checklist`}
         </Button>
       </div>
     </div>

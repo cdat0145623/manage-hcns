@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { t } from "@lingui/core/macro";
-import { env } from "next-runtime-env";
 import { Trans } from "@lingui/react/macro";
+import { env } from "next-runtime-env";
+
 import { authClient } from "@kan/auth/client";
 
 import { Auth } from "~/components/AuthForm";
@@ -15,10 +16,9 @@ export default function SignUpPage() {
 
   const redirect = useSearchParams().get("next");
 
-  const { data } = authClient.useSession();
+  const { data, isPending } = authClient.useSession();
 
-  if (data?.user.id) router.push("/reports");
-
+  if (!isPending && data?.user.id) router.push("/reports");
 
   const isInviteFlow = redirect?.startsWith("/invite/");
 

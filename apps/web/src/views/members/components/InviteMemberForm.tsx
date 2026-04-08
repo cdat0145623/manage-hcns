@@ -364,7 +364,7 @@ export function InviteMemberForm({
               disabled={inviteMember.isPending || !isEmailEnabled}
               isLoading={inviteMember.isPending}
             >
-              {t`Invite member`}
+              {t`Thêm thành viên`}
             </Button>
           )}
         </div>

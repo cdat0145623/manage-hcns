@@ -176,10 +176,10 @@ export function AttachmentUpload({
             <HiOutlinePaperClip className="h-6 w-6" />
           </div>
           <p className="text-sm font-medium text-light-1000 dark:text-dark-1000">
-            {t`Click or drag file to this area to upload`}
+            {t`Nhấp chuột hoặc kéo tệp vào khu vực này để tải lên`}
           </p>
           <p className="text-xs text-light-600 dark:text-dark-600">
-            {t`Support for a single or bulk upload. Maximum file size is 50MB.`}
+            {t`Hỗ trợ tải lên một hoặc nhiều tệp. Kích thước tệp tối đa là 50MB.`}
           </p>
         </div>
 
@@ -210,7 +210,7 @@ export function AttachmentUpload({
           }
           onClick={() => openModal("ADD_CHECKLIST")}
         >
-          {t`Add Checklist`}
+          {t`Thêm checklist`}
         </Button>
       </div>
     </div>

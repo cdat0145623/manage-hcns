@@ -29,6 +29,7 @@ interface DueDateSelectorProps {
   disabled?: boolean;
   onDateSelect?: (date: Date | undefined) => void;
   weekStartsOn?: 0 | 1 | 6;
+  label?: string;
 }
 
 export function DueDateSelector({
@@ -37,6 +38,7 @@ export function DueDateSelector({
   disabled = false,
   onDateSelect,
   weekStartsOn = 1,
+  label,
 }: DueDateSelectorProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [dropdownPos, setDropdownPos] = useState({ top: 0, left: 0 });
@@ -341,7 +343,7 @@ export function DueDateSelector({
         ) : (
           <>
             <HiMiniPlus size={22} className="pr-2" />
-            {t`Set due date`}
+            {label}
           </>
         )}
       </button>

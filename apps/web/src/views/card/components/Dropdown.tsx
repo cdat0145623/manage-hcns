@@ -55,14 +55,14 @@ export default function CardDropdown({
 
   const items = [
     {
-      label: t`Copy card link`,
+      label: t`Copy link thẻ`,
       action: handleCopyCardLink,
       icon: <HiLink className="h-[16px] w-[16px] text-dark-900" />,
     },
     ...(canEditCard
       ? [
           {
-            label: t`Add checklist`,
+            label: t`Thêm checklist`,
             action: () => openModal("ADD_CHECKLIST"),
             icon: (
               <HiOutlineCheckCircle className="h-[16px] w-[16px] text-dark-900" />
@@ -73,7 +73,7 @@ export default function CardDropdown({
     ...(canDeleteCard || isCreator
       ? [
           {
-            label: t`Delete card`,
+            label: t`Xóa thẻ`,
             action: () => openModal("DELETE_CARD"),
             icon: (
               <HiOutlineTrash className="h-[16px] w-[16px] text-dark-900" />

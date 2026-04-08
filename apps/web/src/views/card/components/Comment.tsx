@@ -210,7 +210,7 @@ const Comment = ({
               onChange={(value) => setValue("comment", value)}
               workspaceMembers={workspaceMembers}
               enableYouTubeEmbed={false}
-              placeholder={t`Add comment... (type '/' to open commands or '@' to mention)`}
+              placeholder={t`Bình luận... (gõ '/' để mở lệnh hoặc '@' để đề cập)`}
               disableHeadings={true}
             />
           </div>

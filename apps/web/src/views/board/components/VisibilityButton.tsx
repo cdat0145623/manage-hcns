@@ -100,7 +100,7 @@ const VisibilityButton = ({
             iconLeft={isPublic ? <HiOutlineEye /> : <HiOutlineEyeSlash />}
             disabled={isLoading || !canEdit}
           >
-            {t`Visibility`}
+            {t`Hiển thị`}
           </Button>
         </CheckboxDropdown>
       </Tooltip>

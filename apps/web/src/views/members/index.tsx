@@ -223,7 +223,7 @@ export default function MembersPage() {
                 <Dropdown
                   items={[
                     {
-                      label: t`Edit permissions`,
+                      label: t`Sửa quyền`,
                       action: () =>
                         openModal(
                           "EDIT_MEMBER_PERMISSIONS",
@@ -232,7 +232,7 @@ export default function MembersPage() {
                         ),
                     },
                     {
-                      label: t`Remove member`,
+                      label: t`Xóa thành viên`,
                       action: () =>
                         openModal(
                           "REMOVE_MEMBER",
@@ -262,7 +262,7 @@ export default function MembersPage() {
         <div className="mb-8 flex w-full justify-between">
           <div className="flex items-center gap-3">
             <h1 className="font-bold tracking-tight text-neutral-900 dark:text-dark-1000 sm:text-[1.2rem]">
-              {t`Members`}
+              {t`Thành viên`}
             </h1>
           </div>
           <div className="flex items-center gap-3">
@@ -305,7 +305,7 @@ export default function MembersPage() {
               iconLeft={<HiOutlinePlusSmall className="h-4 w-4" />}
               disabled={workspace.role !== "ADMIN"}
             >
-              {t`Invite`}
+              {t`Thêm`}
             </Button>
           </div>
         </div>
@@ -321,13 +321,13 @@ export default function MembersPage() {
                         scope="col"
                         className="w-full rounded-tl-lg py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-light-900 dark:text-dark-900 sm:w-[65%] sm:pl-6"
                       >
-                        {t`User`}
+                        {t`Thành viên`}
                       </th>
                       <th
                         scope="col"
                         className="w-auto whitespace-nowrap rounded-tr-lg px-3 py-3.5 text-left text-sm font-semibold text-light-900 dark:text-dark-900 sm:w-[35%]"
                       >
-                        {t`Role`}
+                        {t`Vai trò`}
                       </th>
                     </tr>
                   </thead>

@@ -107,7 +107,7 @@ export function NewChecklistForm({
       {!hideHeader && (
         <div className="flex w-full items-center justify-between pb-4">
           <h2 className="text-sm font-bold text-neutral-900 dark:text-dark-1000">
-            {t`New checklist`}
+            {t`Thêm checklist`}
           </h2>
           <button
             type="button"
@@ -140,7 +140,7 @@ export function NewChecklistForm({
             type="submit"
             disabled={createChecklist.isPending || !watch("name")}
           >
-            {t`Create checklist`}
+            {t`Tạo checklist`}
           </Button>
         </div>
       </div>

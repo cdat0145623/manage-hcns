@@ -42,7 +42,7 @@ export default function BoardsPage({ isTemplate }: { isTemplate?: boolean }) {
       type: "PRESS",
       stroke: { key: "C" },
       action: () => canCreateBoard && openModal("NEW_BOARD"),
-      description: t`Create new ${isTemplate ? "template" : "board"}`,
+      description: t`Tạo ${isTemplate ? "mẫu mới" : "bảng mới"}`,
       group: "ACTIONS",
     });
 
@@ -96,7 +96,7 @@ export default function BoardsPage({ isTemplate }: { isTemplate?: boolean }) {
                   <HiOutlinePlusSmall aria-hidden="true" className="h-4 w-4" />
                 }
               >
-                {t`New`}
+                {t`Tạo mới`}
               </Button>
             </Tooltip>
           </div>

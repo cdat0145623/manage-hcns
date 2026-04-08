@@ -112,7 +112,7 @@ export default function BoardActivitySidebar({
         <div className="flex-1 overflow-y-auto p-4 scrollbar-thin scrollbar-thumb-light-400 dark:scrollbar-thumb-dark-300">
           <div className="mb-6">
             <h3 className="mb-4 text-sm font-semibold uppercase tracking-wider text-light-800 dark:text-dark-800">
-              {t`Activity`}
+              {t`Lịch sử`}
             </h3>
             <div className="space-y-6">
               {allActivities.map((activity, index) => {

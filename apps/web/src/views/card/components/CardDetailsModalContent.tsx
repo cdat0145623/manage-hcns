@@ -280,10 +280,10 @@ export default function CardDetailsModalContent({
         <div className="hidden md:block">
           <SideDockedPopup
             title={
-              modalContentType === "NEW_LABEL" ? t`Create new label` :
-              modalContentType === "EDIT_LABEL" ? t`Edit label` :
-              modalContentType === "DELETE_LABEL" ? t`Delete label` :
-              modalContentType === "ADD_CHECKLIST" ? t`Add checklist` : ""
+              modalContentType === "NEW_LABEL" ? t`Tạo nhãn mới` :
+              modalContentType === "EDIT_LABEL" ? t`Chỉnh sửa nhãn` :
+              modalContentType === "DELETE_LABEL" ? t`Xóa nhãn` :
+              modalContentType === "ADD_CHECKLIST" ? t`Thêm checklist` : ""
             }
             onClose={closeModal}
           >
@@ -414,7 +414,7 @@ export default function CardDetailsModalContent({
           {card && (
             <div className="mt-6 border-t border-light-300 pt-6 dark:border-dark-300">
               <h2 className="mb-4 text-sm font-semibold text-light-1000 dark:text-dark-1000">
-                {t`Activity`}
+                {t`Lịch sử`}
               </h2>
               <ActivityList
                 cardPublicId={cardId}
@@ -437,7 +437,7 @@ export default function CardDetailsModalContent({
         <div className="w-full shrink-0 border-t border-light-300 bg-light-50 p-5 dark:border-dark-300 dark:bg-dark-50 md:w-56 md:border-l md:border-t-0">
           <div className="mb-4">
             <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-light-700 dark:text-dark-700">
-              {t`List`}
+              {t`Cột`}
             </p>
             <ListSelector
               cardPublicId={cardId}
@@ -448,7 +448,7 @@ export default function CardDetailsModalContent({
           </div>
           <div className="mb-4">
             <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-light-700 dark:text-dark-700">
-              {t`Labels`}
+              {t`Nhãn`}
             </p>
             <LabelSelector
               cardPublicId={cardId}
@@ -460,7 +460,7 @@ export default function CardDetailsModalContent({
           {!isTemplate && (
             <div className="mb-4">
               <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-light-700 dark:text-dark-700">
-                {t`Members`}
+                {t`Thành viên`}
               </p>
               <MemberSelector
                 cardPublicId={cardId}
@@ -472,7 +472,7 @@ export default function CardDetailsModalContent({
           )}
           <div className="mb-4">
             {card?.startDate && <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-light-700 dark:text-dark-700">
-              {t`Start date`}
+              {t`Ngày bắt đầu`}
             </p>}
             <DueDateSelector
               cardPublicId={cardId}
@@ -488,11 +488,12 @@ export default function CardDetailsModalContent({
                 }
               }}
               weekStartsOn={workspace.weekStartDay}
+              label={t`Ngày bắt đầu`}
             />
           </div>
           <div className="mb-4">
             {card?.dueDate && <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-light-700 dark:text-dark-700">
-              {t`Due date`}
+              {t`Ngày hết hạn`}
             </p>}
             <DueDateSelector
               cardPublicId={cardId}
@@ -508,6 +509,7 @@ export default function CardDetailsModalContent({
                 }
               }}
               weekStartsOn={workspace.weekStartDay}
+              label={t`Ngày hết hạn`}
             />
           </div>
         </div>

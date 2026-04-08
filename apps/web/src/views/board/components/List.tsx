@@ -133,7 +133,7 @@ export default function List({
                   ...(canCreateCard
                     ? [
                         {
-                          label: t`Add a card`,
+                          label: t`Tạo thẻ mới`,
                           action: () => openNewCardForm(list.publicId),
                           icon: (
                             <HiOutlineSquaresPlus className="h-[18px] w-[18px] text-dark-900" />
@@ -144,7 +144,7 @@ export default function List({
                   ...(canDeleteList || isCreator
                     ? [
                         {
-                          label: t`Delete list`,
+                          label: t`Xóa cột`,
                           action: handleOpenDeleteListConfirmation,
                           icon: (
                             <HiOutlineTrash className="h-[18px] w-[18px] text-dark-900" />

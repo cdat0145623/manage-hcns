@@ -122,35 +122,37 @@ export function EditMemberPermissionsModal() {
   };
 
   const permissionLabels: Record<Permission, string> = {
-    "workspace:view": t`Can view workspace`,
-    "workspace:edit": t`Can edit workspace`,
-    "workspace:delete": t`Can delete workspace`,
-    "workspace:manage": t`Can manage workspace settings`,
+    "workspace:view": t`Xem không gian làm việc`,
+    "workspace:edit": t`Chỉnh sửa không gian làm việc`,
+    "workspace:delete": t`Xóa không gian làm việc`,
+    "workspace:manage": t`Quản lý cài đặt không gian làm việc`,
 
-    "board:view": t`Can view boards`,
-    "board:create": t`Can create boards`,
-    "board:edit": t`Can edit boards`,
-    "board:delete": t`Can delete boards`,
+    "board:view": t`Xem bảng`,
+    "board:create": t`Tạo bảng`,
+    "board:edit": t`Chỉnh sửa bảng`,
+    "board:delete": t`Xóa bảng`,
 
-    "list:view": t`Can view lists`,
-    "list:create": t`Can create lists`,
-    "list:edit": t`Can edit lists`,
-    "list:delete": t`Can delete lists`,
+    "list:view": t`Xem danh sách`,
+    "list:create": t`Tạo danh sách`,
+    "list:edit": t`Chỉnh sửa danh sách`,
+    "list:delete": t`Xóa danh sách`,
 
-    "card:view": t`Can view cards`,
-    "card:create": t`Can create cards`,
-    "card:edit": t`Can edit cards`,
-    "card:delete": t`Can delete cards`,
+    "card:view": t`Xem thẻ`,
+    "card:create": t`Tạo thẻ`,
+    "card:edit": t`Chỉnh sửa thẻ`,
+    "card:delete": t`Xóa thẻ`,
+    "card:attach": t`Đính kèm thẻ`,
+    "card:tick": t`Check thẻ`,
 
-    "comment:view": t`Can view comments`,
-    "comment:create": t`Can add comments`,
-    "comment:edit": t`Can edit comments`,
-    "comment:delete": t`Can delete comments`,
+    "comment:view": t`Xem bình luận`,
+    "comment:create": t`Thêm bình luận`,
+    "comment:edit": t`Chỉnh sửa bình luận`,
+    "comment:delete": t`Xóa bình luận`,
 
-    "member:view": t`Can view members`,
-    "member:invite": t`Can invite members`,
-    "member:edit": t`Can edit member roles and permissions`,
-    "member:remove": t`Can remove members`,
+    "member:view": t`Xem thành viên`,
+    "member:invite": t`Mời thành viên`,
+    "member:edit": t`Chỉnh sửa vai trò và quyền của thành viên`,
+    "member:remove": t`Xóa thành viên`,
   };
 
   return (
@@ -159,7 +161,7 @@ export function EditMemberPermissionsModal() {
         <div className="mb-3 flex items-start justify-between gap-3">
           <div>
             <h2 className="mb-1 text-sm font-semibold">
-              {t`Edit permissions`}
+              {t`Sửa quyền`}
             </h2>
             <p className="min-h-[16px] text-xs text-light-900 dark:text-dark-900">
               {entityLabel}
@@ -169,7 +171,7 @@ export function EditMemberPermissionsModal() {
             type="button"
             onClick={closeModal}
             className="ml-2 inline-flex h-6 w-6 items-center justify-center rounded-md text-light-900 hover:bg-light-200 focus:outline-none dark:text-dark-900 dark:hover:bg-dark-200"
-            aria-label={t`Close`}
+            aria-label={t`Đóng`}
           >
             <HiXMark className="h-3.5 w-3.5" />
           </button>
@@ -177,7 +179,7 @@ export function EditMemberPermissionsModal() {
 
         {isLoading ? (
           <p className="text-xs text-light-900 dark:text-dark-900">
-            {t`Loading permissions...`}
+            {t`Đang tải ...`}
           </p>
         ) : (
           <div className="max-h-80 pb-4 space-y-3 overflow-y-auto pr-1">
@@ -242,7 +244,7 @@ export function EditMemberPermissionsModal() {
             disabled={isBusy || !hasOverrides}
             isLoading={resetMutation.isPending}
           >
-            {t`Reset to role defaults`}
+            {t`Đặt lại quyền`}
           </Button>
         </div>
       </div>

@@ -11,35 +11,37 @@ function formatRoleLabel(role: Role) {
 }
 
 const permissionLabels: Record<Permission, string> = {
-  "workspace:view": t`Can view workspace`,
-  "workspace:edit": t`Can edit workspace`,
-  "workspace:delete": t`Can delete workspace`,
-  "workspace:manage": t`Can manage workspace settings`,
+  "workspace:view": t`Xem không gian làm việc`,
+  "workspace:edit": t`Chỉnh sửa không gian làm việc`,
+  "workspace:delete": t`Xóa không gian làm việc`,
+  "workspace:manage": t`Quản lý không gian làm việc`,
 
-  "board:view": t`Can view boards`,
-  "board:create": t`Can create boards`,
-  "board:edit": t`Can edit boards`,
-  "board:delete": t`Can delete boards`,
+  "board:view": t`Xem bảng`,
+  "board:create": t`Tạo bảng`,
+  "board:edit": t`Chỉnh sửa bảng`,
+  "board:delete": t`Xóa bảng`,
 
-  "list:view": t`Can view lists`,
-  "list:create": t`Can create lists`,
-  "list:edit": t`Can edit lists`,
-  "list:delete": t`Can delete lists`,
+  "list:view": t`Xem danh sách`,
+  "list:create": t`Tạo danh sách`,
+  "list:edit": t`Chỉnh sửa danh sách`,
+  "list:delete": t`Xóa danh sách`,
 
-  "card:view": t`Can view cards`,
-  "card:create": t`Can create cards`,
-  "card:edit": t`Can edit cards`,
-  "card:delete": t`Can delete cards`,
+  "card:view": t`Xem thẻ`,
+  "card:create": t`Tạo thẻ`,
+  "card:edit": t`Chỉnh sửa thẻ`,
+  "card:delete": t`Xóa thẻ`,
+  "card:attach": t`Đính kèm thẻ`,
+  "card:tick": t`Tích thẻ`,
 
-  "comment:view": t`Can view comments`,
-  "comment:create": t`Can add comments`,
-  "comment:edit": t`Can edit comments`,
-  "comment:delete": t`Can delete comments`,
+  "comment:view": t`Xem bình luận`,
+  "comment:create": t`Thêm bình luận`,
+  "comment:edit": t`Chỉnh sửa bình luận`,
+  "comment:delete": t`Xóa bình luận`,
 
-  "member:view": t`Can view members`,
-  "member:invite": t`Can invite members`,
-  "member:edit": t`Can edit member roles and permissions`,
-  "member:remove": t`Can remove members`,
+  "member:view": t`Xem thành viên`,
+  "member:invite": t`Mời thành viên`,
+  "member:edit": t`Chỉnh sửa thành viên`,
+  "member:remove": t`Xóa thành viên`,
 };
 
 export function RolePermissions() {
@@ -107,7 +109,7 @@ export function RolePermissions() {
     <div className="mt-2">
       {orderedRoleNames.length === 0 && !isLoading ? (
         <p className="mb-4 text-sm text-neutral-500 dark:text-dark-800">
-          {t`No roles found for this workspace yet.`}
+          {t`Chưa có vai trò nào cho không gian làm việc này.`}
         </p>
       ) : null}
 
@@ -115,13 +117,13 @@ export function RolePermissions() {
         <table className="min-w-full table-fixed divide-y divide-light-600 overflow-visible text-left text-sm dark:divide-dark-600">
           <thead className="rounded-t-lg bg-light-300 dark:bg-dark-300">
             <tr>
-              <th className="w-1/2 rounded-tl-lg px-4 py-3 text-left text-xs font-semibold tracking-wide text-light-900 dark:text-dark-900">
-                {t`Permission`}
+              <th className="w-1/2 rounded-tl-lg px-4 py-3 text-left text-xs font-semibold tracking-wide text-neutral-900 dark:text-dark-900">
+                {t`Quyền hạn`}
               </th>
               {orderedRoleNames.map((role) => (
                 <th
                   key={role}
-                  className="w-1/6 px-4 py-3 text-center text-xs font-semibold tracking-wide text-light-900 dark:text-dark-900"
+                  className="w-1/6 px-4 py-3 text-center text-xs font-semibold tracking-wide text-neutral-900 dark:text-dark-900"
                 >
                   {formatRoleLabel(role)}
                 </th>
@@ -136,7 +138,7 @@ export function RolePermissions() {
               <tr className="bg-light-100 dark:bg-dark-200">
                 <td
                   colSpan={1 + orderedRoleNames.length}
-                  className="px-4 py-2 text-xs font-semibold tracking-wide text-light-900 dark:text-dark-900"
+                  className="px-4 py-2 text-xs font-semibold tracking-wide text-neutral-900 dark:text-dark-900"
                 >
                   {category.label}
                 </td>

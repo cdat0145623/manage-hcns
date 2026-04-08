@@ -90,7 +90,7 @@ export default function BoardPage({ isTemplate }: { isTemplate?: boolean }) {
       type: "PRESS",
       stroke: { key: "C" },
       action: () => boardId && canCreateList && openNewListForm(boardId),
-      description: t`Create new list`,
+      description: t`Tạo cột mới`,
       group: "ACTIONS",
     });
 
@@ -561,7 +561,7 @@ export default function BoardPage({ isTemplate }: { isTemplate?: boolean }) {
                 }}
                 disabled={!boardData || !canCreateList}
               >
-                {t`New list`}
+                {t`Tạo cột mới`}
               </Button>
             </Tooltip>
             <BoardDropdown
@@ -613,7 +613,7 @@ export default function BoardPage({ isTemplate }: { isTemplate?: boolean }) {
                       }}
                       disabled={!canCreateList}
                     >
-                      {t`Create new list`}
+                      {t`Tạo cột mới`}
                     </Button>
                   </Tooltip>
                 </div>

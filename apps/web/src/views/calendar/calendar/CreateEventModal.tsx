@@ -863,7 +863,7 @@ export function CreateEventModal({
               <p className="text-sm font-bold text-neutral-900 dark:text-white">
                 {title || (
                   <span className="font-normal italic text-neutral-400">
-                    Sự kiện chưa đặt tên
+                    Công việc chưa đặt tên
                   </span>
                 )}
               </p>

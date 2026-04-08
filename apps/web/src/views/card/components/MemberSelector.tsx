@@ -131,7 +131,7 @@ export default function MemberSelector({
             ) : (
               <>
                 <HiMiniPlus size={22} className="pr-2" />
-                {t`Add member`}
+                {t`Gán thành viên`}
               </>
             )}
           </div>

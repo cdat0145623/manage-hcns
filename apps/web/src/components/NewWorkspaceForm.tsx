@@ -260,7 +260,7 @@ export function NewWorkspaceForm() {
 
         <Input
           id="workspace-name"
-          placeholder={t`Workspace name`}
+          placeholder={t`Tên workspace`}
           {...register("name")}
           errorMessage={errors.name?.message}
           onKeyDown={async (e) => {

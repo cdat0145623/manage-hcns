@@ -125,7 +125,7 @@ export const permissionCategories = {
     ] as const,
   },
   board: {
-    label: "Boards",
+    label: "Bảng",
     permissions: [
       "board:view",
       "board:create",
@@ -134,7 +134,7 @@ export const permissionCategories = {
     ] as const,
   },
   list: {
-    label: "Lists",
+    label: "Cột",
     permissions: [
       "list:view",
       "list:create",
@@ -143,7 +143,7 @@ export const permissionCategories = {
     ] as const,
   },
   card: {
-    label: "Cards",
+    label: "Thẻ",
     permissions: [
       "card:view",
       "card:create",
@@ -154,7 +154,7 @@ export const permissionCategories = {
     ] as const,
   },
   comment: {
-    label: "Comments",
+    label: "Bình luận",
     permissions: [
       "comment:view",
       "comment:create",
@@ -163,7 +163,7 @@ export const permissionCategories = {
     ] as const,
   },
   member: {
-    label: "Members",
+    label: "Thành viên",
     permissions: [
       "member:view",
       "member:invite",

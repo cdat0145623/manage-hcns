@@ -146,6 +146,8 @@ export function NewCardForm({
               listId: 2,
               description: "",
               dueDate: args.dueDate ?? null,
+              startDate: null,
+              fileActivities: [],
               labels: oldBoard.labels.filter((label) =>
                 args.labelPublicIds.includes(label.publicId),
               ),
@@ -304,7 +306,7 @@ export function NewCardForm({
       <div className="px-5 pt-5">
         <div className="flex w-full items-center justify-between pb-5">
           <h2 className="text-sm font-bold text-neutral-900 dark:text-dark-1000">
-            {t`New card`}
+            {t`Thêm thẻ mới`}
           </h2>
           <button
             type="button"
@@ -321,7 +323,7 @@ export function NewCardForm({
         <div>
           <Input
             id="title"
-            placeholder={t`Card title`}
+            placeholder={t`Tiêu đề thẻ`}
             {...register("title")}
             onKeyDown={async (e) => {
               if (e.key === "Enter") {
@@ -379,7 +381,7 @@ export function NewCardForm({
               >
                 <div className="flex h-full w-full items-center rounded-[5px] border-[1px] border-light-600 bg-light-200 px-2 py-1 text-left text-xs text-light-800 hover:bg-light-300 dark:border-dark-600 dark:bg-dark-400 dark:text-dark-1000 dark:hover:bg-dark-500">
                   {!memberPublicIds.length ? (
-                    t`Members`
+                    t`Thành viên`
                   ) : (
                     <div className="flex -space-x-1 overflow-hidden">
                       {memberPublicIds.map((memberPublicId) => {
@@ -421,7 +423,7 @@ export function NewCardForm({
             >
               <div className="flex h-full w-full items-center rounded-[5px] border-[1px] border-light-600 bg-light-200 px-2 py-1 text-left text-xs text-light-800 hover:bg-light-300 dark:border-dark-600 dark:bg-dark-400 dark:text-dark-1000 dark:hover:bg-dark-500">
                 {!labelPublicIds.length ? (
-                  t`Labels`
+                  t`Nhãn`
                 ) : (
                   <>
                     <div
@@ -472,7 +474,7 @@ export function NewCardForm({
               {dueDate ? (
                 <span>{format(dueDate, "MMM d, yyyy")}</span>
               ) : (
-                <>{t`Due date`}</>
+                <>{t`Ngày hết hạn`}</>
               )}
             </button>
             {isDateSelectorOpen && (
@@ -530,7 +532,7 @@ export function NewCardForm({
             type="submit"
             disabled={title.length === 0 || createCard.isPending}
           >
-            {t`Create card`}
+            {t`Tạo thẻ`}
           </Button>
         </div>
       </div>

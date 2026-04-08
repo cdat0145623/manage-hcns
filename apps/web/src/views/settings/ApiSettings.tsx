@@ -27,7 +27,7 @@ export default function ApiSettings() {
 
         <div className="mb-4 flex items-center justify-between">
           <Button variant="primary" onClick={() => openModal("NEW_API_KEY")}>
-            {t`Create new key`}
+            {t`Tạo key mới`}
           </Button>
         </div>
 

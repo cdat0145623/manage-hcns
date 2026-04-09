@@ -95,12 +95,6 @@ export default function PublicBoardsView() {
             />
           )}
         </div>
-        <Link
-          className="text-lg font-bold tracking-tight text-neutral-900 dark:text-dark-1000"
-          href="/"
-        >
-          kan.bn
-        </Link>
       </div>
     </>
   );

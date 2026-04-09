@@ -109,8 +109,8 @@ export default function InvitePage() {
               </p>
             </div>
             <div className="text-center">
-              <Button href="/" variant="primary">
-                {t`Go Home`}
+              <Button href="/reports" variant="primary">
+                {t`Go to reports`}
               </Button>
             </div>
           </div>

@@ -160,6 +160,18 @@ export default function SideNavigation({
       },
     },
     {
+      name: "Tài khoản",
+      href: "/account",
+      icon: isDarkMode ? membersIconDark : membersIconLight,
+      keyboardShortcut: {
+        type: "SEQUENCE",
+        strokes: [{ key: "G" }, { key: "A" }],
+        action: () => router.push("/account"),
+        group: "NAVIGATION",
+        description: t`Go to account`,
+      },
+    },
+    {
       name: "Cài đặt",
       href: "/settings",
       icon: isDarkMode ? settingsIconDark : settingsIconLight,
@@ -187,14 +199,6 @@ export default function SideNavigation({
       >
         <div>
           <div className="hidden h-[45px] items-center justify-between pb-3 md:flex">
-            {!isCollapsed && (
-              <Link href="/" className="block">
-                <h1 className="pl-2 text-[16px] font-bold tracking-tight text-neutral-900 dark:text-dark-1000">
-                  kan.bn
-                </h1>
-
-              </Link>
-            )}
             <Button
               onClick={toggleCollapse}
               className={twMerge(

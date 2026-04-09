@@ -38,7 +38,7 @@ export const memberRouter = createTRPCRouter({
     })
     .input(
       z.object({
-        email: z.string().email(),
+        username: z.string(),
         workspacePublicId: z.string().min(12),
       }),
     )
@@ -52,11 +52,11 @@ export const memberRouter = createTRPCRouter({
           code: "UNAUTHORIZED",
         });
 
-      const existingUser = await userRepo.getByEmail(ctx.db, input.email);
+      const existingUser = await userRepo.getByUsername(ctx.db, input.username);
 
       if (!existingUser)
         throw new TRPCError({
-          message: `Email not found`,
+          message: `Username not found`,
           code: "NOT_FOUND",
         });
 
@@ -74,12 +74,12 @@ export const memberRouter = createTRPCRouter({
       await assertPermission(ctx.db, userId, workspace.id, "member:invite");
 
       const isInvitedEmailAlreadyMember = workspace.members.some(
-        (member) => member.email === input.email,
+        (member) => member.email === existingUser.email,
       );
 
       if (isInvitedEmailAlreadyMember) {
         throw new TRPCError({
-          message: `User with email ${input.email} is already a member of this workspace`,
+          message: `User with email ${existingUser.email} is already a member of this workspace`,
           code: "CONFLICT",
         });
       }
@@ -134,7 +134,7 @@ export const memberRouter = createTRPCRouter({
 
       const invite = await memberRepo.create(ctx.db, {
         workspaceId: workspace.id,
-        email: input.email,
+        email: existingUser.email,
         userId: existingUser?.id ?? null,
         createdBy: userId,
         role: "NVVP",
@@ -144,30 +144,30 @@ export const memberRouter = createTRPCRouter({
 
       if (!invite)
         throw new TRPCError({
-          message: `Unable to invite user with email ${input.email}`,
+          message: `Unable to invite user with username ${input.username}`,
           code: "INTERNAL_SERVER_ERROR",
         });
 
       // Sign-in magic link removed
-      const status = true;
+      // const status = true;
 
-      if (!status) {
-        console.error("Failed to send magic link invitation:", {
-          email: input.email,
-          callbackURL: `/boards?type=invite&memberPublicId=${invite.publicId}`,
-        });
+      // if (!status) {
+      //   console.error("Failed to send magic link invitation:", {
+      //     email: existingUser.email,
+      //     callbackURL: `/boards?type=invite&memberPublicId=${invite.publicId}`,
+      //   });
 
-        await memberRepo.softDelete(ctx.db, {
-          memberId: invite.id,
-          deletedAt: new Date(),
-          deletedBy: userId,
-        });
+      //   await memberRepo.softDelete(ctx.db, {
+      //     memberId: invite.id,
+      //     deletedAt: new Date(),
+      //     deletedBy: userId,
+      //   });
 
-        throw new TRPCError({
-          message: `Failed to send magic link invitation to user with email ${input.email}.`,
-          code: "INTERNAL_SERVER_ERROR",
-        });
-      }
+      //   throw new TRPCError({
+      //     message: `Failed to send magic link invitation to user with username ${input.username}.`,
+      //     code: "INTERNAL_SERVER_ERROR",
+      //   });
+      // }
 
       return invite;
     }),

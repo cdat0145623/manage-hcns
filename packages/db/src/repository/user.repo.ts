@@ -3,6 +3,9 @@ import { v4 as uuidv4 } from "uuid";
 
 import type { dbClient } from "@kan/db/client";
 import { apikey, users } from "@kan/db/schema";
+import { memberRoles } from "@kan/db/schema";
+
+export type UserRole = (typeof memberRoles)[number];
 
 export const getCount = async (db: dbClient) => {
   const result = await db.select({ count: count() }).from(users);
@@ -72,22 +75,24 @@ export const getByUsername = (db: dbClient, username: string) => {
 export const create = async (
   db: dbClient,
   user: {
-    id?: string;
+    name?: string | null;
     email?: string | null;
     username?: string | null;
     password?: string | null;
     stripeCustomerId?: string;
+    role: UserRole;
   },
 ) => {
   const [result] = await db
     .insert(users)
     .values({
-      id: user.id ?? uuidv4(),
+      name: user.name,
       email: user.email,
       username: user.username,
       password: user.password,
       stripeCustomerId: user.stripeCustomerId,
-      emailVerified: false,
+      emailVerified: true,
+      role: user.role,
     })
     .returning();
 

@@ -27,10 +27,11 @@ const signUpUsernamePlugin = () => ({
           email: z.string().email(),
           emailVerified: z.boolean(),
           callbackURL: z.string().optional(),
+          role: z.enum(["ADMIN", "NVKT_MANAGER", "NVKD_MANAGER", "NVVP"]).optional(),
         }),
       },
       async (ctx) => {
-        const { username: normalizedUsername, password, name, email, emailVerified } = ctx.body;
+        const { username: normalizedUsername, password, name, email, emailVerified, role } = ctx.body;
         const usernameLower = normalizedUsername.toLowerCase();
 
         // Check if username exists
@@ -47,7 +48,7 @@ const signUpUsernamePlugin = () => ({
 
         const hashedPassword = await ctx.context.password.hash(password);
         const userId = generateId();
-
+console.log("role", role)
         const user = await ctx.context.adapter.create({
           model: "user",
           data: {
@@ -57,6 +58,7 @@ const signUpUsernamePlugin = () => ({
             password: hashedPassword,
             email: email,
             emailVerified: emailVerified,
+            role: role || "NVVP",
             // Account fields for single-table setup
             accountId: userId,
             providerId: "credential",
@@ -201,6 +203,11 @@ export const initAuth = (db: dbClient) => {
           required: false,
           defaultValue: null,
           input: false,
+        },
+        role: {
+          type: "string",
+          required: false,
+          defaultValue: "NVVP",
         },
       },
     },

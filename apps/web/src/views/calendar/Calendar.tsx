@@ -6,10 +6,10 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
 import type { DropResult } from "react-beautiful-dnd";
 import { t } from "@lingui/macro";
+import { isSameMonth, startOfMonth } from "date-fns";
 import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { DragDropContext } from "react-beautiful-dnd";
-import { isSameMonth, startOfMonth } from "date-fns";
 
 import type { ViewMode } from "./calendar/CalendarHeader";
 import type {
@@ -17,9 +17,11 @@ import type {
   EditableEntry,
 } from "./calendar/CreateEventModal";
 import type { CalendarEntry } from "~/hooks/useRecurrence";
+import Modal from "~/components/modal";
 import { useRecurrence } from "~/hooks/useRecurrence";
 import { usePopup } from "~/providers/popup";
 import { api } from "~/utils/api";
+import CardDetailsModalContent from "../card/components/CardDetailsModalContent";
 import { CalendarHeader } from "./calendar/CalendarHeader";
 import { CreateEventModal } from "./calendar/CreateEventModal";
 import { DayView } from "./calendar/DayView";
@@ -27,8 +29,6 @@ import { EventDetailModal } from "./calendar/EventDetailModal";
 import { MonthView } from "./calendar/MonthView";
 import { SuccessModal } from "./calendar/SuccessModal";
 import { WeekView } from "./calendar/WeekView";
-import CardDetailsModalContent from "../card/components/CardDetailsModalContent";
-import Modal from "~/components/modal";
 
 function toEditableEntry(entry: CalendarEntry): EditableEntry {
   const date = new Date(entry.date);
@@ -50,7 +50,8 @@ function toEditableEntry(entry: CalendarEntry): EditableEntry {
     startTime,
     endTime,
     color: entry.color,
-    recurrence: "NONE",
+    recurrence: entry.recurrence,
+    rruleString: entry.rruleString,
     attendees: [],
   };
 }
@@ -71,7 +72,9 @@ export function Calendar() {
 
   const { data: currentUser } = api.user.getUser.useQuery();
   const { data: allUsers } = api.user.getAll.useQuery();
-  const [selectedUserId, setSelectedUserId] = useState<string | undefined>(undefined);
+  const [selectedUserId, setSelectedUserId] = useState<string | undefined>(
+    undefined,
+  );
 
   const displayUsers = useMemo(() => {
     if (!currentUser) return [];
@@ -83,7 +86,7 @@ export function Calendar() {
         return [
           {
             id: currentUser.id,
-            name: `${currentUser.name} (Tôi)`,
+            name: currentUser.name,
             email: currentUser.email,
             username: currentUser.username,
           },
@@ -114,7 +117,10 @@ export function Calendar() {
   }, [displayUsers, currentUser, selectedUserId]);
 
   const [viewMode, setViewMode] = useState<ViewMode>("MONTH");
-  const { calendarEntries, cards, formattedResult, moveTask } = useRecurrence(currentDate, selectedUserId);
+  const { calendarEntries, cards, formattedResult, moveTask } = useRecurrence(
+    currentDate,
+    selectedUserId,
+  );
   const { showPopup } = usePopup();
   const utils = api.useUtils();
 
@@ -177,7 +183,13 @@ export function Calendar() {
   });
 
   const handleCellClick = (date: Date) => {
-    setSelectedDate(date);
+    const d = new Date(date);
+    if (viewMode === "MONTH") {
+      d.setMilliseconds(1);
+    } else {
+      d.setMilliseconds(0);
+    }
+    setSelectedDate(d);
     setEditEntry(null);
     setIsFormOpen(true);
   };
@@ -189,8 +201,8 @@ export function Calendar() {
     //   setEditEntry(editable);
     //   setIsFormOpen(true);
     // } else {
-      setDetailEntry(editable);
-      setIsDetailOpen(true);
+    setDetailEntry(editable);
+    setIsDetailOpen(true);
     // }
   };
 
@@ -242,16 +254,16 @@ export function Calendar() {
         taskMasterId: entry.masterId,
         type: "all",
       });
-    } 
+    }
     // else {
-      // For single deletion, use instanceId (BUG-2: guard already blocks virtual tasks above)
-      // const idToDelete = entry.instanceId ?? entry.id;
+    // For single deletion, use instanceId (BUG-2: guard already blocks virtual tasks above)
+    // const idToDelete = entry.instanceId ?? entry.id;
 
-      // deleteMutation.mutate({
-      //   id: idToDelete,
-      //   taskMasterId: entry.masterId,
-      //   type: "single",
-      // });
+    // deleteMutation.mutate({
+    //   id: idToDelete,
+    //   taskMasterId: entry.masterId,
+    //   type: "single",
+    // });
     //}
   };
 
@@ -312,7 +324,7 @@ export function Calendar() {
           viewMode={viewMode}
           setViewMode={(mode) => {
             setDirection(0);
-            
+
             if (!isSameMonth(currentDate, new Date())) {
               if (mode === "WEEK" || mode === "DAY") {
                 setCurrentDate(startOfMonth(currentDate));

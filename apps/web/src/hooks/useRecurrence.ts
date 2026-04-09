@@ -6,7 +6,7 @@ import {
 import { useMemo } from "react";
 import { api } from "~/utils/api";
 
-export type RecurrenceType = "DAILY" | "WEEKLY" | "MONTHLY" | "MONTHLY_DATE" | "MONTHLY_DAY" | "NONE" | "UNSELECTED";
+export type RecurrenceType = "DAILY" | "WEEKLY" | "MONTHLY" | "MONTHLY_DATE" | "MONTHLY_DAY" | "NONE" | "UNSELECTED" | "CUSTOM";
 
 export interface TaskMaster {
   id: string;
@@ -36,9 +36,11 @@ export interface CalendarEntry {
   selectedUserId?: string;
   date: Date;
   status?: "pending" | "done" | "missed";
-  type: "VIRTUAL" | "INSTANCE";
   color: string;
   duration: number;
+  type: "VIRTUAL" | "INSTANCE";
+  recurrence: RecurrenceType;
+  rruleString: string;
 }
 
 export function useRecurrence(currentDate: Date, selectedUserId: string | undefined) {
@@ -84,6 +86,8 @@ export function useRecurrence(currentDate: Date, selectedUserId: string | undefi
         type: isVirtual ? "VIRTUAL" : "INSTANCE",
         color: task.color ?? "bg-blue-500",
         duration: task.duration ?? 60,
+        recurrence: (task.taskMaster?.recurrence || task.recurrence || "NONE") as RecurrenceType,
+        rruleString: task.taskMaster?.rruleString || task.rruleString || "",
       } as CalendarEntry;
     });
   }, [virtualTasks]);

@@ -9,16 +9,10 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { authClient } from "@kan/auth/client";
 import { generateRRuleString } from "@kan/shared/utils";
 
+import type { RecurrenceType } from "~/hooks/useRecurrence";
 import { usePopup } from "~/providers/popup";
 import { api } from "~/utils/api";
 import Modal from "../../../components/modal";
-
-export type RecurrenceType =
-  | "UNSELECTED"
-  | "NONE"
-  | "WEEKLY"
-  | "MONTHLY_DATE"
-  | "MONTHLY_DAY";
 
 export interface Attendee {
   id: string;
@@ -44,6 +38,7 @@ export interface EditableEntry {
   endTime?: string;
   color?: string;
   recurrence?: RecurrenceType;
+  rruleString?: string;
   attendees?: Attendee[];
 }
 
@@ -92,7 +87,7 @@ const DAY_NAMES = [
   "Thứ Sáu",
   "Thứ Bảy",
 ];
-const NTH_LABELS = ["thứ nhất", "thứ hai", "thứ ba", "thứ tư", "thứ năm"];
+const NTH_LABELS = ["đầu tiên", "thứ hai", "thứ ba", "thứ tư", "thứ năm"];
 
 function ordinalSuffix(n: number) {
   if (n >= 11 && n <= 13) return "th";
@@ -130,6 +125,25 @@ function getInitials(name: string) {
     .toUpperCase();
 }
 
+function parseWeekdaysFromRRule(rruleStr: string): number[] {
+  if (!rruleStr) return [];
+  const match = /BYDAY=([^;]+)/.exec(rruleStr);
+  if (!match?.[1]) return [];
+  const daysMap: Record<string, number> = {
+    MO: 0,
+    TU: 1,
+    WE: 2,
+    TH: 3,
+    FR: 4,
+    SA: 5,
+    SU: 6,
+  };
+  return match[1]
+    .split(",")
+    .map((d) => daysMap[d.trim()]!)
+    .filter((d) => d !== undefined);
+}
+
 function Label({ children }: { children: React.ReactNode }) {
   return (
     <p className="text-[10px] font-black uppercase tracking-[0.15em] text-neutral-500 dark:text-neutral-400">
@@ -149,9 +163,16 @@ export function CreateEventModal({
 }: CreateEventModalProps) {
   const isEditMode = !!editEntry;
   const { data: session } = authClient.useSession();
-  const { data: users } = api.user.getAll.useQuery();
+  const { data: currentUser } = api.user.getUser.useQuery();
+  const { data: users = [] } = api.user.getAll.useQuery();
   const utils = api.useUtils();
   const { showPopup } = usePopup();
+
+  const filteredUsers = useMemo(() => {
+    if (!currentUser) return [];
+    if (currentUser.role === "ADMIN") return users;
+    return users.filter((u) => u.id === currentUser.id);
+  }, [currentUser, users]);
 
   const createTask = api.taskMaster.create.useMutation({
     onSuccess: () => {
@@ -229,12 +250,17 @@ export function CreateEventModal({
   const [hasAttemptedSave, setHasAttemptedSave] = useState(false);
   const [showUpdateConfirm, setShowUpdateConfirm] = useState(false);
 
+  const [selectedWeekdays, setSelectedWeekdays] = useState<number[]>([]);
   const [selectedUserId, setSelectedUserId] = useState<string>("");
 
   const [showStartOptions, setShowStartOptions] = useState(false);
   const [showEndOptions, setShowEndOptions] = useState(false);
+  const [showRecurrenceOptions, setShowRecurrenceOptions] = useState(false);
+  const [showAssigneeOptions, setShowAssigneeOptions] = useState(false);
   const startTimeRef = useRef<HTMLDivElement>(null);
   const endTimeRef = useRef<HTMLDivElement>(null);
+  const recurrenceRef = useRef<HTMLDivElement>(null);
+  const assigneeRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -250,20 +276,26 @@ export function CreateEventModal({
       ) {
         setShowEndOptions(false);
       }
+      if (
+        recurrenceRef.current &&
+        !recurrenceRef.current.contains(e.target as Node)
+      ) {
+        setShowRecurrenceOptions(false);
+      }
+      if (
+        assigneeRef.current &&
+        !assigneeRef.current.contains(e.target as Node)
+      ) {
+        setShowAssigneeOptions(false);
+      }
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
   const startTimeOptions = useMemo(() => {
-    const now = new Date();
-    const currentMins = now.getHours() * 60 + now.getMinutes();
-
-    let nextRounded = Math.ceil(currentMins / 30) * 30;
-    if (nextRounded >= 24 * 60) nextRounded = 23 * 60 + 30;
-
     const options = [];
-    for (let i = nextRounded; i < 24 * 60; i += 30) {
+    for (let i = 0; i < 24 * 60; i += 30) {
       const val = minutesToTime(i);
       options.push({ value: val, label: val });
     }
@@ -308,47 +340,76 @@ export function CreateEventModal({
       setRecurrence(editEntry.recurrence ?? "NONE");
       setSelectedUserId(editEntry.selectedUserId ?? "");
       setAttendees(editEntry.attendees ?? []);
+
+      // RESTORE CUSTOM WEEKDAYS IF EDITING
+      if (editEntry.recurrence === "CUSTOM" && editEntry.rruleString) {
+        setSelectedWeekdays(parseWeekdaysFromRRule(editEntry.rruleString));
+      } else {
+        setSelectedWeekdays([]);
+      }
     } else {
       setTitle("");
       setDescription("");
-      setCurrentDate(selectedDate);
-      setEndDateVal(selectedDate);
 
-      // Default to next rounded 30 minutes
-      const now = new Date();
-      const currentMins = now.getHours() * 60 + now.getMinutes();
-      let nextRounded = Math.ceil(currentMins / 30) * 30;
-      if (nextRounded >= 24 * 60) nextRounded = 23 * 60 + 30;
+      const d = new Date(selectedDate);
+      setCurrentDate(d);
+      setEndDateVal(d);
 
-      setStartTime(minutesToTime(nextRounded));
-      setEndTime(minutesToTime(Math.min(24 * 60 - 1, nextRounded + 60)));
+      // 12 AM SLOT FIX:
+      // If milliseconds === 1, it's a Month View (all-day) click -> round to real time.
+      // If milliseconds === 0, it's a specific time slot click (even if it's 12 AM) -> keep 00:00.
+      const isAlldayMonthClick = d.getMilliseconds() === 1;
+
+      let startMins: number;
+      if (
+        !isAlldayMonthClick &&
+        (d.getHours() !== 0 ||
+          d.getMinutes() !== 0 ||
+          d.getMilliseconds() === 0)
+      ) {
+        // Slot click: specific time given
+        startMins = d.getHours() * 60 + d.getMinutes();
+      } else {
+        // Month view (all-day): round real time
+        const now = new Date();
+        const currentMins = now.getHours() * 60 + now.getMinutes();
+        startMins = Math.ceil(currentMins / 30) * 30;
+        if (startMins >= 24 * 60) startMins = 23 * 60 + 30;
+      }
+
+      setStartTime(minutesToTime(startMins));
+      setEndTime(minutesToTime(Math.min(24 * 60 - 1, startMins + 60)));
       setRecurrence("UNSELECTED");
+      setSelectedUserId(
+        currentUser?.role !== "ADMIN" ? currentUser?.id || "" : "",
+      );
+      setSelectedWeekdays([]);
       setAttendees([]);
       setHasAttemptedSave(false);
       setShowUpdateConfirm(false);
     }
-  }, [isVisible, editEntry, selectedDate]);
+  }, [isVisible, editEntry, selectedDate, currentUser]);
 
   const recurrenceOptions = useMemo(() => {
     const dayName = DAY_NAMES[getDay(currentDate)] ?? "";
     const dateNum = getDate(currentDate);
     const nthLabel = getNthWeekdayLabel(currentDate);
     return [
-      { value: "NONE" as RecurrenceType, label: "Không lặp", icon: "🚫" },
       {
         value: "WEEKLY" as RecurrenceType,
         label: `Hàng tuần vào ${dayName}`,
-        icon: "🗓️",
       },
       {
         value: "MONTHLY_DATE" as RecurrenceType,
         label: `Hàng tháng vào ngày ${dateNum}`,
-        icon: "📆",
       },
       {
         value: "MONTHLY_DAY" as RecurrenceType,
         label: `Hàng tháng vào ${nthLabel}`,
-        icon: "🔄",
+      },
+      {
+        value: "CUSTOM" as RecurrenceType,
+        label: "Tùy chỉnh...",
       },
     ];
   }, [currentDate]);
@@ -411,7 +472,7 @@ export function CreateEventModal({
       endDate: endDT,
       startTime,
       endTime,
-      recurrence,
+      recurrence: recurrence === "CUSTOM" ? "WEEKLY" : recurrence,
       attendees,
     };
 
@@ -434,16 +495,23 @@ export function CreateEventModal({
       try {
         rruleString = generateRRuleString({
           type:
-            recurrence === "WEEKLY"
+            recurrence === "WEEKLY" || recurrence === "CUSTOM"
               ? "dayOfWeek"
               : recurrence === "MONTHLY_DATE"
                 ? "monthlyDate"
                 : "monthlyDayRank",
           days:
-            recurrence === "WEEKLY" ? [(startDT.getDay() + 6) % 7] : undefined,
-          dates: recurrence === "MONTHLY_DATE" ? [startDT.getDate()] : undefined,
+            recurrence === "WEEKLY"
+              ? [(startDT.getDay() + 6) % 7]
+              : recurrence === "CUSTOM"
+                ? selectedWeekdays
+                : undefined,
+          dates:
+            recurrence === "MONTHLY_DATE" ? [startDT.getDate()] : undefined,
           rankDay:
-            recurrence === "MONTHLY_DAY" ? (startDT.getDay() + 6) % 7 : undefined,
+            recurrence === "MONTHLY_DAY"
+              ? (startDT.getDay() + 6) % 7
+              : undefined,
           rank:
             recurrence === "MONTHLY_DAY"
               ? Math.ceil(startDT.getDate() / 7)
@@ -473,27 +541,27 @@ export function CreateEventModal({
           selectedUserId: selectedUserId,
           rruleString,
         });
-      } 
+      }
       // else if (updateType === "single") {
-        // if (editEntry.type === "VIRTUAL") {
-        //   showPopup({
-        //     header: "Cannot edit virtual occurrence",
-        //     message:
-        //       "You must mark this scheduled occurrence as Pending or Done to instantiate it before you can edit its details.",
-        //     icon: "info",
-        //   });
-        //   setShowUpdateConfirm(false);
-        //   setHasAttemptedSave(false);
-        //   return;
-        // }
+      // if (editEntry.type === "VIRTUAL") {
+      //   showPopup({
+      //     header: "Cannot edit virtual occurrence",
+      //     message:
+      //       "You must mark this scheduled occurrence as Pending or Done to instantiate it before you can edit its details.",
+      //     icon: "info",
+      //   });
+      //   setShowUpdateConfirm(false);
+      //   setHasAttemptedSave(false);
+      //   return;
+      // }
 
-        // updateTaskInstance.mutate({
-        //   id: editEntry.id,
-        //   taskMasterId: editEntry.masterId!,
-        //   name: title,
-        //   description,
-        //   status: editEntry.status!,
-        // });
+      // updateTaskInstance.mutate({
+      //   id: editEntry.id,
+      //   taskMasterId: editEntry.masterId!,
+      //   name: title,
+      //   description,
+      //   status: editEntry.status!,
+      // });
       // }
     } else {
       createTask.mutate({
@@ -524,7 +592,7 @@ export function CreateEventModal({
           className="relative flex max-h-[92vh] flex-col overflow-hidden rounded-2xl bg-white shadow-2xl dark:bg-dark-100"
         >
           <div
-            className={`flex-shrink-0 border-b border-light-200 px-7 py-5 dark:border-dark-300 ${
+            className={`flex-shrink-0 border-b border-light-200 px-5 py-4 dark:border-dark-300 ${
               isEditMode
                 ? "bg-gradient-to-r from-violet-50 to-purple-50 dark:from-dark-200 dark:to-dark-300"
                 : "bg-gradient-to-r from-blue-50 to-sky-50 dark:from-dark-200 dark:to-dark-300"
@@ -565,7 +633,7 @@ export function CreateEventModal({
             </div>
           </div>
 
-          <div className="flex-1 space-y-5 overflow-y-auto px-7 py-6">
+          <div className="flex-1 space-y-4 overflow-y-auto px-5 py-4">
             <div className="space-y-1.5">
               <Label>Tiêu đề sự kiện *</Label>
               <input
@@ -574,7 +642,7 @@ export function CreateEventModal({
                 onChange={(e) => setTitle(e.target.value)}
                 placeholder="Nhập tiêu đề"
                 autoFocus
-                className="w-full rounded-xl border border-neutral-200/70 bg-neutral-50/50 px-4 py-3 text-base font-semibold text-neutral-900 placeholder-neutral-400 shadow-[inset_0_2px_4px_rgba(0,0,0,0.02)] transition-all hover:bg-neutral-50 focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-[3px] focus:ring-blue-500/10 dark:border-dark-400/50 dark:bg-dark-300/50 dark:text-white dark:focus:bg-dark-200"
+                className="w-full rounded-xl border border-neutral-200/70 bg-neutral-50/50 px-4 py-2.5 text-base font-semibold text-neutral-900 placeholder-neutral-400 shadow-[inset_0_2px_4px_rgba(0,0,0,0.02)] transition-all hover:bg-neutral-50 focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-[3px] focus:ring-blue-500/10 dark:border-dark-400/50 dark:bg-dark-300/50 dark:text-white dark:focus:bg-dark-200"
               />
             </div>
 
@@ -584,14 +652,14 @@ export function CreateEventModal({
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="Nhập mô tả (tùy chọn)"
-                rows={2}
-                className="w-full resize-none rounded-xl border border-neutral-200/70 bg-neutral-50/50 px-4 py-3 text-sm text-neutral-900 placeholder-neutral-400 shadow-[inset_0_2px_4px_rgba(0,0,0,0.02)] transition-all hover:bg-neutral-50 focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-[3px] focus:ring-blue-500/10 dark:border-dark-400/50 dark:bg-dark-300/50 dark:text-white dark:focus:bg-dark-200"
+                rows={5}
+                className="w-full resize-none rounded-xl border border-neutral-200/70 bg-neutral-50/50 px-4 py-2.5 text-sm text-neutral-900 placeholder-neutral-400 shadow-[inset_0_2px_4px_rgba(0,0,0,0.02)] transition-all hover:bg-neutral-50 focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-[3px] focus:ring-blue-500/10 dark:border-dark-400/50 dark:bg-dark-300/50 dark:text-white dark:focus:bg-dark-200"
               />
             </div>
 
             <motion.div
               layout
-              className="space-y-4 rounded-3xl border border-neutral-100 bg-white p-5 shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:border-dark-300 dark:bg-dark-200/50"
+              className="space-y-4 rounded-3xl border border-neutral-100 bg-white p-4 shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:border-dark-300 dark:bg-dark-200/50"
             >
               <div className="flex flex-wrap items-center gap-3">
                 {/* Date */}
@@ -603,47 +671,20 @@ export function CreateEventModal({
                       const d = new Date(e.target.value);
                       if (!isNaN(d.getTime())) setCurrentDate(d);
                     }}
+                    onKeyDown={(e) => e.preventDefault()}
                     className="cursor-pointer appearance-none rounded-lg border-none bg-neutral-100 px-3 py-2 text-sm font-medium text-neutral-700 shadow-none transition-colors hover:bg-neutral-200 focus:bg-blue-50 focus:text-blue-700 focus:outline-none focus:ring-0 dark:bg-dark-300 dark:text-neutral-200 dark:hover:bg-dark-400 dark:focus:bg-blue-900/30 dark:focus:text-blue-300"
                   />
                 </div>
-
-                {/* Start time */}
                 <div className="relative" ref={startTimeRef}>
                   <input
                     type="text"
                     placeholder="HH:mm"
-                    maxLength={5}
+                    readOnly
                     value={startTime}
-                    onFocus={(e) => {
-                      e.target.select();
-                      setShowStartOptions(true);
-                    }}
-                    onChange={(e) => {
-                      let val = e.target.value;
-                      if (
-                        val.length === 2 &&
-                        startTime.length === 1 &&
-                        !val.includes(":")
-                      ) {
-                        val += ":";
-                      }
-                      setStartTime(val);
-                      if (val.length === 5 && val.includes(":")) {
-                        setEndTime(minutesToTime(timeToMinutes(val) + 60));
-                      }
-                    }}
-                    onBlur={() => {
-                      if (
-                        startTime &&
-                        !startTime.includes(":") &&
-                        startTime.length <= 2
-                      ) {
-                        setStartTime(startTime.padStart(2, "0") + ":00");
-                      }
-                    }}
-                    className="w-[84px] cursor-text appearance-none rounded-lg border-none bg-neutral-100 px-3 py-2 text-center text-sm font-medium text-neutral-700 shadow-none transition-colors hover:bg-neutral-200 focus:bg-neutral-200 focus:outline-none focus:ring-0 dark:bg-dark-300 dark:text-neutral-200 dark:hover:bg-dark-400 dark:focus:bg-dark-400"
+                    onFocus={() => setShowStartOptions(true)}
+                    onClick={() => setShowStartOptions(true)}
+                    className="w-[84px] cursor-pointer appearance-none rounded-lg border-none bg-neutral-100 px-3 py-2 text-center text-sm font-medium text-neutral-700 shadow-none transition-colors hover:bg-neutral-200 focus:bg-neutral-200 focus:outline-none focus:ring-0 dark:bg-dark-300 dark:text-neutral-200 dark:hover:bg-dark-400 dark:focus:bg-dark-400"
                   />
-
                   <AnimatePresence>
                     {showStartOptions && (
                       <motion.div
@@ -682,35 +723,12 @@ export function CreateEventModal({
                   <input
                     type="text"
                     placeholder="HH:mm"
-                    maxLength={5}
+                    readOnly
                     value={endTime}
-                    onFocus={(e) => {
-                      e.target.select();
-                      setShowEndOptions(true);
-                    }}
-                    onChange={(e) => {
-                      let val = e.target.value;
-                      if (
-                        val.length === 2 &&
-                        endTime.length === 1 &&
-                        !val.includes(":")
-                      ) {
-                        val += ":";
-                      }
-                      setEndTime(val);
-                    }}
-                    onBlur={() => {
-                      if (
-                        endTime &&
-                        !endTime.includes(":") &&
-                        endTime.length <= 2
-                      ) {
-                        setEndTime(endTime.padStart(2, "0") + ":00");
-                      }
-                    }}
-                    className="w-[84px] cursor-text appearance-none rounded-lg border-none bg-neutral-100 px-3 py-2 text-center text-sm font-medium text-neutral-700 shadow-none transition-colors hover:bg-neutral-200 focus:bg-neutral-200 focus:outline-none focus:ring-0 dark:bg-dark-300 dark:text-neutral-200 dark:hover:bg-dark-400 dark:focus:bg-dark-400"
+                    onFocus={() => setShowEndOptions(true)}
+                    onClick={() => setShowEndOptions(true)}
+                    className="w-[84px] cursor-pointer appearance-none rounded-lg border-none bg-neutral-100 px-3 py-2 text-center text-sm font-medium text-neutral-700 shadow-none transition-colors hover:bg-neutral-200 focus:bg-neutral-200 focus:outline-none focus:ring-0 dark:bg-dark-300 dark:text-neutral-200 dark:hover:bg-dark-400 dark:focus:bg-dark-400"
                   />
-
                   <AnimatePresence>
                     {showEndOptions && (
                       <motion.div
@@ -745,48 +763,36 @@ export function CreateEventModal({
                     )}
                   </AnimatePresence>
                 </div>
-
-                <AnimatePresence>
-                  {showEndDate && (
-                    <motion.div className="relative overflow-hidden">
-                      <input
-                        type="date"
-                        value={format(endDateVal, "yyyy-MM-dd")}
-                        min={format(currentDate, "yyyy-MM-dd")}
-                        onChange={(e) => {
-                          const d = new Date(e.target.value);
-                          if (!isNaN(d.getTime())) setEndDateVal(d);
-                        }}
-                        className="w-[125px] cursor-pointer appearance-none rounded-lg border-none bg-neutral-100 px-3 py-2 text-sm font-medium text-neutral-700 shadow-none transition-colors hover:bg-neutral-200 focus:bg-blue-50 focus:text-blue-700 focus:outline-none focus:ring-0 dark:bg-dark-300 dark:text-neutral-200 dark:hover:bg-dark-400 dark:focus:bg-blue-900/30 dark:focus:text-blue-300"
-                      />
-                    </motion.div>
-                  )}
-                </AnimatePresence>
               </div>
-
               <div className="space-y-2">
                 <Label>Lặp lại</Label>
-                <div className="relative">
-                  <select
-                    value={recurrence}
-                    onChange={(e) =>
-                      setRecurrence(e.target.value as RecurrenceType)
+                <div className="relative" ref={recurrenceRef}>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setShowRecurrenceOptions(!showRecurrenceOptions)
                     }
-                    className={`w-full appearance-none rounded-xl border bg-none py-3 pl-4 pr-9 text-sm font-medium shadow-[inset_0_2px_4px_rgba(0,0,0,0.02)] transition-all focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-[3px] focus:ring-blue-500/10 dark:focus:bg-dark-200 ${hasAttemptedSave && recurrence === "UNSELECTED" ? "border-rose-400 bg-rose-50/50 text-rose-700 dark:border-rose-900/50 dark:bg-rose-900/20 dark:text-rose-400" : "border-neutral-200/70 bg-neutral-50/50 text-neutral-900 dark:border-dark-400/50 dark:bg-dark-300/50 dark:text-white"}`}
-                    style={{ backgroundImage: "none" }}
+                    className={`flex w-full items-center justify-between rounded-2xl border px-4 py-3 text-sm font-medium shadow-[0_2px_10px_rgba(0,0,0,0.06)] transition-all hover:shadow-[0_4px_16px_rgba(0,0,0,0.1)] focus:outline-none ${
+                      hasAttemptedSave && recurrence === "UNSELECTED"
+                        ? "border-rose-400 bg-rose-50/50 text-rose-500 dark:border-rose-900/50 dark:bg-rose-900/20 dark:text-rose-400"
+                        : recurrence !== "UNSELECTED"
+                          ? "border-blue-200 bg-blue-50/60 text-blue-700 dark:border-blue-800/50 dark:bg-blue-900/20 dark:text-blue-300"
+                          : "border-neutral-200/70 bg-neutral-50/50 text-neutral-400 dark:border-dark-400/50 dark:bg-dark-300/50 dark:text-neutral-500"
+                    }`}
                   >
-                    <option value="UNSELECTED" disabled hidden>
-                      Chọn tuỳ chọn lặp lại...
-                    </option>
-                    {recurrenceOptions.map((opt) => (
-                      <option key={opt.value} value={opt.value}>
-                        {opt.label}
-                      </option>
-                    ))}
-                  </select>
-                  <div className="pointer-events-none absolute inset-y-0 right-4 flex items-center">
-                    <svg
-                      className="h-4 w-4 text-blue-500"
+                    <span>
+                      {recurrence !== "UNSELECTED" && selectedOpt
+                        ? selectedOpt.label
+                        : "Chọn tuỳ chọn lặp lại..."}
+                    </span>
+                    <motion.svg
+                      animate={{ rotate: showRecurrenceOptions ? 180 : 0 }}
+                      transition={{ duration: 0.2 }}
+                      className={`h-4 w-4 flex-shrink-0 ${
+                        recurrence !== "UNSELECTED"
+                          ? "text-blue-500"
+                          : "text-neutral-400"
+                      }`}
                       fill="none"
                       viewBox="0 0 24 24"
                       stroke="currentColor"
@@ -797,8 +803,68 @@ export function CreateEventModal({
                         strokeLinejoin="round"
                         d="M19 9l-7 7-7-7"
                       />
-                    </svg>
-                  </div>
+                    </motion.svg>
+                  </button>
+
+                  {/* Custom dropdown list */}
+                  <AnimatePresence>
+                    {showRecurrenceOptions && (
+                      <motion.div
+                        initial={{ opacity: 0, scale: 0.96, y: -6 }}
+                        animate={{ opacity: 1, scale: 1, y: 0 }}
+                        exit={{ opacity: 0, scale: 0.96, y: -6 }}
+                        transition={{ duration: 0.15, ease: "easeOut" }}
+                        className="absolute left-0 right-0 top-full z-50 mt-2 overflow-hidden rounded-2xl border border-neutral-200/80 bg-white shadow-[0_8px_30px_rgba(0,0,0,0.12)] dark:border-dark-300 dark:bg-dark-100"
+                      >
+                        {recurrenceOptions.map((opt, idx) => (
+                          <button
+                            key={opt.value}
+                            type="button"
+                            onMouseDown={(e) => {
+                              e.preventDefault();
+                              setRecurrence(opt.value);
+                              if (opt.value === "CUSTOM") {
+                                const startDay = (getDay(currentDate) + 6) % 7;
+                                // If nothing is selected, or if we want to ensure current day is selected when switching
+                                if (!selectedWeekdays.includes(startDay)) {
+                                  setSelectedWeekdays((prev) =>
+                                    [...new Set([...prev, startDay])].sort(),
+                                  );
+                                }
+                              }
+                              setShowRecurrenceOptions(false);
+                            }}
+                            className={`flex w-full items-center gap-3 px-4 py-3 text-left text-sm font-medium transition-colors ${
+                              idx !== recurrenceOptions.length - 1
+                                ? "border-b border-neutral-100 dark:border-dark-300"
+                                : ""
+                            } ${
+                              recurrence === opt.value
+                                ? "bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-300"
+                                : "text-neutral-700 hover:bg-neutral-50 dark:text-neutral-300 dark:hover:bg-dark-200"
+                            }`}
+                          >
+                            <span>{opt.label}</span>
+                            {recurrence === opt.value && (
+                              <svg
+                                className="ml-auto h-4 w-4 text-blue-500"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                stroke="currentColor"
+                                strokeWidth={2.5}
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  d="M5 13l4 4L19 7"
+                                />
+                              </svg>
+                            )}
+                          </button>
+                        ))}
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                 </div>
 
                 <AnimatePresence>
@@ -809,10 +875,51 @@ export function CreateEventModal({
                       exit={{ opacity: 0, y: -4 }}
                       className="inline-flex items-center gap-1.5 rounded-full bg-blue-100 px-3 py-1 dark:bg-blue-900/30"
                     >
-                      <span className="text-sm">{selectedOpt.icon}</span>
                       <span className="text-xs font-semibold text-blue-700 dark:text-blue-300">
                         {selectedOpt.label}
                       </span>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
+                <AnimatePresence>
+                  {recurrence === "CUSTOM" && (
+                    <motion.div
+                      initial={{ opacity: 0, height: 0, marginTop: 0 }}
+                      animate={{ opacity: 1, height: "auto", marginTop: 12 }}
+                      exit={{ opacity: 0, height: 0, marginTop: 0 }}
+                      className="overflow-hidden"
+                    >
+                      <div className="flex items-center justify-between px-1">
+                        {["T2", "T3", "T4", "T5", "T6", "T7", "Cn"].map(
+                          (day, idx) => {
+                            const isSelected = selectedWeekdays.includes(idx);
+                            return (
+                              <button
+                                key={day}
+                                type="button"
+                                onClick={() => {
+                                  setSelectedWeekdays((prev) => {
+                                    if (prev.includes(idx)) {
+                                      // Don't allow deselecting the last day
+                                      if (prev.length <= 1) return prev;
+                                      return prev.filter((d) => d !== idx);
+                                    }
+                                    return [...prev, idx].sort();
+                                  });
+                                }}
+                                className={`flex h-9 w-9 items-center justify-center rounded-full text-[11px] font-black transition-all ${
+                                  isSelected
+                                    ? "bg-blue-600 text-white shadow-lg shadow-blue-500/30"
+                                    : "bg-neutral-100 text-neutral-500 hover:bg-neutral-200 dark:bg-dark-300 dark:text-neutral-400"
+                                }`}
+                              >
+                                {day}
+                              </button>
+                            );
+                          },
+                        )}
+                      </div>
                     </motion.div>
                   )}
                 </AnimatePresence>
@@ -822,39 +929,185 @@ export function CreateEventModal({
             <div className="space-y-2.5">
               <Label>Giao việc cho</Label>
 
-              <div className="relative">
-                <select
-                  value={selectedUserId}
-                  onChange={(e) => setSelectedUserId(e.target.value)}
-                  className="w-full appearance-none rounded-xl border border-neutral-200/70 bg-neutral-50/50 py-3 pl-4 pr-9 text-sm font-medium text-neutral-900 shadow-[inset_0_2px_4px_rgba(0,0,0,0.02)] transition-all hover:bg-neutral-50 focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-[3px] focus:ring-blue-500/10 dark:border-dark-400/50 dark:bg-dark-300/50 dark:text-white dark:focus:bg-dark-200"
-                  style={{ backgroundImage: "none" }}
-                >
-                  <option value="" disabled hidden>
-                    Chọn người dùng...
-                  </option>
-                  {users?.map((user) => (
-                    <option key={user.id} value={user.id}>
-                      {user.name || user.username || user.email}
-                    </option>
-                  ))}
-                </select>
-                <div className="pointer-events-none absolute inset-y-0 right-4 flex items-center">
-                  <svg
-                    className="h-4 w-4 text-blue-500"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    strokeWidth={2.5}
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M19 9l-7 7-7-7"
-                    />
-                  </svg>
+              <div className="relative" ref={assigneeRef}>
+                  {currentUser?.role === "ADMIN" ? (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setShowAssigneeOptions(!showAssigneeOptions)
+                        }
+                        className={`flex w-full items-center justify-between rounded-2xl border px-4 py-4 text-sm font-medium shadow-[0_2px_10px_rgba(0,0,0,0.06)] transition-all hover:shadow-[0_4px_16px_rgba(0,0,0,0.1)] focus:outline-none ${
+                          selectedUserId
+                            ? "border-blue-200 bg-blue-50/60 text-blue-700 dark:border-blue-800/50 dark:bg-blue-900/20 dark:text-blue-300"
+                            : "border-neutral-200/70 bg-neutral-50/50 text-neutral-400 dark:border-dark-400/50 dark:bg-dark-300/50 dark:text-neutral-500"
+                        }`}
+                      >
+                        <span className="flex items-center gap-2">
+                          {selectedUserId && users
+                            ? (() => {
+                                const u = users.find(
+                                  (x) => x.id === selectedUserId,
+                                );
+                                const name = u
+                                  ? u.name || u.username || u.email || ""
+                                  : "";
+                                const initials = name
+                                  .split(" ")
+                                  .map((w: string) => w[0])
+                                  .join("")
+                                  .slice(0, 2)
+                                  .toUpperCase();
+                                return (
+                                  <>
+                                    <span className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-500 text-[10px] font-bold text-white">
+                                      {initials}
+                                    </span>
+                                    <span>{name}</span>
+                                  </>
+                                );
+                              })()
+                            : "Chọn người thực hiện..."}
+                        </span>
+                        <motion.svg
+                          animate={{ rotate: showAssigneeOptions ? 180 : 0 }}
+                          transition={{ duration: 0.2 }}
+                          className={`h-4 w-4 flex-shrink-0 ${
+                            selectedUserId
+                              ? "text-blue-500"
+                              : "text-neutral-400"
+                          }`}
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                          strokeWidth={2.5}
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            d="M19 9l-7 7-7-7"
+                          />
+                        </motion.svg>
+                      </button>
+
+                      {/* Dropdown list for Admins */}
+                      <AnimatePresence>
+                        {showAssigneeOptions && (
+                          <motion.div
+                            initial={{ opacity: 0, scale: 0.96, y: -6 }}
+                            animate={{ opacity: 1, scale: 1, y: 0 }}
+                            exit={{ opacity: 0, scale: 0.96, y: -6 }}
+                            transition={{ duration: 0.15, ease: "easeOut" }}
+                            className="absolute left-0 right-0 top-full z-50 mt-2 max-h-72 overflow-y-auto rounded-2xl border border-neutral-200/80 bg-white shadow-[0_8px_30px_rgba(0,0,0,0.12)] dark:border-dark-300 dark:bg-dark-100"
+                          >
+                            {filteredUsers.map((user, idx) => {
+                              const name =
+                                user.name || user.username || user.email || "";
+                              const initials = name
+                                .split(" ")
+                                .map((w: string) => w[0])
+                                .join("")
+                                .slice(0, 2)
+                                .toUpperCase();
+                              const colors = [
+                                "bg-blue-500",
+                                "bg-violet-500",
+                                "bg-emerald-500",
+                                "bg-orange-500",
+                                "bg-rose-500",
+                                "bg-cyan-500",
+                              ];
+                              const color = colors[idx % colors.length]!;
+                              const isSelected = selectedUserId === user.id;
+                              return (
+                                <button
+                                  key={user.id}
+                                  type="button"
+                                  onMouseDown={(e) => {
+                                    e.preventDefault();
+                                    setSelectedUserId(user.id);
+                                    setShowAssigneeOptions(false);
+                                  }}
+                                  className={`flex w-full items-center gap-3 px-4 py-2 text-left text-sm font-medium transition-colors ${
+                                    idx !== filteredUsers.length - 1
+                                      ? "border-b border-neutral-100 dark:border-dark-300"
+                                      : ""
+                                  } ${
+                                    isSelected
+                                      ? "bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-300"
+                                      : "text-neutral-700 hover:bg-neutral-50 dark:text-neutral-300 dark:hover:bg-dark-200"
+                                  }`}
+                                >
+                                  <span
+                                    className={`flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full text-xs font-bold text-white ${color}`}
+                                  >
+                                    {initials}
+                                  </span>
+                                  <span className="flex-1">{name}</span>
+                                  {isSelected && (
+                                    <svg
+                                      className="h-4 w-4 text-blue-500"
+                                      fill="none"
+                                      viewBox="0 0 24 24"
+                                      stroke="currentColor"
+                                      strokeWidth={2.5}
+                                    >
+                                      <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        d="M5 13l4 4L19 7"
+                                      />
+                                    </svg>
+                                  )}
+                                </button>
+                              );
+                            })}
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </>
+                  ) : (
+                    /* Static display for non-Admins - Self-assignment only */
+                    <div className="flex w-full items-center gap-3 rounded-2xl border border-blue-200 bg-blue-50/60 px-4 py-4 text-sm font-medium text-blue-700 shadow-[0_2px_10px_rgba(0,0,0,0.04)] dark:border-blue-800/50 dark:bg-blue-900/20 dark:text-blue-300">
+                      {(() => {
+                        const name =
+                          currentUser?.name ||
+                          currentUser?.username ||
+                          currentUser?.email ||
+                          "";
+                        const initials = name
+                          .split(" ")
+                          .map((w: string) => w[0])
+                          .join("")
+                          .slice(0, 2)
+                          .toUpperCase();
+                        return (
+                          <>
+                            <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-blue-500 text-xs font-bold text-white">
+                              {initials}
+                            </span>
+                            <span className="flex-1">{name}</span>
+                            {/* Indicator that this is a self-assignment */}
+                            <svg
+                              className="h-4 w-4 text-blue-500/50"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                              strokeWidth={2.5}
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                d="M5 13l4 4L19 7"
+                              />
+                            </svg>
+                          </>
+                        );
+                      })()}
+                    </div>
+                  )}
                 </div>
               </div>
-            </div>
 
             <div className="rounded-xl bg-neutral-50 p-4 dark:bg-dark-200">
               <p className="mb-2 text-[10px] font-black uppercase tracking-[0.15em] text-neutral-400">
@@ -875,7 +1128,7 @@ export function CreateEventModal({
               </p>
               {recurrence !== "NONE" && selectedOpt && (
                 <p className="mt-1 text-xs font-medium text-blue-600 dark:text-blue-400">
-                  {selectedOpt.icon} {selectedOpt.label}
+                  {selectedOpt.label}
                 </p>
               )}
               {attendees.length > 0 && (
@@ -899,16 +1152,16 @@ export function CreateEventModal({
             </div>
           </div>
 
-          <div className="flex flex-shrink-0 gap-3 border-t border-light-200 bg-light-50 px-7 py-4 dark:border-dark-300 dark:bg-dark-200">
+          <div className="flex flex-shrink-0 gap-3 border-t border-light-200 bg-light-50 px-5 py-3 dark:border-dark-300 dark:bg-dark-200">
             <button
               onClick={onClose}
-              className="flex-1 rounded-xl bg-neutral-100 px-6 py-3 text-sm font-bold text-neutral-600 transition-all hover:bg-neutral-200 dark:bg-dark-300 dark:text-dark-200 dark:hover:bg-dark-400"
+              className="flex-1 rounded-xl bg-neutral-100 px-4 py-2.5 text-sm font-bold text-neutral-600 transition-all hover:bg-neutral-200 dark:bg-dark-300 dark:text-dark-200 dark:hover:bg-dark-400"
             >
               Hủy
             </button>
             <button
               onClick={() => handleSave()}
-              className={`flex-1 rounded-xl px-6 py-3 text-sm font-bold text-white shadow-md transition-all hover:shadow-lg active:scale-[0.98] ${
+              className={`flex-1 rounded-xl px-4 py-2.5 text-sm font-bold text-white shadow-md transition-all hover:shadow-lg active:scale-[0.98] ${
                 isEditMode
                   ? "bg-violet-500 hover:bg-violet-600"
                   : "bg-blue-500 hover:bg-blue-600"
@@ -919,8 +1172,6 @@ export function CreateEventModal({
           </div>
         </motion.div>
       </Modal>
-
-      {/* Custom Update Confirmation Modal */}
       <AnimatePresence>
         {showUpdateConfirm && (
           <div className="fixed inset-0 z-[3000] flex items-center justify-center p-4">
@@ -1037,7 +1288,7 @@ export function CreateEventModal({
                   onClick={() => setShowUpdateConfirm(false)}
                   className="mt-1 rounded-xl py-2 text-sm font-bold text-neutral-400 transition-all hover:text-neutral-600 dark:hover:text-neutral-200"
                 >
-                     Hủy
+                  Hủy
                 </button>
               </div>
             </motion.div>

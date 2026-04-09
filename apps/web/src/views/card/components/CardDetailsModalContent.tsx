@@ -1,4 +1,5 @@
 import { t } from "@lingui/core/macro";
+import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { HiXMark } from "react-icons/hi2";
@@ -21,21 +22,14 @@ import { api } from "~/utils/api";
 import { invalidateCard } from "~/utils/cardInvalidation";
 import { formatMemberDisplayName, getAvatarUrl } from "~/utils/helpers";
 import { DeleteLabelConfirmation } from "../../../components/DeleteLabelConfirmation";
-import { cardChildModalTypes } from "../constants";
 import ActivityList from "./ActivityList";
+import Checklists from "./Checklists";
 import { AttachmentThumbnails } from "./AttachmentThumbnails";
 import { AttachmentUpload } from "./AttachmentUpload";
-import Checklists from "./Checklists";
-import { DeleteCardConfirmation } from "./DeleteCardConfirmation";
-import { DeleteChecklistConfirmation } from "./DeleteChecklistConfirmation";
-import { DeleteCommentConfirmation } from "./DeleteCommentConfirmation";
 import Dropdown from "./Dropdown";
-import { DueDateSelector } from "./DueDateSelector";
-import LabelSelector from "./LabelSelector";
-import ListSelector from "./ListSelector";
-import MemberSelector from "./MemberSelector";
-import { NewChecklistForm } from "./NewChecklistForm";
 import NewCommentForm from "./NewCommentForm";
+import CardMetadataGrid from "./CardMetadataGrid";
+import CardDetailsModals from "./CardDetailsModals";
 
 interface FormValues {
   cardId: string;
@@ -55,22 +49,17 @@ export default function CardDetailsModalContent({
   onClose,
 }: CardDetailsModalContentProps) {
   const utils = api.useUtils();
-  const {
-    modalContentType,
-    entityId,
-    getModalState,
-    clearModalState,
-    closeModal,
-    isOpen,
-    modalStates,
-  } = useModal();
+  const { modalContentType, entityId, clearModalState, isOpen, modalStates } =
+    useModal();
   const { showPopup } = usePopup();
   const { workspace } = useWorkspace();
-  const { canEditCard, canAttach, canTick, canCreateComment } =
-    usePermissions();
+  const { canEditCard, canAttach, canCreateComment } = usePermissions();
   const { data: session } = authClient.useSession();
   const [activeChecklistForm, setActiveChecklistForm] = useState<string | null>(
     null,
+  );
+  const [activeTab, setActiveTab] = useState<"comments" | "history">(
+    "comments",
   );
 
   const { data: card, isLoading } = api.card.byId.useQuery(
@@ -83,7 +72,6 @@ export default function CardDetailsModalContent({
   const refetchCard = async () => {
     if (cardId) await utils.card.byId.refetch({ cardPublicId: cardId });
   };
-
   const board = card?.list.board;
   const labels = board?.labels;
   const workspaceMembers = board?.workspace.members;
@@ -94,7 +82,7 @@ export default function CardDetailsModalContent({
   const formattedLabels =
     labels?.map((label) => {
       const isSelected = selectedLabels?.some(
-        (selectedLabel) => selectedLabel.publicId === label.publicId,
+        (sl) => sl.publicId === label.publicId,
       );
       return {
         key: label.publicId,
@@ -114,7 +102,7 @@ export default function CardDetailsModalContent({
   const formattedMembers =
     workspaceMembers?.map((member) => {
       const isSelected = selectedMembers?.some(
-        (assignedMember) => assignedMember.publicId === member.publicId,
+        (am) => am.publicId === member.publicId,
       );
       return {
         key: member.publicId,
@@ -141,47 +129,40 @@ export default function CardDetailsModalContent({
 
   const editorWorkspaceMembers =
     workspaceMembers
-      ?.filter(
-        (member): member is typeof member & { email: string } =>
-          member.email !== null,
-      )
-      .map((member) => ({
-        publicId: member.publicId,
-        email: member.email,
-        user: member.user
+      ?.filter((m): m is typeof m & { email: string } => m.email !== null)
+      .map((m) => ({
+        publicId: m.publicId,
+        email: m.email,
+        user: m.user
           ? {
-              id: member.user.id,
-              name: member.user.name ?? null,
-              image: member.user.image ?? null,
+              id: m.user.id,
+              name: m.user.name ?? null,
+              image: m.user.image ?? null,
             }
           : null,
       })) ?? [];
 
   const updateCard = api.card.update.useMutation({
-    onError: () => {
+    onError: () =>
       showPopup({
         header: t`Unable to update card`,
-        message: t`Please try again later, or contact customer support.`,
+        message: t`Please try again later.`,
         icon: "error",
-      });
-    },
+      }),
     onSettled: async () => {
       if (cardId) await invalidateCard(utils, cardId);
     },
   });
 
   const addOrRemoveLabel = api.card.addOrRemoveLabel.useMutation({
-    onError: () => {
+    onError: () =>
       showPopup({
         header: t`Unable to add label`,
-        message: t`Please try again later, or contact customer support.`,
+        message: t`Please try again later.`,
         icon: "error",
-      });
-    },
+      }),
     onSettled: async () => {
-      if (cardId) {
-        await utils.card.byId.invalidate({ cardPublicId: cardId });
-      }
+      if (cardId) await utils.card.byId.invalidate({ cardPublicId: cardId });
     },
   });
 
@@ -193,379 +174,298 @@ export default function CardDetailsModalContent({
     },
   });
 
-  const onSubmit = (values: FormValues) => {
+  const onSubmit = (values: FormValues) =>
     updateCard.mutate({
       cardPublicId: values.cardId,
       title: values.title,
       description: values.description,
     });
-  };
 
-  // Add new created label to selected labels
   useEffect(() => {
     const newLabelId = modalStates.NEW_LABEL_CREATED as string | undefined;
     if (newLabelId && cardId) {
-      const isAlreadyAdded = card?.labels.some(
-        (label) => label.publicId === newLabelId,
-      );
-      if (!isAlreadyAdded) {
+      if (!card?.labels.some((l) => l.publicId === newLabelId))
         addOrRemoveLabel.mutate({
           cardPublicId: cardId,
           labelPublicId: newLabelId,
         });
-      }
       clearModalState("NEW_LABEL_CREATED");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [modalStates.NEW_LABEL_CREATED, card, cardId]);
 
-  // Open new item form after creating a new checklist
   useEffect(() => {
-    if (!card) return;
-    const state = modalStates.ADD_CHECKLIST as
-      | { createdChecklistId?: string }
-      | undefined;
-    const createdId = state?.createdChecklistId;
-    if (createdId) {
-      setActiveChecklistForm(createdId);
-      clearModalState("ADD_CHECKLIST");
-    }
-  }, [card, modalStates, clearModalState]);
-
-  // Auto-resize title textarea
-  useEffect(() => {
-    const titleTextarea = document.getElementById(
+    const el = document.getElementById(
       "card-modal-title",
     ) as HTMLTextAreaElement | null;
-    if (titleTextarea) {
-      titleTextarea.style.height = "auto";
-      titleTextarea.style.height = `${titleTextarea.scrollHeight}px`;
+    if (el) {
+      el.style.height = "auto";
+      el.style.height = `${el.scrollHeight}px`;
     }
   }, [card]);
 
   if (!cardId) return null;
 
-  return (
-    <div className="relative">
-      {/* Two-column layout: left (main) + right (sidebar) */}
-      <div className="flex max-h-[90vh] w-full flex-col overflow-hidden rounded-lg shadow-2xl md:flex-row">
-        {/* Header bar */}
-        <div className="flex w-full items-center justify-between border-b border-light-300 bg-light-50 px-5 py-3 dark:border-dark-300 dark:bg-dark-100 md:hidden">
-          <span className="text-sm font-semibold text-light-900 dark:text-dark-900">
-            {card?.title ?? t`Card`}
-          </span>
-          <button
-            onClick={onClose}
-            className="flex h-7 w-7 items-center justify-center rounded-md text-light-700 hover:bg-light-200 dark:text-dark-700 dark:hover:bg-dark-200"
-          >
-            <HiXMark className="h-4 w-4" />
-          </button>
-        </div>
+  const canComment = canCreateComment && card && !isTemplate;
 
-        {/* Left column — main content */}
-        <div className="flex-1 overflow-y-auto p-5 md:p-6">
-          {/* Title + close button row */}
-          <div className="mb-4 flex items-start justify-between">
-            {!card && isLoading && (
-              <div className="h-8 w-48 animate-pulse rounded bg-light-300 dark:bg-dark-300" />
-            )}
-            {card && (
-              <form onSubmit={handleSubmit(onSubmit)} className="mr-3 w-full">
+  const canUpload = canAttach && card && !isTemplate;
+
+  return (
+    <div className="flex w-full items-center justify-center font-sans antialiased">
+      <motion.div
+        initial={{ opacity: 0, scale: 0.97 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ duration: 0.18, ease: "easeOut" }}
+        className="flex h-[92vh] w-[95vw] max-w-[1200px] overflow-hidden rounded-2xl border border-light-200 bg-white shadow-2xl dark:border-dark-300 dark:bg-dark-100"
+      >
+        <div className="flex w-1/2 flex-col overflow-hidden border-r border-light-100 dark:border-dark-300">
+          <div className="shrink-0 border-b border-light-100 px-10 py-7 dark:border-dark-300">
+            {!card && isLoading ? (
+              <div className="h-10 w-3/4 animate-pulse rounded-lg bg-light-200 dark:bg-dark-300" />
+            ) : card ? (
+              <form onSubmit={handleSubmit(onSubmit)}>
                 <textarea
                   id="card-modal-title"
                   {...register("title")}
                   onBlur={canEdit ? handleSubmit(onSubmit) : undefined}
                   rows={1}
                   disabled={!canEdit}
-                  className={`block w-full resize-none overflow-hidden border-0 bg-transparent p-0 text-xl font-bold leading-relaxed text-neutral-900 focus:ring-0 dark:text-dark-1000 ${!canEdit ? "cursor-default" : ""}`}
+                  placeholder={t`Tiêu đề thẻ...`}
+                  className={`block w-full resize-none overflow-hidden border-0 bg-transparent p-0 text-2xl font-bold leading-snug text-neutral-900 placeholder:text-light-400 focus:outline-none focus:ring-0 dark:text-dark-1000 dark:placeholder:text-dark-500 ${!canEdit ? "cursor-default" : ""}`}
                   onInput={(e) => {
-                    const target = e.target as HTMLTextAreaElement;
-                    target.style.height = "auto";
-                    target.style.height = `${target.scrollHeight}px`;
+                    const el = e.target as HTMLTextAreaElement;
+                    el.style.height = "auto";
+                    el.style.height = `${el.scrollHeight}px`;
                   }}
                 />
               </form>
-            )}
-            <div className="flex shrink-0 items-center gap-1">
+            ) : null}
+          </div>
+          <div className="shrink-0 border-b border-light-100 px-10 py-6 dark:border-dark-300">
+            <p className="mb-3 text-[10px] font-semibold uppercase tracking-widest text-light-500 dark:text-dark-500">
+              {t`Mô tả`}
+            </p>
+            <div className="min-h-[120px] rounded-xl border border-light-100 bg-light-50/30 px-1 dark:border-dark-300/40 dark:bg-dark-200/10">
               {card && (
-                <Dropdown
-                  cardPublicId={cardId}
-                  isTemplate={isTemplate}
-                  boardPublicId={boardId}
-                  cardCreatedBy={card.createdBy}
-                />
+                <form onSubmit={handleSubmit(onSubmit)}>
+                  <Editor
+                    content={card.description}
+                    onChange={
+                      canEdit ? (v) => setValue("description", v) : undefined
+                    }
+                    onBlur={
+                      canEdit ? () => handleSubmit(onSubmit)() : undefined
+                    }
+                    workspaceMembers={
+                      workspaceMembers?.filter(
+                        (m): m is typeof m & { email: string } =>
+                          m.email !== null,
+                      ) ?? []
+                    }
+                    readOnly={!canEdit}
+                  />
+                </form>
               )}
+            </div>
+          </div>
+
+          {/* Checklists */}
+          <div className="flex-1 overflow-y-auto px-10 pb-10 pt-4">
+            <p className="mb-3 text-[10px] font-semibold uppercase tracking-widest text-light-500 dark:text-dark-500">
+              {t`Checklist`}
+            </p>
+            {card && (
+              <Checklists
+                checklists={card.checklists}
+                cardPublicId={cardId}
+                viewOnly={!canEditCard}
+                activeChecklistForm={activeChecklistForm}
+                setActiveChecklistForm={setActiveChecklistForm}
+              />
+            )}
+          </div>
+        </div>
+        <div className="flex w-1/2 shrink-0 flex-col overflow-hidden bg-light-50/50 dark:bg-dark-50/30">
+          <div className="relative z-50 flex shrink-0 items-center justify-end border-b border-light-100 bg-white/50 px-8 py-7 backdrop-blur-sm dark:border-b-dark-300 dark:bg-dark-100/50">
+            <div className="flex items-center gap-3">
+              {card && (
+                <div className="rounded-xl border border-light-200 bg-white p-1 shadow-sm transition-all hover:bg-light-50 hover:shadow-md dark:border-dark-300 dark:bg-dark-100 dark:hover:bg-dark-200">
+                  <Dropdown
+                    cardPublicId={cardId}
+                    isTemplate={isTemplate}
+                    boardPublicId={boardId}
+                    cardCreatedBy={card.createdBy}
+                  />
+                </div>
+              )}
+              <div className="h-4 w-px bg-light-200 dark:bg-dark-300" />
               <button
                 onClick={onClose}
-                className="hidden h-7 w-7 items-center justify-center rounded-md text-light-700 hover:bg-light-200 dark:text-dark-700 dark:hover:bg-dark-200 md:flex"
+                className="flex h-9 w-9 items-center justify-center rounded-xl border border-light-200 bg-white text-light-600 shadow-sm transition-all hover:bg-light-100 hover:text-light-900 active:scale-95 dark:border-dark-300 dark:bg-dark-100 dark:text-dark-600 dark:hover:bg-dark-200 dark:hover:text-dark-1000"
               >
-                <HiXMark className="h-4 w-4" />
+                <HiXMark className="h-5 w-5" />
               </button>
             </div>
           </div>
 
-          {/* Description */}
-          {card && (
-            <div className="mb-6">
-              <form onSubmit={handleSubmit(onSubmit)}>
-                <Editor
-                  content={card.description}
-                  onChange={
-                    canEdit ? (e) => setValue("description", e) : undefined
-                  }
-                  onBlur={canEdit ? () => handleSubmit(onSubmit)() : undefined}
-                  workspaceMembers={
-                    workspaceMembers?.filter(
-                      (m): m is typeof m & { email: string } =>
-                        m.email !== null,
-                    ) ?? []
-                  }
-                  readOnly={!canEdit}
+          <div className="flex flex-1 flex-col overflow-y-auto">
+            <CardMetadataGrid
+              cardId={cardId}
+              card={card}
+              formattedLists={formattedLists}
+              formattedMembers={formattedMembers}
+              formattedLabels={formattedLabels}
+              canEdit={!!canEdit}
+              updateCard={updateCard}
+              weekStartsOn={workspace.weekStartDay as 0 | 1 | 6}
+            />
+
+            <div className="mx-6 shrink-0 border-t border-light-200 dark:border-dark-300" />
+            <div className="sticky top-0 z-10 shrink-0 bg-light-50/80 px-6 py-4 backdrop-blur-md dark:bg-dark-50/80">
+              <div className="relative flex rounded-2xl border border-light-200 bg-white p-1 shadow-sm dark:border-dark-300 dark:bg-dark-100">
+                <button
+                  onClick={() => setActiveTab("comments")}
+                  className={`relative z-10 flex-1 rounded-xl py-2.5 text-[11px] font-bold uppercase tracking-widest transition-all ${
+                    activeTab === "comments"
+                      ? "text-neutral-900 dark:text-dark-1000"
+                      : "text-light-500 hover:text-light-700 dark:text-dark-500"
+                  }`}
+                >
+                  {t`Tính năng`}
+                </button>
+                <button
+                  onClick={() => setActiveTab("history")}
+                  className={`relative z-10 flex-1 rounded-xl py-2.5 text-[11px] font-bold uppercase tracking-widest transition-all ${
+                    activeTab === "history"
+                      ? "text-neutral-900 dark:text-dark-1000"
+                      : "text-light-500 hover:text-light-700 dark:text-dark-500"
+                  }`}
+                >
+                  {t`Hoạt động`}
+                </button>
+                <motion.div
+                  className="absolute inset-y-1 rounded-xl bg-light-100 shadow-inner dark:bg-dark-200"
+                  style={{ width: "calc(50% - 4px)" }}
+                  animate={{
+                    x: activeTab === "comments" ? 0 : "calc(100% + 4px)",
+                  }}
+                  initial={false}
+                  transition={{ type: "spring", stiffness: 450, damping: 38 }}
                 />
-              </form>
+              </div>
             </div>
-          )}
 
-          {/* Checklists */}
-          {card && (
-            <Checklists
-              checklists={card.checklists}
-              cardPublicId={cardId}
-              activeChecklistForm={activeChecklistForm}
-              setActiveChecklistForm={setActiveChecklistForm}
-              viewOnly={!canEdit}
-            />
-          )}
-
-          {/* Attachments */}
-          {card && !isTemplate && (
-            <>
-              {card.attachments.length > 0 && (
-                <div className="mt-4">
-                  <AttachmentThumbnails
-                    attachments={card.attachments}
+            <AnimatePresence mode="wait">
+              {activeTab === "history" ? (
+                <motion.div
+                  key="history"
+                  initial={{ opacity: 0, y: 5 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -5 }}
+                  transition={{ duration: 0.15 }}
+                  className="flex-1 px-6 pb-6"
+                >
+                  <ActivityList
                     cardPublicId={cardId}
-                    isReadOnly={!canEdit}
+                    isLoading={!card}
+                    isAdmin={workspace.role === "ADMIN"}
+                    excludedTypes={[
+                      "comment",
+                      "updated_comment_added",
+                      "updated_comment_updated",
+                      "updated_comment_deleted",
+                    ]}
                   />
-                </div>
+                </motion.div>
+              ) : (
+                <motion.div
+                  key="comments"
+                  initial={{ opacity: 0, y: 5 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -5 }}
+                  transition={{ duration: 0.15 }}
+                  className="flex flex-1 flex-col gap-6 px-6 pb-6"
+                >
+                  {card && !isTemplate && (
+                    <div className="shrink-0 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-light-500 dark:text-dark-500">
+                          {t`Tài liệu đính kèm`}
+                        </p>
+                        {card.attachments.length > 0 && (
+                          <span className="flex h-5 items-center justify-center rounded-full bg-light-100 px-2 text-[10px] font-bold text-light-600 dark:bg-dark-300 dark:text-dark-600">
+                            {card.attachments.length}
+                          </span>
+                        )}
+                      </div>
+                      <div className="rounded-xl border border-light-200 bg-white/50 p-3 shadow-sm dark:border-dark-300 dark:bg-dark-100/50">
+                        {card.attachments.length > 0 && (
+                          <div className="mb-3 max-h-40 overflow-y-auto rounded-lg bg-light-50/50 p-2 dark:bg-dark-200/50">
+                            <AttachmentThumbnails
+                              attachments={card.attachments}
+                              cardPublicId={cardId}
+                              isReadOnly={!canEdit}
+                            />
+                          </div>
+                        )}
+                        <AttachmentUpload
+                          cardPublicId={cardId}
+                          hideChecklistButton={true}
+                        />
+                      </div>
+                    </div>
+                  )}
+                  <div className="h-px bg-light-200 dark:bg-dark-300" />
+                  {canComment && (
+                    <div className="shrink-0 space-y-3">
+                      <p className="text-[10px] font-bold uppercase tracking-widest text-light-500 dark:text-dark-500">
+                        {t`Viết bình luận`}
+                      </p>
+                      <div className="overflow-hidden rounded-xl border border-light-200 bg-white shadow-sm ring-1 ring-light-100/50 dark:border-dark-300 dark:bg-dark-100 dark:ring-white/5">
+                        <NewCommentForm
+                          cardPublicId={cardId}
+                          workspaceMembers={editorWorkspaceMembers}
+                        />
+                      </div>
+                    </div>
+                  )}
+                  <div className="flex-1 space-y-4">
+                    <div className="flex items-center gap-2">
+                      <p className="text-[10px] font-bold uppercase tracking-widest text-light-500 dark:text-dark-500">
+                        {t`Lịch sử comment`}
+                      </p>
+                      <div className="h-px flex-1 bg-light-200/50 dark:bg-dark-300/50" />
+                    </div>
+                    <div className="flex-1 overflow-y-auto pr-1">
+                      <ActivityList
+                        cardPublicId={cardId}
+                        isLoading={!card}
+                        isAdmin={workspace.role === "ADMIN"}
+                        includedTypes={[
+                          "comment",
+                          "updated_comment_added",
+                          "updated_comment_updated",
+                          "updated_comment_deleted",
+                        ]}
+                      />
+                    </div>
+                  </div>
+                </motion.div>
               )}
-              {canAttach &&
-                (isCreator ||
-                  card.members
-                    .map((m) => m.user?.id)
-                    .includes(session?.user.id)) && (
-                  <div className="mt-4">
-                    <AttachmentUpload cardPublicId={cardId} />
-                  </div>
-                )}
-            </>
-          )}
-
-          {/* Activity */}
-          {card && (
-            <div className="mt-6 border-t border-light-300 pt-6 dark:border-dark-300">
-              <h2 className="mb-4 text-sm font-semibold text-light-1000 dark:text-dark-1000">
-                {t`Lịch sử`}
-              </h2>
-              <ActivityList
-                cardPublicId={cardId}
-                isLoading={!card}
-                isAdmin={workspace.role === "ADMIN"}
-              />
-              {!isTemplate &&
-                canCreateComment &&
-                (isCreator ||
-                  card.members
-                    .map((m) => m.user?.id)
-                    .includes(session?.user.id)) && (
-                  <div className="mt-4">
-                    <NewCommentForm
-                      cardPublicId={cardId}
-                      workspaceMembers={editorWorkspaceMembers}
-                    />
-                  </div>
-                )}
-            </div>
-          )}
-        </div>
-
-        {/* Right column — sidebar */}
-        <div className="w-full shrink-0 border-t border-light-300 bg-light-50 p-5 dark:border-dark-300 dark:bg-dark-50 md:w-64 md:border-l md:border-t-0">
-          <div className="mb-4">
-            <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-light-700 dark:text-dark-700">
-              {t`Cột`}
-            </p>
-            <ListSelector
-              cardPublicId={cardId}
-              lists={formattedLists}
-              isLoading={!card}
-              disabled={!canEdit}
-            />
-          </div>
-          <div className="mb-4">
-            <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-light-700 dark:text-dark-700">
-              {t`Nhãn`}
-            </p>
-            <LabelSelector
-              cardPublicId={cardId}
-              labels={formattedLabels}
-              isLoading={!card}
-              disabled={!canEdit}
-            />
-          </div>
-          {!isTemplate && (
-            <div className="mb-4">
-              <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-light-700 dark:text-dark-700">
-                {t`Thành viên`}
-              </p>
-              <MemberSelector
-                cardPublicId={cardId}
-                members={formattedMembers}
-                isLoading={!card}
-                disabled={!canEdit}
-              />
-            </div>
-          )}
-          <div className="mb-4">
-            {card?.startDate && (
-              <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-light-700 dark:text-dark-700">
-                {t`Ngày bắt đầu`}
-              </p>
-            )}
-            <DueDateSelector
-              cardPublicId={cardId}
-              dueDate={card?.startDate}
-              isLoading={!card}
-              disabled={!canEdit}
-              onDateSelect={(date) => {
-                if (card) {
-                  updateCard.mutate({
-                    cardPublicId: card.publicId,
-                    startDate: date ?? null,
-                  });
-                }
-              }}
-              weekStartsOn={workspace.weekStartDay}
-              label={t`Ngày bắt đầu`}
-            />
-          </div>
-          <div className="mb-4">
-            {card?.dueDate && (
-              <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-light-700 dark:text-dark-700">
-                {t`Ngày hết hạn`}
-              </p>
-            )}
-            <DueDateSelector
-              cardPublicId={cardId}
-              dueDate={card?.dueDate}
-              isLoading={!card}
-              disabled={!canEdit}
-              onDateSelect={(date) => {
-                if (card) {
-                  updateCard.mutate({
-                    cardPublicId: card.publicId,
-                    dueDate: date ?? null,
-                  });
-                }
-              }}
-              weekStartsOn={workspace.weekStartDay}
-              label={t`Ngày hết hạn`}
-            />
+            </AnimatePresence>
           </div>
         </div>
-      </div>
+      </motion.div>
 
-      {/* Sub-modals (Only centered ones) */}
-      <Modal
-        modalSize="md"
-        isVisible={isOpen && modalContentType === "NEW_FEEDBACK"}
-      >
-        <FeedbackModal />
-      </Modal>
-
-      <Modal
-        modalSize="sm"
-        isVisible={isOpen && modalContentType === "DELETE_CARD"}
-      >
-        <DeleteCardConfirmation
-          boardPublicId={boardId ?? ""}
-          cardPublicId={cardId}
-        />
-      </Modal>
-
-      <Modal
-        modalSize="sm"
-        isVisible={isOpen && modalContentType === "DELETE_COMMENT"}
-      >
-        <DeleteCommentConfirmation
-          cardPublicId={cardId}
-          commentPublicId={entityId}
-        />
-      </Modal>
-
-      <Modal
-        modalSize="sm"
-        isVisible={isOpen && modalContentType === "NEW_WORKSPACE"}
-      >
-        <NewWorkspaceForm />
-      </Modal>
-
-      <Modal
-        modalSize="sm"
-        centered
-        isVisible={isOpen && modalContentType === "NEW_LABEL"}
-      >
-        <LabelForm boardPublicId={boardId ?? ""} refetch={refetchCard} />
-      </Modal>
-
-      <Modal
-        modalSize="sm"
-        centered
-        isVisible={isOpen && modalContentType === "EDIT_LABEL"}
-      >
-        <LabelForm
-            boardPublicId={boardId ?? ""}
-            refetch={refetchCard}
-            isEdit
-          />
-      </Modal>
-
-      <Modal
-        modalSize="sm"
-        centered
-        isVisible={isOpen && modalContentType === "DELETE_LABEL"}
-      >
-        <DeleteLabelConfirmation
-            refetch={refetchCard}
-            labelPublicId={entityId}
-          />
-      </Modal>
-
-      <Modal
-        modalSize="sm"
-        centered
-        isVisible={isOpen && modalContentType === "ADD_CHECKLIST"}
-      >
-        <NewChecklistForm cardPublicId={cardId} />
-      </Modal>
-
-      <Modal
-        modalSize="sm"
-        centered
-        isVisible={isOpen && modalContentType === "DELETE_CHECKLIST"}
-      >
-        <DeleteChecklistConfirmation
-          cardPublicId={cardId}
-          checklistPublicId={entityId}
-        />
-      </Modal>
-
-      <Modal
-        modalSize="sm"
-        isVisible={isOpen && modalContentType === "EDIT_YOUTUBE"}
-      >
-        <EditYouTubeModal />
-      </Modal>
+      <CardDetailsModals
+        isOpen={isOpen}
+        modalContentType={modalContentType}
+        entityId={entityId}
+        boardId={boardId}
+        cardId={cardId}
+        refetchCard={refetchCard}
+        clearModalState={clearModalState}
+      />
     </div>
   );
 }

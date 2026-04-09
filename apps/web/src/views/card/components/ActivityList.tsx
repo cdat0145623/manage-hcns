@@ -411,6 +411,7 @@ const ActivityList = ({
   isAdmin: _isAdmin,
   isViewOnly,
   includedTypes,
+  excludedTypes,
 }: {
   cardPublicId?: string;
   taskInstanceId?: string;
@@ -418,6 +419,7 @@ const ActivityList = ({
   isAdmin?: boolean;
   isViewOnly?: boolean;
   includedTypes?: ActivityType[];
+  excludedTypes?: ActivityType[];
 }) => {
   const { dateLocale } = useLocalisation();
   const { data: sessionData } = authClient.useSession();
@@ -554,7 +556,11 @@ const ActivityList = ({
   return (
     <div className="flex max-h-[350px] flex-col overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-light-400 dark:scrollbar-thumb-dark-300 space-y-4 pt-4">
       {allActivities
-        .filter((activity) => !includedTypes || includedTypes.includes(activity.type))
+        .filter((activity) => {
+          if (includedTypes) return includedTypes.includes(activity.type);
+          if (excludedTypes) return !excludedTypes.includes(activity.type);
+          return true;
+        })
         .map((activity, index) => {
         const activityText = getActivityText({
           type: activity.type,

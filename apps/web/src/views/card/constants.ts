@@ -11,5 +11,6 @@ export const cardChildModalTypes = [
   "NEW_WORKSPACE",
   "NEW_FEEDBACK",
   "EDIT_YOUTUBE",
+  "ADD_ATTACHMENT",
 ];
 

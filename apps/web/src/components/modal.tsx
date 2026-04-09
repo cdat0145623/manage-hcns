@@ -6,7 +6,7 @@ import { useModal } from "~/providers/modal";
 
 interface Props {
   children: React.ReactNode;
-  modalSize?: "sm" | "md" | "lg";
+  modalSize?: "sm" | "md" | "lg" | "hh";
   positionFromTop?: "sm" | "md" | "lg";
   isVisible?: boolean;
   closeOnClickOutside?: boolean;
@@ -16,7 +16,7 @@ interface Props {
 
 const Modal: React.FC<Props> = ({
   children,
-  modalSize = "sm",
+  modalSize = "hh",
   positionFromTop = "md",
   isVisible,
   closeOnClickOutside,
@@ -36,7 +36,8 @@ const Modal: React.FC<Props> = ({
   const modalSizeMap = {
     sm: "max-w-[400px]",
     md: "max-w-[550px]",
-    lg: "max-w-[800px]",
+    hh: "max-w-[800px]",
+    lg: "max-w-[1100px]",
   };
 
   const positionFromTopMap = {

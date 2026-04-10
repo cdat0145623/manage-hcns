@@ -48,7 +48,7 @@ const signUpUsernamePlugin = () => ({
 
         const hashedPassword = await ctx.context.password.hash(password);
         const userId = generateId();
-console.log("role", role)
+
         const user = await ctx.context.adapter.create({
           model: "user",
           data: {

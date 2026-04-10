@@ -8,9 +8,11 @@ import { invalidateCard } from "~/utils/cardInvalidation";
 
 export function DeleteChecklistConfirmation({
   cardPublicId,
+  taskInstanceId,
   checklistPublicId,
 }: {
-  cardPublicId: string;
+  cardPublicId?: string;
+  taskInstanceId?: string;
   checklistPublicId: string;
 }) {
   const { closeModal, closeModals } = useModal();
@@ -19,19 +21,25 @@ export function DeleteChecklistConfirmation({
 
   const deleteChecklist = api.checklist.delete.useMutation({
     onMutate: async () => {
-      await utils.card.byId.cancel({ cardPublicId });
-      const previous = utils.card.byId.getData({ cardPublicId });
-      utils.card.byId.setData({ cardPublicId }, (old) => {
-        if (!old) return old as any;
-        const updatedChecklists = old.checklists.filter(
-          (cl) => cl.publicId !== checklistPublicId,
-        );
-        return { ...old, checklists: updatedChecklists } as typeof old;
-      });
-      return { previous };
+      if (cardPublicId) {
+        await utils.card.byId.cancel({ cardPublicId });
+        const previous = utils.card.byId.getData({ cardPublicId });
+        utils.card.byId.setData({ cardPublicId }, (old) => {
+          if (!old) return old as any;
+          const updatedChecklists = old.checklists.filter(
+            (cl) => cl.publicId !== checklistPublicId,
+          );
+          return { ...old, checklists: updatedChecklists } as typeof old;
+        });
+        return { previous };
+      }
+      if (taskInstanceId) {
+        await utils.taskInstance.byId.cancel({ id: taskInstanceId });
+      }
+      return { previous: undefined };
     },
     onError: (_err, _vars, ctx) => {
-      if (ctx?.previous)
+      if (ctx?.previous && cardPublicId)
         utils.card.byId.setData({ cardPublicId }, ctx.previous);
       showPopup({
         header: t`Unable to delete checklist`,
@@ -41,7 +49,12 @@ export function DeleteChecklistConfirmation({
     },
     onSettled: async () => {
       closeModals(2);
-      await invalidateCard(utils, cardPublicId);
+      if (cardPublicId) {
+        await invalidateCard(utils, cardPublicId);
+      }
+      if (taskInstanceId) {
+        await utils.taskInstance.byId.invalidate({ id: taskInstanceId });
+      }
     },
   });
 

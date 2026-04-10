@@ -40,6 +40,8 @@ export interface EditableEntry {
   recurrence?: RecurrenceType;
   rruleString?: string;
   attendees?: Attendee[];
+  checklists?: any[];
+  createdBy?: string;
 }
 
 export interface CreateEventInput {

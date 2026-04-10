@@ -10,11 +10,13 @@ export default function ChecklistNameInput({
   checklistPublicId,
   initialName,
   cardPublicId,
+  taskInstanceId,
   viewOnly = false,
 }: {
   checklistPublicId: string;
   initialName: string;
-  cardPublicId: string;
+  cardPublicId?: string;
+  taskInstanceId?: string;
   viewOnly?: boolean;
 }) {
   const utils = api.useUtils();
@@ -28,19 +30,25 @@ export default function ChecklistNameInput({
 
   const update = api.checklist.update.useMutation({
     onMutate: async (vars) => {
-      await utils.card.byId.cancel({ cardPublicId });
-      const previous = utils.card.byId.getData({ cardPublicId });
-      utils.card.byId.setData({ cardPublicId }, (old) => {
-        if (!old) return old as any;
-        const updated = old.checklists.map((cl) =>
-          cl.publicId === checklistPublicId ? { ...cl, name: vars.name } : cl,
-        );
-        return { ...old, checklists: updated } as typeof old;
-      });
+      let previous = undefined;
+      if (cardPublicId) {
+        await utils.card.byId.cancel({ cardPublicId });
+        previous = utils.card.byId.getData({ cardPublicId });
+        utils.card.byId.setData({ cardPublicId }, (old) => {
+          if (!old) return old as any;
+          const updated = old.checklists.map((cl) =>
+            cl.publicId === checklistPublicId ? { ...cl, name: vars.name } : cl,
+          );
+          return { ...old, checklists: updated } as typeof old;
+        });
+      }
+      if (taskInstanceId) {
+        await utils.taskInstance.invalidate();
+      }
       return { previous };
     },
     onError: (_err, _vars, ctx) => {
-      if (ctx?.previous)
+      if (ctx?.previous && cardPublicId)
         utils.card.byId.setData({ cardPublicId }, ctx.previous);
       showPopup({
         header: t`Unable to update checklist`,
@@ -49,7 +57,12 @@ export default function ChecklistNameInput({
       });
     },
     onSettled: async () => {
-      await invalidateCard(utils, cardPublicId);
+      if (cardPublicId) {
+        await invalidateCard(utils, cardPublicId);
+      }
+      if (taskInstanceId) {
+        await utils.taskInstance.invalidate();
+      }
     },
   });
 

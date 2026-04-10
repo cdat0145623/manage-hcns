@@ -23,19 +23,33 @@ export const getCountItems = async (db: dbClient) => {
 export const create = async (
   db: dbClient,
   checklistInput: {
-    cardId: number;
+    cardId?: number;
+    taskInstanceId?: string;
     name: string;
     createdBy: string;
   },
 ) => {
   return db.transaction(async (tx) => {
-    const card = await tx.query.checklists.findFirst({
-      where: and(
-        eq(checklists.cardId, checklistInput.cardId),
-        isNull(checklists.deletedAt),
-      ),
-      orderBy: desc(checklists.index),
-    });
+    let index = 0;
+    if (checklistInput.cardId) {
+      const lastWithCard = await tx.query.checklists.findFirst({
+        where: and(
+          eq(checklists.cardId, checklistInput.cardId),
+          isNull(checklists.deletedAt),
+        ),
+        orderBy: desc(checklists.index),
+      });
+      index = lastWithCard ? lastWithCard.index + 1 : 0;
+    } else if (checklistInput.taskInstanceId) {
+      const lastWithTask = await tx.query.checklists.findFirst({
+        where: and(
+          eq(checklists.taskInstanceId, checklistInput.taskInstanceId),
+          isNull(checklists.deletedAt),
+        ),
+        orderBy: desc(checklists.index),
+      });
+      index = lastWithTask ? lastWithTask.index + 1 : 0;
+    }
 
     const [result] = await tx
       .insert(checklists)
@@ -44,7 +58,8 @@ export const create = async (
         name: checklistInput.name,
         createdBy: checklistInput.createdBy,
         cardId: checklistInput.cardId,
-        index: card ? card.index + 1 : 0,
+        taskInstanceId: checklistInput.taskInstanceId,
+        index,
       })
       .returning({
         id: checklists.id,

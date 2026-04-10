@@ -8,7 +8,7 @@ import { twMerge } from "tailwind-merge";
 import PlainTextEditor from "~/components/PlainTextEditor";
 import { usePopup } from "~/providers/popup";
 import { api } from "~/utils/api";
-import { invalidateCard } from "~/utils/cardInvalidation";
+import { invalidateCard, invalidateTaskInstance } from "~/utils/cardInvalidation";
 
 interface ChecklistItemRowProps {
   item: {
@@ -16,7 +16,8 @@ interface ChecklistItemRowProps {
     title: string;
     completed: boolean;
   };
-  cardPublicId: string;
+  cardPublicId?: string;
+  taskInstanceId?: string;
   onCreateNewItem?: () => void;
   viewOnly?: boolean;
   dragHandleProps?: DraggableProvided["dragHandleProps"];
@@ -26,6 +27,7 @@ interface ChecklistItemRowProps {
 export default function ChecklistItemRow({
   item,
   cardPublicId,
+  taskInstanceId,
   onCreateNewItem,
   viewOnly = false,
   dragHandleProps,
@@ -37,31 +39,64 @@ export default function ChecklistItemRow({
 
   const updateItem = api.checklist.updateItem.useMutation({
     onMutate: async (vars) => {
-      await utils.card.byId.cancel({ cardPublicId });
-      const previous = utils.card.byId.getData({ cardPublicId });
-      utils.card.byId.setData({ cardPublicId }, (old) => {
-        if (!old) return old as any;
-        const updatedChecklists = old.checklists.map((cl) => ({
-          ...cl,
-          items: cl.items.map((ci) =>
-            ci.publicId === item.publicId
-              ? {
-                  ...ci,
-                  ...(vars.title !== undefined ? { title: vars.title } : {}),
-                  ...(vars.completed !== undefined
-                    ? { completed: vars.completed }
-                    : {}),
-                }
-              : ci,
-          ),
-        }));
-        return { ...old, checklists: updatedChecklists } as typeof old;
-      });
-      return { previous };
+      let previousCard = undefined;
+      let previousTaskInstance = undefined;
+      if (cardPublicId) {
+        await utils.card.byId.cancel({ cardPublicId });
+        previousCard = utils.card.byId.getData({ cardPublicId });
+        utils.card.byId.setData({ cardPublicId }, (old) => {
+          if (!old) return old as any;
+          const updatedChecklists = old.checklists.map((cl) => ({
+            ...cl,
+            items: cl.items.map((ci) =>
+              ci.publicId === item.publicId
+                ? {
+                    ...ci,
+                    ...(vars.title !== undefined ? { title: vars.title } : {}),
+                    ...(vars.completed !== undefined
+                      ? { completed: vars.completed }
+                      : {}),
+                  }
+                : ci,
+            ),
+          }));
+          return { ...old, checklists: updatedChecklists } as typeof old;
+        });
+      }
+      if (taskInstanceId) {
+        await utils.taskInstance.byId.cancel({ id: taskInstanceId });
+        previousTaskInstance = utils.taskInstance.byId.getData({
+          id: taskInstanceId,
+        });
+        utils.taskInstance.byId.setData({ id: taskInstanceId }, (old) => {
+          if (!old) return old as any;
+          const updatedChecklists = old.checklists.map((cl) => ({
+            ...cl,
+            items: cl.items.map((ci) =>
+              ci.publicId === item.publicId
+                ? {
+                    ...ci,
+                    ...(vars.title !== undefined ? { title: vars.title } : {}),
+                    ...(vars.completed !== undefined
+                      ? { completed: vars.completed }
+                      : {}),
+                  }
+                : ci,
+            ),
+          }));
+          return { ...old, checklists: updatedChecklists } as typeof old;
+        });
+      }
+      return { previousCard, previousTaskInstance };
     },
     onError: (_err, _vars, ctx) => {
-      if (ctx?.previous)
-        utils.card.byId.setData({ cardPublicId }, ctx.previous);
+      if (ctx?.previousCard && cardPublicId)
+        utils.card.byId.setData({ cardPublicId }, ctx.previousCard);
+      if (ctx?.previousTaskInstance && taskInstanceId)
+        utils.taskInstance.byId.setData(
+          { id: taskInstanceId },
+          ctx.previousTaskInstance,
+        );
       showPopup({
         header: t`Unable to update checklist item`,
         message: t`Please try again later, or contact customer support.`,
@@ -69,26 +104,37 @@ export default function ChecklistItemRow({
       });
     },
     onSettled: async () => {
-      await invalidateCard(utils, cardPublicId);
+      if (cardPublicId) {
+        await invalidateCard(utils, cardPublicId);
+      }
+      if (taskInstanceId) {
+        await invalidateTaskInstance(utils, taskInstanceId);
+      }
     },
   });
 
   const deleteItem = api.checklist.deleteItem.useMutation({
     onMutate: async () => {
-      await utils.card.byId.cancel({ cardPublicId });
-      const previous = utils.card.byId.getData({ cardPublicId });
-      utils.card.byId.setData({ cardPublicId }, (old) => {
-        if (!old) return old as any;
-        const updatedChecklists = old.checklists.map((cl) => ({
-          ...cl,
-          items: cl.items.filter((ci) => ci.publicId !== item.publicId),
-        }));
-        return { ...old, checklists: updatedChecklists } as typeof old;
-      });
+      let previous = undefined;
+      if (cardPublicId) {
+        await utils.card.byId.cancel({ cardPublicId });
+        previous = utils.card.byId.getData({ cardPublicId });
+        utils.card.byId.setData({ cardPublicId }, (old) => {
+          if (!old) return old as any;
+          const updatedChecklists = old.checklists.map((cl) => ({
+            ...cl,
+            items: cl.items.filter((ci) => ci.publicId !== item.publicId),
+          }));
+          return { ...old, checklists: updatedChecklists } as typeof old;
+        });
+      }
+      if (taskInstanceId) {
+        await utils.taskInstance.byId.cancel({ id: taskInstanceId });
+      }
       return { previous };
     },
     onError: (_err, _vars, ctx) => {
-      if (ctx?.previous)
+      if (ctx?.previous && cardPublicId)
         utils.card.byId.setData({ cardPublicId }, ctx.previous);
       showPopup({
         header: t`Unable to delete checklist item`,
@@ -97,7 +143,12 @@ export default function ChecklistItemRow({
       });
     },
     onSettled: async () => {
-      await invalidateCard(utils, cardPublicId);
+      if (cardPublicId) {
+        await invalidateCard(utils, cardPublicId);
+      }
+      if (taskInstanceId) {
+        await utils.taskInstance.byId.invalidate({ id: taskInstanceId });
+      }
     },
   });
 

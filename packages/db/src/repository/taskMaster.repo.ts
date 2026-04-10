@@ -213,7 +213,6 @@ export const softDelete = async (
     await db.insert(cardActivities).values({
       publicId: generateUID(),
       taskMasterId: taskMaster.id,
-      freqId: taskMaster.freqId,
       type: "archived",
       createdBy: taskMasterInput.userId,
       createdAt: new Date()

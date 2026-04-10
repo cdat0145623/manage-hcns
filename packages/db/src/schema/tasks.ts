@@ -14,6 +14,7 @@ import {
 } from "drizzle-orm/pg-core";
 import { users } from "./users";
 import { cards } from "./cards";
+import { checklists } from "./checklists";
 
 export const statusTypeEnum = pgEnum("statusType", ["pending", "done", "missed"]);
 export const fileActivityTypeEnum = pgEnum("file_activity_type", [
@@ -159,6 +160,7 @@ export const taskInstanceRelations = relations(taskInstances, ({ one, many }) =>
     references: [taskMasters.id],
   }),
   fileActivities: many(fileActivityLog),
+  checklists: many(checklists),
 }));
 
 export const fileActivityLogRelations = relations(fileActivityLog, ({ one }) => ({

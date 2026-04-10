@@ -54,7 +54,7 @@ export function DayTasksPopover({
               {["Chủ Nhật", "Thứ Hai", "Thứ Ba", "Thứ Tư", "Thứ Năm", "Thứ Sáu", "Thứ Bảy"][day.getDay()]}
             </span>
             <span className="text-xl font-black text-neutral-900 dark:text-white">
-              Tháng {day.getMonth() + 1} {format(day, "d")}
+              {format(day, "d")} Tháng {day.getMonth() + 1}
             </span>
           </div>
           <button
@@ -72,14 +72,14 @@ export function DayTasksPopover({
               entries.map((entry, idx) => (
                 <div key={entry.id} className="min-h-[20px]">
                    <CalendarTask
-                    entry={entry}
-                    onClick={(clickedEntry) => {
-                      onTaskClick(clickedEntry);
-                      onClose();
-                    }}
-                    index={idx}
-                    isDraggable={false}
-                  />
+                      entry={entry}
+                      onClick={(clickedEntry) => {
+                        onTaskClick(clickedEntry);
+                        onClose();
+                      }}
+                      index={idx}
+                      isDraggable={false}
+                    />
                 </div>
               ))
             ) : (
@@ -95,7 +95,7 @@ export function DayTasksPopover({
         {/* Footer Hint */}
         <div className="bg-neutral-50/50 p-4 text-center dark:bg-neutral-800/20">
           <span className="text-[10px] font-bold text-neutral-400">
-            Click a task to view details or edit
+            Nhấn vào công việc để xem chi tiết hoặc chỉnh sửa
           </span>
         </div>
       </motion.div>

@@ -12,6 +12,7 @@ import {
   startOfWeek,
   subMonths,
 } from "date-fns";
+import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
@@ -21,6 +22,21 @@ import {
   HiXMark,
 } from "react-icons/hi2";
 import { twMerge } from "tailwind-merge";
+
+const parseTime = (t: string) => {
+  const [h, m] = t.split(":").map((n) => parseInt(n ?? "0", 10));
+  return { hours: h ?? 0, minutes: m ?? 0 };
+};
+
+const timeToMinutes = (t: string) => {
+  const { hours, minutes } = parseTime(t);
+  return hours * 60 + minutes;
+};
+
+const minutesToTime = (mins: number) => {
+  const clamped = Math.min(mins, 24 * 60 - 1);
+  return `${String(Math.floor(clamped / 60)).padStart(2, "0")}:${String(clamped % 60).padStart(2, "0")}`;
+};
 
 interface DueDateSelectorProps {
   cardPublicId: string;
@@ -48,31 +64,54 @@ export function DueDateSelector({
   const [currentMonth, setCurrentMonth] = useState(() =>
     dueDate ? startOfMonth(dueDate) : startOfMonth(new Date()),
   );
-  const [hour, setHour] = useState(() =>
-    dueDate ? String(dueDate.getHours()).padStart(2, "0") : "00",
-  );
-  const [minute, setMinute] = useState(() =>
-    dueDate ? String(dueDate.getMinutes()).padStart(2, "0") : "00",
-  );
-  const minuteRef = useRef<HTMLInputElement>(null);
 
-  // Sync time when dueDate prop changes externally
+  const [pendingDate, setPendingDate] = useState<Date | undefined>(
+    dueDate ?? undefined,
+  );
+  const [currentTime, setCurrentTime] = useState<string | null>(null);
+
+  const [showTimeOptions, setShowTimeOptions] = useState(false);
+
+  const lastCommittedDateRef = useRef<string | undefined>(
+    dueDate?.toISOString(),
+  );
+
+  // Sync state with props when they change externally
   useEffect(() => {
-    if (dueDate) {
-      setHour(String(dueDate.getHours()).padStart(2, "0"));
-      setMinute(String(dueDate.getMinutes()).padStart(2, "0"));
-      setCurrentMonth(startOfMonth(dueDate));
+    if (
+      dueDate?.toISOString() !== lastCommittedDateRef.current ||
+      (!dueDate && lastCommittedDateRef.current)
+    ) {
+      setPendingDate(dueDate ?? undefined);
+      lastCommittedDateRef.current = dueDate?.toISOString();
     }
   }, [dueDate]);
+
+  // Commit immediately on close if there are pending changes
+  const handleClose = () => {
+    if (isOpen) {
+      setIsOpen(false);
+      setShowTimeOptions(false);
+      // Reset currentTime on close to ensure next open shows --:--
+      setCurrentTime(null);
+    }
+  };
+
 
   // Calculate dropdown position when opening
   const openDropdown = () => {
     if (!buttonRef.current) return;
     const rect = buttonRef.current.getBoundingClientRect();
     setDropdownPos({
-      top: rect.bottom + window.scrollY + rect.width / 2 - 160,
-      left: rect.left + window.scrollX + 170,
+      top: rect.bottom + window.scrollY + 8,
+      left: rect.left + window.scrollX,
     });
+    // Set current time to existing due date's time if present
+    if (dueDate) {
+      setCurrentTime(format(dueDate, "HH:mm"));
+    } else {
+      setCurrentTime(null);
+    }
     setIsOpen(true);
   };
 
@@ -83,8 +122,8 @@ export function DueDateSelector({
       if (!buttonRef.current) return;
       const rect = buttonRef.current.getBoundingClientRect();
       setDropdownPos({
-        top: rect.bottom + window.scrollY + rect.width / 2 - 160,
-        left: rect.left + window.scrollX + 40,
+        top: rect.bottom + window.scrollY + 8,
+        left: rect.left + window.scrollX,
       });
     };
     window.addEventListener("scroll", reposition, true);
@@ -104,7 +143,7 @@ export function DueDateSelector({
         dropdownRef.current?.contains(e.target as Node)
       )
         return;
-      setIsOpen(false);
+      handleClose();
     };
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
@@ -129,87 +168,70 @@ export function DueDateSelector({
       (date) => ({
         date: format(date, "yyyy-MM-dd"),
         isToday: isToday(date),
-        isSelected: dueDate ? isSameDay(date, dueDate) : false,
+        isSelected: pendingDate ? isSameDay(date, pendingDate) : false,
         isCurrentMonth: date >= monthStart && date <= monthEnd,
         dateObj: date,
       }),
     );
-  }, [currentMonth, dueDate, weekStartsOn]);
+  }, [currentMonth, pendingDate, weekStartsOn]);
 
-  const buildDate = (dateObj: Date) => {
-    const h = Math.min(23, Math.max(0, parseInt(hour, 10) || 0));
-    const m = Math.min(59, Math.max(0, parseInt(minute, 10) || 0));
+  const timeOptions = useMemo(() => {
+    const options = [];
+    for (let i = 0; i < 24 * 60; i += 30) {
+      const val = minutesToTime(i);
+      options.push({ value: val, label: val });
+    }
+    return options;
+  }, []);
+
+  const buildDate = (dateObj: Date, timeStr: string) => {
+    const { hours, minutes } = parseTime(timeStr);
     const result = new Date(dateObj);
-    result.setHours(h, m, 0, 0);
+    if (isNaN(result.getTime())) return null;
+    result.setHours(hours, minutes, 0, 0);
     return result;
   };
 
   const handleDayClick = (dateObj: Date, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (dueDate && isSameDay(dateObj, dueDate)) {
-      onDateSelect?.(undefined);
+    if (pendingDate && isSameDay(dateObj, pendingDate)) {
+      setPendingDate(undefined);
     } else {
-      onDateSelect?.(buildDate(dateObj));
-    }
-  };
-
-  const handleTimeChange = (type: "hour" | "minute", value: string) => {
-    const numVal = value.replace(/\D/g, "").slice(0, 2);
-
-    if (type === "hour") {
-      setHour(numVal);
-      if (type === "hour" && numVal.length === 2) {
-        minuteRef.current?.focus();
-        minuteRef.current?.select();
+      setPendingDate(dateObj);
+      if (currentTime) {
+        const fullDate = buildDate(dateObj, currentTime);
+        if (
+          fullDate &&
+          !isNaN(fullDate.getTime()) &&
+          fullDate.getTime() !== dueDate?.getTime()
+        ) {
+          onDateSelect?.(fullDate);
+        }
       }
-    } else {
-      setMinute(numVal);
     }
-
-    if (!dueDate) return;
-
-    // Chỉ update date khi đã nhập đủ 2 chữ số
-    if (numVal.length < 2) return;
-
-    const h =
-      type === "hour"
-        ? Math.min(23, parseInt(numVal, 10))
-        : Math.min(23, parseInt(hour, 10) || 0);
-    const m =
-      type === "minute"
-        ? Math.min(59, parseInt(numVal, 10))
-        : Math.min(59, parseInt(minute, 10) || 0);
-
-    const updated = new Date(dueDate);
-    updated.setHours(h, m, 0, 0);
-    onDateSelect?.(updated);
   };
 
-  const handleBlurPad = (type: "hour" | "minute") => {
-    // Khi blur: pad + commit luôn dù chưa đủ 2 chữ số
-    const h =
-      type === "hour"
-        ? Math.min(23, parseInt(hour || "0", 10))
-        : Math.min(23, parseInt(hour || "0", 10));
-    const m =
-      type === "minute"
-        ? Math.min(59, parseInt(minute || "0", 10))
-        : Math.min(59, parseInt(minute || "0", 10));
-
-    if (type === "hour") setHour(String(h).padStart(2, "0"));
-    else setMinute(String(m).padStart(2, "0"));
-
-    if (!dueDate) return;
-
-    const updated = new Date(dueDate);
-    updated.setHours(h, m, 0, 0);
-    onDateSelect?.(updated);
+  const handleTimeSelect = (timeStr: string) => {
+    setCurrentTime(timeStr);
+    setShowTimeOptions(false);
+    if (pendingDate) {
+      const fullDate = buildDate(pendingDate, timeStr);
+      if (
+        fullDate &&
+        !isNaN(fullDate.getTime()) &&
+        fullDate.getTime() !== dueDate?.getTime()
+      ) {
+        onDateSelect?.(fullDate);
+      }
+    }
   };
 
   const handleClear = (e: React.MouseEvent) => {
     e.stopPropagation();
+    setPendingDate(undefined);
+    setCurrentTime(null);
     onDateSelect?.(undefined);
-    setIsOpen(false);
+    handleClose();
   };
 
   const dropdown = isOpen
@@ -281,35 +303,48 @@ export function DueDateSelector({
               {t`Time`}
             </p>
             <div className="flex items-center gap-1">
-              <input
-                type="text"
-                inputMode="numeric"
-                maxLength={2}
-                value={hour}
-                onChange={(e) => handleTimeChange("hour", e.target.value)}
-                onBlur={() => handleBlurPad("hour")}
-                disabled={!dueDate}
-                className="w-10 rounded border border-light-200 bg-transparent px-1.5 py-1 text-center font-mono text-xs text-neutral-900 focus:outline-none focus:ring-1 focus:ring-light-500 disabled:opacity-40 dark:border-dark-300 dark:text-dark-1000 dark:focus:ring-dark-500"
-              />
-              <span className="text-xs font-bold text-neutral-900 dark:text-dark-900">
-                :
-              </span>
-              <input
-                type="text"
-                inputMode="numeric"
-                maxLength={2}
-                value={minute}
-                onChange={(e) => handleTimeChange("minute", e.target.value)}
-                onBlur={() => handleBlurPad("minute")}
-                disabled={!dueDate}
-                className="w-10 rounded border border-light-200 bg-transparent px-1.5 py-1 text-center font-mono text-xs text-neutral-900 focus:outline-none focus:ring-1 focus:ring-light-500 disabled:opacity-40 dark:border-dark-300 dark:text-dark-1000 dark:focus:ring-dark-500"
-              />
-              {dueDate && (
+              <div className="relative flex-1">
+                <button
+                  type="button"
+                  onClick={() => setShowTimeOptions(!showTimeOptions)}
+                  disabled={!pendingDate}
+                  className="flex w-full items-center justify-between rounded border border-light-200 bg-transparent px-2.5 py-1.5 text-center font-mono text-xs text-neutral-900 focus:outline-none focus:ring-1 focus:ring-light-500 disabled:opacity-40 dark:border-dark-300 dark:text-dark-1000 dark:focus:ring-dark-500"
+                >
+                  <span className="w-full">{currentTime ?? "--:--"}</span>
+                </button>
+                <AnimatePresence>
+                  {showTimeOptions && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 4 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: 4 }}
+                      className="absolute bottom-full left-0 z-[10000] mb-1 max-h-48 w-full overflow-y-auto rounded-lg border border-light-200 bg-white py-1 shadow-2xl dark:border-dark-300 dark:bg-dark-100"
+                    >
+                      {timeOptions.map((opt) => (
+                        <button
+                          key={opt.value}
+                          type="button"
+                          onClick={() => handleTimeSelect(opt.value)}
+                          className={twMerge(
+                            "w-full px-3 py-1.5 text-left font-mono text-[11px] transition-colors hover:bg-light-100 dark:hover:bg-dark-200",
+                            currentTime === opt.value
+                              ? "bg-light-50 font-bold text-neutral-900 dark:bg-dark-200 dark:text-white"
+                              : "text-neutral-700 dark:text-dark-1000",
+                          )}
+                        >
+                          {opt.label}
+                        </button>
+                      ))}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+              {pendingDate && (
                 <button
                   type="button"
                   onClick={handleClear}
                   title={t`Clear`}
-                  className="ml-auto flex h-6 w-6 items-center justify-center rounded text-light-500 hover:bg-light-100 hover:text-light-800 dark:text-dark-500 dark:hover:bg-dark-200 dark:hover:text-dark-900"
+                  className="ml-auto flex h-6 w-6 items-center justify-center rounded text-neutral-600 hover:bg-light-100 hover:text-neutral-900 dark:text-dark-500 dark:hover:bg-dark-200 dark:hover:text-dark-900"
                 >
                   <HiXMark className="h-3.5 w-3.5" />
                 </button>
@@ -329,15 +364,17 @@ export function DueDateSelector({
         onClick={() =>
           !disabled &&
           !isLoading &&
-          (isOpen ? setIsOpen(false) : openDropdown())
+          (isOpen ? handleClose() : openDropdown())
         }
         disabled={isLoading || disabled}
         className={`flex min-h-[34px] w-full items-center rounded-xl bg-white px-3 text-left text-[13px] font-medium text-neutral-900 shadow-sm ring-1 ring-light-300 transition-all hover:bg-light-50 hover:ring-light-400 dark:bg-dark-300/30 dark:text-dark-1000 dark:ring-dark-300/50 dark:hover:bg-dark-300/50 ${
           disabled ? "cursor-not-allowed opacity-60" : ""
         }`}
       >
-        {dueDate ? (
-          <span className="truncate">{format(dueDate, "MMM d, yyyy HH:mm")}</span>
+        {pendingDate ? (
+          <span className="truncate">
+            {format(pendingDate, "MMM d, yyyy HH:mm")}
+          </span>
         ) : (
           <>
             <HiMiniPlus size={16} className="mr-1.5 text-light-500" />
@@ -349,3 +386,4 @@ export function DueDateSelector({
     </div>
   );
 }
+

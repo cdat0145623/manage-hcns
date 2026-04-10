@@ -163,8 +163,6 @@ export function EventDetailModal({
     { enabled: !!entry?.instanceId && entry?.type === "INSTANCE" && isVisible },
   );
 
-  const { data: currentUser } = api.user.getUser.useQuery();
-
   const canEdit =
     entry?.createdBy === session?.user?.id ||
     entry?.selectedUserId === session?.user?.id;
@@ -473,7 +471,7 @@ export function EventDetailModal({
                           Tài liệu đính kèm
                         </p>
                         {attachments && attachments.length > 0 && (
-                          <span className="flex h-5 items-center justify-center rounded-full bg-light-100 px-2 text-[10px] font-bold text-light-600 dark:bg-dark-300 dark:text-dark-600">
+                          <span className="flex h-5 items-center justify-center rounded-full bg-light-100 px-2 text-[10px] font-bold text-neutral-900 dark:bg-dark-300 dark:text-dark-600">
                             {attachments.length}
                           </span>
                         )}

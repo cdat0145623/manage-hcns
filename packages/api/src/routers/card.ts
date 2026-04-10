@@ -883,7 +883,7 @@ export const cardRouter = createTRPCRouter({
         status: statusTypeEnumSchema.optional(),
       }),
     )
-    .output(z.custom<Awaited<ReturnType<typeof cardRepo.update>>>())
+    .output(z.any())
     .mutation(async ({ ctx, input }) => {
       const userId = ctx.user?.id;
 
@@ -954,11 +954,13 @@ export const cardRouter = createTRPCRouter({
 
       const previousDueDate = existingCard.dueDate;
       const previousStartDate = existingCard.startDate;
+
       if (
         input.title ||
         input.description ||
         input.dueDate !== undefined ||
-        input.startDate !== undefined
+        input.startDate !== undefined ||
+        input.status !== undefined
       ) {
         result = await cardRepo.update(
           ctx.db,
@@ -969,6 +971,7 @@ export const cardRouter = createTRPCRouter({
             ...(input.startDate !== undefined && {
               startDate: input.startDate,
             }),
+            ...(input.status !== undefined && { status: input.status }),
           },
           { cardPublicId: input.cardPublicId },
         );
@@ -989,6 +992,16 @@ export const cardRouter = createTRPCRouter({
         });
 
       const activities = [];
+
+      if (input.status && existingCard.status !== input.status) {
+        activities.push({
+          type: "status_changed" as const,
+          cardId: result.id,
+          createdBy: userId,
+          oldValue: existingCard.status,
+          newValue: input.status,
+        });
+      }
 
       if (input.title && existingCard.title !== input.title) {
         activities.push({
@@ -1104,6 +1117,9 @@ export const cardRouter = createTRPCRouter({
       }
       if (newListId && existingCard.listId !== newListId) {
         webhookChanges.listId = { from: existingCard.listId, to: newListId };
+      }
+      if (input.status && existingCard.status !== input.status) {
+        webhookChanges.status = { from: existingCard.status, to: input.status };
       }
 
       // Fire webhooks (non-blocking)

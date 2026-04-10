@@ -255,6 +255,7 @@ export const getByPublicId = async (
               index: true,
               dueDate: true,
               startDate: true,
+              status: true,
             },
             with: {
               labels: {

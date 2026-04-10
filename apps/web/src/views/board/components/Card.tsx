@@ -24,6 +24,7 @@ const Card = ({
   attachments = [],
   dueDate,
   startDate,
+  status,
 }: {
   title: string;
   labels?: { name: string; colourCode: string | null }[];
@@ -51,6 +52,7 @@ const Card = ({
   attachments?: { publicId: string }[];
   dueDate?: Date | null;
   startDate?: Date | null;
+  status: "pending" | "missed" | "done";
 }) => {
   const { dateLocale } = useLocalisation();
   const showYear = dueDate ? !isSameYear(dueDate, new Date()) : false;
@@ -101,8 +103,10 @@ const Card = ({
                 <div
                   className={twMerge(
                     "flex items-center gap-1",
-                    isOverdue
+                    isOverdue && status !== "done"
                       ? "text-red-600 dark:text-red-400"
+                      : status === "done"
+                      ? "text-emerald-600 dark:text-emerald-400"
                       : "text-light-800 dark:text-dark-800",
                   )}
                 >

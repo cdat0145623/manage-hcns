@@ -692,6 +692,7 @@ export default function BoardPage({ isTemplate }: { isTemplate?: boolean }) {
                                             attachments={card.attachments}
                                             dueDate={card.dueDate ?? null}
                                             startDate={card.startDate ?? null}
+                                            status={card.status}
                                           />
                                         </div>
                                       )}

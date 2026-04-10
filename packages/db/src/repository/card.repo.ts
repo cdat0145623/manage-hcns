@@ -196,6 +196,7 @@ export const update = async (
     description?: string;
     dueDate?: Date | null;
     startDate?: Date | null;
+    status?: TaskStatus;
   },
   args: {
     cardPublicId: string;
@@ -210,6 +211,7 @@ export const update = async (
       startDate:
         cardInput.startDate !== undefined ? cardInput.startDate : undefined,
       updatedAt: new Date(),
+      status: cardInput.status,
     })
     .where(and(eq(cards.publicId, args.cardPublicId), isNull(cards.deletedAt)))
     .returning({
@@ -219,6 +221,7 @@ export const update = async (
       description: cards.description,
       dueDate: cards.dueDate,
       startDate: cards.startDate,
+      status: cards.status,
     });
 
   return result;
@@ -276,6 +279,7 @@ export const getByPublicId = (db: dbClient, cardPublicId: string) => {
       listId: true,
       dueDate: true,
       startDate: true,
+      status: true,
     },
     where: eq(cards.publicId, cardPublicId),
   });
@@ -463,6 +467,7 @@ export const getWithListAndMembersByPublicId = async (
       startDate: true,
       dueDate: true,
       createdBy: true,
+      status: true,
     },
     with: {
       labels: {

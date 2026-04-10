@@ -204,10 +204,6 @@ export default function CardDetailsModalContent({
     }
   }, [card]);
 
-  if (!cardId) return null;
-
-  const canComment = canCreateComment && card && !isTemplate;
-
   const { data: activitiesData } = api.card.getActivities.useQuery(
     { cardPublicId: cardId ?? "", limit: 100 },
     { enabled: !!cardId && activeTab === "comments" }
@@ -221,6 +217,10 @@ export default function CardDetailsModalContent({
       "updated_comment_deleted",
     ].includes(a.type),
   ) ?? false;
+
+  if (!cardId) return null;
+
+  const canComment = canCreateComment && card && !isTemplate;
 
   const canUpload = canAttach && card && !isTemplate;
 

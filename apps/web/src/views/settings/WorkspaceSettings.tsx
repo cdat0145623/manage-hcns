@@ -60,7 +60,7 @@ export default function WorkspaceSettings() {
 
       <div className="mb-8 border-t border-light-300 dark:border-dark-300">
         <h2 className="mb-4 mt-8 text-[14px] font-bold text-neutral-900 dark:text-dark-1000">
-          {t`Workspace name`}
+          {t`Tên workspace`}
         </h2>
         <UpdateWorkspaceNameForm
           workspacePublicId={workspace.publicId}
@@ -79,7 +79,7 @@ export default function WorkspaceSettings() {
         />
 
         <h2 className="mb-4 mt-8 text-[14px] font-bold text-neutral-900 dark:text-dark-1000">
-          {t`Workspace description`}
+          {t`Mô tả workspace`}
         </h2>
         <UpdateWorkspaceDescriptionForm
           workspacePublicId={workspace.publicId}
@@ -88,7 +88,7 @@ export default function WorkspaceSettings() {
         />
 
         <h2 className="mb-4 mt-8 text-[14px] font-bold text-neutral-900 dark:text-dark-1000">
-          {t`Week start day`}
+          {t`Ngày bắt đầu tuần`}
         </h2>
         <UpdateWeekStartDayForm
           workspacePublicId={workspace.publicId}
@@ -97,7 +97,7 @@ export default function WorkspaceSettings() {
         />
 
         <h2 className="mb-4 mt-8 text-[14px] font-bold text-neutral-900 dark:text-dark-1000">
-          {t`Email visibility`}
+          {t`Hiển thị email`}
         </h2>
         <UpdateWorkspaceEmailVisibilityForm
           workspacePublicId={workspace.publicId}
@@ -122,18 +122,18 @@ export default function WorkspaceSettings() {
 
         <div className="border-t border-light-300 dark:border-dark-300">
           <h2 className="mb-4 mt-8 text-[14px] font-bold text-neutral-900 dark:text-dark-1000">
-            {t`Delete workspace`}
+            {t`Xóa workspace`}
           </h2>
           <p className="mb-8 text-sm text-neutral-500 dark:text-dark-900">
-            {t`Once you delete your workspace, there is no going back. This action cannot be undone.`}
+            {t`Khi bạn xóa workspace, không có cách nào để khôi phục. Hành động này không thể hoàn tác.`}
           </p>
           <div className="mt-4">
             <Button
               variant="secondary"
               onClick={() => openModal("DELETE_WORKSPACE")}
-              disabled={workspace.role !== "admin"}
+              disabled={workspace.role !== "ADMIN"}
             >
-              {t`Delete workspace`}
+              {t`Xóa workspace`}
             </Button>
           </div>
         </div>

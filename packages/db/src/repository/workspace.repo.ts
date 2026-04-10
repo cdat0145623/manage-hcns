@@ -31,19 +31,24 @@ const SYSTEM_ROLES: {
   hierarchyLevel: number;
 }[] = [
     {
-      name: "admin",
+      name: "ADMIN",
       description: "Full access to all workspace features",
       hierarchyLevel: 100,
     },
     {
-      name: "member",
-      description: "Standard member with create and edit permissions",
-      hierarchyLevel: 50,
+      name: "NVKT_MANAGER",
+      description: "Technical manager with extensive permissions",
+      hierarchyLevel: 80,
     },
     {
-      name: "guest",
-      description: "View-only access",
-      hierarchyLevel: 10,
+      name: "NVKD_MANAGER",
+      description: "Business manager with standard permissions",
+      hierarchyLevel: 60,
+    },
+    {
+      name: "NVVP",
+      description: "Ordinary staff with basic permissions",
+      hierarchyLevel: 40,
     },
   ];
 
@@ -95,7 +100,7 @@ export const create = async (
         isSystem: true,
         permissions: [...getDefaultPermissions(roleData.name)] as Permission[],
       });
-      if (roleData.name === "admin" && role) {
+      if (roleData.name === "ADMIN" && role) {
         adminRoleId = role.id;
       }
     }
@@ -106,7 +111,7 @@ export const create = async (
       email: workspaceInput.createdByEmail,
       workspaceId: workspace.id,
       createdBy: workspaceInput.createdBy,
-      role: "admin",
+      role: "ADMIN",
       roleId: adminRoleId,
       status: "active",
     });
@@ -205,7 +210,7 @@ export const getByPublicIdWithMembers = (
         },
         where: isNull(workspaceMembers.deletedAt),
         orderBy: (member, { desc }) => [
-          desc(sql`CASE WHEN ${member.role} = 'admin' THEN 1 ELSE 0 END`),
+          desc(sql`CASE WHEN ${member.role} = 'ADMIN' THEN 1 ELSE 0 END`),
           desc(member.createdAt),
         ],
         with: {
@@ -343,7 +348,7 @@ export const isUserInWorkspace = async (
   db: dbClient,
   userId: string,
   workspaceId: number,
-  role?: "admin" | "member",
+  role?: Role,
 ) => {
   const result = await db.query.workspaceMembers.findFirst({
     columns: {

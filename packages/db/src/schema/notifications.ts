@@ -35,17 +35,17 @@ export const notifications = pgTable(
     type: notificationTypeEnum("type").notNull(),
     userId: uuid("userId")
       .notNull()
-      .references(() => users.id, { onDelete: "cascade" }),
+      .references(() => users.id, { onDelete: "restrict" }),
     cardId: bigint("cardId", { mode: "number" }).references(() => cards.id, {
-      onDelete: "cascade",
+      onDelete: "restrict",
     }),
     commentId: bigint("commentId", { mode: "number" }).references(
       () => comments.id,
-      { onDelete: "cascade" },
+      { onDelete: "restrict" },
     ),
     workspaceId: bigint("workspaceId", { mode: "number" }).references(
       () => workspaces.id,
-      { onDelete: "cascade" },
+      { onDelete: "restrict" },
     ),
     metadata: text("metadata"),
     readAt: timestamp("readAt"),

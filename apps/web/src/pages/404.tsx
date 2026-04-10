@@ -8,15 +8,10 @@ import PatternedBackground from "~/components/PatternedBackground";
 export default function NotFoundPage() {
   return (
     <>
-      <PageHead title={t`404 - Page Not Found | kan.bn`} />
+      <PageHead title={t`404 - Page Not Found`} />
       <main className="h-screen bg-light-100 pt-20 dark:bg-dark-50 sm:pt-0">
         <div className="justify-top flex h-full flex-col items-center px-4 sm:justify-center">
           <div className="z-10 flex w-full flex-col items-center">
-            <Link href="/">
-              <h1 className="mb-6 text-lg font-bold tracking-tight text-light-1000 dark:text-dark-1000">
-                kan.bn
-              </h1>
-            </Link>
             <p className="mb-4 text-8xl font-bold tracking-tight text-light-1000 dark:text-dark-1000">
               404
             </p>
@@ -31,12 +26,6 @@ export default function NotFoundPage() {
                   </Trans>
                 </p>
                 <div className="flex flex-col gap-3">
-                  <Link
-                    href="/"
-                    className="flex w-full justify-center rounded-md bg-light-1000 px-3 py-2 text-sm font-semibold text-light-100 shadow-sm hover:bg-light-900 dark:bg-dark-1000 dark:text-dark-100 dark:hover:bg-dark-900"
-                  >
-                    <Trans>Go to homepage</Trans>
-                  </Link>
                   <Link
                     href="/boards"
                     className="flex w-full justify-center rounded-md border border-light-500 bg-light-100 px-3 py-2 text-sm font-semibold text-light-1000 shadow-sm hover:bg-light-200 dark:border-dark-400 dark:bg-dark-100 dark:text-dark-1000 dark:hover:bg-dark-300"

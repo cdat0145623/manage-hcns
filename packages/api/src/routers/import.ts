@@ -362,7 +362,7 @@ export const importRouter = createTRPCRouter({
               );
 
               const activities = newCards.map((card) => ({
-                type: "card.created" as const,
+                type: "created" as const,
                 cardId: card.id,
                 createdBy: userId,
               }));
@@ -896,7 +896,7 @@ export const importRouter = createTRPCRouter({
 
           // Create Activities
           const activities = createdCards.map((card) => ({
-            type: "card.created" as const,
+            type: "created" as const,
             cardId: card.id,
             createdBy: userId,
           }));

@@ -60,10 +60,10 @@ export function BoardsList({ isTemplate, archived = false }: { isTemplate?: bool
         <div className="flex flex-col items-center">
           <HiOutlineRectangleStack className="h-10 w-10 text-light-800 dark:text-dark-800" />
           <p className="mb-2 mt-4 text-[14px] font-bold text-light-1000 dark:text-dark-950">
-            {archived ? t`No archived boards` : t`No ${isTemplate ? "templates" : "boards"}`}
+            {archived ? t`Không có bảng lưu trữ` : t`Không có bảng`}
           </p>
           <p className="text-[14px] text-light-900 dark:text-dark-900">
-            {archived ? t`Boards you archive will appear here.` : t`Get started by creating a new ${isTemplate ? "template" : "board"}`}
+            {archived ? t`Các bảng bạn lưu trữ sẽ xuất hiện ở đây.` : t`Tạo bảng mới để bắt đầu`}
           </p>
         </div>
         <Tooltip
@@ -77,7 +77,7 @@ export function BoardsList({ isTemplate, archived = false }: { isTemplate?: bool
             }}
             disabled={!canCreateBoard}
           >
-            {t`Create new ${isTemplate ? "template" : "board"}`}
+            {t`Tạo ${isTemplate ? "mẫu mới" : "bảng mới"}`}
           </Button>
         </Tooltip>
       </div>

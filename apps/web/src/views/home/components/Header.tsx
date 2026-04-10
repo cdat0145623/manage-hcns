@@ -73,13 +73,6 @@ const Header = ({ isLoggedIn }: { isLoggedIn: boolean }) => {
       >
         <div className="flex h-[4rem] min-h-[4rem] w-full border-b border-light-300 bg-light-50/80 px-5 py-2 align-middle opacity-100 shadow-sm backdrop-blur-[10px] transition-all duration-500 dark:border-dark-300 dark:bg-dark-50/90">
           <div className="mx-auto flex w-full max-w-[1100px] items-center justify-between lg:px-4">
-            <div className="my-auto flex items-center justify-between">
-              <Link href="/">
-                <h1 className="text-lg font-bold tracking-tight text-neutral-900 dark:text-dark-1000 lg:w-[200px]">
-                  kan.bn
-                </h1>
-              </Link>
-            </div>
             {/* Desktop Menu */}
             <div className="hidden justify-center gap-10 dark:text-dark-1000 lg:flex">
               {desktopMenuItems.map((item) => (

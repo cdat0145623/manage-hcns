@@ -1,4 +1,5 @@
 import { TRPCError } from "@trpc/server";
+import { parseString } from "rrule/dist/esm/parsestring";
 import { z } from "zod";
 
 import * as cardRepo from "@kan/db/repository/card.repo";
@@ -7,16 +8,23 @@ import * as cardCommentRepo from "@kan/db/repository/cardComment.repo";
 import * as labelRepo from "@kan/db/repository/label.repo";
 import * as listRepo from "@kan/db/repository/list.repo";
 import * as workspaceRepo from "@kan/db/repository/workspace.repo";
+import { statusTypeEnum } from "@kan/db/schema";
+import { generateAttachmentUrl, generateAvatarUrl } from "@kan/shared/utils";
 
 import { createTRPCRouter, protectedProcedure, publicProcedure } from "../trpc";
 import { mergeActivities } from "../utils/activities";
 import { sendMentionEmails } from "../utils/notifications";
-import { assertCanDelete, assertCanEdit, assertPermission } from "../utils/permissions";
-import { generateAttachmentUrl, generateAvatarUrl } from "@kan/shared/utils";
+import {
+  assertCanDelete,
+  assertCanEdit,
+  assertPermission,
+} from "../utils/permissions";
 import {
   createCardWebhookPayload,
   sendWebhooksForWorkspace,
 } from "../utils/webhook";
+
+const statusTypeEnumSchema = z.enum(statusTypeEnum.enumValues);
 
 export const cardRouter = createTRPCRouter({
   create: protectedProcedure
@@ -110,7 +118,7 @@ export const cardRouter = createTRPCRouter({
           });
 
         const cardActivitesInsert = cardLabels.map((cardLabel) => ({
-          type: "card.updated.label.added" as const,
+          type: "updated_label_added" as const,
           cardId: cardLabel.cardId,
           labelId: cardLabel.labelId,
           createdBy: userId,
@@ -149,7 +157,7 @@ export const cardRouter = createTRPCRouter({
           });
 
         const cardActivitesInsert = cardMembers.map((cardMember) => ({
-          type: "card.updated.member.added" as const,
+          type: "member_assigned" as const,
           cardId: cardMember.cardId,
           workspaceMemberId: cardMember.workspaceMemberId,
           createdBy: userId,
@@ -174,7 +182,7 @@ export const cardRouter = createTRPCRouter({
         ctx.db,
         list.workspaceId,
         createCardWebhookPayload(
-          "card.created",
+          "created",
           {
             id: String(newCard.id),
             title: input.title,
@@ -235,7 +243,12 @@ export const cardRouter = createTRPCRouter({
           code: "NOT_FOUND",
         });
 
-      await assertPermission(ctx.db, userId, card.workspaceId, "comment:create");
+      await assertPermission(
+        ctx.db,
+        userId,
+        card.workspaceId,
+        "comment:create",
+      );
 
       const newComment = await cardCommentRepo.create(ctx.db, {
         comment: input.comment,
@@ -250,7 +263,7 @@ export const cardRouter = createTRPCRouter({
         });
 
       await cardActivityRepo.create(ctx.db, {
-        type: "card.updated.comment.added" as const,
+        type: "updated_comment_added" as const,
         cardId: card.id,
         commentId: newComment.id,
         toComment: newComment.comment,
@@ -339,7 +352,7 @@ export const cardRouter = createTRPCRouter({
         });
 
       await cardActivityRepo.create(ctx.db, {
-        type: "card.updated.comment.updated" as const,
+        type: "updated_comment_updated" as const,
         cardId: card.id,
         commentId: updatedComment.id,
         fromComment: existingComment.comment,
@@ -428,7 +441,7 @@ export const cardRouter = createTRPCRouter({
         });
 
       await cardActivityRepo.create(ctx.db, {
-        type: "card.updated.comment.deleted" as const,
+        type: "updated_comment_deleted" as const,
         cardId: card.id,
         commentId: existingComment.id,
         createdBy: userId,
@@ -502,7 +515,7 @@ export const cardRouter = createTRPCRouter({
           });
 
         await cardActivityRepo.create(ctx.db, {
-          type: "card.updated.label.removed" as const,
+          type: "updated_label_removed" as const,
           cardId: card.id,
           labelId: label.id,
           createdBy: userId,
@@ -521,7 +534,7 @@ export const cardRouter = createTRPCRouter({
         });
 
       await cardActivityRepo.create(ctx.db, {
-        type: "card.updated.label.added" as const,
+        type: "updated_label_added" as const,
         cardId: card.id,
         labelId: label.id,
         createdBy: userId,
@@ -600,7 +613,7 @@ export const cardRouter = createTRPCRouter({
           });
 
         await cardActivityRepo.create(ctx.db, {
-          type: "card.updated.member.removed" as const,
+          type: "member_unassigned" as const,
           cardId: card.id,
           workspaceMemberId: member.id,
           createdBy: userId,
@@ -619,7 +632,7 @@ export const cardRouter = createTRPCRouter({
         });
 
       await cardActivityRepo.create(ctx.db, {
-        type: "card.updated.member.added" as const,
+        type: "member_assigned" as const,
         cardId: card.id,
         workspaceMemberId: member.id,
         createdBy: userId,
@@ -648,11 +661,11 @@ export const cardRouter = createTRPCRouter({
         > & {
           attachments: {
             publicId: string;
-            contentType: string;
-            s3Key: string;
-            originalFilename: string | null;
-            size?: number | null;
-            url: string | null;
+            mimeType: string;
+            newFileUrl: string;
+            fileName: string;
+            fileSize: number;
+            createdAt: Date;
           }[];
         }
       >(),
@@ -695,40 +708,38 @@ export const cardRouter = createTRPCRouter({
       // Generate URLs for all attachments
       const attachmentsWithUrls = await Promise.all(
         result.attachments.map(async (attachment) => {
-          const url = await generateAttachmentUrl(attachment.s3Key);
+          // const url = await generateAttachmentUrl(attachment.newFileUrl);
           return {
             publicId: attachment.publicId,
-            contentType: attachment.contentType,
-            s3Key: attachment.s3Key,
-            originalFilename: attachment.originalFilename,
-            size: attachment.size,
-            url,
+            mimeType: attachment.mimeType,
+            newFileUrl: attachment.newFileUrl,
+            fileName: attachment.fileName,
+            fileSize: attachment.fileSize,
+            createdAt: (attachment as unknown as { createdAt: Date }).createdAt,
           };
         }),
       );
 
       // Generate presigned URLs for workspace member avatars
-      const workspaceWithAvatarUrls = result.list.board.workspace
-        ? {
-            ...result.list.board.workspace,
-            members: await Promise.all(
-              result.list.board.workspace.members.map(async (member) => {
-                if (!member.user?.image) {
-                  return member;
-                }
+      const workspaceWithAvatarUrls = {
+        ...result.list.board.workspace,
+        members: await Promise.all(
+          result.list.board.workspace.members.map(async (member) => {
+            if (!member.user?.image) {
+              return member;
+            }
 
-                const avatarUrl = await generateAvatarUrl(member.user.image);
-                return {
-                  ...member,
-                  user: {
-                    ...member.user,
-                    image: avatarUrl,
-                  },
-                };
-              }),
-            ),
-          }
-        : result.list.board.workspace;
+            const avatarUrl = await generateAvatarUrl(member.user.image);
+            return {
+              ...member,
+              user: {
+                ...member.user,
+                image: avatarUrl,
+              },
+            };
+          }),
+        ),
+      };
 
       return {
         ...result,
@@ -868,9 +879,11 @@ export const cardRouter = createTRPCRouter({
         index: z.number().optional(),
         listPublicId: z.string().min(12).optional(),
         dueDate: z.date().nullable().optional(),
+        startDate: z.date().nullable().optional(),
+        status: statusTypeEnumSchema.optional(),
       }),
     )
-    .output(z.custom<Awaited<ReturnType<typeof cardRepo.update>>>())
+    .output(z.any())
     .mutation(async ({ ctx, input }) => {
       const userId = ctx.user?.id;
 
@@ -935,18 +948,30 @@ export const cardRouter = createTRPCRouter({
             description: string | null;
             publicId: string;
             dueDate: Date | null;
+            startDate: Date | null;
           }
         | undefined;
 
       const previousDueDate = existingCard.dueDate;
+      const previousStartDate = existingCard.startDate;
 
-      if (input.title || input.description || input.dueDate !== undefined) {
+      if (
+        input.title ||
+        input.description ||
+        input.dueDate !== undefined ||
+        input.startDate !== undefined ||
+        input.status !== undefined
+      ) {
         result = await cardRepo.update(
           ctx.db,
           {
             ...(input.title && { title: input.title }),
             ...(input.description && { description: input.description }),
             ...(input.dueDate !== undefined && { dueDate: input.dueDate }),
+            ...(input.startDate !== undefined && {
+              startDate: input.startDate,
+            }),
+            ...(input.status !== undefined && { status: input.status }),
           },
           { cardPublicId: input.cardPublicId },
         );
@@ -968,9 +993,19 @@ export const cardRouter = createTRPCRouter({
 
       const activities = [];
 
+      if (input.status && existingCard.status !== input.status) {
+        activities.push({
+          type: "status_changed" as const,
+          cardId: result.id,
+          createdBy: userId,
+          oldValue: existingCard.status,
+          newValue: input.status,
+        });
+      }
+
       if (input.title && existingCard.title !== input.title) {
         activities.push({
-          type: "card.updated.title" as const,
+          type: "updated_title" as const,
           cardId: result.id,
           createdBy: userId,
           fromTitle: existingCard.title,
@@ -980,21 +1015,21 @@ export const cardRouter = createTRPCRouter({
 
       if (input.description && existingCard.description !== input.description) {
         activities.push({
-          type: "card.updated.description" as const,
+          type: "updated_description" as const,
           cardId: result.id,
           createdBy: userId,
           fromDescription: existingCard.description ?? undefined,
           toDescription: input.description,
         });
 
-        sendMentionEmails({
-          db: ctx.db,
-          cardPublicId: input.cardPublicId,
-          commentHtml: input.description,
-          commenterUserId: userId,
-        }).catch((error) => {
-          console.error("Failed to send mention emails:", error);
-        });
+        // sendMentionEmails({
+        //   db: ctx.db,
+        //   cardPublicId: input.cardPublicId,
+        //   commentHtml: input.description,
+        //   commenterUserId: userId,
+        // }).catch((error) => {
+        //   console.error("Failed to send mention emails:", error);
+        // });
       }
 
       if (
@@ -1002,16 +1037,16 @@ export const cardRouter = createTRPCRouter({
         previousDueDate?.getTime() !== input.dueDate?.getTime()
       ) {
         let activityType:
-          | "card.updated.dueDate.added"
-          | "card.updated.dueDate.updated"
-          | "card.updated.dueDate.removed";
+          | "deadline_added"
+          | "deadline_changed"
+          | "deadline_removed";
 
         if (!previousDueDate) {
-          activityType = "card.updated.dueDate.added";
+          activityType = "deadline_added";
         } else if (!input.dueDate) {
-          activityType = "card.updated.dueDate.removed";
+          activityType = "deadline_removed";
         } else {
-          activityType = "card.updated.dueDate.updated";
+          activityType = "deadline_changed";
         }
 
         activities.push({
@@ -1023,9 +1058,35 @@ export const cardRouter = createTRPCRouter({
         });
       }
 
+      if (
+        input.startDate !== undefined &&
+        previousStartDate?.getTime() !== input.startDate?.getTime()
+      ) {
+        let activityType:
+          | "start_date_added"
+          | "start_date_changed"
+          | "start_date_removed";
+
+        if (!previousStartDate) {
+          activityType = "start_date_added";
+        } else if (!input.startDate) {
+          activityType = "start_date_removed";
+        } else {
+          activityType = "start_date_changed";
+        }
+
+        activities.push({
+          type: activityType,
+          cardId: result.id,
+          createdBy: userId,
+          oldValue: previousStartDate?.toLocaleString(),
+          newValue: input.startDate?.toLocaleString(),
+        });
+      }
+
       if (newListId && existingCard.listId !== newListId) {
         activities.push({
-          type: "card.updated.list" as const,
+          type: "updated_list" as const,
           cardId: result.id,
           createdBy: userId,
           fromListId: existingCard.listId,
@@ -1056,6 +1117,9 @@ export const cardRouter = createTRPCRouter({
       }
       if (newListId && existingCard.listId !== newListId) {
         webhookChanges.listId = { from: existingCard.listId, to: newListId };
+      }
+      if (input.status && existingCard.status !== input.status) {
+        webhookChanges.status = { from: existingCard.status, to: input.status };
       }
 
       // Fire webhooks (non-blocking)
@@ -1149,7 +1213,7 @@ export const cardRouter = createTRPCRouter({
       });
 
       await cardActivityRepo.create(ctx.db, {
-        type: "card.archived",
+        type: "archived",
         cardId: card.id,
         createdBy: userId,
       });
@@ -1183,5 +1247,24 @@ export const cardRouter = createTRPCRouter({
       }
 
       return { success: true };
+    }),
+  getByUserId: publicProcedure
+    .meta({
+      openapi: {
+        summary: "Get cards by user ID",
+        method: "GET",
+        path: "/cards/user/{userId}",
+        description: "Gets all cards for a specific user",
+        tags: ["Cards"],
+      },
+    })
+    .input(
+      z.object({
+        userId: z.string().optional(),
+      }),
+    )
+    .output(z.custom<Awaited<ReturnType<typeof cardRepo.getByUserId>>>())
+    .query(async ({ ctx, input }) => {
+      return cardRepo.getByUserId(ctx.db, input.userId);
     }),
 });

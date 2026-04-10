@@ -34,6 +34,8 @@ export const allPermissions = [
   "card:create",
   "card:edit",
   "card:delete",
+  "card:attach",
+  "card:tick",
   "comment:view",
   "comment:create",
   "comment:edit",
@@ -46,21 +48,23 @@ export const allPermissions = [
 
 export type Permission = (typeof allPermissions)[number];
 
-export const roleHierarchy = {
-  admin: 100,
-  member: 50,
-  guest: 10,
+export const roles = ["ADMIN", "NVKT_MANAGER", "NVKD_MANAGER", "NVVP"] as const;
+export type Role = (typeof roles)[number];
+
+export const roleHierarchy: Record<Role, number> = {
+  ADMIN: 100,
+  NVKT_MANAGER: 80,
+  NVKD_MANAGER: 60,
+  NVVP: 40,
 } as const;
 
-export type Role = keyof typeof roleHierarchy;
-export const roles = Object.keys(roleHierarchy) as Role[];
-
 export const defaultRolePermissions: Record<Role, readonly Permission[]> = {
-  admin: allPermissions,
-  member: [
+  ADMIN: allPermissions,
+  NVKT_MANAGER: [
     "workspace:view",
     "board:view",
     "board:create",
+    "board:edit",
     "list:view",
     "list:create",
     "list:edit",
@@ -69,19 +73,42 @@ export const defaultRolePermissions: Record<Role, readonly Permission[]> = {
     "card:create",
     "card:edit",
     "card:delete",
+    "card:attach",
+    "card:tick",
     "comment:view",
     "comment:create",
     "comment:edit",
     "comment:delete",
     "member:view",
+    "member:invite",
   ],
-
-  guest: [
+  NVKD_MANAGER: [
+    "workspace:view",
+    "board:view",
+    "board:create",
+    "list:view",
+    "list:create",
+    "list:edit",
+    "card:view",
+    "card:create",
+    "card:edit",
+    "card:attach",
+    "card:tick",
+    "comment:view",
+    "comment:create",
+    "comment:edit",
+    "member:view",
+  ],
+  NVVP: [
     "workspace:view",
     "board:view",
     "list:view",
     "card:view",
+    "card:create",
+    "card:attach",
+    "card:tick",
     "comment:view",
+    "comment:create",
     "member:view",
   ],
 } as const;
@@ -98,7 +125,7 @@ export const permissionCategories = {
     ] as const,
   },
   board: {
-    label: "Boards",
+    label: "Bảng",
     permissions: [
       "board:view",
       "board:create",
@@ -107,7 +134,7 @@ export const permissionCategories = {
     ] as const,
   },
   list: {
-    label: "Lists",
+    label: "Cột",
     permissions: [
       "list:view",
       "list:create",
@@ -116,16 +143,18 @@ export const permissionCategories = {
     ] as const,
   },
   card: {
-    label: "Cards",
+    label: "Thẻ",
     permissions: [
       "card:view",
       "card:create",
       "card:edit",
       "card:delete",
+      "card:attach",
+      "card:tick",
     ] as const,
   },
   comment: {
-    label: "Comments",
+    label: "Bình luận",
     permissions: [
       "comment:view",
       "comment:create",
@@ -134,7 +163,7 @@ export const permissionCategories = {
     ] as const,
   },
   member: {
-    label: "Members",
+    label: "Thành viên",
     permissions: [
       "member:view",
       "member:invite",

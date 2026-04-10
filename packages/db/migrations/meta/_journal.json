@@ -218,6 +218,132 @@
       "when": 1773212242728,
       "tag": "20260311065722_AddWeekStartDay",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1774575756676,
+      "tag": "20260327014236_AddAttachmentRenamedActivity",
+      "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1774595658293,
+      "tag": "20260327071418_update_user_auth_fields",
+      "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1774599810441,
+      "tag": "20260327082330_AddAuthFieldsToUser",
+      "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1774600598004,
+      "tag": "20260327083638_MakeMemberEmailNullable",
+      "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "7",
+      "when": 1774667048478,
+      "tag": "20260328030408_UpdateSchemaForTasks",
+      "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1774671493094,
+      "tag": "20260328041813_AddMoreActivityTypes",
+      "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1774672934662,
+      "tag": "20260328044214_AddDeadlineActivities",
+      "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1774673068646,
+      "tag": "20260328044428_AddDeadlineActivities",
+      "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "7",
+      "when": 1774928749759,
+      "tag": "20260331034549_clammy_sersi",
+      "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1774931453085,
+      "tag": "20260331043053_pale_bucky",
+      "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1774932418000,
+      "tag": "20260331_DropAndAddNewConstraint",
+      "breakpoints": true
+    },
+    {
+      "idx": 42,
+      "version": "7",
+      "when": 1775016201960,
+      "tag": "20260401040321_living_forgotten_one",
+      "breakpoints": true
+    },
+    {
+      "idx": 43,
+      "version": "7",
+      "when": 1775115350717,
+      "tag": "20260402073549_hesitant_corsair",
+      "breakpoints": true
+    },
+    {
+      "idx": 44,
+      "version": "7",
+      "when": 1775183111073,
+      "tag": "20260403022511_tearful_young_avengers",
+      "breakpoints": true
+    },
+    {
+      "idx": 45,
+      "version": "7",
+      "when": 1775268026898,
+      "tag": "20260404020026_same_stingray",
+      "breakpoints": true
+    },
+    {
+      "idx": 46,
+      "version": "7",
+      "when": 1775274128315,
+      "tag": "20260404034204_wandering_machine_man",
+      "breakpoints": true
+    },
+    {
+      "idx": 47,
+      "version": "7",
+      "when": 1775285384921,
+      "tag": "20260404064944_omniscient_wallow",
+      "breakpoints": true
+    },
+    {
+      "idx": 48,
+      "version": "7",
+      "when": 1775717758989,
+      "tag": "20260409065558_puzzling_kabuki",
+      "breakpoints": true
     }
   ]
 }

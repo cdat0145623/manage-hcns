@@ -52,7 +52,7 @@ export const boards = pgTable(
     ),
     workspaceId: bigint("workspaceId", { mode: "number" })
       .notNull()
-      .references(() => workspaces.id, { onDelete: "cascade" }),
+      .references(() => workspaces.id, { onDelete: "restrict" }),
     visibility: boardVisibilityEnum("visibility").notNull().default("private"),
     type: boardTypeEnum("type").notNull().default("regular"),
     isArchived: boolean("isArchived").notNull().default(false),
@@ -101,10 +101,10 @@ export const userBoardFavorites = pgTable(
   {
     userId: uuid("userId")
       .notNull()
-      .references(() => users.id, { onDelete: "cascade" }),
+      .references(() => users.id, { onDelete: "restrict" }),
     boardId: bigint("boardId", { mode: "number" })
       .notNull()
-      .references(() => boards.id, { onDelete: "cascade" }),
+      .references(() => boards.id, { onDelete: "restrict" }),
     createdAt: timestamp("createdAt").defaultNow().notNull(),
   },
   (table) => ({

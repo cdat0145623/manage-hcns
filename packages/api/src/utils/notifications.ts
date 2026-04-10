@@ -1,3 +1,4 @@
+import { t } from "@lingui/core/macro";
 import { env } from "next-runtime-env";
 
 import type { dbClient } from "@kan/db/client";
@@ -56,7 +57,7 @@ export async function sendMentionEmails({
     const commenter = await userRepo.getById(db, commenterUserId);
     if (!commenter) return;
 
-    const commenterName = commenter.name?.trim() || commenter.email;
+    const commenterName = commenter.name?.trim() || commenter.email || t`Unknown user`;
 
     // Get mentioned members with full details (filtered by workspace)
     const membersWithDetails = await memberRepo.getByPublicIdsWithUsers(

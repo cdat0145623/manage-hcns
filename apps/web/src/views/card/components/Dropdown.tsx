@@ -3,6 +3,7 @@ import {
   HiEllipsisHorizontal,
   HiLink,
   HiOutlineCheckCircle,
+  HiOutlinePaperClip,
   HiOutlineTrash,
 } from "react-icons/hi2";
 
@@ -18,11 +19,13 @@ export default function CardDropdown({
   isTemplate,
   boardPublicId,
   cardCreatedBy,
+  hideChecklist = false,
 }: {
   cardPublicId: string;
   isTemplate?: boolean;
   boardPublicId?: string;
   cardCreatedBy?: string | null;
+  hideChecklist?: boolean;
 }) {
   const { openModal } = useModal();
   const { showPopup } = usePopup();
@@ -55,28 +58,41 @@ export default function CardDropdown({
 
   const items = [
     {
-      label: t`Copy card link`,
+      label: t`Copy link thẻ`,
       action: handleCopyCardLink,
-      icon: <HiLink className="h-[16px] w-[16px] text-dark-900" />,
+      icon: (
+        <HiLink className="h-[16px] w-[16px] text-light-600 dark:text-dark-600" />
+      ),
     },
     ...(canEditCard
       ? [
           {
-            label: t`Add checklist`,
-            action: () => openModal("ADD_CHECKLIST"),
+            label: t`Đính kèm`,
+            action: () => openModal("ADD_ATTACHMENT"),
             icon: (
-              <HiOutlineCheckCircle className="h-[16px] w-[16px] text-dark-900" />
+              <HiOutlinePaperClip className="h-[16px] w-[16px] text-light-600 dark:text-dark-600" />
             ),
           },
+          ...(!hideChecklist
+            ? [
+                {
+                  label: t`Thêm Checklist`,
+                  action: () => openModal("ADD_CHECKLIST"),
+                  icon: (
+                    <HiOutlineCheckCircle className="h-[16px] w-[16px] text-light-600 dark:text-dark-600" />
+                  ),
+                },
+              ]
+            : []),
         ]
       : []),
     ...(canDeleteCard || isCreator
       ? [
           {
-            label: t`Delete card`,
+            label: t`Xóa thẻ`,
             action: () => openModal("DELETE_CARD"),
             icon: (
-              <HiOutlineTrash className="h-[16px] w-[16px] text-dark-900" />
+              <HiOutlineTrash className="h-[16px] w-[16px] text-light-600 dark:text-dark-600" />
             ),
           },
         ]
@@ -89,7 +105,7 @@ export default function CardDropdown({
 
   return (
     <Dropdown items={items}>
-      <HiEllipsisHorizontal className="h-5 w-5 text-dark-900" />
+      <HiEllipsisHorizontal className="h-3.5 w-3.5 text-light-950 transition-colors hover:text-light-1000 dark:text-dark-600 dark:hover:text-dark-1000" />
     </Dropdown>
   );
 }

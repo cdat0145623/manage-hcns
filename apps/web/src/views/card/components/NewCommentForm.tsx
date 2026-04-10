@@ -8,7 +8,7 @@ import LoadingSpinner from "~/components/LoadingSpinner";
 import { usePermissions } from "~/hooks/usePermissions";
 import { usePopup } from "~/providers/popup";
 import { api } from "~/utils/api";
-import { invalidateCard } from "~/utils/cardInvalidation";
+import { invalidateCard, invalidateTaskInstance } from "~/utils/cardInvalidation";
 
 interface FormValues {
   comment: string;
@@ -16,22 +16,23 @@ interface FormValues {
 
 const NewCommentForm = ({
   cardPublicId,
+  taskInstanceId,
   workspaceMembers,
 }: {
-  cardPublicId: string;
+  cardPublicId?: string;
+  taskInstanceId?: string;
   workspaceMembers: WorkspaceMember[];
 }) => {
   const utils = api.useUtils();
   const { showPopup } = usePopup();
-  const { canCreateComment } = usePermissions();
   const { handleSubmit, setValue, watch, reset } = useForm<FormValues>({
     values: {
       comment: "",
     },
   });
 
-  const addCommentMutation = api.card.addComment.useMutation({
-    onError: (_error, _newList) => {
+  const addCardCommentMutation = api.card.addComment.useMutation({
+    onError: () => {
       showPopup({
         header: t`Unable to add comment`,
         message: t`Please try again later, or contact customer support.`,
@@ -40,20 +41,39 @@ const NewCommentForm = ({
     },
     onSettled: async () => {
       reset();
-      await invalidateCard(utils, cardPublicId);
+      if (cardPublicId) await invalidateCard(utils, cardPublicId);
     },
   });
 
-  const onSubmit = (data: FormValues) => {
-    addCommentMutation.mutate({
-      cardPublicId,
-      comment: data.comment,
-    });
-  };
+  const addTaskCommentMutation = api.taskInstance.addComment.useMutation({
+    onError: () => {
+      showPopup({
+        header: t`Unable to add comment`,
+        message: t`Please try again later, or contact customer support.`,
+        icon: "error",
+      });
+    },
+    onSettled: async () => {
+      reset();
+      if (taskInstanceId) await invalidateTaskInstance(utils, taskInstanceId);
+    },
+  });
 
-  if (!canCreateComment) {
-    return null;
-  }
+  const isPending = addCardCommentMutation.isPending || addTaskCommentMutation.isPending;
+
+  const onSubmit = (data: FormValues) => {
+    if (cardPublicId) {
+        addCardCommentMutation.mutate({
+            cardPublicId,
+            comment: data.comment,
+        });
+    } else if (taskInstanceId) {
+        addTaskCommentMutation.mutate({
+            id: taskInstanceId,
+            comment: data.comment,
+        });
+    }
+  };
 
   return (
     <form
@@ -65,16 +85,16 @@ const NewCommentForm = ({
         onChange={(value) => setValue("comment", value)}
         workspaceMembers={workspaceMembers}
         enableYouTubeEmbed={false}
-        placeholder={t`Add comment... (type '/' to open commands or '@' to mention)`}
+        placeholder={t`Bình luận... (gõ '/' để mở lệnh hoặc '@' để đề cập)`}
         disableHeadings={true}
       />
       <div className="flex justify-end">
         <button
           type="submit"
-          disabled={addCommentMutation.isPending}
+          disabled={isPending}
           className="flex h-8 w-8 items-center justify-center rounded-full border border-light-600 bg-light-300 hover:bg-light-400 disabled:opacity-50 dark:border-dark-400 dark:bg-dark-200 dark:hover:bg-dark-400"
         >
-          {addCommentMutation.isPending ? (
+          {isPending ? (
             <LoadingSpinner size="sm" />
           ) : (
             <HiOutlineArrowUp />

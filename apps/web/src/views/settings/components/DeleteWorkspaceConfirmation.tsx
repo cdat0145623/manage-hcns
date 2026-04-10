@@ -36,7 +36,7 @@ export function DeleteWorkspaceConfirmation() {
       if (filteredWorkspaces.length > 0 && filteredWorkspaces[0]) {
         switchWorkspace(filteredWorkspaces[0]);
       } else {
-        router.push("/");
+        router.push("/boards");
       }
     },
     onError: () => {

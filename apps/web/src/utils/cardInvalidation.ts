@@ -16,3 +16,20 @@ export async function invalidateCard(
   ]);
 }
 
+/**
+ * Invalidates all task-instance-related queries.
+ */
+export async function invalidateTaskInstance(
+  utils: ReturnType<typeof api.useUtils>,
+  taskInstanceId: string,
+) {
+  if (!taskInstanceId) return;
+
+  await Promise.all([
+    utils.taskInstance.getActivities.invalidate({ id: taskInstanceId }),
+    utils.attachment.getByTaskInstanceId.invalidate({ taskInstanceId }),
+    utils.taskInstance.byId.invalidate({ id: taskInstanceId }),
+    utils.taskInstance.getVirtual.invalidate(),
+  ]);
+}
+

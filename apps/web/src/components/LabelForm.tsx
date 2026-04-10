@@ -27,10 +27,12 @@ export function LabelForm({
   boardPublicId,
   refetch,
   isEdit,
+  hideHeader,
 }: {
   boardPublicId: string;
-  refetch: () => void;
+  refetch: () => void | Promise<void>;
   isEdit?: boolean;
+  hideHeader?: boolean;
 }) {
   const { closeModal, entityId, openModal, setModalState } = useModal();
 
@@ -46,11 +48,11 @@ export function LabelForm({
   const { control, register, reset, handleSubmit, setValue, watch } =
     useForm<LabelFormInput>({
       values: {
+        isCreateAnotherEnabled: false,
         name: isEdit && label.data?.name ? label.data.name : "",
         colour: (isEdit && label.data?.colourCode
-          ? colours.find((c) => c.code === label.data?.colourCode)
+          ? colours.find((c) => c.code === label.data.colourCode)
           : colours[0]) as Colour,
-        isCreateAnotherEnabled: false,
       },
     });
 
@@ -62,7 +64,7 @@ export function LabelForm({
         (c) => c.code === watch("colour").code,
       );
       try {
-        refetch();
+        void refetch();
         setModalState("NEW_LABEL_CREATED", newLabel.publicId);
         if (!isCreateAnotherEnabled) {
           closeModal();
@@ -82,7 +84,7 @@ export function LabelForm({
 
   const updateLabel = api.label.update.useMutation({
     onSuccess: () => {
-      refetch();
+      void refetch();
       closeModal();
     },
   });
@@ -114,21 +116,23 @@ export function LabelForm({
   return (
     <form onSubmit={handleSubmit(onSubmit)}>
       <div className="px-5 pt-5">
-        <div className="flex w-full items-center justify-between pb-4 text-neutral-900 dark:text-dark-1000">
-          <h2 className="text-sm font-medium">
-            {isEdit ? t`Edit label` : t`New label`}
-          </h2>
-          <button
-            type="button"
-            className="rounded p-1 hover:bg-light-300 focus:outline-none dark:hover:bg-dark-300"
-            onClick={(e) => {
-              e.preventDefault();
-              closeModal();
-            }}
-          >
-            <HiXMark size={18} className="text-light-900 dark:text-dark-900" />
-          </button>
-        </div>
+        {!hideHeader && (
+          <div className="flex w-full items-center justify-between pb-4 text-neutral-900 dark:text-dark-1000">
+            <h2 className="text-sm font-medium">
+              {isEdit ? t`Edit label` : t`New label`}
+            </h2>
+            <button
+              type="button"
+              className="rounded p-1 hover:bg-light-300 focus:outline-none dark:hover:bg-dark-300"
+              onClick={(e) => {
+                e.preventDefault();
+                closeModal();
+              }}
+            >
+              <HiXMark size={18} className="text-light-900 dark:text-dark-900" />
+            </button>
+          </div>
+        )}
 
         <Input
           id="label-name"

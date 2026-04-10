@@ -79,7 +79,7 @@ const DateSelector = ({
   };
 
   return (
-    <div className="w-[250px] p-4">
+    <div className="w-full">
       <div className="flex items-center text-light-1000 dark:text-dark-1000">
         <button
           type="button"

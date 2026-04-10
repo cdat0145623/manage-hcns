@@ -1,4 +1,4 @@
-import { relations } from "drizzle-orm";
+import { relations, sql } from "drizzle-orm";
 import {
   bigint,
   bigserial,
@@ -8,19 +8,24 @@ import {
   timestamp,
   uuid,
   varchar,
+  check,
 } from "drizzle-orm/pg-core";
 
 import { cards } from "./cards";
 import { users } from "./users";
+import { taskInstances } from "./tasks";
 
 export const checklists = pgTable("card_checklist", {
   id: bigserial("id", { mode: "number" }).primaryKey(),
   publicId: varchar("publicId", { length: 12 }).notNull().unique(),
   name: varchar("name", { length: 255 }).notNull(),
   index: integer("index").notNull(),
-  cardId: bigint("cardId", { mode: "number" })
-    .notNull()
-    .references(() => cards.id, { onDelete: "cascade" }),
+  cardId: bigint("cardId", { mode: "number" }).references(() => cards.id, {
+    onDelete: "restrict",
+  }),
+  taskInstanceId: uuid("taskInstanceId").references(() => taskInstances.id, {
+    onDelete: "restrict",
+  }),
   createdBy: uuid("createdBy").references(() => users.id, {
     onDelete: "set null",
   }),
@@ -30,13 +35,23 @@ export const checklists = pgTable("card_checklist", {
   deletedBy: uuid("deletedBy").references(() => users.id, {
     onDelete: "set null",
   }),
-}).enableRLS();
+}, (table) => [
+  check(
+    "card_checklist_entity_check",
+    sql`(((("taskInstanceId" IS NOT NULL) AND ("cardId" IS NULL)) OR (("taskInstanceId" IS NULL) AND ("cardId" IS NOT NULL))))`
+  ),
+]).enableRLS();
 
 export const checklistsRelations = relations(checklists, ({ one, many }) => ({
   card: one(cards, {
     fields: [checklists.cardId],
     references: [cards.id],
     relationName: "checklistsCard",
+  }),
+  taskInstance: one(taskInstances, {
+    fields: [checklists.taskInstanceId],
+    references: [taskInstances.id],
+    relationName: "checklistsTaskInstance",
   }),
   createdBy: one(users, {
     fields: [checklists.createdBy],
@@ -59,7 +74,7 @@ export const checklistItems = pgTable("card_checklist_item", {
   index: integer("index").notNull(),
   checklistId: bigint("checklistId", { mode: "number" })
     .notNull()
-    .references(() => checklists.id, { onDelete: "cascade" }),
+    .references(() => checklists.id, { onDelete: "restrict" }),
   createdBy: uuid("createdBy").references(() => users.id, {
     onDelete: "set null",
   }),

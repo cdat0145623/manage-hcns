@@ -1,0 +1,1 @@
+ALTER TYPE "public"."card_activity_type" ADD VALUE 'card.updated.attachment.renamed' BEFORE 'card.updated.attachment.removed';

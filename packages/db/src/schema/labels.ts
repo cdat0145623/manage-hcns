@@ -25,7 +25,7 @@ export const labels = pgTable("label", {
   updatedAt: timestamp("updatedAt"),
   boardId: bigint("boardId", { mode: "number" })
     .notNull()
-    .references(() => boards.id, { onDelete: "cascade" }),
+    .references(() => boards.id, { onDelete: "restrict" }),
   importId: bigint("importId", { mode: "number" }).references(() => imports.id),
   deletedAt: timestamp("deletedAt"),
   deletedBy: uuid("deletedBy").references(() => users.id, {

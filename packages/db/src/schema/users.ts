@@ -1,7 +1,9 @@
 import { relations, sql } from "drizzle-orm";
 import {
   boolean,
+  integer,
   pgTable,
+  text,
   timestamp,
   uuid,
   varchar,
@@ -12,7 +14,7 @@ import { boards, userBoardFavorites } from "./boards";
 import { cards } from "./cards";
 import { imports } from "./imports";
 import { lists } from "./lists";
-import { workspaceMembers, workspaces } from "./workspaces";
+import { workspaceMembers, workspaces, memberRoleEnum } from "./workspaces";
 import { integrations } from "./integrations";
 
 export const users = pgTable("user", {
@@ -21,12 +23,21 @@ export const users = pgTable("user", {
     .primaryKey()
     .default(sql`uuid_generate_v4()`),
   name: varchar("name", { length: 255 }),
-  email: varchar("email", { length: 255 }).notNull().unique(),
-  emailVerified: boolean("emailVerified").notNull(),
+  email: varchar("email", { length: 255 }).unique(),
+  username: text("username").unique(),
+  password: text("password"),
+  accountId: text("account_id"),
+  providerId: text("provider_id"),
+  userId: text("user_id"),
+  emailVerified: boolean("emailVerified").notNull().default(false),
   image: varchar("image", { length: 255 }),
   createdAt: timestamp("createdAt").notNull().defaultNow(),
   updatedAt: timestamp("updatedAt").notNull().defaultNow(),
   stripeCustomerId: varchar("stripeCustomerId", { length: 255 }),
+  role: memberRoleEnum("role").notNull().default("NVVP"),
+  branchId: integer("branchId"),
+  areaId: integer("areaId"),
+  isActive: boolean("isActive").notNull().default(true),
 }).enableRLS();
 
 export const usersRelations = relations(users, ({ many }) => ({

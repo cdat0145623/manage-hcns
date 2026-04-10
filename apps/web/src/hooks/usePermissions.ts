@@ -29,6 +29,8 @@ interface UsePermissionsResult {
   canRemoveMember: boolean;
   canViewWorkspace: boolean;
   canEditWorkspace: boolean;
+  canAttach: boolean;
+  canTick: boolean;
 }
 
 export function usePermissions(): UsePermissionsResult {
@@ -62,6 +64,8 @@ export function usePermissions(): UsePermissionsResult {
       canRemoveMember: false,
       canViewWorkspace: false,
       canEditWorkspace: false,
+      canAttach: false,
+      canTick: false
     };
     return emptyPermissions;
   }
@@ -107,6 +111,8 @@ export function usePermissions(): UsePermissionsResult {
     canRemoveMember: hasPermission("member:remove"),
     canViewWorkspace: hasPermission("workspace:view"),
     canEditWorkspace: hasPermission("workspace:edit"),
+    canAttach: hasPermission("card:attach"),
+    canTick: hasPermission("card:tick"),
   };
 }
 

@@ -9,6 +9,7 @@ import {
 } from "react-icons/hi2";
 import { twMerge } from "tailwind-merge";
 
+import type { Role } from "@kan/shared";
 import type { Subscription } from "@kan/shared/utils";
 import { authClient } from "@kan/auth/client";
 import { getSubscriptionByPlan, hasUnlimitedSeats } from "@kan/shared/utils";
@@ -99,7 +100,7 @@ export default function MembersPage() {
     showSkeleton?: boolean;
     showPendingIcon?: boolean;
   }) => {
-    const handleRoleChange = (newRole: "admin" | "member" | "guest") => {
+    const handleRoleChange = (newRole: Role) => {
       if (!memberPublicId) return;
 
       updateRoleMutation.mutate({
@@ -144,7 +145,7 @@ export default function MembersPage() {
                     {memberName}
                   </p>
                 </div>
-                {((workspace.role === "admin" ||
+                {((workspace.role === "ADMIN" ||
                   data?.showEmailsToMembers === true) ||
                   showSkeleton) && (
                   <p
@@ -192,15 +193,16 @@ export default function MembersPage() {
                       value={memberRole}
                       onChange={(e) =>
                         handleRoleChange(
-                          e.target.value as "admin" | "member" | "guest",
+                          e.target.value as Role,
                         )
                       }
                       disabled={updateRoleMutation.isPending}
                       className="absolute inset-0 h-full w-full cursor-pointer appearance-none border-none bg-transparent p-0 text-[10px] leading-none opacity-0 focus:outline-none focus-visible:outline-none sm:text-[11px]"
                     >
-                      <option value="admin">{t`Admin`}</option>
-                      <option value="member">{t`Member`}</option>
-                      <option value="guest">{t`Guest`}</option>
+                      <option value="ADMIN">{t`Admin`}</option>
+                      <option value="NVKT_MANAGER">{t`Technical Manager`}</option>
+                      <option value="NVKD_MANAGER">{t`Business Manager`}</option>
+                      <option value="NVVP">{t`Staff`}</option>
                     </select>
                   )}
                 </div>
@@ -214,14 +216,14 @@ export default function MembersPage() {
             <div
               className={twMerge(
                 "relative",
-                (workspace.role !== "admin" || showSkeleton) && "hidden",
+                (workspace.role !== "ADMIN" || showSkeleton) && "hidden",
               )}
             >
               {session?.user.id !== memberId && (
                 <Dropdown
                   items={[
                     {
-                      label: t`Edit permissions`,
+                      label: t`Sửa quyền`,
                       action: () =>
                         openModal(
                           "EDIT_MEMBER_PERMISSIONS",
@@ -230,7 +232,7 @@ export default function MembersPage() {
                         ),
                     },
                     {
-                      label: t`Remove member`,
+                      label: t`Xóa thành viên`,
                       action: () =>
                         openModal(
                           "REMOVE_MEMBER",
@@ -260,7 +262,7 @@ export default function MembersPage() {
         <div className="mb-8 flex w-full justify-between">
           <div className="flex items-center gap-3">
             <h1 className="font-bold tracking-tight text-neutral-900 dark:text-dark-1000 sm:text-[1.2rem]">
-              {t`Members`}
+              {t`Thành viên`}
             </h1>
           </div>
           <div className="flex items-center gap-3">
@@ -301,9 +303,9 @@ export default function MembersPage() {
             <Button
               onClick={() => openModal("INVITE_MEMBER")}
               iconLeft={<HiOutlinePlusSmall className="h-4 w-4" />}
-              disabled={workspace.role !== "admin"}
+              disabled={workspace.role !== "ADMIN"}
             >
-              {t`Invite`}
+              {t`Thêm`}
             </Button>
           </div>
         </div>
@@ -319,13 +321,13 @@ export default function MembersPage() {
                         scope="col"
                         className="w-full rounded-tl-lg py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-light-900 dark:text-dark-900 sm:w-[65%] sm:pl-6"
                       >
-                        {t`User`}
+                        {t`Thành viên`}
                       </th>
                       <th
                         scope="col"
                         className="w-auto whitespace-nowrap rounded-tr-lg px-3 py-3.5 text-left text-sm font-semibold text-light-900 dark:text-dark-900 sm:w-[35%]"
                       >
-                        {t`Role`}
+                        {t`Vai trò`}
                       </th>
                     </tr>
                   </thead>

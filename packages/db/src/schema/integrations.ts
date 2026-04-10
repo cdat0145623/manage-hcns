@@ -16,7 +16,7 @@ export const integrations = pgTable(
     provider: varchar("provider", { length: 255 }).notNull(),
     userId: uuid("userId")
       .notNull()
-      .references(() => users.id, { onDelete: "cascade" }),
+      .references(() => users.id, { onDelete: "restrict" }),
     accessToken: text("accessToken").notNull(),
     refreshToken: varchar("refreshToken", { length: 255 }),
     expiresAt: timestamp("expiresAt").notNull(),

@@ -22,14 +22,14 @@ describe("webhook repository integration tests", () => {
         name: "My Webhook",
         url: "https://example.com/webhook",
         secret: "my-secret",
-        events: ["card.created", "card.updated"],
+        events: ["created", "card.updated"],
         createdBy: testUser.id,
       });
 
       expect(webhook).not.toBeNull();
       expect(webhook!.name).toBe("My Webhook");
       expect(webhook!.url).toBe("https://example.com/webhook");
-      expect(webhook!.events).toEqual(["card.created", "card.updated"]);
+      expect(webhook!.events).toEqual(["created", "card.updated"]);
       expect(webhook!.active).toBe(true);
       expect(webhook!.publicId).toMatch(/^[a-zA-Z0-9]{12}$/);
     });
@@ -54,7 +54,7 @@ describe("webhook repository integration tests", () => {
         workspaceId: testWorkspace.id,
         name: "Test Webhook",
         url: "https://example.com/webhook",
-        events: ["card.created"],
+        events: ["created"],
         createdBy: testUser.id,
       });
 
@@ -78,7 +78,7 @@ describe("webhook repository integration tests", () => {
         workspaceId: testWorkspace.id,
         name: "Webhook 1",
         url: "https://example.com/webhook1",
-        events: ["card.created"],
+        events: ["created"],
         createdBy: testUser.id,
       });
 
@@ -110,7 +110,7 @@ describe("webhook repository integration tests", () => {
         workspaceId: testWorkspace.id,
         name: "Active Webhook",
         url: "https://example.com/active",
-        events: ["card.created"],
+        events: ["created"],
         createdBy: testUser.id,
       });
 
@@ -118,7 +118,7 @@ describe("webhook repository integration tests", () => {
         workspaceId: testWorkspace.id,
         name: "Inactive Webhook",
         url: "https://example.com/inactive",
-        events: ["card.created"],
+        events: ["created"],
         createdBy: testUser.id,
       });
 
@@ -140,7 +140,7 @@ describe("webhook repository integration tests", () => {
         workspaceId: testWorkspace.id,
         name: "Original Name",
         url: "https://example.com/webhook",
-        events: ["card.created"],
+        events: ["created"],
         createdBy: testUser.id,
       });
 
@@ -158,15 +158,15 @@ describe("webhook repository integration tests", () => {
         workspaceId: testWorkspace.id,
         name: "Test Webhook",
         url: "https://example.com/webhook",
-        events: ["card.created"],
+        events: ["created"],
         createdBy: testUser.id,
       });
 
       const updated = await webhookRepo.update(db, created!.publicId, {
-        events: ["card.created", "card.updated", "card.deleted"],
+        events: ["created", "card.updated", "card.deleted"],
       });
 
-      expect(updated!.events).toEqual(["card.created", "card.updated", "card.deleted"]);
+      expect(updated!.events).toEqual(["created", "card.updated", "card.deleted"]);
     });
 
     it("updates webhook active status", async () => {
@@ -174,7 +174,7 @@ describe("webhook repository integration tests", () => {
         workspaceId: testWorkspace.id,
         name: "Test Webhook",
         url: "https://example.com/webhook",
-        events: ["card.created"],
+        events: ["created"],
         createdBy: testUser.id,
       });
 
@@ -192,7 +192,7 @@ describe("webhook repository integration tests", () => {
         workspaceId: testWorkspace.id,
         name: "Test Webhook",
         url: "https://example.com/webhook",
-        events: ["card.created"],
+        events: ["created"],
         createdBy: testUser.id,
       });
 
@@ -223,7 +223,7 @@ describe("webhook repository integration tests", () => {
         workspaceId: testWorkspace.id,
         name: "To Be Deleted",
         url: "https://example.com/webhook",
-        events: ["card.created"],
+        events: ["created"],
         createdBy: testUser.id,
       });
 

@@ -13,7 +13,7 @@
       "default": "./src/client.ts"
     },
     "./schema": {
-      "types": "./dist/schema.d.ts",
+      "types": "./dist/schema/index.d.ts",
       "default": "./src/schema/index.ts"
     },
     "./types/*": {
@@ -37,6 +37,7 @@
     "format": "prettier --check . --ignore-path ../../.gitignore",
     "lint": "eslint",
     "migrate": "pnpm with-env drizzle-kit migrate",
+    "generate": "pnpm with-env drizzle-kit generate",
     "push": "pnpm with-env drizzle-kit push",
     "studio": "pnpm with-env drizzle-kit studio",
     "typecheck": "tsc --noEmit --emitDeclarationOnly false",

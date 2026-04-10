@@ -97,12 +97,12 @@ export default function LabelSelector({
           }}
           handleEdit={disabled ? undefined : (labelPublicId) => openModal("EDIT_LABEL", labelPublicId)}
           handleCreate={disabled ? undefined : () => openModal("NEW_LABEL")}
-          createNewItemLabel={t`Create new label`}
+          createNewItemLabel={t`Tạo nhãn mới`}
           disabled={disabled}
           asChild
         >
           {selectedLabels.length ? (
-            <div className="flex flex-wrap gap-x-0.5">
+            <div className={`flex min-h-[34px] w-full flex-wrap items-center gap-1.5 rounded-xl bg-white px-2 py-1 text-left text-[13px] font-medium text-neutral-900 shadow-sm ring-1 ring-light-300 transition-all hover:bg-light-50 hover:ring-light-400 dark:bg-dark-300/30 dark:text-dark-1000 dark:ring-dark-300/50 dark:hover:bg-dark-300/50 ${disabled ? "cursor-not-allowed opacity-60" : ""}`}>
               {selectedLabels.map((label) => (
                 <Badge
                   key={label.key}
@@ -110,12 +110,15 @@ export default function LabelSelector({
                   iconLeft={label.leftIcon}
                 />
               ))}
-              <Badge value={t`Add label`} iconLeft={<HiMiniPlus size={14} />} />
+              {/* <div className="flex items-center gap-1 px-1 text-light-500">
+                <HiMiniPlus size={14} />
+                <span className="text-[11px]">{t`Nhãn`}</span>
+              </div> */}
             </div>
           ) : (
-            <div className={`flex h-full w-full items-center rounded-[5px] border-[1px] border-light-50 pl-2 text-left text-sm text-neutral-900 dark:border-dark-50 dark:text-dark-1000 ${disabled ? "cursor-not-allowed opacity-60" : "hover:border-light-300 hover:bg-light-200 dark:hover:border-dark-200 dark:hover:bg-dark-100"}`}>
-              <HiMiniPlus size={22} className="pr-2" />
-              {t`Add label`}
+            <div className={`flex min-h-[34px] w-full items-center rounded-xl bg-white px-2.5 text-left text-[13px] font-medium text-neutral-900 shadow-sm ring-1 ring-light-300 transition-all hover:bg-light-50 hover:ring-light-400 dark:bg-dark-300/30 dark:text-dark-1000 dark:ring-dark-300/50 dark:hover:bg-dark-300/50 ${disabled ? "cursor-not-allowed opacity-60" : ""}`}>
+              <HiMiniPlus size={16} className="mr-1.5 text-light-500" />
+              {t`Nhãn`}
             </div>
           )}
         </CheckboxDropdown>

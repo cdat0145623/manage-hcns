@@ -75,7 +75,7 @@ export function NewWebhookModal({
         name: modalState.name ?? "",
         url: modalState.url ?? "",
         secret: "",
-        events: modalState.events ?? ["card.created"],
+        events: modalState.events ?? ["created"],
         active: modalState.active ?? true,
       });
     } else if (!isEdit) {

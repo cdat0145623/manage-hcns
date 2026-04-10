@@ -65,7 +65,7 @@ export function NewWorkspaceForm() {
   });
   const utils = api.useUtils();
 
-  const hasAvailableWorkspaces = availableWorkspaces.length > 0;
+  const hasAvailableWorkspaces = availableWorkspaces.length >= 0;
 
   const isCloudEnv = env("NEXT_PUBLIC_KAN_ENV") === "cloud";
 
@@ -110,7 +110,7 @@ export function NewWorkspaceForm() {
           description: values.description,
           slug: values.slug,
           plan: values.plan,
-          role: "admin",
+          role: "ADMIN",
           weekStartDay: 1,
         });
 
@@ -260,7 +260,7 @@ export function NewWorkspaceForm() {
 
         <Input
           id="workspace-name"
-          placeholder={t`Workspace name`}
+          placeholder={t`Tên workspace`}
           {...register("name")}
           errorMessage={errors.name?.message}
           onKeyDown={async (e) => {

@@ -1,3 +1,5 @@
+import { env } from "~/env";
+
 export const formatToArray = (
   value: string | string[] | undefined,
 ): string[] => {
@@ -43,12 +45,41 @@ export const formatMemberDisplayName = (
   return localPart.replace(/[_-]/g, ".");
 };
 
-export const getAvatarUrl = (imageOrKey: string | null) => {
+export const getAvatarUrl = (imageOrKey: string | null | undefined) => {
   if (!imageOrKey) return "";
 
   if (imageOrKey.startsWith("http://") || imageOrKey.startsWith("https://")) {
     return imageOrKey;
   }
 
-  return "";
+  const avatarBucket = env.NEXT_PUBLIC_AVATAR_BUCKET_NAME ?? "images";
+  return `/${avatarBucket}/${imageOrKey}`;
+};
+
+export const getAttachmentUrl = (key: string | null | undefined, contentType?: string | null) => {
+  if (!key) return "";
+
+  if (key.startsWith("http://") || key.startsWith("https://") || key.startsWith("/")) {
+    return key;
+  }
+
+  const isImage = contentType?.startsWith("image/");
+  const bucket = isImage 
+    ? (env.NEXT_PUBLIC_AVATAR_BUCKET_NAME ?? "images")
+    : (env.NEXT_PUBLIC_ATTACHMENTS_BUCKET_NAME ?? "my-app");
+
+  return `/${bucket}/${key}`;
+};
+
+export const fixServerDate = (date: Date | string | number) => {
+  const d = new Date(date);
+  const now = new Date();
+  
+  // If the date is more than 30 minutes in the future, it's almost certainly the timezone shift bug
+  // We subtract 7 hours (25200000 ms) to restore it to the correct local time
+  if (d.getTime() - now.getTime() > 30 * 60 * 1000) {
+    return new Date(d.getTime() - 7 * 60 * 60 * 1000);
+  }
+  
+  return d;
 };

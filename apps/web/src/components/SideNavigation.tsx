@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-misused-promises */
 import Link from "next/link";
 import { useRouter } from "next/router";
 import { Button } from "@headlessui/react";
@@ -16,6 +17,8 @@ import type { Subscription } from "@kan/shared/utils";
 import { hasActiveSubscription } from "@kan/shared/utils";
 
 import type { KeyboardShortcut } from "~/providers/keyboard-shortcuts";
+import activityLogsIconDark from "~/assets/activity-logs-dark.json";
+import activityLogsIconLight from "~/assets/activity-logs-light.json";
 import boardsIconDark from "~/assets/boards-dark.json";
 import boardsIconLight from "~/assets/boards-light.json";
 import membersIconDark from "~/assets/members-dark.json";
@@ -96,7 +99,19 @@ export default function SideNavigation({
     keyboardShortcut: KeyboardShortcut;
   }[] = [
     {
-      name: t`Boards`,
+      name: "Tổng quan",
+      href: "/reports",
+      icon: isDarkMode ? activityLogsIconDark : activityLogsIconLight,
+      keyboardShortcut: {
+        type: "SEQUENCE",
+        strokes: [{ key: "G" }, { key: "D" }],
+        action: () => router.push("/reports"),
+        group: "NAVIGATION",
+        description: t`Go to dashboard`,
+      },
+    },
+    {
+      name: "Bảng",
       href: "/boards",
       icon: isDarkMode ? boardsIconDark : boardsIconLight,
       keyboardShortcut: {
@@ -106,9 +121,22 @@ export default function SideNavigation({
         group: "NAVIGATION",
         description: t`Go to boards`,
       },
+
     },
     {
-      name: t`Templates`,
+      name: "Lịch",
+      href: "/calendar",
+      icon: isDarkMode ? activityLogsIconDark : activityLogsIconLight,
+      keyboardShortcut: {
+        type: "SEQUENCE",
+        strokes: [{ key: "G" }, { key: "C" }],
+        action: () => router.push("/calendar"),
+        group: "NAVIGATION",
+        description: t`Go to calendar`,
+      },
+    },
+    {
+      name: "Mẫu bảng",
       href: "/templates",
       icon: isDarkMode ? templatesIconDark : templatesIconLight,
       keyboardShortcut: {
@@ -120,7 +148,7 @@ export default function SideNavigation({
       },
     },
     {
-      name: t`Members`,
+      name: "Thành viên",
       href: "/members",
       icon: isDarkMode ? membersIconDark : membersIconLight,
       keyboardShortcut: {
@@ -132,7 +160,19 @@ export default function SideNavigation({
       },
     },
     {
-      name: t`Settings`,
+      name: "Tài khoản",
+      href: "/account",
+      icon: isDarkMode ? membersIconDark : membersIconLight,
+      keyboardShortcut: {
+        type: "SEQUENCE",
+        strokes: [{ key: "G" }, { key: "A" }],
+        action: () => router.push("/account"),
+        group: "NAVIGATION",
+        description: t`Go to account`,
+      },
+    },
+    {
+      name: "Cài đặt",
       href: "/settings",
       icon: isDarkMode ? settingsIconDark : settingsIconLight,
       keyboardShortcut: {
@@ -159,13 +199,6 @@ export default function SideNavigation({
       >
         <div>
           <div className="hidden h-[45px] items-center justify-between pb-3 md:flex">
-            {!isCollapsed && (
-              <Link href="/" className="block">
-                <h1 className="pl-2 text-[16px] font-bold tracking-tight text-neutral-900 dark:text-dark-1000">
-                  kan.bn
-                </h1>
-              </Link>
-            )}
             <Button
               onClick={toggleCollapse}
               className={twMerge(

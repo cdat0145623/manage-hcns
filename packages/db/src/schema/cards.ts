@@ -3,6 +3,7 @@ import {
   bigint,
   bigserial,
   integer,
+  jsonb,
   pgEnum,
   pgTable,
   primaryKey,
@@ -19,35 +20,42 @@ import { labels } from "./labels";
 import { lists } from "./lists";
 import { users } from "./users";
 import { workspaceMembers } from "./workspaces";
+import { taskInstances, fileActivityLog, taskMasters, frequence } from "./tasks";
+import { statusTypeEnum } from "./tasks";
 
 export const activityTypes = [
-  "card.created",
-  "card.updated.title",
-  "card.updated.description",
-  "card.updated.index",
-  "card.updated.list",
-  "card.updated.label.added",
-  "card.updated.label.removed",
-  "card.updated.member.added",
-  "card.updated.member.removed",
-  "card.updated.comment.added",
-  "card.updated.comment.updated",
-  "card.updated.comment.deleted",
-  // Checklist activities
-  "card.updated.checklist.added",
-  "card.updated.checklist.renamed",
-  "card.updated.checklist.deleted",
-  "card.updated.checklist.item.added",
-  "card.updated.checklist.item.updated",
-  "card.updated.checklist.item.completed",
-  "card.updated.checklist.item.uncompleted",
-  "card.updated.checklist.item.deleted",
-  "card.updated.attachment.added",
-  "card.updated.attachment.removed",
-  "card.updated.dueDate.added",
-  "card.updated.dueDate.updated",
-  "card.updated.dueDate.removed",
-  "card.archived",
+  "created",
+  "updated_title",
+  "updated_description",
+  "updated_list",
+  "updated_index",
+  "status_changed",
+  "member_assigned",
+  "member_unassigned",
+  "deadline_changed",
+  "comment",
+  "updated_comment_added",
+  "updated_comment_updated",
+  "updated_comment_deleted",
+  "updated_checklist_added",
+  "updated_checklist_renamed",
+  "updated_checklist_deleted",
+  "updated_checklist_item_added",
+  "updated_checklist_item_updated",
+  "updated_checklist_item_completed",
+  "updated_checklist_item_uncompleted",
+  "updated_checklist_item_deleted",
+  "updated_attachment_added",
+  "updated_attachment_removed",
+  "updated_label_added",
+  "updated_label_removed",
+  "archived",
+  "updated_attachment_renamed",
+  "deadline_added",
+  "deadline_removed",
+  "start_date_added",
+  "start_date_removed",
+  "start_date_changed",
 ] as const;
 
 export type ActivityType = (typeof activityTypes)[number];
@@ -60,6 +68,10 @@ export const cards = pgTable("card", {
   title: text("title").notNull(),
   description: text("description"),
   index: integer("index").notNull(),
+  targetUser: uuid("targetUser").references(() => users.id, {
+    onDelete: "set null",
+  }),
+  status: statusTypeEnum("status").notNull().default("pending"),
   createdBy: uuid("createdBy").references(() => users.id, {
     onDelete: "set null",
   }),
@@ -71,16 +83,123 @@ export const cards = pgTable("card", {
   }),
   listId: bigint("listId", { mode: "number" })
     .notNull()
-    .references(() => lists.id, { onDelete: "cascade" }),
+    .references(() => lists.id, { onDelete: "restrict" }),
   importId: bigint("importId", { mode: "number" }).references(() => imports.id),
   dueDate: timestamp("dueDate"),
+  startDate: timestamp("startDate"),
 }).enableRLS();
+
+export const cardActivities = pgTable("card_activity", {
+  id: bigserial("id", { mode: "number" }).primaryKey(),
+  publicId: varchar("publicId", { length: 12 }).notNull().unique(),
+  type: activityTypeEnum("type").notNull(),
+  cardId: bigint("cardId", { mode: "number" }).references(() => cards.id, {
+    onDelete: "restrict",
+  }),
+  taskInstanceId: uuid("taskInstanceId").references(() => taskInstances.id),
+  oldValue: text("oldValue"),
+  newValue: text("newValue"),
+  metadata: jsonb("metadata"),
+  fromIndex: integer("fromIndex"),
+  toIndex: integer("toIndex"),
+  fromListId: bigint("fromListId", { mode: "number" }).references(
+    () => lists.id,
+    { onDelete: "restrict" },
+  ),
+  toListId: bigint("toListId", { mode: "number" }).references(() => lists.id, {
+    onDelete: "restrict",
+  }),
+  labelId: bigint("labelId", { mode: "number" }).references(() => labels.id, {
+    onDelete: "restrict",
+  }),
+  workspaceMemberId: bigint("workspaceMemberId", {
+    mode: "number",
+  }).references(() => workspaceMembers.id, { onDelete: "set null" }),
+  fromTitle: text("fromTitle"),
+  toTitle: text("toTitle"),
+  fromDescription: text("fromDescription"),
+  toDescription: text("toDescription"),
+  createdBy: uuid("createdBy").references(() => users.id, {
+    onDelete: "set null",
+  }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  commentId: bigint("commentId", { mode: "number" }).references(
+    () => comments.id,
+    { onDelete: "restrict" },
+  ),
+  fromComment: text("fromComment"),
+  toComment: text("toComment"),
+  fromDueDate: timestamp("fromDueDate"),
+  toDueDate: timestamp("toDueDate"),
+  sourceBoardId: bigint("sourceBoardId", { mode: "number" }).references(
+    () => boards.id,
+    { onDelete: "set null" },
+  ),
+  attachmentId: uuid("attachmentId").references(
+    () => fileActivityLog.id,
+    { onDelete: "restrict" },
+  ),
+  taskMasterId: uuid("taskMasterId").references(() => taskMasters.id),
+  freqId: uuid("freqId").references(() => frequence.id),
+}).enableRLS();
+
+export const cardsToLabels = pgTable(
+  "_card_labels",
+  {
+    cardId: bigint("cardId", { mode: "number" })
+      .notNull()
+      .references(() => cards.id, { onDelete: "restrict" }),
+    labelId: bigint("labelId", { mode: "number" })
+      .notNull()
+      .references(() => labels.id, { onDelete: "restrict" }),
+  },
+  (t) => [primaryKey({ columns: [t.cardId, t.labelId] })],
+).enableRLS();
+
+export const cardToWorkspaceMembers = pgTable(
+  "_card_workspace_members",
+  {
+    cardId: bigint("cardId", { mode: "number" })
+      .notNull()
+      .references(() => cards.id, { onDelete: "restrict" }),
+    workspaceMemberId: bigint("workspaceMemberId", { mode: "number" })
+      .notNull()
+      .references(() => workspaceMembers.id, { onDelete: "restrict" }),
+  },
+  (t) => [primaryKey({ columns: [t.cardId, t.workspaceMemberId] })],
+).enableRLS();
+
+export const comments = pgTable("comments", {
+  id: bigserial("id", { mode: "number" }).primaryKey(),
+  publicId: varchar("publicId", { length: 12 }).notNull().unique(),
+  comment: text("comment").notNull(),
+  cardId: bigint("cardId", { mode: "number" }).references(() => cards.id, {
+    onDelete: "restrict",
+  }),
+  taskInstanceId: uuid("taskInstanceId").references(() => taskInstances.id),
+  createdBy: uuid("createdBy").references(() => users.id, {
+    onDelete: "set null",
+  }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt"),
+  deletedAt: timestamp("deletedAt"),
+  deletedBy: uuid("deletedBy").references(() => users.id, {
+    onDelete: "set null",
+  }),
+}).enableRLS();
+
+// Relations definitions 
 
 export const cardsRelations = relations(cards, ({ one, many }) => ({
   createdBy: one(users, {
     fields: [cards.createdBy],
     references: [users.id],
     relationName: "cardsCreatedByUser",
+  }),
+  targetUser: one(users, {
+    fields: [cards.targetUser],
+    references: [users.id],
+    relationName: "cardsTargetUser",
   }),
   list: one(lists, {
     fields: [cards.listId],
@@ -102,62 +221,19 @@ export const cardsRelations = relations(cards, ({ one, many }) => ({
   comments: many(comments),
   activities: many(cardActivities),
   checklists: many(checklists),
-  attachments: many(cardAttachments),
+  fileActivities: many(fileActivityLog),
 }));
-
-export const cardActivities = pgTable("card_activity", {
-  id: bigserial("id", { mode: "number" }).primaryKey(),
-  publicId: varchar("publicId", { length: 12 }).notNull().unique(),
-  type: activityTypeEnum("type").notNull(),
-  cardId: bigint("cardId", { mode: "number" })
-    .notNull()
-    .references(() => cards.id, { onDelete: "cascade" }),
-  fromIndex: integer("fromIndex"),
-  toIndex: integer("toIndex"),
-  fromListId: bigint("fromListId", { mode: "number" }).references(
-    () => lists.id,
-    { onDelete: "cascade" },
-  ),
-  toListId: bigint("toListId", { mode: "number" }).references(() => lists.id, {
-    onDelete: "cascade",
-  }),
-  labelId: bigint("labelId", { mode: "number" }).references(() => labels.id, {
-    onDelete: "cascade",
-  }),
-  workspaceMemberId: bigint("workspaceMemberId", {
-    mode: "number",
-  }).references(() => workspaceMembers.id, { onDelete: "set null" }),
-  fromTitle: text("fromTitle"),
-  toTitle: text("toTitle"),
-  fromDescription: text("fromDescription"),
-  toDescription: text("toDescription"),
-  createdBy: uuid("createdBy").references(() => users.id, {
-    onDelete: "set null",
-  }),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-  commentId: bigint("commentId", { mode: "number" }).references(
-    () => comments.id,
-    { onDelete: "cascade" },
-  ),
-  fromComment: text("fromComment"),
-  toComment: text("toComment"),
-  fromDueDate: timestamp("fromDueDate"),
-  toDueDate: timestamp("toDueDate"),
-  sourceBoardId: bigint("sourceBoardId", { mode: "number" }).references(
-    () => boards.id,
-    { onDelete: "set null" },
-  ),
-  attachmentId: bigint("attachmentId", { mode: "number" }).references(
-    () => cardAttachments.id,
-    { onDelete: "cascade" },
-  ),
-}).enableRLS();
 
 export const cardActivitiesRelations = relations(cardActivities, ({ one }) => ({
   card: one(cards, {
     fields: [cardActivities.cardId],
     references: [cards.id],
     relationName: "cardActivitiesCard",
+  }),
+  taskInstance: one(taskInstances, {
+    fields: [cardActivities.taskInstanceId],
+    references: [taskInstances.id],
+    relationName: "cardActivitiesTaskInstance",
   }),
   fromList: one(lists, {
     fields: [cardActivities.fromListId],
@@ -194,25 +270,12 @@ export const cardActivitiesRelations = relations(cardActivities, ({ one }) => ({
     references: [comments.id],
     relationName: "cardActivitiesComment",
   }),
-  attachment: one(cardAttachments, {
+  attachment: one(fileActivityLog, {
     fields: [cardActivities.attachmentId],
-    references: [cardAttachments.id],
+    references: [fileActivityLog.id],
     relationName: "cardActivitiesAttachment",
   }),
 }));
-
-export const cardsToLabels = pgTable(
-  "_card_labels",
-  {
-    cardId: bigint("cardId", { mode: "number" })
-      .notNull()
-      .references(() => cards.id, { onDelete: "cascade" }),
-    labelId: bigint("labelId", { mode: "number" })
-      .notNull()
-      .references(() => labels.id, { onDelete: "cascade" }),
-  },
-  (t) => [primaryKey({ columns: [t.cardId, t.labelId] })],
-).enableRLS();
 
 export const cardToLabelsRelations = relations(cardsToLabels, ({ one }) => ({
   card: one(cards, {
@@ -226,19 +289,6 @@ export const cardToLabelsRelations = relations(cardsToLabels, ({ one }) => ({
     relationName: "cardToLabelsLabel",
   }),
 }));
-
-export const cardToWorkspaceMembers = pgTable(
-  "_card_workspace_members",
-  {
-    cardId: bigint("cardId", { mode: "number" })
-      .notNull()
-      .references(() => cards.id, { onDelete: "cascade" }),
-    workspaceMemberId: bigint("workspaceMemberId", { mode: "number" })
-      .notNull()
-      .references(() => workspaceMembers.id, { onDelete: "cascade" }),
-  },
-  (t) => [primaryKey({ columns: [t.cardId, t.workspaceMemberId] })],
-).enableRLS();
 
 export const cardToWorkspaceMembersRelations = relations(
   cardToWorkspaceMembers,
@@ -256,29 +306,16 @@ export const cardToWorkspaceMembersRelations = relations(
   }),
 );
 
-export const comments = pgTable("card_comments", {
-  id: bigserial("id", { mode: "number" }).primaryKey(),
-  publicId: varchar("publicId", { length: 12 }).notNull().unique(),
-  comment: text("comment").notNull(),
-  cardId: bigint("cardId", { mode: "number" })
-    .notNull()
-    .references(() => cards.id, { onDelete: "cascade" }),
-  createdBy: uuid("createdBy").references(() => users.id, {
-    onDelete: "set null",
-  }),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt"),
-  deletedAt: timestamp("deletedAt"),
-  deletedBy: uuid("deletedBy").references(() => users.id, {
-    onDelete: "set null",
-  }),
-}).enableRLS();
-
 export const commentsRelations = relations(comments, ({ one }) => ({
   card: one(cards, {
     fields: [comments.cardId],
     references: [cards.id],
     relationName: "commentsCard",
+  }),
+  taskInstance: one(taskInstances, {
+    fields: [comments.taskInstanceId],
+    references: [taskInstances.id],
+    relationName: "commentsTaskInstance",
   }),
   createdBy: one(users, {
     fields: [comments.createdBy],
@@ -291,37 +328,3 @@ export const commentsRelations = relations(comments, ({ one }) => ({
     relationName: "commentsDeletedByUser",
   }),
 }));
-
-export const cardAttachments = pgTable("card_attachment", {
-  id: bigserial("id", { mode: "number" }).primaryKey(),
-  publicId: varchar("publicId", { length: 12 }).notNull().unique(),
-  cardId: bigint("cardId", { mode: "number" })
-    .notNull()
-    .references(() => cards.id, { onDelete: "cascade" }),
-  filename: varchar("filename", { length: 255 }).notNull(),
-  originalFilename: varchar("originalFilename", { length: 255 }).notNull(),
-  contentType: varchar("contentType", { length: 100 }).notNull(),
-  size: bigint("size", { mode: "number" }).notNull(),
-  s3Key: varchar("s3Key", { length: 500 }).notNull(),
-  createdBy: uuid("createdBy").references(() => users.id, {
-    onDelete: "set null",
-  }),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-  deletedAt: timestamp("deletedAt"),
-}).enableRLS();
-
-export const cardAttachmentsRelations = relations(
-  cardAttachments,
-  ({ one }) => ({
-    card: one(cards, {
-      fields: [cardAttachments.cardId],
-      references: [cards.id],
-      relationName: "cardAttachmentsCard",
-    }),
-    createdBy: one(users, {
-      fields: [cardAttachments.createdBy],
-      references: [users.id],
-      relationName: "cardAttachmentsCreatedByUser",
-    }),
-  }),
-);

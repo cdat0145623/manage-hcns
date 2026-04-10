@@ -32,13 +32,13 @@ export function SettingsLayout({ children, currentTab }: SettingsLayoutProps) {
   const { canViewWorkspace, canEditWorkspace } = usePermissions();
   const [selectedTabIndex, setSelectedTabIndex] = useState(0);
 
-  const isAdmin = workspace.role === "admin";
+  const isAdmin = workspace.role === "ADMIN";
 
   const settingsTabs = [
     {
       key: "account",
       icon: <HiOutlineUser />,
-      label: t`Account`,
+      label: t`Tài khoản`,
       condition: true,
     },
     {
@@ -50,12 +50,12 @@ export function SettingsLayout({ children, currentTab }: SettingsLayoutProps) {
     {
       key: "permissions",
       icon: <HiOutlineShieldCheck />,
-      label: t`Permissions`,
+      label: t`Quyền`,
       condition: isAdmin,
     },
     {
       key: "billing",
-      label: t`Billing`,
+      label: t`Thanh toán`,
       icon: <HiOutlineBanknotes />,
       condition: env("NEXT_PUBLIC_KAN_ENV") === "cloud" && isAdmin,
     },
@@ -74,7 +74,7 @@ export function SettingsLayout({ children, currentTab }: SettingsLayoutProps) {
     {
       key: "integrations",
       icon: <HiOutlineCodeBracketSquare />,
-      label: t`Integrations`,
+      label: t`Tích hợp`,
       condition: canEditWorkspace,
     },
   ];
@@ -99,7 +99,7 @@ export function SettingsLayout({ children, currentTab }: SettingsLayoutProps) {
         <div className="m-auto max-w-[1100px] px-5 py-6 md:px-28 md:py-12">
           <div className="mb-8 flex w-full justify-between">
             <h1 className="font-bold tracking-tight text-neutral-900 dark:text-dark-1000 sm:text-[1.2rem]">
-              {t`Settings`}
+              {t`Cài đặt`}
             </h1>
           </div>
 

@@ -73,7 +73,7 @@ export function ChangePasswordFormConfirmation() {
 
       utils.invalidate();
       reset();
-      router.push("/");
+      router.push("/boards");
     },
     onError: async (error: any) => {
       const errorMessage = error.message.toLowerCase();

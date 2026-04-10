@@ -144,7 +144,7 @@ const Filters = ({
       ? [
           {
             key: "members",
-            label: t`Members`,
+            label: t`Thành viên`,
             icon: <HiOutlineUserCircle size={16} />,
             items: formattedMembers,
           },
@@ -152,7 +152,7 @@ const Filters = ({
       : []),
     {
       key: "labels",
-      label: t`Labels`,
+      label: t`Nhãn`,
       icon: <HiOutlineTag size={16} />,
       items: formattedLabels,
     },
@@ -160,7 +160,7 @@ const Filters = ({
       ? [
           {
             key: "lists",
-            label: t`Lists`,
+            label: t`Cột`,
             icon: <HiOutlineSquare3Stack3D size={16} />,
             items: formattedLists,
           },
@@ -168,7 +168,7 @@ const Filters = ({
       : []),
     {
       key: "dueDate",
-      label: t`Due date`,
+      label: t`Ngày hết hạn`,
       icon: <HiOutlineClock size={16} />,
       items: dueDateItems,
     },
@@ -218,7 +218,7 @@ const Filters = ({
           disabled={isLoading}
           iconLeft={<IoFilterOutline />}
         >
-          {t`Filter`}
+          {t`Bộ lọc`}
         </Button>
         {numOfFilters > 0 && (
           <button

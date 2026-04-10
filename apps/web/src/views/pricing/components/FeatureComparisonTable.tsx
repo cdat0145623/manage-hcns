@@ -78,7 +78,7 @@ const FeatureComparisonTable = ({
     },
     {
       key: "members",
-      label: t`Members`,
+      label: t`Thành viên`,
       free: { text: t`1 user`, highlightFirstWord: true },
       teams: { text: t`Per-seat pricing`, highlightFirstWord: true },
       pro: { text: t`Unlimited members`, highlightFirstWord: true },

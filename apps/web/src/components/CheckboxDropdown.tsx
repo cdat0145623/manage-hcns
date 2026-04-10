@@ -1,4 +1,4 @@
-import { Menu, Transition } from "@headlessui/react";
+import { Menu, Transition, Portal } from "@headlessui/react";
 import { Fragment, useState } from "react";
 import { HiEllipsisHorizontal, HiMiniPlus } from "react-icons/hi2";
 import { twMerge } from "tailwind-merge";
@@ -127,19 +127,16 @@ export default function CheckboxDropdown({
   );
 
   return (
-    <Menu
-      as="div"
-      className="relative flex w-full flex-wrap items-center text-left"
-    >
-      <>
-        <Menu.Button
-          as={asChild ? "div" : undefined}
-          disabled={disabled}
-          className="h-full w-full cursor-pointer focus-visible:outline-none disabled:cursor-not-allowed"
-        >
-          {children}
-        </Menu.Button>
+    <Menu as="div" className="relative flex w-full flex-wrap items-center text-left">
+      <Menu.Button
+        as={asChild ? "div" : undefined}
+        disabled={disabled}
+        className="h-full w-full cursor-pointer focus-visible:outline-none disabled:cursor-not-allowed"
+      >
+        {children}
+      </Menu.Button>
 
+      <Portal>
         <Transition
           as={Fragment}
           enter="transition ease-out duration-100"
@@ -151,10 +148,12 @@ export default function CheckboxDropdown({
           afterLeave={() => setSelectedGroup(null)}
         >
           <Menu.Items
+            anchor={{
+              to: position === "left" ? "bottom start" : "bottom end",
+              gap: 8,
+            }}
             className={twMerge(
-              "mt-2s absolute z-50 w-56 origin-top-left rounded-md border-[1px] border-light-200 bg-light-50 shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none dark:border-dark-500 dark:bg-dark-200",
-              position === "left" ? "left-0" : "right-0",
-              menuSpacingClass[menuSpacing],
+              "z-[9999] w-56 origin-top rounded-xl border border-light-200 bg-white p-1 shadow-xl ring-1 ring-black/5 focus:outline-none dark:border-dark-400 dark:bg-dark-100",
             )}
           >
             <div className="max-h-[350px] overflow-y-auto p-1">
@@ -165,14 +164,14 @@ export default function CheckboxDropdown({
                   {groups?.map((group) => (
                     <Menu.Item key={group.key}>
                       <div
-                        className="flex items-center rounded-[5px] p-2 hover:bg-light-200 dark:hover:bg-dark-300"
+                        className="flex items-center rounded-lg p-2 transition-colors hover:bg-light-100 dark:hover:bg-dark-200"
                         onClick={(e) => {
                           e.preventDefault();
                           setSelectedGroup(group.key);
                         }}
                       >
                         <span className="mr-2 text-dark-900">{group.icon}</span>
-                        <span className="pointer-events-none text-[12px] text-dark-900">
+                        <span className="pointer-events-none text-[12px] text-dark-900 dark:text-dark-1000">
                           {group.label}
                         </span>
                       </div>
@@ -191,7 +190,7 @@ export default function CheckboxDropdown({
             </div>
           </Menu.Items>
         </Transition>
-      </>
+      </Portal>
     </Menu>
   );
 }

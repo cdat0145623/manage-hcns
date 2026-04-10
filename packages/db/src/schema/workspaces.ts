@@ -17,7 +17,7 @@ import { workspaceMemberPermissions, workspaceRoles } from "./permissions";
 import { subscription } from "./subscriptions";
 import { users } from "./users";
 
-export const memberRoles = ["admin", "member", "guest"] as const;
+export const memberRoles = ["ADMIN", "NVKT_MANAGER", "NVKD_MANAGER", "NVVP"] as const;
 export type MemberRole = (typeof memberRoles)[number];
 export const memberRoleEnum = pgEnum("role", memberRoles);
 
@@ -78,11 +78,11 @@ export const workspaceRelations = relations(workspaces, ({ one, many }) => ({
 export const workspaceMembers = pgTable("workspace_members", {
   id: bigserial("id", { mode: "number" }).primaryKey(),
   publicId: varchar("publicId", { length: 12 }).notNull().unique(),
-  email: varchar("email", { length: 255 }).notNull(),
+  email: varchar("email", { length: 255 }),
   userId: uuid("userId").references(() => users.id, { onDelete: "set null" }),
   workspaceId: bigint("workspaceId", { mode: "number" })
     .notNull()
-    .references(() => workspaces.id, { onDelete: "cascade" }),
+    .references(() => workspaces.id, { onDelete: "restrict" }),
   createdBy: uuid("createdBy").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt"),

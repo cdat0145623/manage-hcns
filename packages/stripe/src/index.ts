@@ -81,3 +81,17 @@ export const getCancellationDetails = async (
 };
 
 export { createStripeClient };
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
+export type MaterializedInstance = {
+  id: number;
+  publicId: string;
+  targetDate: Date;
+  status: "pending" | "in_progress" | "done" | "skipped";
+  actualStartAt: Date | null;
+  actualEndAt: Date | null;
+  note: string | null;
+  cardId: number | null;
+};

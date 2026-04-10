@@ -479,7 +479,7 @@ export default function Editor({
           placeholder: readOnly
             ? ""
             : placeholder ??
-              t`Add description... (type '/' to open commands or '@' to mention)`,
+              t`Thêm mô tả... (gõ '/' để mở dòng lệnh hoặc '@' để nhắc đến)`,
         }),
         SlashCommands.configure({
           commandItems: getCommandItems(disableHeadings),

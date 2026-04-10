@@ -15,19 +15,20 @@ import {
   HiOutlineTrash,
   HiOutlineUserMinus,
   HiOutlineUserPlus,
+  HiChevronDoubleDown,
+  HiChevronDoubleUp,
 } from "react-icons/hi2";
 
 import type {
   ActivityType,
   GetCardActivitiesOutput,
-  GetCardByIdOutput,
 } from "@kan/api/types";
 import { authClient } from "@kan/auth/client";
 
 import Avatar from "~/components/Avatar";
 import { useLocalisation } from "~/hooks/useLocalisation";
 import { api } from "~/utils/api";
-import { getAvatarUrl } from "~/utils/helpers";
+import { getAvatarUrl, fixServerDate } from "~/utils/helpers";
 import Comment from "./Comment";
 
 
@@ -65,6 +66,8 @@ export const getActivityText = ({
   label,
   fromTitle,
   toDueDate,
+  oldValue,
+  newValue,
   dateLocale,
   mergedLabels,
   attachmentName,
@@ -80,6 +83,8 @@ export const getActivityText = ({
   fromTitle?: string | null;
   fromDueDate?: Date | null;
   toDueDate?: Date | null;
+  oldValue?: string | null;
+  newValue?: string | null;
   dateLocale: DateFnsLocale;
   mergedLabels?: string[];
   attachmentName?: string | null;
@@ -92,7 +97,7 @@ export const getActivityText = ({
   );
 
   if (
-    type === "card.updated.label.added" &&
+    type === "updated_label_added" &&
     mergedLabels &&
     mergedLabels.length > 1
   ) {
@@ -106,7 +111,7 @@ export const getActivityText = ({
   }
 
   if (
-    type === "card.updated.label.removed" &&
+    type === "updated_label_removed" &&
     mergedLabels &&
     mergedLabels.length > 1
   ) {
@@ -120,33 +125,43 @@ export const getActivityText = ({
   }
 
   const ACTIVITY_TYPE_MAP = {
-    "card.created": t`created the card`,
-    "card.updated.title": t`updated the title`,
-    "card.updated.description": t`updated the description`,
-    "card.updated.list": t`moved the card to another list`,
-    "card.updated.label.added": t`added a label to the card`,
-    "card.updated.label.removed": t`removed a label from the card`,
-    "card.updated.member.added": t`added a member to the card`,
-    "card.updated.member.removed": t`removed a member from the card`,
-    "card.updated.checklist.added": t`added a checklist`,
-    "card.updated.checklist.renamed": t`renamed a checklist`,
-    "card.updated.checklist.deleted": t`deleted a checklist`,
-    "card.updated.checklist.item.added": t`added a checklist item`,
-    "card.updated.checklist.item.updated": t`updated a checklist item`,
-    "card.updated.checklist.item.completed": t`completed a checklist item`,
-    "card.updated.checklist.item.uncompleted": t`marked a checklist item as incomplete`,
-    "card.updated.checklist.item.deleted": t`deleted a checklist item`,
-    "card.updated.attachment.added": t`added an attachment`,
-    "card.updated.attachment.removed": t`removed an attachment`,
-    "card.updated.dueDate.added": t`set the due date`,
-    "card.updated.dueDate.updated": t`updated the due date`,
-    "card.updated.dueDate.removed": t`removed the due date`,
+    "created": t`created the card`,
+    "updated_title": t`updated the title`,
+    "updated_description": t`updated the description`,
+    "updated_list": t`moved the card to another list`,
+    "updated_index": t`changed the card's position`,
+    "updated_label_added": t`added a label to the card`,
+    "updated_label_removed": t`removed a label from the card`,
+    "member_assigned": t`added a member to the card`,
+    "member_unassigned": t`removed a member from the card`,
+    "updated_comment_added": t`added a comment`,
+    "updated_comment_updated": t`updated a comment`,
+    "updated_comment_deleted": t`deleted a comment`,
+    "comment": t`added a comment`,
+    "updated_checklist_added": t`added a checklist`,
+    "updated_checklist_renamed": t`renamed a checklist`,
+    "updated_checklist_deleted": t`deleted a checklist`,
+    "updated_checklist_item_added": t`added a checklist item`,
+    "updated_checklist_item_updated": t`updated a checklist item`,
+    "updated_checklist_item_completed": t`completed a checklist item`,
+    "updated_checklist_item_uncompleted": t`marked a checklist item as incomplete`,
+    "updated_checklist_item_deleted": t`deleted a checklist item`,
+    "updated_attachment_added": t`added an attachment`,
+    "updated_attachment_renamed": t`renamed an attachment`,
+    "updated_attachment_removed": t`removed an attachment`,
+    "deadline_changed": t`changed the due date`,
+    "deadline_added": t`added a due date`,
+    "deadline_removed": t`removed a due date`,
+    "archived": t`archived the card`,
+    "start_date_added": t`added a start date`,
+    "start_date_changed": t`changed a start date`,
+    "start_date_removed": t`removed a start date`,
   } as const;
 
   if (!(type in ACTIVITY_TYPE_MAP)) return null;
   const baseText = ACTIVITY_TYPE_MAP[type as keyof typeof ACTIVITY_TYPE_MAP];
 
-  if (type === "card.updated.title" && toTitle) {
+  if (type === "updated_title" && toTitle) {
     return (
       <Trans>
         updated the title to <TextHighlight>{truncate(toTitle)}</TextHighlight>
@@ -154,7 +169,7 @@ export const getActivityText = ({
     );
   }
 
-  if (type === "card.updated.list" && fromList && toList) {
+  if (type === "updated_list" && fromList && toList) {
     return (
       <Trans>
         moved the card from <TextHighlight>{truncate(fromList)}</TextHighlight>{" "}
@@ -164,7 +179,7 @@ export const getActivityText = ({
     );
   }
 
-  if (type === "card.updated.member.added" && displayName) {
+  if (type === "member_assigned" && displayName) {
     if (isSelf) return <Trans>self-assigned the card</Trans>;
 
     return (
@@ -175,7 +190,7 @@ export const getActivityText = ({
     );
   }
 
-  if (type === "card.updated.member.removed" && displayName) {
+  if (type === "member_unassigned" && displayName) {
     if (isSelf) return <Trans>unassigned themselves from the card</Trans>;
 
     return (
@@ -186,7 +201,7 @@ export const getActivityText = ({
     );
   }
 
-  if (type === "card.updated.label.added" && label) {
+  if (type === "updated_label_added" && label) {
     return (
       <Trans>
         added label <TextHighlight>{truncate(label)}</TextHighlight>
@@ -194,7 +209,7 @@ export const getActivityText = ({
     );
   }
 
-  if (type === "card.updated.label.removed" && label) {
+  if (type === "updated_label_removed" && label) {
     return (
       <Trans>
         removed label <TextHighlight>{truncate(label)}</TextHighlight>
@@ -202,7 +217,7 @@ export const getActivityText = ({
     );
   }
 
-  if (type === "card.updated.checklist.added" && toTitle) {
+  if (type === "updated_checklist_added" && toTitle) {
     return (
       <Trans>
         added checklist <TextHighlight>{truncate(toTitle)}</TextHighlight>
@@ -210,7 +225,7 @@ export const getActivityText = ({
     );
   }
 
-  if (type === "card.updated.checklist.renamed" && toTitle) {
+  if (type === "updated_checklist_renamed" && toTitle) {
     return (
       <Trans>
         renamed checklist <TextHighlight>{truncate(toTitle)}</TextHighlight>
@@ -218,7 +233,7 @@ export const getActivityText = ({
     );
   }
 
-  if (type === "card.updated.checklist.deleted" && fromTitle) {
+  if (type === "updated_checklist_deleted" && fromTitle) {
     return (
       <Trans>
         deleted checklist <TextHighlight>{truncate(fromTitle)}</TextHighlight>
@@ -226,7 +241,7 @@ export const getActivityText = ({
     );
   }
 
-  if (type === "card.updated.checklist.item.added" && toTitle) {
+  if (type === "updated_checklist_item_added" && toTitle) {
     return (
       <Trans>
         added checklist item <TextHighlight>{truncate(toTitle)}</TextHighlight>
@@ -234,7 +249,7 @@ export const getActivityText = ({
     );
   }
 
-  if (type === "card.updated.checklist.item.updated" && toTitle) {
+  if (type === "updated_checklist_item_updated" && toTitle) {
     return (
       <Trans>
         renamed checklist item to{" "}
@@ -243,7 +258,7 @@ export const getActivityText = ({
     );
   }
 
-  if (type === "card.updated.checklist.item.completed" && toTitle) {
+  if (type === "updated_checklist_item_completed" && toTitle) {
     return (
       <Trans>
         completed checklist item{" "}
@@ -252,7 +267,7 @@ export const getActivityText = ({
     );
   }
 
-  if (type === "card.updated.checklist.item.uncompleted" && toTitle) {
+  if (type === "updated_checklist_item_uncompleted" && toTitle) {
     return (
       <Trans>
         marked checklist item <TextHighlight>{truncate(toTitle)}</TextHighlight>{" "}
@@ -261,7 +276,7 @@ export const getActivityText = ({
     );
   }
 
-  if (type === "card.updated.checklist.item.deleted" && fromTitle) {
+  if (type === "updated_checklist_item_deleted" && fromTitle) {
     return (
       <Trans>
         deleted checklist item{" "}
@@ -270,7 +285,7 @@ export const getActivityText = ({
     );
   }
 
-  if (type === "card.updated.attachment.added") {
+  if (type === "updated_attachment_added") {
     const filename = attachmentName ?? toTitle;
     if (!filename) return baseText;
     return (
@@ -280,8 +295,18 @@ export const getActivityText = ({
     );
   }
 
-  if (type === "card.updated.attachment.removed") {
-    const filename = attachmentName ?? fromTitle;
+  if (type === "updated_attachment_renamed" && fromTitle && toTitle) {
+    return (
+      <Trans>
+        renamed an attachment from{" "}
+        <TextHighlight>{truncate(fromTitle)}</TextHighlight> to{" "}
+        <TextHighlight>{truncate(toTitle)}</TextHighlight>
+      </Trans>
+    );
+  }
+
+  if (type === "updated_attachment_removed") {
+    const filename = attachmentName ?? toTitle;
     if (!filename) return baseText;
     return (
       <Trans>
@@ -291,11 +316,16 @@ export const getActivityText = ({
     );
   }
 
-  if (type === "card.updated.dueDate.added" && toDueDate) {
+  if (
+    (type === "deadline_added" ||
+      type === "deadline_changed" ||
+      type === "deadline_removed") &&
+    toDueDate
+  ) {
     const showYear = !isSameYear(toDueDate, new Date());
     const formattedDate = format(
       toDueDate,
-      showYear ? "do MMM yyyy" : "do MMM",
+      showYear ? "HH:mm do MMM yyyy" : "HH:mm do MMM",
       { locale: dateLocale },
     );
     return (
@@ -305,21 +335,26 @@ export const getActivityText = ({
     );
   }
 
-  if (type === "card.updated.dueDate.updated" && toDueDate) {
-    const showYear = !isSameYear(toDueDate, new Date());
+  if (
+    (type === "start_date_added" ||
+      type === "start_date_changed" ||
+      type === "start_date_removed") &&
+    newValue
+  ) {
+    const showYear = !isSameYear(newValue, new Date());
     const formattedDate = format(
-      toDueDate,
-      showYear ? "do MMM yyyy" : "do MMM",
+      newValue,
+      showYear ? "HH:mm do MMM yyyy" : "HH:mm do MMM",
       { locale: dateLocale },
     );
     return (
       <Trans>
-        changed the due date to <TextHighlight>{formattedDate}</TextHighlight>
+        changed the start date to <TextHighlight>{formattedDate}</TextHighlight>
       </Trans>
     );
   }
 
-  if (type === "card.updated.dueDate.removed") {
+  if (type === "deadline_removed") {
     return <Trans>removed the due date</Trans>;
   }
 
@@ -328,26 +363,30 @@ export const getActivityText = ({
 
 const ACTIVITY_ICON_MAP: Partial<Record<ActivityType, React.ReactNode | null>> =
   {
-    "card.created": <HiOutlinePlus />,
-    "card.updated.title": <HiOutlinePencil />,
-    "card.updated.description": <HiOutlinePencil />,
-    "card.updated.label.added": <HiOutlineTag />,
-    "card.updated.label.removed": <HiOutlineTag />,
-    "card.updated.member.added": <HiOutlineUserPlus />,
-    "card.updated.member.removed": <HiOutlineUserMinus />,
-    "card.updated.checklist.added": <HiOutlinePlus />,
-    "card.updated.checklist.renamed": <HiOutlinePencil />,
-    "card.updated.checklist.deleted": <HiOutlineTrash />,
-    "card.updated.checklist.item.added": <HiOutlinePlus />,
-    "card.updated.checklist.item.updated": <HiOutlinePencil />,
-    "card.updated.checklist.item.completed": <HiOutlineCheckCircle />,
-    "card.updated.checklist.item.uncompleted": <HiOutlineCheckCircle />,
-    "card.updated.checklist.item.deleted": <HiOutlineTrash />,
-    "card.updated.attachment.added": <HiOutlinePaperClip />,
-    "card.updated.attachment.removed": <HiOutlinePaperClip />,
-    "card.updated.dueDate.added": <HiOutlineClock />,
-    "card.updated.dueDate.updated": <HiOutlineClock />,
-    "card.updated.dueDate.removed": <HiOutlineClock />,
+    "created": <HiOutlinePlus />,
+    "updated_title": <HiOutlinePencil />,
+    "updated_description": <HiOutlinePencil />,
+    "updated_label_added": <HiOutlineTag />,
+    "updated_label_removed": <HiOutlineTag />,
+    "member_assigned": <HiOutlineUserPlus />,
+    "member_unassigned": <HiOutlineUserMinus />,
+    "updated_checklist_added": <HiOutlinePlus />,
+    "updated_checklist_renamed": <HiOutlinePencil />,
+    "updated_checklist_deleted": <HiOutlineTrash />,
+    "updated_checklist_item_added": <HiOutlinePlus />,
+    "updated_checklist_item_updated": <HiOutlinePencil />,
+    "updated_checklist_item_completed": <HiOutlineCheckCircle />,
+    "updated_checklist_item_uncompleted": <HiOutlineCheckCircle />,
+    "updated_checklist_item_deleted": <HiOutlineTrash />,
+    "updated_attachment_added": <HiOutlinePaperClip />,
+    "updated_attachment_renamed": <HiOutlinePaperClip />,
+    "updated_attachment_removed": <HiOutlinePaperClip />,
+    "deadline_changed": <HiOutlineClock />,
+    "deadline_added": <HiOutlineClock />,
+    "deadline_removed": <HiOutlineClock />,
+    "start_date_changed": <HiOutlineClock />,
+    "start_date_added": <HiOutlineClock />,
+    "start_date_removed": <HiOutlineClock />,
   } as const;
 
 export const getActivityIcon = (
@@ -355,7 +394,7 @@ export const getActivityIcon = (
   fromIndex?: number | null,
   toIndex?: number | null,
 ): React.ReactNode | null => {
-  if (type === "card.updated.list" && fromIndex != null && toIndex != null) {
+  if (type === "updated_list" && fromIndex != null && toIndex != null) {
     return fromIndex > toIndex ? (
       <HiOutlineArrowLeft />
     ) : (
@@ -369,14 +408,20 @@ const ACTIVITIES_PAGE_SIZE = 20;
 
 const ActivityList = ({
   cardPublicId,
+  taskInstanceId,
   isLoading: cardIsLoading,
-  isAdmin,
+  isAdmin: _isAdmin,
   isViewOnly,
+  includedTypes,
+  excludedTypes,
 }: {
-  cardPublicId: string;
+  cardPublicId?: string;
+  taskInstanceId?: string;
   isLoading: boolean;
   isAdmin?: boolean;
   isViewOnly?: boolean;
+  includedTypes?: ActivityType[];
+  excludedTypes?: ActivityType[];
 }) => {
   const { dateLocale } = useLocalisation();
   const { data: sessionData } = authClient.useSession();
@@ -389,20 +434,85 @@ const ActivityList = ({
 
   const isFullyExpandedRef = useRef(false);
   const lastDataUpdatedAtRef = useRef<number | null>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const prevLengthRef = useRef(0);
+  const [showNav, setShowNav] = useState(false);
 
   const {
     data: firstPageData,
     isFetching: isFetchingFirst,
     dataUpdatedAt,
-  } = api.card.getActivities.useQuery(
-    {
-      cardPublicId,
-      limit: ACTIVITIES_PAGE_SIZE,
-    },
-    {
-      enabled: !!cardPublicId && cardPublicId.length >= 12,
-    },
-  );
+  } = (taskInstanceId 
+    ? api.taskInstance.getActivities.useQuery(
+        {
+          id: taskInstanceId,
+          limit: ACTIVITIES_PAGE_SIZE,
+        },
+        {
+          enabled: !!taskInstanceId,
+        },
+      )
+    : api.card.getActivities.useQuery(
+        {
+          cardPublicId: cardPublicId!,
+          limit: ACTIVITIES_PAGE_SIZE,
+        },
+        {
+          enabled: !!cardPublicId && cardPublicId.length >= 12,
+        },
+      )) as {
+    data: GetCardActivitiesOutput | undefined;
+    isFetching: boolean;
+    dataUpdatedAt: number;
+  };
+
+  const scrollToBottom = (behavior: ScrollBehavior = "smooth") => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTo({
+        top: scrollRef.current.scrollHeight,
+        behavior,
+      });
+    }
+  };
+
+  const scrollToTop = (behavior: ScrollBehavior = "smooth") => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTo({
+        top: 0,
+        behavior,
+      });
+    }
+  };
+
+  // Check if scrollable
+  useEffect(() => {
+    const checkScroll = () => {
+      if (scrollRef.current) {
+        setShowNav(
+          scrollRef.current.scrollHeight > scrollRef.current.clientHeight,
+        );
+      }
+    };
+    checkScroll();
+    // Re-check when activities change
+  }, [allActivities]);
+
+  // Auto-scroll on new comment by current user
+  useEffect(() => {
+    if (allActivities.length > prevLengthRef.current) {
+      const lastActivity = allActivities[allActivities.length - 1];
+      const isByMe = lastActivity?.user?.id === sessionData?.user.id;
+      const isComment =
+        lastActivity?.type === "comment" ||
+        lastActivity?.type === "updated_comment_added";
+
+      if (isByMe && isComment) {
+        // Small delay to ensure the new activity is rendered
+        setTimeout(() => scrollToBottom(), 100);
+      }
+    }
+    prevLengthRef.current = allActivities.length;
+  }, [allActivities, sessionData?.user.id]);
 
   useEffect(() => {
     if (firstPageData && dataUpdatedAt !== lastDataUpdatedAtRef.current) {
@@ -422,11 +532,17 @@ const ActivityList = ({
             if (!lastActivity) break;
 
             const nextCursor = new Date(lastActivity.createdAt).toISOString();
-            const nextPage = await utils.card.getActivities.fetch({
-              cardPublicId,
-              limit: ACTIVITIES_PAGE_SIZE,
-              cursor: nextCursor,
-            });
+            const nextPage = (taskInstanceId 
+                ? await utils.taskInstance.getActivities.fetch({
+                    id: taskInstanceId,
+                    limit: ACTIVITIES_PAGE_SIZE,
+                    cursor: nextCursor,
+                })
+                : await utils.card.getActivities.fetch({
+                    cardPublicId: cardPublicId!,
+                    limit: ACTIVITIES_PAGE_SIZE,
+                    cursor: nextCursor,
+                })) as GetCardActivitiesOutput;
 
             const existingIds = new Set(
               currentActivities.map((a) => a.publicId),
@@ -463,11 +579,17 @@ const ActivityList = ({
     setIsLoadingMore(true);
     try {
       const nextCursor = new Date(lastActivity.createdAt).toISOString();
-      const nextPage = await utils.card.getActivities.fetch({
-        cardPublicId,
-        limit: ACTIVITIES_PAGE_SIZE,
-        cursor: nextCursor,
-      });
+      const nextPage = (taskInstanceId 
+        ? await utils.taskInstance.getActivities.fetch({
+            id: taskInstanceId,
+            limit: ACTIVITIES_PAGE_SIZE,
+            cursor: nextCursor,
+        })
+        : await utils.card.getActivities.fetch({
+            cardPublicId: cardPublicId!,
+            limit: ACTIVITIES_PAGE_SIZE,
+            cursor: nextCursor,
+        })) as GetCardActivitiesOutput;
 
       const existingIds = new Set(allActivities.map((a) => a.publicId));
       const newActivities = nextPage.activities.filter(
@@ -489,8 +611,19 @@ const ActivityList = ({
     cardIsLoading || (isFetchingFirst && allActivities.length === 0);
 
   return (
-    <div className="flex flex-col space-y-4 pt-4">
-      {allActivities.map((activity, index) => {
+    <div className="group/activity-list relative w-full">
+      <div
+        ref={scrollRef}
+        className="flex max-h-[350px] flex-col overflow-y-auto scrollbar-thin scrollbar-thumb-light-400 dark:scrollbar-thumb-dark-300 space-y-4 pt-1"
+      >
+      {allActivities
+        .filter((activity) => {
+          if (includedTypes) return includedTypes.includes(activity.type);
+          if (excludedTypes) return !excludedTypes.includes(activity.type);
+          return true;
+        })
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+        .map((activity, index) => {
         const activityText = getActivityText({
           type: activity.type,
           toTitle: activity.toTitle,
@@ -503,6 +636,8 @@ const ActivityList = ({
           fromTitle: activity.fromTitle ?? null,
           fromDueDate: activity.fromDueDate ?? null,
           toDueDate: activity.toDueDate ?? null,
+          oldValue: activity.oldValue ?? null,
+          newValue: activity.newValue ?? null,
           dateLocale: dateLocale,
           mergedLabels: (activity as ActivityWithMergedLabels).mergedLabels,
           attachmentName:
@@ -510,17 +645,18 @@ const ActivityList = ({
             null,
         });
 
-        if (activity.type === "card.updated.comment.added")
+        if (activity.type === "comment" || activity.type === "updated_comment_added")
           return (
             <Comment
               key={activity.publicId}
               publicId={activity.comment?.publicId}
               cardPublicId={cardPublicId}
+              taskInstanceId={taskInstanceId}
               name={activity.user?.name ?? ""}
               email={activity.user?.email ?? ""}
               image={activity.user?.image ?? null}
               isLoading={isLoading}
-              createdAt={activity.createdAt.toISOString()}
+              createdAt={fixServerDate(activity.createdAt).toISOString()}
               comment={activity.comment?.comment}
               isEdited={!!activity.comment?.updatedAt}
               isAuthor={activity.comment?.createdBy === sessionData?.user.id}
@@ -559,7 +695,7 @@ const ActivityList = ({
               </span>
               <span className="mx-1 text-light-900 dark:text-dark-800">·</span>
               <span className="space-x-1 text-light-900 dark:text-dark-800">
-                {formatDistanceToNow(new Date(activity.createdAt), {
+                {formatDistanceToNow(fixServerDate(activity.createdAt), {
                   addSuffix: true,
                   locale: dateLocale,
                 })}
@@ -569,13 +705,34 @@ const ActivityList = ({
         );
       })}
       {hasMore && (
-        <div className="flex justify-center pt-4">
+        <div className="flex justify-center py-4">
           <button
             onClick={handleLoadMore}
             disabled={isFetching}
             className="text-sm font-medium text-light-900 hover:text-light-1000 disabled:opacity-50 dark:text-dark-800 dark:hover:text-dark-1000"
           >
             {isFetching ? t`Loading...` : t`Load more activities`}
+          </button>
+        </div>
+      )}
+      </div>
+
+      {/* Navigation Buttons */}
+      {showNav && (
+        <div className="absolute bottom-2 right-4 z-20 flex flex-col gap-1.5 opacity-0 transition-opacity duration-200 group-hover/activity-list:opacity-100">
+          <button
+            onClick={() => scrollToTop()}
+            title={t`Go to top`}
+            className="flex h-7 w-7 items-center justify-center rounded-lg border border-white/40 bg-white/20 text-neutral-900 shadow-lg backdrop-blur-md outline-none transition-all hover:bg-white/40 active:scale-90 dark:border-white/10 dark:bg-dark-100/40 dark:text-dark-1000 dark:hover:bg-dark-100/60"
+          >
+            <HiChevronDoubleUp className="h-3.5 w-3.5" />
+          </button>
+          <button
+            onClick={() => scrollToBottom()}
+            title={t`Go to bottom`}
+            className="flex h-7 w-7 items-center justify-center rounded-lg border border-white/40 bg-white/20 text-neutral-900 shadow-lg backdrop-blur-md outline-none transition-all hover:bg-white/40 active:scale-90 dark:border-white/10 dark:bg-dark-100/40 dark:text-dark-1000 dark:hover:bg-dark-100/60"
+          >
+            <HiChevronDoubleDown className="h-3.5 w-3.5" />
           </button>
         </div>
       )}

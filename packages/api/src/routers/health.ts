@@ -8,7 +8,7 @@ import type { dbClient } from "@kan/db/client";
 import * as boardRepo from "@kan/db/repository/board.repo";
 import * as cardRepo from "@kan/db/repository/card.repo";
 import * as cardActivityRepo from "@kan/db/repository/cardActivity.repo";
-import * as cardAttachmentRepo from "@kan/db/repository/cardAttachment.repo";
+import * as fileActivityLogRepo from "@kan/db/repository/fileActivityLog.repo";
 import * as cardCommentRepo from "@kan/db/repository/cardComment.repo";
 import * as checklistRepo from "@kan/db/repository/checklist.repo";
 import * as importRepo from "@kan/db/repository/import.repo";
@@ -167,7 +167,7 @@ export const healthRouter = createTRPCRouter({
           checklistRepo.getCountItems(ctx.db),
           checklistRepo.getCount(ctx.db),
           labelRepo.getCount(ctx.db),
-          cardAttachmentRepo.getCount(ctx.db),
+          fileActivityLogRepo.getCount(ctx.db),
           cardActivityRepo.getCount(ctx.db),
           memberRepo.getActiveCount(ctx.db),
           inviteLinkRepo.getActiveCount(ctx.db),

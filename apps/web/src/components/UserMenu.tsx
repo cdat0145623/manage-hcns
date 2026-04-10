@@ -128,7 +128,7 @@ export default function UserMenu({
           <div className="flex flex-col text-neutral-900 dark:text-dark-1000">
             <div className="p-1">
               <div className="flex w-full items-center px-3 py-2 text-left text-xs">
-                <span>{t`Theme`}</span>
+                <span>{t`Giao diện`}</span>
               </div>
               <Menu.Item>
                 <button
@@ -141,7 +141,7 @@ export default function UserMenu({
                       "mr-4 h-[6px] w-[6px] rounded-full bg-light-900 dark:bg-dark-900",
                     )}
                   />
-                  {t`System`}
+                  {t`Hệ thống`}
                 </button>
               </Menu.Item>
               <Menu.Item>
@@ -155,7 +155,7 @@ export default function UserMenu({
                       "mr-4 h-[6px] w-[6px] rounded-full bg-light-900 dark:bg-dark-900",
                     )}
                   />
-                  {t`Dark`}
+                  {t`Tối`}
                 </button>
               </Menu.Item>
               <Menu.Item>
@@ -169,7 +169,7 @@ export default function UserMenu({
                       "mr-4 h-[6px] w-[6px] rounded-full bg-light-900 dark:bg-dark-900",
                     )}
                   />
-                  {t`Light`}
+                  {t`Sáng`}
                 </button>
               </Menu.Item>
             </div>
@@ -184,37 +184,7 @@ export default function UserMenu({
                   }}
                   className="flex w-full items-center rounded-[5px] px-3 py-2 text-left text-xs hover:bg-light-200 dark:hover:bg-dark-400"
                 >
-                  {t`Shortcuts`}
-                </button>
-              </Menu.Item>
-              <Menu.Item>
-                <Link
-                  href="mailto:support@kan.bn"
-                  target="_blank"
-                  rel="noreferrer"
-                  onClick={handleLinkClick}
-                  className="flex w-full items-center rounded-[5px] px-3 py-2 text-left text-xs hover:bg-light-200 dark:hover:bg-dark-400"
-                >
-                  {t`Support`}
-                </Link>
-              </Menu.Item>
-              <Menu.Item>
-                <Link
-                  href="https://docs.kan.bn"
-                  target="_blank"
-                  rel="noreferrer"
-                  onClick={handleLinkClick}
-                  className="flex w-full items-center rounded-[5px] px-3 py-2 text-left text-xs hover:bg-light-200 dark:hover:bg-dark-400"
-                >
-                  {t`Documentation`}
-                </Link>
-              </Menu.Item>
-              <Menu.Item>
-                <button
-                  onClick={() => handleModalOpen("NEW_FEEDBACK")}
-                  className="flex w-full items-center rounded-[5px] px-3 py-2 text-left text-xs hover:bg-light-200 dark:hover:bg-dark-400"
-                >
-                  {t`Feedback`}
+                  {t`Phím tắt`}
                 </button>
               </Menu.Item>
             </div>
@@ -224,7 +194,7 @@ export default function UserMenu({
                   onClick={handleLogout}
                   className="flex w-full items-center rounded-[5px] px-3 py-2 text-left text-xs hover:bg-light-200 dark:hover:bg-dark-400"
                 >
-                  {t`Logout`}
+                  {t`Đăng xuất`}
                 </button>
               </Menu.Item>
             </div>

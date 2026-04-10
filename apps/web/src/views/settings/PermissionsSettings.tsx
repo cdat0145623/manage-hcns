@@ -16,7 +16,7 @@ export default function PermissionsSettings() {
   const { showPopup } = usePopup();
   const utils = api.useUtils();
 
-  const isAdmin = workspace.role === "admin";
+  const isAdmin = workspace.role === "ADMIN";
 
   const resetAllOverrides = api.permission.resetWorkspaceMemberPermissions.useMutation(
     {
@@ -50,10 +50,10 @@ export default function PermissionsSettings() {
 
       <div className="mb-8 border-t border-light-300 dark:border-dark-300">
         <h2 className="mb-4 mt-8 text-[14px] font-bold text-neutral-900 dark:text-dark-1000">
-          {t`Workspace permissions`}
+          {t`Quyền workspace`}
         </h2>
         <p className="mb-6 text-sm text-neutral-500 dark:text-dark-900">
-          {t`Configure which actions are allowed for each workspace role. These permissions apply to all members with that role.`}
+          {t`Cấu hình hành động nào được phép cho mỗi vai trò trong workspace. Các quyền này áp dụng cho tất cả thành viên có vai trò đó.`}
         </p>
 
         {isAdmin ? (
@@ -61,10 +61,10 @@ export default function PermissionsSettings() {
             <RolePermissions />
             <div className="mt-8">
               <h2 className="mb-4 text-[14px] font-bold text-neutral-900 dark:text-dark-1000">
-                {t`Custom permissions`}
+                {t`Quyền tùy chỉnh`}
               </h2>
               <p className="mb-6 text-sm text-neutral-500 dark:text-dark-900">
-                {t`Clear any custom member permissions so that all members only inherit permissions from their role defaults.`}
+                {t`Xóa tất cả quyền tùy chỉnh của thành viên để tất cả thành viên chỉ kế thừa quyền mặc định của vai trò.`}
               </p>
               <Button
                 variant="secondary"
@@ -77,13 +77,13 @@ export default function PermissionsSettings() {
                 }}
                 disabled={resetAllOverrides.isPending}
               >
-                {t`Clear custom permissions`}
+                {t`Xóa quyền tùy chỉnh`}
               </Button>
             </div>
           </>
         ) : (
           <p className="mt-4 text-sm text-neutral-500 dark:text-dark-900">
-            {t`You need to be an admin to manage workspace permissions.`}
+            {t`Bạn cần phải là admin để quản lý quyền workspace.`}
           </p>
         )}
       </div>

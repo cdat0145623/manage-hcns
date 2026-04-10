@@ -23,7 +23,7 @@ export const create = async (
   db: dbClient,
   memberInput: {
     userId: string | null;
-    email: string;
+    email: string | null;
     workspaceId: number;
     createdBy: string;
     role: MemberRole;
@@ -95,15 +95,16 @@ export const getByPublicIdsWithUsers = async (
 
 export const getByEmailAndStatus = async (
   db: dbClient,
-  email: string,
+  email: string | null,
   status: MemberStatus,
 ) => {
   return db.query.workspaceMembers.findFirst({
-    where: and(
-      eq(workspaceMembers.email, email),
-      eq(workspaceMembers.status, status),
-      isNull(workspaceMembers.deletedAt),
-    ),
+    where: (members, { and, eq, isNull: isNullFn }) =>
+      and(
+        email ? eq(members.email, email) : isNullFn(members.email),
+        eq(members.status, status),
+        isNullFn(members.deletedAt),
+      ),
   });
 };
 

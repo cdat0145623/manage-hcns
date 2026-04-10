@@ -70,7 +70,7 @@ const FeatureItem = ({
 
       {feature.new && (
         <div className="absolute right-4 top-4 rounded-full border border-light-300 px-2 py-1 text-[10px] text-light-1000 dark:border-dark-600 dark:bg-dark-50 dark:text-dark-900">
-          {t`New`}
+          {t`Tạo mới`}
         </div>
       )}
     </div>
@@ -82,44 +82,44 @@ const Features = ({ theme }: { theme: "light" | "dark" }) => {
 
   const features = [
     {
-      title: t`Board visibility`,
-      description: t`Control who can view and edit your boards.`,
+      title: t`Quyền riêng tư`,
+      description: t`Kiểm soát ai có thể xem và chỉnh sửa bảng của bạn.`,
       icon: isDark ? boardVisibilityIconDark : boardVisibilityIconLight,
     },
     {
-      title: t`Workspace members`,
-      description: t`Collaborate seamlessly with your team.`,
+      title: t`Thành viên`,
+      description: t`Cộng tác liền mạch với nhóm của bạn.`,
       icon: isDark ? membersIconDark : membersIconLight,
     },
     {
-      title: t`Trello imports`,
-      description: t`Import your Trello boards and hit the ground running.`,
+      title: t`Nhập từ Trello`,
+      description: t`Nhập bảng từ Trello và bắt đầu ngay.`,
       icon: isDark ? importsIconDark : importsIconLight,
     },
     {
-      title: t`Labels & Filters`,
-      description: t`Organize and find cards quickly with powerful filtering tools.`,
+      title: t`Nhãn & Bộ lọc`,
+      description: t`Sắp xếp và tìm thẻ nhanh chóng với các công cụ lọc mạnh mẽ.`,
       icon: isDark ? labelsIconDark : labelsIconLight,
     },
     {
-      title: t`Comments`,
-      description: t`Discuss and collaborate on cards.`,
+      title: t`Bình luận`,
+      description: t`Thảo luận và cộng tác trên thẻ.`,
       icon: isDark ? commentsIconDark : commentsIconLight,
     },
     {
-      title: t`Activity logs`,
-      description: t`Track all card changes with detailed activity history.`,
+      title: t`Nhật ký hoạt động`,
+      description: t`Theo dõi tất cả các thay đổi của thẻ với lịch sử hoạt động chi tiết.`,
       icon: isDark ? activityLogsIconDark : activityLogsIconLight,
     },
     {
-      title: t`Templates`,
-      description: t`Save time with reusable board templates.`,
+      title: t`Mẫu bảng`,
+      description: t`Lưu thời gian với các mẫu bảng có thể tái sử dụng.`,
       icon: isDark ? templatesIconDark : templatesIconLight,
       new: true,
     },
     {
-      title: t`Integrations`,
-      description: t`Connect your favorite tools to streamline your workflow.`,
+      title: t`Tích hợp`,
+      description: t`Kết nối với các công cụ yêu thích của bạn để tối ưu hóa quy trình làm việc.`,
       icon: isDark ? integrationsIconDark : integrationsIconLight,
       comingSoon: true,
     },
@@ -149,9 +149,9 @@ const Features = ({ theme }: { theme: "light" | "dark" }) => {
         <div>
           <div className="mt-8 flex items-center gap-2 rounded-full border bg-light-50 px-4 py-1 text-center text-sm text-light-1000 dark:border-dark-300 dark:bg-dark-50 dark:text-dark-900">
             <p className="text-xs lg:text-sm">
-              {t`We're just getting started. `}
+              {t`Chúng tôi mới bắt đầu. `}
               <Link href="/kan/roadmap" className="underline">
-                {t`View our roadmap.`}
+                {t`Xem lộ trình phát triển.`}
               </Link>
             </p>
           </div>

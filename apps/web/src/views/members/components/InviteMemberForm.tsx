@@ -48,7 +48,7 @@ export function InviteMemberForm({
   const isEmailEnabled = env("NEXT_PUBLIC_DISABLE_EMAIL") !== "true";
 
   const InviteMemberSchema = z.object({
-    email: z.string().email({ message: t`Invalid email address` }),
+    username: z.string({ message: t`Invalid username` }),
     workspacePublicId: z.string(),
   });
 
@@ -59,7 +59,7 @@ export function InviteMemberForm({
     formState: { errors },
   } = useForm<InviteMemberInput>({
     defaultValues: {
-      email: "",
+      username: "",
       workspacePublicId: workspace.publicId || "",
     },
     resolver: zodResolver(InviteMemberSchema),
@@ -245,9 +245,9 @@ export function InviteMemberForm({
   };
 
   useEffect(() => {
-    const emailElement: HTMLElement | null =
-      document.querySelector<HTMLElement>("#email");
-    if (emailElement) emailElement.focus();
+    const usernameElement: HTMLElement | null =
+      document.querySelector<HTMLElement>("#username");
+    if (usernameElement) usernameElement.focus();
   }, []);
 
   return (
@@ -268,21 +268,21 @@ export function InviteMemberForm({
         </div>
         {isEmailEnabled && (
           <Input
-            id="email"
-            placeholder={t`Email`}
+            id="username"
+            placeholder={t`Username`}
             disabled={
               env("NEXT_PUBLIC_KAN_ENV") === "cloud" &&
               !hasTeamSubscription &&
               !hasProSubscription
             }
-            {...register("email", { required: true })}
+            {...register("username", { required: true })}
             onKeyDown={async (e) => {
               if (e.key === "Enter") {
                 e.preventDefault();
                 await handleSubmit(onSubmit)();
               }
             }}
-            errorMessage={errors.email?.message}
+            errorMessage={errors.username?.message}
           />
         )}
         {(!isEmailEnabled || (isShareInviteLinkEnabled && inviteLink)) && (
@@ -364,7 +364,7 @@ export function InviteMemberForm({
               disabled={inviteMember.isPending || !isEmailEnabled}
               isLoading={inviteMember.isPending}
             >
-              {t`Invite member`}
+              {t`Thêm thành viên`}
             </Button>
           )}
         </div>

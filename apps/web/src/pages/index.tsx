@@ -1,5 +1,14 @@
-import HomeView from "~/views/home";
+import { type GetServerSideProps } from "next";
+
+export const getServerSideProps: GetServerSideProps = async () => {
+  return {
+    redirect: {
+      destination: "/reports",
+      permanent: false,
+    },
+  };
+};
 
 export default function Home() {
-  return <HomeView />;
+  return null;
 }

@@ -17,13 +17,13 @@ import type { BoardVisibilityStatus } from "@kan/db/schema";
 import {
   boards,
   cardActivities,
-  cardAttachments,
   cards,
   cardsToLabels,
   cardToWorkspaceMembers,
   checklistItems,
   checklists,
   comments,
+  fileActivityLog,
   labels,
   lists,
   userBoardFavorites,
@@ -254,6 +254,8 @@ export const getByPublicId = async (
               listId: true,
               index: true,
               dueDate: true,
+              startDate: true,
+              status: true,
             },
             with: {
               labels: {
@@ -287,12 +289,17 @@ export const getByPublicId = async (
                   },
                 },
               },
-              attachments: {
+              fileActivities: {
                 columns: {
                   publicId: true,
+                  mimeType: true,
+                  newFileUrl: true,
+                  fileName: true,
+                  fileSize: true,
+                  createdAt: true,
+                  activityType: true,
                 },
-                where: isNull(cardAttachments.deletedAt),
-                orderBy: asc(cardAttachments.createdAt),
+                orderBy: asc(fileActivityLog.createdAt),
               },
               checklists: {
                 columns: {
@@ -363,13 +370,33 @@ export const getByPublicId = async (
     userFavorites: undefined,
     lists: board.lists.map((list) => ({
       ...list,
-      cards: list.cards.map((card) => ({
-        ...card,
-        labels: card.labels.map((label) => label.label),
-        members: card.members
-          .map((member) => member.member)
-          .filter((member) => member.deletedAt === null),
-      })),
+      cards: list.cards.map((card) => {
+        // Filter for active attachments: group by publicId and take the latest activity.
+        const latestFiles = new Map<string, typeof card.fileActivities[0]>();
+        for (const activity of card.fileActivities) {
+          latestFiles.set(activity.publicId, activity);
+        }
+
+        const activeAttachments = Array.from(latestFiles.values())
+          .filter((f) => f.activityType !== "file_deleted")
+          .map((f) => ({
+            publicId: f.publicId,
+            contentType: f.mimeType ?? "",
+            s3Key: f.newFileUrl ?? "",
+            originalFilename: f.fileName,
+            size: f.fileSize,
+            createdAt: f.createdAt,
+          }));
+
+        return {
+          ...card,
+          labels: card.labels.map((label) => label.label),
+          members: card.members
+            .map((member) => member.member)
+            .filter((member) => member.deletedAt === null),
+          attachments: activeAttachments,
+        };
+      }),
     })),
   };
 
@@ -448,6 +475,7 @@ export const getBySlug = async (
               listId: true,
               index: true,
               dueDate: true,
+              startDate: true,
             },
             with: {
               labels: {
@@ -461,12 +489,17 @@ export const getBySlug = async (
                   },
                 },
               },
-              attachments: {
+              fileActivities: {
                 columns: {
                   publicId: true,
+                  mimeType: true,
+                  newFileUrl: true,
+                  fileName: true,
+                  fileSize: true,
+                  createdAt: true,
+                  activityType: true,
                 },
-                where: isNull(cardAttachments.deletedAt),
-                orderBy: asc(cardAttachments.createdAt),
+                orderBy: asc(fileActivityLog.createdAt),
               },
               comments: {
                 columns: {
@@ -536,10 +569,30 @@ export const getBySlug = async (
     ...board,
     lists: board.lists.map((list) => ({
       ...list,
-      cards: list.cards.map((card) => ({
-        ...card,
-        labels: card.labels.map((label) => label.label),
-      })),
+      cards: list.cards.map((card) => {
+        // Filter for active attachments
+        const latestFiles = new Map<string, typeof card.fileActivities[0]>();
+        for (const activity of card.fileActivities) {
+          latestFiles.set(activity.publicId, activity);
+        }
+
+        const activeAttachments = Array.from(latestFiles.values())
+          .filter((f) => f.activityType !== "file_deleted")
+          .map((f) => ({
+            publicId: f.publicId,
+            contentType: f.mimeType ?? "",
+            s3Key: f.newFileUrl ?? "",
+            originalFilename: f.fileName,
+            size: f.fileSize,
+            createdAt: f.createdAt,
+          }));
+
+        return {
+          ...card,
+          labels: card.labels.map((label) => label.label),
+          attachments: activeAttachments,
+        };
+      }),
     })),
   };
 
@@ -867,10 +920,10 @@ export const createFromSnapshot = async (
 
         if (!createdCard) throw new Error("Failed to create card");
 
-        // Create card.created activity
+        // Create created activity
         await tx.insert(cardActivities).values({
           publicId: generateUID(),
-          type: "card.created",
+          type: "created",
           cardId: createdCard.id,
           createdBy: args.createdBy,
           sourceBoardId: args.sourceBoardId,
@@ -886,10 +939,10 @@ export const createFromSnapshot = async (
           if (cardLabels.length) {
             await tx.insert(cardsToLabels).values(cardLabels);
 
-            // Create card.updated.label.added activities for each label
+            // Create updated_label_added activities for each label
             const labelActivities = cardLabels.map((cardLabel) => ({
               publicId: generateUID(),
-              type: "card.updated.label.added" as const,
+              type: "updated_label_added" as const,
               cardId: cardLabel.cardId,
               labelId: cardLabel.labelId,
               createdBy: args.createdBy,
@@ -917,10 +970,10 @@ export const createFromSnapshot = async (
 
             if (!createdChecklist) continue;
 
-            // Create card.updated.checklist.added activity
+            // Create updated_checklist_added activity
             await tx.insert(cardActivities).values({
               publicId: generateUID(),
-              type: "card.updated.checklist.added",
+              type: "updated_checklist_added",
               cardId: createdCard.id,
               toTitle: checklist.name,
               createdBy: args.createdBy,
@@ -942,10 +995,10 @@ export const createFromSnapshot = async (
               if (itemValues.length) {
                 await tx.insert(checklistItems).values(itemValues);
 
-                // Create card.updated.checklist.item.added activities for each item
+                // Create updated_checklist_item_added activities for each item
                 const itemActivities = itemValues.map((item) => ({
                   publicId: generateUID(),
-                  type: "card.updated.checklist.item.added" as const,
+                  type: "updated_checklist_item_added" as const,
                   cardId: createdCard.id,
                   toTitle: item.title,
                   createdBy: args.createdBy,

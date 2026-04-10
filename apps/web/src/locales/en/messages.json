@@ -34,7 +34,7 @@
     "origin": [
       [
         "src/views/boards/index.tsx",
-        53
+        48
       ]
     ],
     "translation": "{0}"
@@ -55,7 +55,7 @@
     "origin": [
       [
         "src/views/boards/index.tsx",
-        48
+        43
       ],
       [
         "src/views/card/index.tsx",
@@ -75,7 +75,7 @@
     "origin": [
       [
         "src/views/board/components/BoardDropdown.tsx",
-        56
+        58
       ]
     ],
     "translation": "{0} has been added to your favorites."
@@ -91,7 +91,7 @@
     "origin": [
       [
         "src/views/board/components/BoardDropdown.tsx",
-        57
+        59
       ]
     ],
     "translation": "{0} has been removed from your favorites."
@@ -123,7 +123,7 @@
     "origin": [
       [
         "src/views/board/index.tsx",
-        440
+        442
       ]
     ],
     "translation": "{0} not found"
@@ -347,7 +347,7 @@
     "origin": [
       [
         "src/views/boards/index.tsx",
-        26
+        21
       ],
       [
         "src/views/settings/components/NewWebhookModal.tsx",
@@ -365,6 +365,10 @@
     "placeholders": {},
     "comments": [],
     "origin": [
+      [
+        "src/views/board/components/BoardActivitySidebar.tsx",
+        115
+      ],
       [
         "src/views/card/index.tsx",
         455
@@ -435,6 +439,18 @@
       ]
     ],
     "translation": "Add checklist"
+  },
+  "xTm1rq": {
+    "translation": "Add Checklist",
+    "message": "Add Checklist",
+    "placeholders": {},
+    "comments": [],
+    "origin": [
+      [
+        "src/views/card/components/AttachmentUpload.tsx",
+        181
+      ]
+    ]
   },
   "ngBZOd": {
     "message": "Add comment... (type '/' to open commands or '@' to mention)",
@@ -515,7 +531,7 @@
     "origin": [
       [
         "src/views/board/components/BoardDropdown.tsx",
-        122
+        124
       ]
     ],
     "translation": "Add to favorites"
@@ -546,7 +562,7 @@
     "origin": [
       [
         "src/views/card/components/ActivityList.tsx",
-        102
+        101
       ]
     ],
     "translation": "added {0} labels: <0>{labelList}</0>"
@@ -558,7 +574,7 @@
     "origin": [
       [
         "src/views/card/components/ActivityList.tsx",
-        132
+        131
       ]
     ],
     "translation": "added a checklist"
@@ -570,7 +586,7 @@
     "origin": [
       [
         "src/views/card/components/ActivityList.tsx",
-        135
+        134
       ]
     ],
     "translation": "added a checklist item"
@@ -582,7 +598,7 @@
     "origin": [
       [
         "src/views/card/components/ActivityList.tsx",
-        128
+        127
       ]
     ],
     "translation": "added a label to the card"
@@ -594,7 +610,7 @@
     "origin": [
       [
         "src/views/card/components/ActivityList.tsx",
-        130
+        129
       ]
     ],
     "translation": "added a member to the card"
@@ -606,7 +622,7 @@
     "origin": [
       [
         "src/views/card/components/ActivityList.tsx",
-        140
+        139
       ]
     ],
     "translation": "added an attachment"
@@ -682,7 +698,7 @@
     "origin": [
       [
         "src/views/board/components/BoardDropdown.tsx",
-        53
+        55
       ]
     ],
     "translation": "Added to favorites"
@@ -1057,7 +1073,7 @@
     "origin": [
       [
         "src/views/board/components/BoardDropdown.tsx",
-        111
+        113
       ]
     ],
     "translation": "Archive board"
@@ -1069,7 +1085,7 @@
     "origin": [
       [
         "src/views/boards/index.tsx",
-        27
+        22
       ]
     ],
     "translation": "Archived"
@@ -1233,7 +1249,7 @@
     "origin": [
       [
         "src/views/card/components/AttachmentUpload.tsx",
-        45
+        52
       ]
     ],
     "translation": "Attachment uploaded"
@@ -1409,7 +1425,7 @@
     "origin": [
       [
         "src/views/board/index.tsx",
-        413
+        415
       ],
       [
         "src/views/card/index.tsx",
@@ -1445,7 +1461,7 @@
     "origin": [
       [
         "src/views/board/components/BoardDropdown.tsx",
-        44
+        46
       ]
     ],
     "translation": "Board archived"
@@ -1505,7 +1521,7 @@
     "origin": [
       [
         "src/views/board/components/BoardDropdown.tsx",
-        44
+        46
       ]
     ],
     "translation": "Board unarchived"
@@ -2221,11 +2237,11 @@
     "origin": [
       [
         "src/views/card/components/ActivityList.tsx",
-        303
+        313
       ],
       [
         "src/views/card/components/ActivityList.tsx",
-        317
+        327
       ]
     ],
     "translation": "changed the due date to <0>{formattedDate}</0>"
@@ -2357,6 +2373,18 @@
       ]
     ],
     "translation": "Click on the link we've sent to {magicLinkRecipient} to sign in."
+  },
+  "F21nWs": {
+    "translation": "Click or drag file to this area to upload",
+    "message": "Click or drag file to this area to upload",
+    "placeholders": {},
+    "comments": [],
+    "origin": [
+      [
+        "src/views/card/components/AttachmentUpload.tsx",
+        147
+      ]
+    ]
   },
   "yz7wBu": {
     "message": "Close",
@@ -2493,7 +2521,7 @@
     "origin": [
       [
         "src/views/card/components/ActivityList.tsx",
-        137
+        136
       ]
     ],
     "translation": "completed a checklist item"
@@ -2917,7 +2945,7 @@
       ],
       [
         "src/views/boards/index.tsx",
-        41
+        36
       ]
     ],
     "translation": "Create new {0}"
@@ -2957,11 +2985,11 @@
     "origin": [
       [
         "src/views/board/index.tsx",
-        76
+        78
       ],
       [
         "src/views/board/index.tsx",
-        554
+        557
       ]
     ],
     "translation": "Create new list"
@@ -3025,7 +3053,7 @@
     "origin": [
       [
         "src/views/card/components/ActivityList.tsx",
-        124
+        123
       ]
     ],
     "translation": "created the card"
@@ -3329,7 +3357,7 @@
     "origin": [
       [
         "src/views/board/components/BoardDropdown.tsx",
-        133
+        144
       ]
     ],
     "translation": "Delete board"
@@ -3377,7 +3405,7 @@
     "origin": [
       [
         "src/views/board/components/BoardDropdown.tsx",
-        133
+        144
       ]
     ],
     "translation": "Delete template"
@@ -3421,7 +3449,7 @@
     "origin": [
       [
         "src/views/card/components/ActivityList.tsx",
-        134
+        133
       ]
     ],
     "translation": "deleted a checklist"
@@ -3433,7 +3461,7 @@
     "origin": [
       [
         "src/views/card/components/ActivityList.tsx",
-        139
+        138
       ]
     ],
     "translation": "deleted a checklist item"
@@ -3697,7 +3725,7 @@
     "origin": [
       [
         "src/views/card/components/AttachmentThumbnails.tsx",
-        142
+        170
       ]
     ],
     "translation": "Download failed"
@@ -3793,7 +3821,7 @@
     "origin": [
       [
         "src/views/board/components/BoardDropdown.tsx",
-        102
+        104
       ],
       [
         "src/views/board/components/UpdateBoardSlugForm.tsx",
@@ -4230,6 +4258,18 @@
     ],
     "translation": "Error inviting member"
   },
+  "L9kTn4": {
+    "translation": "Error renaming attachment",
+    "message": "Error renaming attachment",
+    "placeholders": {},
+    "comments": [],
+    "origin": [
+      [
+        "src/views/card/components/AttachmentThumbnails.tsx",
+        481
+      ]
+    ]
+  },
   "sVBn4K": {
     "message": "Error updating display name",
     "placeholders": {},
@@ -4513,7 +4553,11 @@
     "origin": [
       [
         "src/views/card/components/AttachmentUpload.tsx",
-        52
+        59
+      ],
+      [
+        "src/views/card/components/AttachmentUpload.tsx",
+        70
       ]
     ],
     "translation": "Failed to upload attachment. Please try again."
@@ -4629,6 +4673,18 @@
       ]
     ],
     "translation": "Feedback sent"
+  },
+  "NMzjiG": {
+    "translation": "File too large",
+    "message": "File too large",
+    "placeholders": {},
+    "comments": [],
+    "origin": [
+      [
+        "src/views/card/components/AttachmentUpload.tsx",
+        25
+      ]
+    ]
   },
   "F6m23G": {
     "message": "File uploads",
@@ -4881,7 +4937,7 @@
     "origin": [
       [
         "src/views/board/index.tsx",
-        539
+        542
       ]
     ],
     "translation": "Get started by creating a new list"
@@ -5285,7 +5341,7 @@
     "origin": [
       [
         "src/views/boards/index.tsx",
-        73
+        68
       ]
     ],
     "translation": "Import"
@@ -5944,8 +6000,12 @@
     "comments": [],
     "origin": [
       [
+        "src/views/board/components/BoardActivitySidebar.tsx",
+        214
+      ],
+      [
         "src/views/card/components/ActivityList.tsx",
-        580
+        590
       ]
     ],
     "translation": "Load more activities"
@@ -5968,8 +6028,12 @@
     "comments": [],
     "origin": [
       [
+        "src/views/board/components/BoardActivitySidebar.tsx",
+        214
+      ],
+      [
         "src/views/card/components/ActivityList.tsx",
-        580
+        590
       ]
     ],
     "translation": "Loading..."
@@ -6053,7 +6117,7 @@
     "origin": [
       [
         "src/views/board/components/BoardDropdown.tsx",
-        91
+        93
       ]
     ],
     "translation": "Make template"
@@ -6065,7 +6129,7 @@
     "origin": [
       [
         "src/views/card/components/ActivityList.tsx",
-        138
+        137
       ]
     ],
     "translation": "marked a checklist item as incomplete"
@@ -6085,6 +6149,18 @@
       ]
     ],
     "translation": "marked checklist item <0>{0}</0> as incomplete"
+  },
+  "c0zH1E": {
+    "translation": "Maximum file size is 50MB.",
+    "message": "Maximum file size is 50MB.",
+    "placeholders": {},
+    "comments": [],
+    "origin": [
+      [
+        "src/views/card/components/AttachmentUpload.tsx",
+        26
+      ]
+    ]
   },
   "agPptk": {
     "message": "Medium",
@@ -6117,11 +6193,11 @@
     "origin": [
       [
         "src/views/card/components/ActivityList.tsx",
-        55
+        54
       ],
       [
         "src/views/card/components/ActivityList.tsx",
-        88
+        87
       ],
       [
         "src/views/members/index.tsx",
@@ -6190,6 +6266,18 @@
     ],
     "translation": "Mentions"
   },
+  "zucql+": {
+    "translation": "Menu",
+    "message": "Menu",
+    "placeholders": {},
+    "comments": [],
+    "origin": [
+      [
+        "src/views/board/components/BoardActivitySidebar.tsx",
+        101
+      ]
+    ]
+  },
   "hty0d5": {
     "message": "Monday",
     "placeholders": {},
@@ -6256,7 +6344,7 @@
     "origin": [
       [
         "src/views/card/components/ActivityList.tsx",
-        127
+        126
       ]
     ],
     "translation": "moved the card to another list"
@@ -6332,7 +6420,7 @@
     "origin": [
       [
         "src/views/boards/index.tsx",
-        95
+        90
       ],
       [
         "src/views/home/components/Features.tsx",
@@ -6428,7 +6516,7 @@
       ],
       [
         "src/views/board/index.tsx",
-        503
+        505
       ]
     ],
     "translation": "New list"
@@ -6545,6 +6633,18 @@
     ],
     "translation": "No {0}"
   },
+  "ZILws9": {
+    "translation": "No activity yet.",
+    "message": "No activity yet.",
+    "placeholders": {},
+    "comments": [],
+    "origin": [
+      [
+        "src/views/board/components/BoardActivitySidebar.tsx",
+        221
+      ]
+    ]
+  },
   "tlhgDC": {
     "message": "No archived boards",
     "placeholders": {},
@@ -6612,7 +6712,7 @@
     "origin": [
       [
         "src/views/card/components/AttachmentThumbnails.tsx",
-        143
+        171
       ]
     ],
     "translation": "No download URL available for this attachment."
@@ -6636,7 +6736,7 @@
     "origin": [
       [
         "src/views/board/index.tsx",
-        535
+        538
       ]
     ],
     "translation": "No lists"
@@ -6648,7 +6748,7 @@
     "origin": [
       [
         "src/views/board/index.tsx",
-        540
+        543
       ]
     ],
     "translation": "No lists have been created yet"
@@ -6716,6 +6816,18 @@
       ]
     ],
     "translation": "Offer"
+  },
+  "Fdp03t": {
+    "translation": "on",
+    "message": "on",
+    "placeholders": {},
+    "comments": [],
+    "origin": [
+      [
+        "src/views/board/components/BoardActivitySidebar.tsx",
+        187
+      ]
+    ]
   },
   "QnzD50": {
     "message": "On-premise",
@@ -7284,7 +7396,7 @@
       ],
       [
         "src/views/board/components/BoardDropdown.tsx",
-        65
+        67
       ],
       [
         "src/views/board/components/NewCardForm.tsx",
@@ -7312,11 +7424,11 @@
       ],
       [
         "src/views/board/index.tsx",
-        194
+        196
       ],
       [
         "src/views/board/index.tsx",
-        250
+        252
       ],
       [
         "src/views/boards/components/ImportBoardsForm.tsx",
@@ -7328,7 +7440,7 @@
       ],
       [
         "src/views/card/components/AttachmentThumbnails.tsx",
-        74
+        102
       ],
       [
         "src/views/card/components/ChecklistItemRow.tsx",
@@ -7486,6 +7598,10 @@
     "placeholders": {},
     "comments": [],
     "origin": [
+      [
+        "src/views/card/components/AttachmentThumbnails.tsx",
+        482
+      ],
       [
         "src/views/card/components/Dropdown.tsx",
         51
@@ -7760,7 +7876,7 @@
     "origin": [
       [
         "src/views/board/components/BoardDropdown.tsx",
-        121
+        123
       ]
     ],
     "translation": "Remove from favorites"
@@ -7791,7 +7907,7 @@
     "origin": [
       [
         "src/views/card/components/ActivityList.tsx",
-        116
+        115
       ]
     ],
     "translation": "removed {0} labels: <0>{labelList}</0>"
@@ -7803,7 +7919,7 @@
     "origin": [
       [
         "src/views/card/components/ActivityList.tsx",
-        129
+        128
       ]
     ],
     "translation": "removed a label from the card"
@@ -7815,7 +7931,7 @@
     "origin": [
       [
         "src/views/card/components/ActivityList.tsx",
-        131
+        130
       ]
     ],
     "translation": "removed a member from the card"
@@ -7843,7 +7959,7 @@
     "origin": [
       [
         "src/views/card/components/ActivityList.tsx",
-        288
+        298
       ]
     ],
     "translation": "removed an attachment <0>{0}</0>"
@@ -7855,7 +7971,7 @@
     "origin": [
       [
         "src/views/board/components/BoardDropdown.tsx",
-        54
+        56
       ]
     ],
     "translation": "Removed from favorites"
@@ -7887,7 +8003,7 @@
       ],
       [
         "src/views/card/components/ActivityList.tsx",
-        324
+        334
       ]
     ],
     "translation": "removed the due date"
@@ -7899,10 +8015,41 @@
     "origin": [
       [
         "src/views/card/components/ActivityList.tsx",
-        133
+        132
       ]
     ],
     "translation": "renamed a checklist"
+  },
+  "6Ga64y": {
+    "translation": "renamed an attachment",
+    "message": "renamed an attachment",
+    "placeholders": {},
+    "comments": [],
+    "origin": [
+      [
+        "src/views/card/components/ActivityList.tsx",
+        140
+      ]
+    ]
+  },
+  "OAAEgN": {
+    "translation": "renamed an attachment from <0>{0}</0> to <1>{1}</1>",
+    "message": "renamed an attachment from <0>{0}</0> to <1>{1}</1>",
+    "placeholders": {
+      "0": [
+        "truncate(fromTitle)"
+      ],
+      "1": [
+        "truncate(toTitle)"
+      ]
+    },
+    "comments": [],
+    "origin": [
+      [
+        "src/views/card/components/ActivityList.tsx",
+        286
+      ]
+    ]
   },
   "3ZjRJY": {
     "message": "renamed checklist <0>{0}</0>",
@@ -8468,6 +8615,18 @@
     ],
     "translation": "Shortcuts"
   },
+  "8lfpBs": {
+    "translation": "Show menu",
+    "message": "Show menu",
+    "placeholders": {},
+    "comments": [],
+    "origin": [
+      [
+        "src/views/board/components/BoardDropdown.tsx",
+        135
+      ]
+    ]
+  },
   "5lWFkC": {
     "message": "Sign in",
     "placeholders": {},
@@ -8764,6 +8923,18 @@
     ],
     "translation": "Support"
   },
+  "GMRgtJ": {
+    "translation": "Support for a single or bulk upload. Maximum file size is 50MB.",
+    "message": "Support for a single or bulk upload. Maximum file size is 50MB.",
+    "placeholders": {},
+    "comments": [],
+    "origin": [
+      [
+        "src/views/card/components/AttachmentUpload.tsx",
+        150
+      ]
+    ]
+  },
   "wruKPE": {
     "message": "Support the development of the project",
     "placeholders": {},
@@ -8831,11 +9002,11 @@
     "origin": [
       [
         "src/views/board/index.tsx",
-        413
+        415
       ],
       [
         "src/views/board/index.tsx",
-        449
+        451
       ]
     ],
     "translation": "Template"
@@ -8975,7 +9146,7 @@
     "origin": [
       [
         "src/views/board/components/BoardDropdown.tsx",
-        46
+        48
       ]
     ],
     "translation": "The board has been archived."
@@ -8987,7 +9158,7 @@
     "origin": [
       [
         "src/views/board/components/BoardDropdown.tsx",
-        47
+        49
       ]
     ],
     "translation": "The board has been unarchived."
@@ -9535,7 +9706,7 @@
     "origin": [
       [
         "src/views/card/components/AttachmentThumbnails.tsx",
-        73
+        101
       ]
     ],
     "translation": "Unable to delete attachment"
@@ -9643,7 +9814,7 @@
     "origin": [
       [
         "src/views/board/components/BoardDropdown.tsx",
-        64
+        66
       ]
     ],
     "translation": "Unable to update board"
@@ -9679,7 +9850,7 @@
     "origin": [
       [
         "src/views/board/index.tsx",
-        249
+        251
       ],
       [
         "src/views/card/index.tsx",
@@ -9755,7 +9926,7 @@
     "origin": [
       [
         "src/views/board/index.tsx",
-        193
+        195
       ],
       [
         "src/views/card/components/ListSelector.tsx",
@@ -9811,7 +9982,7 @@
     "origin": [
       [
         "src/views/board/components/BoardDropdown.tsx",
-        111
+        113
       ]
     ],
     "translation": "Unarchive board"
@@ -10079,7 +10250,7 @@
     "origin": [
       [
         "src/views/card/components/ActivityList.tsx",
-        136
+        135
       ]
     ],
     "translation": "updated a checklist item"
@@ -10091,7 +10262,7 @@
     "origin": [
       [
         "src/views/card/components/ActivityList.tsx",
-        126
+        125
       ]
     ],
     "translation": "updated the description"
@@ -10115,7 +10286,7 @@
     "origin": [
       [
         "src/views/card/components/ActivityList.tsx",
-        125
+        124
       ]
     ],
     "translation": "updated the title"
@@ -10175,10 +10346,26 @@
     "origin": [
       [
         "src/views/card/components/AttachmentUpload.tsx",
-        51
+        58
+      ],
+      [
+        "src/views/card/components/AttachmentUpload.tsx",
+        69
       ]
     ],
     "translation": "Upload failed"
+  },
+  "GxkJXS": {
+    "translation": "Uploading...",
+    "message": "Uploading...",
+    "placeholders": {},
+    "comments": [],
+    "origin": [
+      [
+        "src/views/card/components/AttachmentUpload.tsx",
+        158
+      ]
+    ]
   },
   "BBUDfW": {
     "message": "Urgent",
@@ -10639,11 +10826,11 @@
       ],
       [
         "src/views/board/index.tsx",
-        413
+        415
       ],
       [
         "src/views/boards/index.tsx",
-        48
+        43
       ],
       [
         "src/views/members/index.tsx",
@@ -10987,11 +11174,11 @@
       ],
       [
         "src/views/board/index.tsx",
-        487
+        489
       ],
       [
         "src/views/board/index.tsx",
-        545
+        548
       ],
       [
         "src/views/boards/components/BoardsList.tsx",
@@ -10999,11 +11186,11 @@
       ],
       [
         "src/views/boards/index.tsx",
-        59
+        54
       ],
       [
         "src/views/boards/index.tsx",
-        80
+        75
       ]
     ],
     "translation": "You don't have permission"
@@ -11135,7 +11322,7 @@
     "origin": [
       [
         "src/views/card/components/AttachmentUpload.tsx",
-        46
+        53
       ]
     ],
     "translation": "Your file has been uploaded successfully."

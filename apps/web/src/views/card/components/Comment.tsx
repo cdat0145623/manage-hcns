@@ -13,8 +13,9 @@ import { usePermissions } from "~/hooks/usePermissions";
 import { useModal } from "~/providers/modal";
 import { usePopup } from "~/providers/popup";
 import { api } from "~/utils/api";
-import { invalidateCard } from "~/utils/cardInvalidation";
-import { getAvatarUrl } from "~/utils/helpers";
+import { invalidateCard, invalidateTaskInstance } from "~/utils/cardInvalidation";
+import { getAvatarUrl, fixServerDate } from "~/utils/helpers";
+import { skipToken } from "@tanstack/react-query";
 
 interface FormValues {
   comment: string;
@@ -23,6 +24,7 @@ interface FormValues {
 const Comment = ({
   publicId,
   cardPublicId,
+  taskInstanceId,
   name,
   email,
   image,
@@ -34,7 +36,8 @@ const Comment = ({
   isViewOnly = false,
 }: {
   publicId: string | undefined;
-  cardPublicId: string;
+  cardPublicId?: string;
+  taskInstanceId?: string;
   name: string;
   email: string;
   image: string | null;
@@ -57,17 +60,14 @@ const Comment = ({
   });
 
   const { data: cardData } = api.card.byId.useQuery(
-    {
-      cardPublicId,
-    },
-    {
-      enabled: !!cardPublicId && cardPublicId.length >= 12,
-    },
+    cardPublicId && cardPublicId.length >= 12
+      ? { cardPublicId }
+      : skipToken,
   );
 
   const workspaceMembers: WorkspaceMember[] =
     cardData?.list.board.workspace.members
-      .filter((member) => member.email)
+      .filter((member): member is typeof member & { email: string } => !!member.email)
       .map((member) => ({
         publicId: member.publicId,
         email: member.email,
@@ -82,9 +82,29 @@ const Comment = ({
 
   if (!publicId) return null;
 
-  const updateCommentMutation = api.card.updateComment.useMutation({
+  const updateCardCommentMutation = api.card.updateComment.useMutation({
     onSuccess: async () => {
-      await invalidateCard(utils, cardPublicId);
+      if (cardPublicId) await invalidateCard(utils, cardPublicId);
+      setIsEditing(false);
+    },
+    onError: () => {
+      showPopup({
+        header: t`Unable to update comment`,
+        message: t`Please try again later, or contact customer support.`,
+        icon: "error",
+      });
+    },
+  });
+
+  // Task instance comments might use the same update procedure if updated to support it, 
+  // or a new one. For now, let's assume api.card.updateComment is updated or use a placeholder.
+  // Actually, I haven't added updateComment to taskInstanceRouter. 
+  // Let's use card.updateComment but ensure it works with taskInstanceId in backend if needed.
+  // Wait, card.updateComment probably requires cardPublicId.
+  
+  const updateTaskCommentMutation = api.taskInstance.updateComment.useMutation({
+    onSuccess: async () => {
+      if (taskInstanceId) await invalidateTaskInstance(utils, taskInstanceId);
       setIsEditing(false);
     },
     onError: () => {
@@ -97,11 +117,19 @@ const Comment = ({
   });
 
   const onSubmit = (data: FormValues) => {
-    updateCommentMutation.mutate({
-      cardPublicId,
-      comment: data.comment,
-      commentPublicId: publicId,
-    });
+    if (cardPublicId) {
+      updateCardCommentMutation.mutate({
+        cardPublicId,
+        comment: data.comment,
+        commentPublicId: publicId,
+      });
+    } else if (taskInstanceId) {
+      updateTaskCommentMutation.mutate({
+        id: taskInstanceId,
+        comment: data.comment,
+        commentPublicId: publicId,
+      });
+    }
   };
 
   const dropdownItems = [
@@ -144,7 +172,7 @@ const Comment = ({
             <span className="font-medium dark:text-dark-1000">{`${name} `}</span>
             <span className="mx-1 text-light-900 dark:text-dark-800">·</span>
             <span className="space-x-1 text-light-900 dark:text-dark-800">
-              {formatDistanceToNow(new Date(createdAt), {
+              {formatDistanceToNow(fixServerDate(createdAt), {
                 addSuffix: true,
               })}
             </span>
@@ -182,7 +210,7 @@ const Comment = ({
               onChange={(value) => setValue("comment", value)}
               workspaceMembers={workspaceMembers}
               enableYouTubeEmbed={false}
-              placeholder={t`Add comment... (type '/' to open commands or '@' to mention)`}
+              placeholder={t`Bình luận... (gõ '/' để mở lệnh hoặc '@' để đề cập)`}
               disableHeadings={true}
             />
           </div>
@@ -195,7 +223,7 @@ const Comment = ({
               {t`Cancel`}
             </Button>
             <Button
-              isLoading={updateCommentMutation.isPending}
+              isLoading={updateCardCommentMutation.isPending || updateTaskCommentMutation.isPending}
               type="submit"
               size="sm"
             >

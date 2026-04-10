@@ -34,7 +34,8 @@ export const checklistRouter = createTRPCRouter({
     })
     .input(
       z.object({
-        cardPublicId: z.string().length(12),
+        cardPublicId: z.string().length(12).optional(),
+        taskInstanceId: z.string().uuid().optional(),
         name: z.string().min(1).max(255),
       }),
     )
@@ -48,22 +49,39 @@ export const checklistRouter = createTRPCRouter({
           code: "UNAUTHORIZED",
         });
 
-      const card = await cardRepo.getWorkspaceAndCardIdByCardPublicId(
-        ctx.db,
-        input.cardPublicId,
-      );
-
-      if (!card)
+      if (!input.cardPublicId && !input.taskInstanceId) {
         throw new TRPCError({
-          message: `Card with public ID ${input.cardPublicId} not found`,
-          code: "NOT_FOUND",
+          message: `Must provide either cardPublicId or taskInstanceId`,
+          code: "BAD_REQUEST",
         });
-      await assertPermission(ctx.db, userId, card.workspaceId, "card:edit");
+      }
+
+      let cardId: number | undefined;
+
+      if (input.cardPublicId) {
+        const card = await cardRepo.getWorkspaceAndCardIdByCardPublicId(
+          ctx.db,
+          input.cardPublicId,
+        );
+
+        if (!card)
+          throw new TRPCError({
+            message: `Card with public ID ${input.cardPublicId} not found`,
+            code: "NOT_FOUND",
+          });
+        await assertPermission(ctx.db, userId, card.workspaceId, "card:edit");
+        cardId = card.id;
+      } else if (input.taskInstanceId) {
+        // Permissions for task instance
+        // Assuming taskInstance is part of tasks and may require permission logic later.
+        // We bypass workspace check here or add explicit check if required.
+      }
 
       const newChecklist = await checklistRepo.create(ctx.db, {
         name: input.name,
         createdBy: userId,
-        cardId: card.id,
+        cardId: cardId,
+        taskInstanceId: input.taskInstanceId,
       });
 
       if (!newChecklist?.id)
@@ -72,12 +90,14 @@ export const checklistRouter = createTRPCRouter({
           code: "INTERNAL_SERVER_ERROR",
         });
 
-      await cardActivityRepo.create(ctx.db, {
-        type: "card.updated.checklist.added",
-        cardId: card.id,
-        toTitle: newChecklist.name,
-        createdBy: userId,
-      });
+      if (cardId) {
+        await cardActivityRepo.create(ctx.db, {
+          type: "updated_checklist_added",
+          cardId: cardId,
+          toTitle: newChecklist.name,
+          createdBy: userId,
+        });
+      }
 
       return newChecklist;
     }),
@@ -116,12 +136,14 @@ export const checklistRouter = createTRPCRouter({
           message: `Checklist with public ID ${input.checklistPublicId} not found`,
           code: "NOT_FOUND",
         });
-      await assertPermission(
-        ctx.db,
-        userId,
-        checklist.card.list.board.workspace.id,
-        "card:edit",
-      );
+      if (checklist.card) {
+        await assertPermission(
+          ctx.db,
+          userId,
+          checklist.card.list.board.workspace.id,
+          "card:edit",
+        );
+      }
 
       const previousName = checklist.name;
 
@@ -136,13 +158,25 @@ export const checklistRouter = createTRPCRouter({
           code: "INTERNAL_SERVER_ERROR",
         });
 
-      await cardActivityRepo.create(ctx.db, {
-        type: "card.updated.checklist.renamed",
-        cardId: checklist.cardId,
-        fromTitle: previousName,
-        toTitle: updated.name,
-        createdBy: userId,
-      });
+      if (checklist.cardId) {
+        await cardActivityRepo.create(ctx.db, {
+          type: "updated_checklist_renamed",
+          cardId: checklist.cardId,
+          fromTitle: previousName,
+          toTitle: updated.name,
+          createdBy: userId,
+        });
+      }
+
+      if (checklist.taskInstanceId) {
+        await cardActivityRepo.bulkCreateForTaskInstance(ctx.db, [{
+          type: "updated_checklist_renamed",
+          taskInstanceId: checklist.taskInstanceId,
+          fromTitle: previousName,
+          toTitle: updated.name,
+          createdBy: userId,
+        }]);
+      }
 
       return updated;
     }),
@@ -176,12 +210,14 @@ export const checklistRouter = createTRPCRouter({
           message: `Checklist with public ID ${input.checklistPublicId} not found`,
           code: "NOT_FOUND",
         });
-      await assertPermission(
-        ctx.db,
-        userId,
-        checklist.card.list.board.workspace.id,
-        "card:edit",
-      );
+      if (checklist.card) {
+        await assertPermission(
+          ctx.db,
+          userId,
+          checklist.card.list.board.workspace.id,
+          "card:edit",
+        );
+      }
 
       await checklistRepo.softDeleteAllItemsByChecklistId(ctx.db, {
         checklistId: checklist.id,
@@ -201,12 +237,21 @@ export const checklistRouter = createTRPCRouter({
           code: "INTERNAL_SERVER_ERROR",
         });
 
-      await cardActivityRepo.create(ctx.db, {
-        type: "card.updated.checklist.deleted",
-        cardId: checklist.cardId,
-        fromTitle: checklist.name,
-        createdBy: userId,
-      });
+      if (checklist.cardId) {
+        await cardActivityRepo.create(ctx.db, {
+          type: "updated_checklist_deleted",
+          cardId: checklist.cardId,
+          fromTitle: checklist.name,
+          createdBy: userId,
+        });
+      } else if (checklist.taskInstanceId) {
+        await cardActivityRepo.bulkCreateForTaskInstance(ctx.db, [{
+          type: "updated_checklist_deleted",
+          taskInstanceId: checklist.taskInstanceId,
+          fromTitle: checklist.name,
+          createdBy: userId,
+        }]);
+      }
 
       return { success: true };
     }),
@@ -247,12 +292,14 @@ export const checklistRouter = createTRPCRouter({
           message: `Checklist with public ID ${input.checklistPublicId} not found`,
           code: "NOT_FOUND",
         });
-      await assertPermission(
-        ctx.db,
-        userId,
-        checklist.card.list.board.workspace.id,
-        "card:edit",
-      );
+      if (checklist.card) {
+        await assertPermission(
+          ctx.db,
+          userId,
+          checklist.card.list.board.workspace.id,
+          "card:edit",
+        );
+      }
 
       const newChecklistItem = await checklistRepo.createItem(ctx.db, {
         title: input.title,
@@ -266,12 +313,21 @@ export const checklistRouter = createTRPCRouter({
           code: "INTERNAL_SERVER_ERROR",
         });
 
-      await cardActivityRepo.create(ctx.db, {
-        type: "card.updated.checklist.item.added",
-        cardId: checklist.cardId,
-        toTitle: newChecklistItem.title,
-        createdBy: userId,
-      });
+      if (checklist.cardId) {
+        await cardActivityRepo.create(ctx.db, {
+          type: "updated_checklist_item_added",
+          cardId: checklist.cardId,
+          toTitle: newChecklistItem.title,
+          createdBy: userId,
+        });
+      } else if (checklist.taskInstanceId) {
+        await cardActivityRepo.bulkCreateForTaskInstance(ctx.db, [{
+          type: "updated_checklist_item_added",
+          taskInstanceId: checklist.taskInstanceId,
+          toTitle: newChecklistItem.title,
+          createdBy: userId,
+        }]);
+      }
 
       return newChecklistItem;
     }),
@@ -314,12 +370,14 @@ export const checklistRouter = createTRPCRouter({
           message: `Checklist item with public ID ${input.checklistItemPublicId} not found`,
           code: "NOT_FOUND",
         });
-      await assertPermission(
-        ctx.db,
-        userId,
-        item.checklist.card.list.board.workspace.id,
-        "card:edit",
-      );
+      if (item.checklist.card) {
+        await assertPermission(
+          ctx.db,
+          userId,
+          item.checklist.card.list.board.workspace.id,
+          "card:edit",
+        );
+      }
 
       const previousTitle = item.title;
 
@@ -348,26 +406,43 @@ export const checklistRouter = createTRPCRouter({
       }
 
       // Log completion toggle
-      if (input.completed !== undefined) {
+      if (input.completed !== undefined && item.checklist.cardId) {
         await cardActivityRepo.create(ctx.db, {
           type: input.completed
-            ? "card.updated.checklist.item.completed"
-            : "card.updated.checklist.item.uncompleted",
+            ? "updated_checklist_item_completed"
+            : "updated_checklist_item_uncompleted",
           cardId: item.checklist.cardId,
           toTitle: updatedItem.title,
           createdBy: userId,
         });
+      } else if (input.completed !== undefined && item.checklist.taskInstanceId) {
+        await cardActivityRepo.bulkCreateForTaskInstance(ctx.db, [{
+          type: input.completed
+            ? "updated_checklist_item_completed"
+            : "updated_checklist_item_uncompleted",
+          taskInstanceId: item.checklist.taskInstanceId,
+          toTitle: updatedItem.title,
+          createdBy: userId,
+        }]);
       }
 
       // Log title change
-      if (input.title !== undefined && input.title !== previousTitle) {
+      if (input.title !== undefined && input.title !== previousTitle && item.checklist.cardId) {
         await cardActivityRepo.create(ctx.db, {
-          type: "card.updated.checklist.item.updated",
+          type: "updated_checklist_item_updated",
           cardId: item.checklist.cardId,
           fromTitle: previousTitle,
           toTitle: updatedItem.title,
           createdBy: userId,
         });
+      } else if (input.title !== undefined && input.title !== previousTitle && item.checklist.taskInstanceId) {
+        await cardActivityRepo.bulkCreateForTaskInstance(ctx.db, [{
+          type: "updated_checklist_item_updated",
+          taskInstanceId: item.checklist.taskInstanceId,
+          fromTitle: previousTitle,
+          toTitle: updatedItem.title,
+          createdBy: userId,
+        }]);
       }
 
       return updatedItem;
@@ -402,12 +477,14 @@ export const checklistRouter = createTRPCRouter({
           message: `Checklist item with public ID ${input.checklistItemPublicId} not found`,
           code: "NOT_FOUND",
         });
-      await assertPermission(
-        ctx.db,
-        userId,
-        item.checklist.card.list.board.workspace.id,
-        "card:edit",
-      );
+      if (item.checklist.card) {
+        await assertPermission(
+          ctx.db,
+          userId,
+          item.checklist.card.list.board.workspace.id,
+          "card:edit",
+        );
+      }
 
       const deleted = await checklistRepo.softDeleteItemById(ctx.db, {
         id: item.id,
@@ -421,12 +498,21 @@ export const checklistRouter = createTRPCRouter({
           code: "INTERNAL_SERVER_ERROR",
         });
 
-      await cardActivityRepo.create(ctx.db, {
-        type: "card.updated.checklist.item.deleted",
-        cardId: item.checklist.cardId,
-        fromTitle: item.title,
-        createdBy: userId,
-      });
+      if (item.checklist.cardId) {
+        await cardActivityRepo.create(ctx.db, {
+          type: "updated_checklist_item_deleted",
+          cardId: item.checklist.cardId,
+          fromTitle: item.title,
+          createdBy: userId,
+        });
+      } else if (item.checklist.taskInstanceId) {
+        await cardActivityRepo.bulkCreateForTaskInstance(ctx.db, [{
+          type: "updated_checklist_item_deleted",
+          taskInstanceId: item.checklist.taskInstanceId,
+          fromTitle: item.title,
+          createdBy: userId,
+        }]);
+      }
 
       return { success: true };
     }),

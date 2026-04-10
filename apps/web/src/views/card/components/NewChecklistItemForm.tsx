@@ -15,7 +15,8 @@ interface FormValues {
 
 interface NewChecklistItemFormProps {
   checklistPublicId: string;
-  cardPublicId: string;
+  cardPublicId?: string;
+  taskInstanceId?: string;
   onCancel: () => void;
   readOnly?: boolean;
 }
@@ -23,6 +24,7 @@ interface NewChecklistItemFormProps {
 const NewChecklistItemForm = ({
   checklistPublicId,
   cardPublicId,
+  taskInstanceId,
   onCancel,
   readOnly = false,
 }: NewChecklistItemFormProps) => {
@@ -54,23 +56,47 @@ const NewChecklistItemForm = ({
 
   const addChecklistItemMutation = api.checklist.createItem.useMutation({
     onMutate: async (vars) => {
-      await utils.card.byId.cancel({ cardPublicId });
-      const previous = utils.card.byId.getData({ cardPublicId });
+      let previousCard = undefined;
+      let previousTaskInstance = undefined;
+      if (cardPublicId) {
+        await utils.card.byId.cancel({ cardPublicId });
+        previousCard = utils.card.byId.getData({ cardPublicId });
 
-      utils.card.byId.setData({ cardPublicId }, (old) => {
-        if (!old) return old as any;
-        const placeholder = {
-          publicId: `PLACEHOLDER_${generateUID()}`,
-          title: vars.title,
-          completed: false,
-        };
-        const updatedChecklists = old.checklists.map((cl) =>
-          cl.publicId === checklistPublicId
-            ? { ...cl, items: [...cl.items, placeholder] }
-            : cl,
-        );
-        return { ...old, checklists: updatedChecklists } as typeof old;
-      });
+        utils.card.byId.setData({ cardPublicId }, (old) => {
+          if (!old) return old as any;
+          const placeholder = {
+            publicId: `PLACEHOLDER_${generateUID()}`,
+            title: vars.title,
+            completed: false,
+          };
+          const updatedChecklists = old.checklists.map((cl) =>
+            cl.publicId === checklistPublicId
+              ? { ...cl, items: [...cl.items, placeholder] }
+              : cl,
+          );
+          return { ...old, checklists: updatedChecklists } as typeof old;
+        });
+      }
+      if (taskInstanceId) {
+        await utils.taskInstance.byId.cancel({ id: taskInstanceId });
+        previousTaskInstance = utils.taskInstance.byId.getData({
+          id: taskInstanceId,
+        });
+        utils.taskInstance.byId.setData({ id: taskInstanceId }, (old) => {
+          if (!old) return old as any;
+          const placeholder = {
+            publicId: `PLACEHOLDER_${generateUID()}`,
+            title: vars.title,
+            completed: false,
+          };
+          const updatedChecklists = old.checklists.map((cl) =>
+            cl.publicId === checklistPublicId
+              ? { ...cl, items: [...cl.items, placeholder] }
+              : cl,
+          );
+          return { ...old, checklists: updatedChecklists } as typeof old;
+        });
+      }
 
       if (keepOpenRef.current) {
         reset({ title: "" });
@@ -80,11 +106,16 @@ const NewChecklistItemForm = ({
         onCancel();
       }
 
-      return { previous };
+      return { previousCard, previousTaskInstance };
     },
     onError: (_err, _vars, ctx) => {
-      if (ctx?.previous)
-        utils.card.byId.setData({ cardPublicId }, ctx.previous);
+      if (ctx?.previousCard && cardPublicId)
+        utils.card.byId.setData({ cardPublicId }, ctx.previousCard);
+      if (ctx?.previousTaskInstance && taskInstanceId)
+        utils.taskInstance.byId.setData(
+          { id: taskInstanceId },
+          ctx.previousTaskInstance,
+        );
       showPopup({
         header: t`Unable to add checklist item`,
         message: t`Please try again later, or contact customer support.`,
@@ -92,7 +123,12 @@ const NewChecklistItemForm = ({
       });
     },
     onSettled: async () => {
-      await invalidateCard(utils, cardPublicId);
+      if (cardPublicId) {
+        await invalidateCard(utils, cardPublicId);
+      }
+      if (taskInstanceId) {
+        await utils.taskInstance.byId.invalidate({ id: taskInstanceId });
+      }
     },
   });
 

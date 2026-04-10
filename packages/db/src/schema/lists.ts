@@ -30,7 +30,7 @@ export const lists = pgTable("list", {
   }),
   boardId: bigint("boardId", { mode: "number" })
     .notNull()
-    .references(() => boards.id, { onDelete: "cascade" }),
+    .references(() => boards.id, { onDelete: "restrict" }),
   importId: bigint("importId", { mode: "number" }).references(() => imports.id),
 }).enableRLS();
 

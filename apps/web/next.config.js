@@ -71,6 +71,7 @@ const config = {
   experimental: {
     // instrumentationHook: true,
     swcPlugins: [["@lingui/swc-plugin", {}]],
+    // allowedDevOrigins: ["192.168.1.115"],
   },
 
   async rewrites() {

@@ -27,13 +27,13 @@ export default function AccountSettings() {
 
       <div className="mb-8 border-t border-light-300 dark:border-dark-300">
         <h2 className="mb-4 mt-8 text-[14px] font-bold text-neutral-900 dark:text-dark-1000">
-          {t`Profile picture`}
+          {t`Ảnh đại diện`}
         </h2>
         <Avatar userId={data?.id} userImage={data?.image} />
 
         <div className="mb-4">
           <h2 className="mb-4 mt-8 text-[14px] font-bold text-neutral-900 dark:text-dark-1000">
-            {t`Display name`}
+            {t`Tên hiển thị`}
           </h2>
           <UpdateDisplayNameForm displayName={data?.name ?? ""} />
         </div>
@@ -47,37 +47,37 @@ export default function AccountSettings() {
 
         <div className="mb-8 border-t border-light-300 dark:border-dark-300">
           <h2 className="mb-4 mt-8 text-[14px] font-bold text-neutral-900 dark:text-dark-1000">
-            {t`Language`}
+            {t`Ngôn ngữ`}
           </h2>
           <p className="mb-8 text-sm text-neutral-500 dark:text-dark-900">
-            {t`Change your language preferences.`}
+            {t`Thay đổi ngôn ngữ`}
           </p>
           <LanguageSelector />
         </div>
 
         <div className="mb-8 border-t border-light-300 dark:border-dark-300">
           <h2 className="mb-4 mt-8 text-[14px] font-bold text-neutral-900 dark:text-dark-1000">
-            {t`Font size`}
+            {t`Kích thước phông chữ`}
           </h2>
           <p className="mb-8 text-sm text-neutral-500 dark:text-dark-900">
-            {t`Change the application font size.`}
+            {t`Thay đổi kích thước phông chữ`}
           </p>
           <FontSizeSelector />
         </div>
 
         <div className="mb-8 border-t border-light-300 dark:border-dark-300">
           <h2 className="mb-4 mt-8 text-[14px] font-bold text-neutral-900 dark:text-dark-1000">
-            {t`Delete account`}
+            {t`Xóa tài khoản`}
           </h2>
           <p className="mb-8 text-sm text-neutral-500 dark:text-dark-900">
-            {t`Once you delete your account, there is no going back. This action cannot be undone.`}
+            {t`Khi bạn xóa tài khoản, không có cách nào để khôi phục. Hành động này không thể hoàn tác.`}
           </p>
           <div className="mt-4">
             <Button
               variant="secondary"
               onClick={() => openModal("DELETE_ACCOUNT")}
             >
-              {t`Delete account`}
+              {t`Xóa tài khoản`}
             </Button>
           </div>
         </div>
@@ -85,17 +85,17 @@ export default function AccountSettings() {
         {isCredentialsEnabled && (
           <div className="mb-8 border-t border-light-300 dark:border-dark-300">
             <h2 className="mb-4 mt-8 text-[14px] font-bold text-neutral-900 dark:text-dark-1000">
-              {t`Change Password`}
+              {t`Thay đổi mật khẩu`}
             </h2>
             <p className="mb-8 text-sm text-neutral-500 dark:text-dark-900">
-              {t`You are about to change your password.`}
+              {t`Bạn sắp thay đổi mật khẩu.`}
             </p>
             <div className="mt-4">
               <Button
                 variant="secondary"
                 onClick={() => openModal("CHANGE_PASSWORD")}
               >
-                {t`Change Password`}
+                {t`Thay đổi mật khẩu`}
               </Button>
             </div>
           </div>

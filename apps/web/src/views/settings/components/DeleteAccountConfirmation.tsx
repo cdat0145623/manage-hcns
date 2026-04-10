@@ -31,7 +31,7 @@ export function DeleteAccountConfirmation() {
 
       utils.invalidate();
 
-      router.push("/");
+      router.push("/boards");
     },
     onError: () => {
       closeModal();

@@ -12,7 +12,9 @@ import {
   generateUID,
   getSubscriptionByPlan,
   hasUnlimitedSeats,
+  roles,
 } from "@kan/shared";
+import type { Role } from "@kan/shared";
 import { updateSubscriptionSeats } from "@kan/stripe";
 
 import { createTRPCRouter, protectedProcedure, publicProcedure } from "../trpc";
@@ -36,7 +38,7 @@ export const memberRouter = createTRPCRouter({
     })
     .input(
       z.object({
-        email: z.string().email(),
+        username: z.string(),
         workspacePublicId: z.string().min(12),
       }),
     )
@@ -48,6 +50,14 @@ export const memberRouter = createTRPCRouter({
         throw new TRPCError({
           message: `User not authenticated`,
           code: "UNAUTHORIZED",
+        });
+
+      const existingUser = await userRepo.getByUsername(ctx.db, input.username);
+
+      if (!existingUser)
+        throw new TRPCError({
+          message: `Username not found`,
+          code: "NOT_FOUND",
         });
 
       const workspace = await workspaceRepo.getByPublicIdWithMembers(
@@ -64,12 +74,12 @@ export const memberRouter = createTRPCRouter({
       await assertPermission(ctx.db, userId, workspace.id, "member:invite");
 
       const isInvitedEmailAlreadyMember = workspace.members.some(
-        (member) => member.email === input.email,
+        (member) => member.email === existingUser.email,
       );
 
       if (isInvitedEmailAlreadyMember) {
         throw new TRPCError({
-          message: `User with email ${input.email} is already a member of this workspace`,
+          message: `User with email ${existingUser.email} is already a member of this workspace`,
           code: "CONFLICT",
         });
       }
@@ -115,53 +125,49 @@ export const memberRouter = createTRPCRouter({
         }
       }
 
-      const existingUser = await userRepo.getByEmail(ctx.db, input.email);
-
       // Get the workspace role to set roleId
       const memberRole = await permissionRepo.getRoleByWorkspaceIdAndName(
         ctx.db,
         workspace.id,
-        "member",
+        "NVVP",
       );
 
       const invite = await memberRepo.create(ctx.db, {
         workspaceId: workspace.id,
-        email: input.email,
+        email: existingUser.email,
         userId: existingUser?.id ?? null,
         createdBy: userId,
-        role: "member",
+        role: "NVVP",
         roleId: memberRole?.id ?? null,
-        status: "invited",
+        status: "active",
       });
 
       if (!invite)
         throw new TRPCError({
-          message: `Unable to invite user with email ${input.email}`,
+          message: `Unable to invite user with username ${input.username}`,
           code: "INTERNAL_SERVER_ERROR",
         });
 
-      const { status } = await ctx.auth.api.signInMagicLink({
-        email: input.email,
-        callbackURL: `/boards?type=invite&memberPublicId=${invite.publicId}`,
-      });
+      // Sign-in magic link removed
+      // const status = true;
 
-      if (!status) {
-        console.error("Failed to send magic link invitation:", {
-          email: input.email,
-          callbackURL: `/boards?type=invite&memberPublicId=${invite.publicId}`,
-        });
+      // if (!status) {
+      //   console.error("Failed to send magic link invitation:", {
+      //     email: existingUser.email,
+      //     callbackURL: `/boards?type=invite&memberPublicId=${invite.publicId}`,
+      //   });
 
-        await memberRepo.softDelete(ctx.db, {
-          memberId: invite.id,
-          deletedAt: new Date(),
-          deletedBy: userId,
-        });
+      //   await memberRepo.softDelete(ctx.db, {
+      //     memberId: invite.id,
+      //     deletedAt: new Date(),
+      //     deletedBy: userId,
+      //   });
 
-        throw new TRPCError({
-          message: `Failed to send magic link invitation to user with email ${input.email}.`,
-          code: "INTERNAL_SERVER_ERROR",
-        });
-      }
+      //   throw new TRPCError({
+      //     message: `Failed to send magic link invitation to user with username ${input.username}.`,
+      //     code: "INTERNAL_SERVER_ERROR",
+      //   });
+      // }
 
       return invite;
     }),
@@ -649,15 +655,15 @@ export const memberRouter = createTRPCRouter({
       const memberRole = await permissionRepo.getRoleByWorkspaceIdAndName(
         ctx.db,
         invite.workspaceId,
-        "member",
+        "NVVP",
       );
 
       await memberRepo.create(ctx.db, {
         workspaceId: invite.workspaceId,
-        email: user.email,
+        email: user.email || null,
         userId: user.id,
         createdBy: user.id,
-        role: "member",
+        role: "NVVP",
         roleId: memberRole?.id ?? null,
         status: "active",
       });
@@ -683,7 +689,7 @@ export const memberRouter = createTRPCRouter({
       z.object({
         workspacePublicId: z.string().min(12),
         memberPublicId: z.string().min(12),
-        role: z.enum(["admin", "member", "guest"]),
+        role: z.enum(roles as unknown as [Role, ...Role[]]),
       }),
     )
     .output(
@@ -740,7 +746,7 @@ export const memberRouter = createTRPCRouter({
 
       await memberRepo.updateRole(ctx.db, {
         memberId: member.id,
-        role: input.role,
+        role: input.role as Role,
         roleId: workspaceRole?.id ?? null,
       });
 

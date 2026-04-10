@@ -29,7 +29,7 @@ describe("webhook utilities", () => {
   describe("createCardWebhookPayload", () => {
     it("creates a payload with required card fields", () => {
       const payload = createCardWebhookPayload(
-        "card.created",
+        "created",
         {
           id: "card-123",
           title: "Test Card",
@@ -40,7 +40,7 @@ describe("webhook utilities", () => {
         },
       );
 
-      expect(payload.event).toBe("card.created");
+      expect(payload.event).toBe("created");
       expect(payload.timestamp).toBe("2024-01-15T12:00:00.000Z");
       expect(payload.data.card).toEqual({
         id: "card-123",
@@ -74,7 +74,7 @@ describe("webhook utilities", () => {
 
     it("includes board context when provided", () => {
       const payload = createCardWebhookPayload(
-        "card.created",
+        "created",
         {
           id: "card-123",
           title: "Test Card",
@@ -94,7 +94,7 @@ describe("webhook utilities", () => {
 
     it("includes list context when provided", () => {
       const payload = createCardWebhookPayload(
-        "card.created",
+        "created",
         {
           id: "card-123",
           title: "Test Card",
@@ -114,7 +114,7 @@ describe("webhook utilities", () => {
 
     it("includes user context when provided", () => {
       const payload = createCardWebhookPayload(
-        "card.created",
+        "created",
         {
           id: "card-123",
           title: "Test Card",
@@ -169,7 +169,7 @@ describe("webhook utilities", () => {
     });
 
     const mockPayload: WebhookPayload = {
-      event: "card.created",
+      event: "created",
       timestamp: "2024-01-15T12:00:00.000Z",
       data: {
         card: {
@@ -244,7 +244,7 @@ describe("webhook utilities", () => {
           method: "POST",
           headers: expect.objectContaining({
             "Content-Type": "application/json",
-            "X-Webhook-Event": "card.created",
+            "X-Webhook-Event": "created",
             "X-Webhook-Timestamp": "2024-01-15T12:00:00.000Z",
           }),
           body: JSON.stringify(mockPayload),
@@ -365,7 +365,7 @@ describe("webhook utilities", () => {
     const mockDb = {} as Parameters<typeof sendWebhooksForWorkspace>[0];
 
     const mockPayload: WebhookPayload = {
-      event: "card.created",
+      event: "created",
       timestamp: "2024-01-15T12:00:00.000Z",
       data: {
         card: {
@@ -384,7 +384,7 @@ describe("webhook utilities", () => {
           publicId: "wh-1",
           url: "https://example.com/webhook1",
           secret: "secret1",
-          events: ["card.created", "card.updated"],
+          events: ["created", "card.updated"],
           active: true,
         },
         {
@@ -392,7 +392,7 @@ describe("webhook utilities", () => {
           publicId: "wh-2",
           url: "https://example.com/webhook2",
           secret: null,
-          events: ["card.created"],
+          events: ["created"],
           active: true,
         },
       ]);
@@ -442,7 +442,7 @@ describe("webhook utilities", () => {
           publicId: "wh-1",
           url: "https://example.com/webhook1",
           secret: null,
-          events: ["card.created"],
+          events: ["created"],
           active: true,
         },
         {
@@ -450,7 +450,7 @@ describe("webhook utilities", () => {
           publicId: "wh-2",
           url: "https://example.com/webhook2",
           secret: null,
-          events: ["card.created"],
+          events: ["created"],
           active: true,
         },
       ]);

@@ -168,6 +168,12 @@ pnpm db:migrate
 pnpm dev
 ```
 
+- Install minio before run
+6. Start minio server
+```bash
+.\minio.exe server C:\minio-data --console-address ":9001"
+```
+
 ## Environment Variables 🔐
 
 | Variable                                  | Description                                               | Required                              | Example                                                     |

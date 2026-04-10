@@ -622,6 +622,7 @@ const ActivityList = ({
           if (excludedTypes) return !excludedTypes.includes(activity.type);
           return true;
         })
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
         .map((activity, index) => {
         const activityText = getActivityText({
           type: activity.type,

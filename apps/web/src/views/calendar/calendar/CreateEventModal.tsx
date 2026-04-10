@@ -31,6 +31,7 @@ export interface EditableEntry {
   title: string;
   description?: string;
   date: Date | string;
+  startDate: Date | string;
   endDate?: Date | string;
   selectedUserId?: string;
   assigneeName?: string;
@@ -491,8 +492,8 @@ export function CreateEventModal({
     if (recurrence !== "NONE") {
       // 100% Frontend Workaround: Extend endDate to 1 year for recurring tasks
       // so the backend generates future virtual instances.
-      finalEndDate = new Date(startDT);
-      finalEndDate.setFullYear(finalEndDate.getFullYear() + 1);
+      finalEndDate = new Date(endDT);
+      // finalEndDate.setFullYear(finalEndDate.getFullYear() + 1);
 
       try {
         rruleString = generateRRuleString({

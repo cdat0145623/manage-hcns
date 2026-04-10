@@ -110,10 +110,10 @@ export default function LabelSelector({
                   iconLeft={label.leftIcon}
                 />
               ))}
-              <div className="flex items-center gap-1 px-1 text-light-500">
+              {/* <div className="flex items-center gap-1 px-1 text-light-500">
                 <HiMiniPlus size={14} />
                 <span className="text-[11px]">{t`Nhãn`}</span>
-              </div>
+              </div> */}
             </div>
           ) : (
             <div className={`flex min-h-[34px] w-full items-center rounded-xl bg-white px-2.5 text-left text-[13px] font-medium text-neutral-900 shadow-sm ring-1 ring-light-300 transition-all hover:bg-light-50 hover:ring-light-400 dark:bg-dark-300/30 dark:text-dark-1000 dark:ring-dark-300/50 dark:hover:bg-dark-300/50 ${disabled ? "cursor-not-allowed opacity-60" : ""}`}>

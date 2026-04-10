@@ -208,6 +208,20 @@ export default function CardDetailsModalContent({
 
   const canComment = canCreateComment && card && !isTemplate;
 
+  const { data: activitiesData } = api.card.getActivities.useQuery(
+    { cardPublicId: cardId ?? "", limit: 100 },
+    { enabled: !!cardId && activeTab === "comments" }
+  );
+
+  const hasComments = activitiesData?.activities.some((a) =>
+    [
+      "comment",
+      "updated_comment_added",
+      "updated_comment_updated",
+      "updated_comment_deleted",
+    ].includes(a.type),
+  ) ?? false;
+
   const canUpload = canAttach && card && !isTemplate;
 
   return (
@@ -242,7 +256,7 @@ export default function CardDetailsModalContent({
             ) : null}
           </div>
           <div className="shrink-0 border-b border-light-100 px-10 py-6 dark:border-dark-300">
-            <p className="mb-3 text-[10px] font-semibold uppercase tracking-widest text-light-500 dark:text-dark-500">
+            <p className="mb-3 text-[10px] font-semibold uppercase tracking-widest text-neutral-900 dark:text-dark-500">
               {t`Mô tả`}
             </p>
             <div className="min-h-[120px] rounded-xl border border-light-100 bg-light-50/30 px-1 dark:border-dark-300/40 dark:bg-dark-200/10">
@@ -271,7 +285,7 @@ export default function CardDetailsModalContent({
 
           {/* Checklists */}
           <div className="flex-1 overflow-y-auto px-10 pb-10 pt-4">
-            <p className="mb-3 text-[10px] font-semibold uppercase tracking-widest text-light-500 dark:text-dark-500">
+            <p className="mb-3 text-[10px] font-semibold uppercase tracking-widest text-neutral-900 dark:text-dark-500">
               {t`Checklist`}
             </p>
             {card && (
@@ -389,7 +403,7 @@ export default function CardDetailsModalContent({
                   {card && !isTemplate && (
                     <div className="shrink-0 space-y-3">
                       <div className="flex items-center justify-between">
-                        <p className="text-[10px] font-bold uppercase tracking-widest text-light-500 dark:text-dark-500">
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-neutral-900 dark:text-dark-500">
                           {t`Tài liệu đính kèm`}
                         </p>
                         {card.attachments.length > 0 && (
@@ -418,7 +432,7 @@ export default function CardDetailsModalContent({
                   <div className="h-px bg-light-200 dark:bg-dark-300" />
                   {canComment && (
                     <div className="shrink-0 space-y-1">
-                      <p className="text-[10px] font-bold uppercase tracking-widest text-light-500 dark:text-dark-500">
+                      <p className="text-[10px] font-bold uppercase tracking-widest text-neutral-900 dark:text-dark-500">
                         {t`Viết bình luận`}
                       </p>
                       <div className="overflow-hidden rounded-xl border border-light-200 bg-white shadow-sm ring-1 ring-light-100/50 dark:border-dark-300 dark:bg-dark-100 dark:ring-white/5">
@@ -429,27 +443,29 @@ export default function CardDetailsModalContent({
                       </div>
                     </div>
                   )}
-                  <div className="flex-1 space-y-1">
-                    <div className="flex items-center gap-2">
-                      <p className="text-[10px] font-bold uppercase tracking-widest text-light-500 dark:text-dark-500">
-                        {t`Lịch sử comment`}
-                      </p>
-                      <div className="h-px flex-1 bg-light-200/50 dark:bg-dark-300/50" />
+                  {hasComments && (
+                    <div className="flex-1 space-y-1">
+                      <div className="flex items-center gap-2">
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-neutral-900 dark:text-dark-500">
+                          {t`Lịch sử bình luận`}
+                        </p>
+                        <div className="h-px flex-1 bg-light-200/50 dark:bg-dark-300/50" />
+                      </div>
+                      <div className="flex-1 overflow-y-auto">
+                        <ActivityList
+                          cardPublicId={cardId}
+                          isLoading={!card}
+                          isAdmin={workspace.role === "ADMIN"}
+                          includedTypes={[
+                            "comment",
+                            "updated_comment_added",
+                            "updated_comment_updated",
+                            "updated_comment_deleted",
+                          ]}
+                        />
+                      </div>
                     </div>
-                    <div className="flex-1 overflow-y-auto">
-                      <ActivityList
-                        cardPublicId={cardId}
-                        isLoading={!card}
-                        isAdmin={workspace.role === "ADMIN"}
-                        includedTypes={[
-                          "comment",
-                          "updated_comment_added",
-                          "updated_comment_updated",
-                          "updated_comment_deleted",
-                        ]}
-                      />
-                    </div>
-                  </div>
+                  )}
                 </motion.div>
               )}
             </AnimatePresence>

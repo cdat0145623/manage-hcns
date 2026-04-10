@@ -25,7 +25,6 @@ const NewCommentForm = ({
 }) => {
   const utils = api.useUtils();
   const { showPopup } = usePopup();
-  const { canCreateComment } = usePermissions();
   const { handleSubmit, setValue, watch, reset } = useForm<FormValues>({
     values: {
       comment: "",
@@ -75,10 +74,6 @@ const NewCommentForm = ({
         });
     }
   };
-
-  if (!canCreateComment) {
-    return null;
-  }
 
   return (
     <form

@@ -15,8 +15,10 @@ import { AttachmentUpload } from "../../card/components/AttachmentUpload";
 import Checklists from "../../card/components/Checklists";
 import { DeleteChecklistConfirmation } from "../../card/components/DeleteChecklistConfirmation";
 import { DeleteCommentConfirmation } from "../../card/components/DeleteCommentConfirmation";
+import { DueDateSelector } from "../../card/components/DueDateSelector";
 import { NewChecklistForm } from "../../card/components/NewChecklistForm";
 import NewCommentForm from "../../card/components/NewCommentForm";
+import { HiXMark, HiMiniPlus } from "react-icons/hi2";
 
 interface EventDetailModalProps {
   isVisible: boolean;
@@ -67,7 +69,7 @@ const STATUS_CONFIG: Record<
     border: "border-neutral-200 dark:border-neutral-700",
     activeBorder: "border-blue-400 dark:border-blue-500",
     text: "text-neutral-500 dark:text-neutral-400",
-    activeText: "text-blue-700 dark:text-blue-300",
+    activeText: "text-blue-700 dark:text-blue-300 ring-1 ring-blue-400 dark:ring-blue-500",
     dot: "bg-blue-500",
     glow: "shadow-blue-500/20",
     description: "In progress",
@@ -94,7 +96,7 @@ const STATUS_CONFIG: Record<
     border: "border-neutral-200 dark:border-neutral-700",
     activeBorder: "border-emerald-400 dark:border-emerald-500",
     text: "text-neutral-500 dark:text-neutral-400",
-    activeText: "text-emerald-700 dark:text-emerald-300",
+    activeText: "text-emerald-700 dark:text-emerald-300 ring-1 ring-emerald-400 dark:ring-emerald-500",
     dot: "bg-emerald-500",
     glow: "shadow-emerald-500/20",
     description: "Completed",
@@ -121,7 +123,7 @@ const STATUS_CONFIG: Record<
     border: "border-neutral-200 dark:border-neutral-700",
     activeBorder: "border-rose-400 dark:border-rose-500",
     text: "text-neutral-500 dark:text-neutral-400",
-    activeText: "text-rose-700 dark:text-rose-300",
+    activeText: "text-rose-700 dark:text-rose-300 ring-1 ring-rose-400 dark:ring-rose-500",
     dot: "bg-rose-500",
     glow: "shadow-rose-500/20",
     description: "Not completed",
@@ -139,25 +141,39 @@ export function EventDetailModal({
   const { data: session } = authClient.useSession();
   const utils = api.useUtils();
   const { showPopup } = usePopup();
-  const { modalContentType, isOpen: isSubModalOpen, entityId } = useModal();
+  const { modalContentType, isOpen: isSubModalOpen, entityId, openModal } = useModal();
   const [isUpdating, setIsUpdating] = useState(false);
-  const [activeChecklistForm, setActiveChecklistForm] = useState<string | null>(
-    null,
-  );
+  const [activeChecklistForm, setActiveChecklistForm] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<"comments" | "history">("comments");
 
   const { data: attachments } = api.attachment.getByTaskInstanceId.useQuery(
     { taskInstanceId: entry?.instanceId as string },
     { enabled: !!entry?.instanceId && entry?.type === "INSTANCE" && isVisible },
   );
 
+  const { data: activitiesData } = api.taskInstance.getActivities.useQuery(
+    { id: entry?.instanceId as string, limit: 100 },
+    { enabled: !!entry?.instanceId && entry?.type === "INSTANCE" && isVisible && activeTab === "comments" }
+  );
+
+  const hasComments = activitiesData?.activities.some(a => ["comment", "updated_comment_added", "updated_comment_updated", "updated_comment_deleted"].includes(a.type)) ?? false;
+
   const { data: latestInstance } = api.taskInstance.byId.useQuery(
     { id: entry?.instanceId as string },
     { enabled: !!entry?.instanceId && entry?.type === "INSTANCE" && isVisible },
   );
 
+  const { data: currentUser } = api.user.getUser.useQuery();
+
   const canEdit =
     entry?.createdBy === session?.user?.id ||
     entry?.selectedUserId === session?.user?.id;
+  // currentUser?.role === "ADMIN";
+
+  const canComment =
+    entry?.createdBy === session?.user?.id ||
+    entry?.selectedUserId === session?.user?.id;
+  // currentUser?.role === "ADMIN";
 
   const updateInstance = api.taskInstance.update.useMutation({
     onSuccess: () => {
@@ -231,230 +247,298 @@ export function EventDetailModal({
   const statusConfig = STATUS_CONFIG[currentStatus];
   const displayChecklists = latestInstance?.checklists ?? entry.checklists;
 
-  return (
-    <Modal isVisible={isVisible} centered modalSize="sm">
-      <motion.div
-        initial={{ opacity: 0, scale: 0.96, y: 16 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.96, y: 16 }}
-        transition={{ type: "spring", stiffness: 320, damping: 28 }}
-        className="relative flex flex-col overflow-hidden rounded-3xl border border-neutral-200/50 bg-white/90 shadow-[0_20px_50px_rgba(0,0,0,0.15)] backdrop-blur-xl dark:border-white/10 dark:bg-neutral-900/90"
-      >
-        {/* Header */}
-        <div className="flex-shrink-0 border-b border-light-200 bg-gradient-to-r from-blue-50 to-indigo-50 p-3 dark:border-dark-300 dark:from-dark-200 dark:to-dark-300">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2.5">
-              <div
-                className={`flex h-8 w-8 items-center justify-center rounded-xl text-sm ${statusConfig.activeBg} ${statusConfig.activeText}`}
-              >
-                {statusConfig.icon}
-              </div>
-              <h2 className="text-lg font-black tracking-tight text-neutral-900 dark:text-white">
-                Chi tiết công việc
-              </h2>
-            </div>
-            <div className="flex gap-1">
-              <motion.button
-                title="Delete"
-                whileHover={{
-                  scale: 1.1,
-                  backgroundColor: "rgba(255,255,255,0.8)",
-                }}
-                whileTap={{ scale: 0.9 }}
-                onClick={() => onDelete(entry)}
-                className="flex h-10 w-10 items-center justify-center rounded-2xl text-neutral-400 shadow-sm transition-all hover:text-neutral-900 dark:hover:bg-dark-300"
-              >
-                <svg
-                  className="h-5 w-5"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth={2.5}
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                  />
-                </svg>
-              </motion.button>
-              <motion.button
-                title="Edit"
-                whileHover={{
-                  scale: 1.1,
-                  backgroundColor: "rgba(255,255,255,0.8)",
-                }}
-                whileTap={{ scale: 0.9 }}
-                onClick={() => onEdit(entry)}
-                className="flex h-10 w-10 items-center justify-center rounded-2xl text-neutral-400 shadow-sm transition-all hover:text-neutral-900 dark:hover:bg-dark-300"
-              >
-                <svg
-                  className="h-5 w-5"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth={2.5}
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-                  />
-                </svg>
-              </motion.button>
-              <motion.button
-                title="Close"
-                whileHover={{
-                  scale: 1.1,
-                  backgroundColor: "rgba(255,255,255,0.8)",
-                }}
-                whileTap={{ scale: 0.9 }}
-                onClick={onClose}
-                className="flex h-10 w-10 items-center justify-center rounded-2xl text-neutral-400 shadow-sm transition-all hover:text-neutral-900 dark:hover:bg-dark-300"
-              >
-                <svg
-                  className="h-5 w-5"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth={2.5}
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M6 18L18 6M6 6l12 12"
-                  />
-                </svg>
-              </motion.button>
-            </div>
-          </div>
-        </div>
+  const startDate = entry.date ? new Date(entry.date) : new Date();
+  if (entry.startTime) {
+    const [h, m] = entry.startTime.split(":");
+    if (h && m) startDate.setHours(parseInt(h, 10), parseInt(m, 10), 0, 0);
+  }
 
-        {/* Body */}
-        <div className="space-y-5 px-7 py-6">
-          {/* Title & Meta */}
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0 flex-1">
-              <h3 className="truncate text-xl font-bold text-neutral-900 dark:text-white">
+  const endDate = entry.date ? new Date(entry.date) : new Date();
+  if (entry.endTime) {
+    const [h, m] = entry.endTime.split(":");
+    if (h && m) endDate.setHours(parseInt(h, 10), parseInt(m, 10), 0, 0);
+  }
+
+  return (
+    <Modal isVisible={isVisible} centered modalSize="lg" className="bg-transparent border-0 shadow-none">
+      <div className="flex w-full items-center justify-center font-sans antialiased [-webkit-font-smoothing:antialiased]">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.97 }}
+          animate={{ opacity: 1, scale: 1 }}
+          exit={{ opacity: 0, scale: 0.97 }}
+          transition={{ duration: 0.18, ease: "easeOut" }}
+          className="flex h-[92vh] w-[95vw] max-w-[1200px] overflow-hidden rounded-2xl border border-light-200 bg-white shadow-2xl dark:border-dark-300 dark:bg-dark-100"
+        >
+          <div className="flex w-1/2 flex-col overflow-hidden border-r border-light-100 dark:border-dark-300">
+            <div className="shrink-0 border-b border-light-100 px-10 py-7 dark:border-dark-300">
+              <h3 className="block w-full resize-none overflow-hidden border-0 bg-transparent p-0 text-2xl font-bold leading-snug text-neutral-900 dark:text-dark-1000">
                 {entry.title}
               </h3>
-              <p className="mt-1 text-sm text-neutral-500 dark:text-neutral-400">
-                {format(new Date(entry.date), "MMMM d, yyyy")} ·{" "}
-                {entry.startTime} – {entry.endTime}
+            </div>
+            <div className="shrink-0 border-b border-light-100 px-10 py-6 dark:border-dark-300">
+              <p className="mb-3 text-[10px] font-semibold uppercase tracking-widest text-neutral-900 dark:text-dark-500">
+                Mô tả
               </p>
-            </div>
-            {entry.assigneeName && (
-              <div className="flex flex-shrink-0 items-center gap-1.5 rounded-lg border border-amber-300 bg-amber-100 px-2.5 py-1 text-[10px] font-black uppercase tracking-widest text-amber-900 shadow-sm dark:border-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
-                <svg
-                  className="h-3 w-3"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth={2.5}
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
-                  />
-                </svg>
-                {entry.assigneeName}
+              <div className="min-h-[120px] rounded-xl border border-light-100 bg-light-50/30 px-4 py-3 dark:border-dark-300/40 dark:bg-dark-200/10">
+                {entry.description ? (
+                  <p className="text-sm leading-relaxed text-neutral-600 dark:text-neutral-300">
+                    {entry.description}
+                  </p>
+                ) : (
+                  <p className="text-sm italic text-light-500 dark:text-dark-500">
+                    Không có mô tả
+                  </p>
+                )}
               </div>
-            )}
-          </div>
-
-          {entry.description && (
-            <p className="text-sm leading-relaxed text-neutral-600 dark:text-neutral-300">
-              {entry.description}
-            </p>
-          )}
-
-          {displayChecklists && (
-            <Checklists
-              checklists={displayChecklists}
-              taskInstanceId={entry.instanceId!}
-              activeChecklistForm={activeChecklistForm}
-              setActiveChecklistForm={setActiveChecklistForm}
-              viewOnly={!canEdit}
-            />
-          )}
-
-          <div className="flex flex-col space-y-2.5">
-            <div className="mt-2">
-              <AttachmentUpload
-                taskInstanceId={entry.instanceId as string}
-              />
             </div>
-            <div className="flex items-center justify-end">
-              {entry.status === "pending" ? (
-                <motion.button
-                  whileHover={{ scale: 1.03, y: -1 }}
-                  whileTap={{ scale: 0.97 }}
-                  onClick={() => handleStatusChange("done")}
-                  className="group relative flex flex-col items-center gap-1.5 overflow-hidden rounded-2xl border-2 border-neutral-300 bg-white px-3 py-3.5 text-center text-neutral-900 shadow-sm transition-all duration-200 hover:border-neutral-400 hover:bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100 dark:hover:border-neutral-600 dark:hover:bg-neutral-800"
-                >
-                  <span className="text-[12px] font-black tracking-widest">
-                    Đánh dấu đã hoàn thành
-                  </span>
-                </motion.button>
-              ) : (
-                <motion.button
-                  whileHover={{ scale: 1.03, y: -1 }}
-                  whileTap={{ scale: 0.97 }}
-                  onClick={() => handleStatusChange("pending")}
-                  className="group relative flex flex-col items-center gap-1.5 overflow-hidden rounded-2xl border-2 border-neutral-300 bg-white px-3 py-3.5 text-center text-neutral-900 shadow-sm transition-all duration-200 hover:border-neutral-400 hover:bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100 dark:hover:border-neutral-600 dark:hover:bg-neutral-800"
-                >
-                  <span className="text-[12px] font-black tracking-widest">
-                    Đánh dấu chưa hoàn thành
-                  </span>
-                </motion.button>
+
+            {/* Checklists */}
+            <div className="flex-1 overflow-y-auto px-10 pb-10 pt-4">
+              <div className="flex items-center gap-3 mb-3">
+                <p className="text-[10px] font-semibold uppercase tracking-widest text-neutral-900 dark:text-dark-500">
+                  Checklist
+                </p>
+                {canEdit && entry?.instanceId && (
+                  <button
+                    onClick={() => openModal("ADD_CHECKLIST", entry.instanceId ?? undefined)}
+                    className="flex items-center justify-center rounded-lg bg-light-100 p-1 text-neutral-600 transition-all hover:bg-light-200 hover:text-neutral-900 dark:bg-dark-300 dark:text-dark-600 dark:hover:bg-dark-200 dark:hover:text-dark-500"
+                    title="Thêm Checklist"
+                  >
+                    <HiMiniPlus className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
+              {displayChecklists && (
+                <Checklists
+                  checklists={displayChecklists}
+                  taskInstanceId={entry.instanceId!}
+                  activeChecklistForm={activeChecklistForm}
+                  setActiveChecklistForm={setActiveChecklistForm}
+                  viewOnly={!canEdit}
+                />
               )}
             </div>
           </div>
 
-          {attachments &&
-            attachments.length > 0 && (
-              <div className="mt-4">
-                <AttachmentThumbnails
-                  attachments={attachments}
-                  taskInstanceId={entry.instanceId as string}
-                />
+          <div className="flex w-1/2 shrink-0 flex-col overflow-hidden bg-light-50/50 dark:bg-dark-50/30">
+            <div className="relative z-50 flex shrink-0 items-center justify-end bg-white/50 py-2 pl-8 pr-4 backdrop-blur-sm dark:bg-dark-100/50">
+              <div className="flex items-center gap-3">
+                <button
+                  title="Delete"
+                  onClick={() => onDelete(entry)}
+                  disabled={!canEdit}
+                  className="flex h-7 w-7 items-center justify-center rounded-xl text-red-500 transition-all hover:bg-red-50 active:scale-95 dark:hover:bg-red-500/10"
+                >
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                </button>
+                <button
+                  title="Edit"
+                  onClick={() => onEdit(entry)}
+                  disabled={!canEdit}
+                  className="flex h-7 w-7 items-center justify-center rounded-xl text-light-950 transition-all hover:bg-light-100 hover:text-light-1000 active:scale-95 dark:text-dark-600 dark:hover:bg-dark-200 dark:hover:text-dark-1000"
+                >
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                  </svg>
+                </button>
+                <div className="h-3 w-px bg-light-200 dark:bg-dark-300" />
+                <button
+                  onClick={onClose}
+                  className="flex h-7 w-7 items-center justify-center rounded-xl text-light-950 transition-all hover:bg-light-100 hover:text-light-1000 active:scale-95 dark:text-dark-600 dark:hover:bg-dark-200 dark:hover:text-dark-1000"
+                >
+                  <HiXMark className="h-4 w-4" />
+                </button>
               </div>
-            )}
-        </div>
+            </div>
 
-        {/* Footer - Activity & Comments */}
-        <div className="max-h-[500px] overflow-y-auto border-t border-light-200 bg-light-50 p-6 dark:border-dark-300 dark:bg-dark-200">
-          <div className="mb-6">
-            <h3 className="mb-4 text-sm font-bold text-neutral-900 dark:text-white">
-              Hoạt động
-            </h3>
-            <ActivityList
-              taskInstanceId={entry.instanceId as string}
-              isLoading={false}
-              includedTypes={[
-                "updated_attachment_added",
-                "updated_attachment_renamed",
-                "updated_attachment_removed",
-                "comment",
-                "updated_comment_added",
-                "updated_comment_updated",
-                "updated_comment_deleted",
-              ]}
-            />
-          </div>
-          <div>
-            <h3 className="mb-4 text-sm font-bold text-neutral-900 dark:text-white">
-              Thêm bình luận
-            </h3>
-            <NewCommentForm
-              taskInstanceId={entry.instanceId as string}
-              workspaceMembers={[]} // Optional for now
-            />
-          </div>
-        </div>
+            <div className="flex flex-1 flex-col overflow-y-auto">
+              <div className="grid grid-cols-2 gap-x-6 gap-y-4 px-8 pt-1 pb-2 text-left">
+                <div className="col-span-1 space-y-1.5 min-w-0">
+                  <div>
+                    {entry.assigneeName ? (
+                      <div className="flex w-fit items-center gap-1.5 rounded-lg border border-amber-300 bg-amber-100 px-2.5 py-1.5 text-[10px] font-black uppercase tracking-widest text-amber-900 shadow-sm dark:border-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
+                        <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                        </svg>
+                        {entry.assigneeName}
+                      </div>
+                    ) : (
+                      <div className="flex min-h-[34px] w-full items-center rounded-xl bg-white px-3 text-left text-[13px] font-medium text-neutral-900 shadow-sm ring-1 ring-light-300 transition-all dark:bg-dark-300/30 dark:text-dark-1000 dark:ring-dark-300/50 opacity-60">
+                         Trống
+                      </div>
+                    )}
+                  </div>
+                </div>
 
-        {/* Sub-modal for deleting comments */}
+                <div className="col-span-1 space-y-1.5 min-w-0">
+                  <div>
+                    <button
+                      disabled={isBusy || !canEdit}
+                      onClick={() => handleStatusChange(entry.status === "pending" ? "done" : "pending")}
+                      className={`flex min-h-[34px] w-full items-center gap-2 rounded-xl px-3 text-left text-[13px] font-medium shadow-sm transition-all ${!canEdit ? 'opacity-50 cursor-not-allowed' : statusConfig.activeBg + ' ' + statusConfig.activeText + ' ' + statusConfig.activeBorder + ' hover:opacity-80'} `}
+                    >
+                      {statusConfig.icon}
+                      {statusConfig.label === 'Done' ? 'Đánh dấu chưa xong' : 'Đánh dấu đã xong'}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="col-span-1 space-y-1.5 min-w-0">
+                  <DueDateSelector
+                    cardPublicId={entry.instanceId || ""}
+                    dueDate={startDate}
+                    disabled={true}
+                    label="Bắt đầu"
+                  />
+                </div>
+
+                <div className="col-span-1 space-y-1.5 min-w-0">
+                  <DueDateSelector
+                    cardPublicId={entry.instanceId || ""}
+                    dueDate={endDate}
+                    disabled={true}
+                    label="Kết thúc"
+                  />
+                </div>
+              </div>
+
+              <div className="mx-6 shrink-0 border-t border-light-200 dark:border-dark-300" />
+              <div className="sticky top-0 z-10 shrink-0 bg-light-50/80 px-6 py-2 backdrop-blur-md dark:bg-dark-50/80">
+                <div className="relative flex rounded-2xl border border-light-200 bg-white p-1 shadow-sm dark:border-dark-300 dark:bg-dark-100">
+                  <button
+                    onClick={() => setActiveTab("comments")}
+                    className={`relative z-10 flex-1 rounded-xl py-2.5 text-[11px] font-bold uppercase tracking-widest transition-all ${
+                      activeTab === "comments"
+                        ? "text-neutral-900 dark:text-dark-1000"
+                        : "text-light-500 hover:text-light-700 dark:text-dark-500"
+                    }`}
+                  >
+                    Tính năng
+                  </button>
+                  <button
+                    onClick={() => setActiveTab("history")}
+                    className={`relative z-10 flex-1 rounded-xl py-2.5 text-[11px] font-bold uppercase tracking-widest transition-all ${
+                      activeTab === "history"
+                        ? "text-neutral-900 dark:text-dark-1000"
+                        : "text-light-500 hover:text-light-700 dark:text-dark-500"
+                    }`}
+                  >
+                    Hoạt động
+                  </button>
+                  <motion.div
+                    className="absolute inset-y-1 rounded-xl bg-light-100 shadow-inner dark:bg-dark-200"
+                    style={{ width: "calc(50% - 4px)" }}
+                    animate={{ x: activeTab === "comments" ? 0 : "calc(100% + 4px)" }}
+                    initial={false}
+                    transition={{ type: "spring", stiffness: 450, damping: 38 }}
+                  />
+                </div>
+              </div>
+
+              <AnimatePresence mode="wait">
+                {activeTab === "history" ? (
+                  <motion.div
+                    key="history"
+                    initial={{ opacity: 0, y: 5 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -5 }}
+                    transition={{ duration: 0.15 }}
+                    className="flex-1 px-6 pb-6"
+                  >
+                    <ActivityList
+                      taskInstanceId={entry.instanceId as string}
+                      isLoading={false}
+                      excludedTypes={[
+                        "comment",
+                        "updated_comment_added",
+                        "updated_comment_updated",
+                        "updated_comment_deleted",
+                      ]}
+                    />
+                  </motion.div>
+                ) : (
+                  <motion.div
+                    key="comments"
+                    initial={{ opacity: 0, y: 5 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -5 }}
+                    transition={{ duration: 0.15 }}
+                    className="flex flex-1 flex-col gap-2 px-6 pb-6"
+                  >
+                    <div className="shrink-0 space-y-3">
+                      <div className="flex items-center justify-between mt-2">
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-neutral-900 dark:text-dark-500">
+                          Tài liệu đính kèm
+                        </p>
+                        {attachments && attachments.length > 0 && (
+                          <span className="flex h-5 items-center justify-center rounded-full bg-light-100 px-2 text-[10px] font-bold text-light-600 dark:bg-dark-300 dark:text-dark-600">
+                            {attachments.length}
+                          </span>
+                        )}
+                      </div>
+                      <div className="rounded-xl border border-light-200 bg-white/50 p-3 shadow-sm dark:border-dark-300 dark:bg-dark-100/50">
+                        {attachments && attachments.length > 0 && (
+                          <div className="mb-3 max-h-40 overflow-y-auto rounded-lg bg-light-50/50 p-2 dark:bg-dark-200/50">
+                            <AttachmentThumbnails
+                              attachments={attachments}
+                              taskInstanceId={entry.instanceId as string}
+                            />
+                          </div>
+                        )}
+                        <AttachmentUpload
+                          taskInstanceId={entry.instanceId as string}
+                          hideChecklistButton={true}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="h-px bg-light-200 dark:bg-dark-300" />
+                    {canComment && (
+                      <div className="shrink-0 space-y-1">
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-neutral-900 dark:text-dark-500">
+                          Viết bình luận
+                        </p>
+                        <div className="overflow-hidden rounded-xl border border-light-200 bg-white shadow-sm ring-1 ring-light-100/50 dark:border-dark-300 dark:bg-dark-100 dark:ring-white/5">
+                          <NewCommentForm
+                            taskInstanceId={entry.instanceId as string}
+                            workspaceMembers={[]} // Optional for now
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    {hasComments && (
+                      <div className="flex-1 space-y-1 mt-2">
+                        <div className="flex items-center gap-2">
+                          <p className="text-[10px] font-bold uppercase tracking-widest text-neutral-900 dark:text-dark-500">
+                            Lịch sử bình luận
+                          </p>
+                          <div className="h-px flex-1 bg-light-200/50 dark:bg-dark-300/50" />
+                        </div>
+                        <div className="flex-1 overflow-y-auto">
+                          <ActivityList
+                            taskInstanceId={entry.instanceId as string}
+                            isLoading={false}
+                            includedTypes={[
+                              "comment",
+                              "updated_comment_added",
+                              "updated_comment_updated",
+                              "updated_comment_deleted",
+                            ]}
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          </div>
+        </motion.div>
+
+        {/* Sub-modals for deleting comments & checklists */}
         <Modal
           modalSize="sm"
           isVisible={isSubModalOpen && modalContentType === "DELETE_COMMENT"}
@@ -488,7 +572,7 @@ export function EventDetailModal({
             checklistPublicId={entityId}
           />
         </Modal>
-      </motion.div>
+      </div>
     </Modal>
   );
 }

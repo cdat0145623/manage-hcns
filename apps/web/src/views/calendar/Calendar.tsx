@@ -31,11 +31,10 @@ import { SuccessModal } from "./calendar/SuccessModal";
 import { WeekView } from "./calendar/WeekView";
 
 function toEditableEntry(entry: CalendarEntry): EditableEntry {
-  const date = new Date(entry.date);
-  const startTime = `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
-  const endTotalMins =
-    date.getHours() * 60 + date.getMinutes() + (entry.duration ?? 60);
-  const endTime = `${String(Math.floor(endTotalMins / 60) % 24).padStart(2, "0")}:${String(endTotalMins % 60).padStart(2, "0")}`;
+  const startDate = new Date(entry.startDate);
+  const endDate = new Date(entry.endDate);
+  const startTime = `${String(startDate.getHours()).padStart(2, "0")}:${String(startDate.getMinutes()).padStart(2, "0")}`;
+  const endTime = `${String(endDate.getHours()).padStart(2, "0")}:${String(endDate.getMinutes()).padStart(2, "0")}`;
   return {
     id: entry.id,
     masterId: entry.masterId,
@@ -46,7 +45,9 @@ function toEditableEntry(entry: CalendarEntry): EditableEntry {
     description: entry.description,
     assigneeName: entry.assigneeName,
     selectedUserId: entry.selectedUserId,
-    date,
+    date: entry.date,
+    startDate,
+    endDate,
     startTime,
     endTime,
     color: entry.color,

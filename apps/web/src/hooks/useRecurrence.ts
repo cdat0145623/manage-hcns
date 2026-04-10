@@ -35,6 +35,8 @@ export interface CalendarEntry {
   assigneeName: string;
   selectedUserId?: string;
   date: Date;
+  startDate: Date;
+  endDate: Date;
   status?: "pending" | "done" | "missed";
   color: string;
   duration: number;
@@ -83,7 +85,9 @@ export function useRecurrence(currentDate: Date, selectedUserId: string | undefi
         description: task.description || task.taskMaster?.description,
         assigneeName: task.assignee?.name || "",
         selectedUserId: task.assignee?.id || "",
-        date: new Date(task.targetDate || task.date),
+        date: new Date(task.targetDate),
+        startDate: new Date(task.taskMaster?.startDate),
+        endDate: new Date(task.taskMaster?.endDate),
         status: currentStatus,
         type: isVirtual ? "VIRTUAL" : "INSTANCE",
         color: task.color ?? "bg-blue-500",

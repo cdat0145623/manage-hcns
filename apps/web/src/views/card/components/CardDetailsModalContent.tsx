@@ -23,13 +23,13 @@ import { invalidateCard } from "~/utils/cardInvalidation";
 import { formatMemberDisplayName, getAvatarUrl } from "~/utils/helpers";
 import { DeleteLabelConfirmation } from "../../../components/DeleteLabelConfirmation";
 import ActivityList from "./ActivityList";
-import Checklists from "./Checklists";
 import { AttachmentThumbnails } from "./AttachmentThumbnails";
 import { AttachmentUpload } from "./AttachmentUpload";
+import CardDetailsModals from "./CardDetailsModals";
+import CardMetadataGrid from "./CardMetadataGrid";
+import Checklists from "./Checklists";
 import Dropdown from "./Dropdown";
 import NewCommentForm from "./NewCommentForm";
-import CardMetadataGrid from "./CardMetadataGrid";
-import CardDetailsModals from "./CardDetailsModals";
 
 interface FormValues {
   cardId: string;
@@ -286,10 +286,10 @@ export default function CardDetailsModalContent({
           </div>
         </div>
         <div className="flex w-1/2 shrink-0 flex-col overflow-hidden bg-light-50/50 dark:bg-dark-50/30">
-          <div className="relative z-50 flex shrink-0 items-center justify-end border-b border-light-100 bg-white/50 px-8 py-7 backdrop-blur-sm dark:border-b-dark-300 dark:bg-dark-100/50">
+          <div className="relative z-50 flex shrink-0 items-center justify-end bg-white/50 py-4 pl-8 pr-8 backdrop-blur-sm dark:bg-dark-100/50">
             <div className="flex items-center gap-3">
               {card && (
-                <div className="rounded-xl border border-light-200 bg-white p-1 shadow-sm transition-all hover:bg-light-50 hover:shadow-md dark:border-dark-300 dark:bg-dark-100 dark:hover:bg-dark-200">
+                <div className="flex h-7 w-7 items-center justify-center rounded-xl transition-all hover:bg-light-100 active:scale-95 dark:hover:bg-dark-200">
                   <Dropdown
                     cardPublicId={cardId}
                     isTemplate={isTemplate}
@@ -298,12 +298,12 @@ export default function CardDetailsModalContent({
                   />
                 </div>
               )}
-              <div className="h-4 w-px bg-light-200 dark:bg-dark-300" />
+              <div className="h-3 w-px bg-light-200 dark:bg-dark-300" />
               <button
                 onClick={onClose}
-                className="flex h-9 w-9 items-center justify-center rounded-xl border border-light-200 bg-white text-light-600 shadow-sm transition-all hover:bg-light-100 hover:text-light-900 active:scale-95 dark:border-dark-300 dark:bg-dark-100 dark:text-dark-600 dark:hover:bg-dark-200 dark:hover:text-dark-1000"
+                className="flex h-7 w-7 items-center justify-center rounded-xl text-light-950 transition-all hover:bg-light-100 hover:text-light-1000 active:scale-95 dark:text-dark-600 dark:hover:bg-dark-200 dark:hover:text-dark-1000"
               >
-                <HiXMark className="h-5 w-5" />
+                <HiXMark className="h-4 w-4" />
               </button>
             </div>
           </div>
@@ -317,11 +317,11 @@ export default function CardDetailsModalContent({
               formattedLabels={formattedLabels}
               canEdit={!!canEdit}
               updateCard={updateCard}
-              weekStartsOn={workspace.weekStartDay as 0 | 1 | 6}
+              weekStartsOn={workspace.weekStartDay}
             />
 
             <div className="mx-6 shrink-0 border-t border-light-200 dark:border-dark-300" />
-            <div className="sticky top-0 z-10 shrink-0 bg-light-50/80 px-6 py-4 backdrop-blur-md dark:bg-dark-50/80">
+            <div className="sticky top-0 z-10 shrink-0 bg-light-50/80 px-6 py-2 backdrop-blur-md dark:bg-dark-50/80">
               <div className="relative flex rounded-2xl border border-light-200 bg-white p-1 shadow-sm dark:border-dark-300 dark:bg-dark-100">
                 <button
                   onClick={() => setActiveTab("comments")}
@@ -384,7 +384,7 @@ export default function CardDetailsModalContent({
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -5 }}
                   transition={{ duration: 0.15 }}
-                  className="flex flex-1 flex-col gap-6 px-6 pb-6"
+                  className="flex flex-1 flex-col gap-2 px-6 pb-6"
                 >
                   {card && !isTemplate && (
                     <div className="shrink-0 space-y-3">
@@ -417,7 +417,7 @@ export default function CardDetailsModalContent({
                   )}
                   <div className="h-px bg-light-200 dark:bg-dark-300" />
                   {canComment && (
-                    <div className="shrink-0 space-y-3">
+                    <div className="shrink-0 space-y-1">
                       <p className="text-[10px] font-bold uppercase tracking-widest text-light-500 dark:text-dark-500">
                         {t`Viết bình luận`}
                       </p>
@@ -429,14 +429,14 @@ export default function CardDetailsModalContent({
                       </div>
                     </div>
                   )}
-                  <div className="flex-1 space-y-4">
+                  <div className="flex-1 space-y-1">
                     <div className="flex items-center gap-2">
                       <p className="text-[10px] font-bold uppercase tracking-widest text-light-500 dark:text-dark-500">
                         {t`Lịch sử comment`}
                       </p>
                       <div className="h-px flex-1 bg-light-200/50 dark:bg-dark-300/50" />
                     </div>
-                    <div className="flex-1 overflow-y-auto pr-1">
+                    <div className="flex-1 overflow-y-auto">
                       <ActivityList
                         cardPublicId={cardId}
                         isLoading={!card}

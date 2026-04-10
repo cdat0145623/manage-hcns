@@ -14,7 +14,7 @@ import { useModal } from "~/providers/modal";
 import { usePopup } from "~/providers/popup";
 import { api } from "~/utils/api";
 import { invalidateCard, invalidateTaskInstance } from "~/utils/cardInvalidation";
-import { getAvatarUrl } from "~/utils/helpers";
+import { getAvatarUrl, fixServerDate } from "~/utils/helpers";
 import { skipToken } from "@tanstack/react-query";
 
 interface FormValues {
@@ -172,7 +172,7 @@ const Comment = ({
             <span className="font-medium dark:text-dark-1000">{`${name} `}</span>
             <span className="mx-1 text-light-900 dark:text-dark-800">·</span>
             <span className="space-x-1 text-light-900 dark:text-dark-800">
-              {formatDistanceToNow(new Date(createdAt), {
+              {formatDistanceToNow(fixServerDate(createdAt), {
                 addSuffix: true,
               })}
             </span>

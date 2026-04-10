@@ -116,7 +116,7 @@ export default function MemberSelector({
           asChild
         >
           <div
-            className={`flex min-h-[40px] w-full items-center rounded-xl bg-light-100/40 px-2.5 text-left text-[13px] font-medium text-neutral-900 ring-1 ring-light-200/50 transition-all hover:bg-light-100/60 hover:ring-light-300 dark:bg-dark-300/30 dark:text-dark-1000 dark:ring-dark-300/50 dark:hover:bg-dark-300/50 ${disabled ? "cursor-not-allowed opacity-60" : ""}`}
+            className={`flex min-h-[34px] w-full items-center rounded-xl bg-white px-2.5 text-left text-[13px] font-medium text-neutral-900 shadow-sm ring-1 ring-light-300 transition-all hover:bg-light-50 hover:ring-light-400 dark:bg-dark-300/30 dark:text-dark-1000 dark:ring-dark-300/50 dark:hover:bg-dark-300/50 ${disabled ? "cursor-not-allowed opacity-60" : ""}`}
           >
             {selectedMembers.length ? (
               <div className="isolate flex justify-end -space-x-1 overflow-hidden">

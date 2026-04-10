@@ -1,8 +1,10 @@
 import { t } from "@lingui/core/macro";
+
+import { fixServerDate } from "~/utils/helpers";
+import { DueDateSelector } from "./DueDateSelector";
+import LabelSelector from "./LabelSelector";
 import ListSelector from "./ListSelector";
 import MemberSelector from "./MemberSelector";
-import LabelSelector from "./LabelSelector";
-import { DueDateSelector } from "./DueDateSelector";
 
 interface CardMetadataGridProps {
   cardId: string;
@@ -26,7 +28,7 @@ export default function CardMetadataGrid({
   weekStartsOn = 1,
 }: CardMetadataGridProps) {
   return (
-    <div className="shrink-0 space-y-6 px-6 pb-6 pt-6">
+    <div className="shrink-0 space-y-3 px-8 pb-2 pt-0.5">
       <div className="grid grid-cols-3 gap-3">
         <ListSelector
           cardPublicId={cardId}
@@ -51,7 +53,7 @@ export default function CardMetadataGrid({
       <div className="grid grid-cols-2 gap-3">
         <DueDateSelector
           cardPublicId={cardId}
-          dueDate={card?.startDate}
+          dueDate={card?.startDate ? fixServerDate(card.startDate) : null}
           isLoading={!card}
           disabled={!canEdit}
           onDateSelect={(date) =>
@@ -66,7 +68,7 @@ export default function CardMetadataGrid({
         />
         <DueDateSelector
           cardPublicId={cardId}
-          dueDate={card?.dueDate}
+          dueDate={card?.dueDate ? fixServerDate(card.dueDate) : null}
           isLoading={!card}
           disabled={!canEdit}
           onDateSelect={(date) =>

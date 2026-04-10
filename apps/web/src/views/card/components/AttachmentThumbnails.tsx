@@ -21,7 +21,7 @@ import { usePopup } from "~/providers/popup";
 import { api } from "~/utils/api";
 import { invalidateCard, invalidateTaskInstance } from "~/utils/cardInvalidation";
 import { skipToken } from "@tanstack/react-query";
-import { getAttachmentUrl } from "~/utils/helpers";
+import { getAttachmentUrl, fixServerDate } from "~/utils/helpers";
 
 interface Attachment {
   publicId: string;
@@ -516,7 +516,7 @@ function FileListItem({
   };
 
   let formattedDate = "";
-  const d = new Date(attachment.createdAt);
+  const d = fixServerDate(attachment.createdAt);
   if (!isNaN(d.getTime())) {
     formattedDate = new Intl.DateTimeFormat(undefined, {
       dateStyle: "short",

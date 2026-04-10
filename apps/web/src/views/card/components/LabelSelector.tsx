@@ -102,7 +102,7 @@ export default function LabelSelector({
           asChild
         >
           {selectedLabels.length ? (
-            <div className={`flex min-h-[40px] w-full flex-wrap items-center gap-1.5 rounded-xl bg-light-100/40 px-2 py-1.5 text-left text-[13px] font-medium text-neutral-900 ring-1 ring-light-200/50 transition-all hover:bg-light-100/60 hover:ring-light-300 dark:bg-dark-300/30 dark:text-dark-1000 dark:ring-dark-300/50 dark:hover:bg-dark-300/50 ${disabled ? "cursor-not-allowed opacity-60" : ""}`}>
+            <div className={`flex min-h-[34px] w-full flex-wrap items-center gap-1.5 rounded-xl bg-white px-2 py-1 text-left text-[13px] font-medium text-neutral-900 shadow-sm ring-1 ring-light-300 transition-all hover:bg-light-50 hover:ring-light-400 dark:bg-dark-300/30 dark:text-dark-1000 dark:ring-dark-300/50 dark:hover:bg-dark-300/50 ${disabled ? "cursor-not-allowed opacity-60" : ""}`}>
               {selectedLabels.map((label) => (
                 <Badge
                   key={label.key}
@@ -116,7 +116,7 @@ export default function LabelSelector({
               </div>
             </div>
           ) : (
-            <div className={`flex min-h-[40px] w-full items-center rounded-xl bg-light-100/40 px-2.5 text-left text-[13px] font-medium text-neutral-900 ring-1 ring-light-200/50 transition-all hover:bg-light-100/60 hover:ring-light-300 dark:bg-dark-300/30 dark:text-dark-1000 dark:ring-dark-300/50 dark:hover:bg-dark-300/50 ${disabled ? "cursor-not-allowed opacity-60" : ""}`}>
+            <div className={`flex min-h-[34px] w-full items-center rounded-xl bg-white px-2.5 text-left text-[13px] font-medium text-neutral-900 shadow-sm ring-1 ring-light-300 transition-all hover:bg-light-50 hover:ring-light-400 dark:bg-dark-300/30 dark:text-dark-1000 dark:ring-dark-300/50 dark:hover:bg-dark-300/50 ${disabled ? "cursor-not-allowed opacity-60" : ""}`}>
               <HiMiniPlus size={16} className="mr-1.5 text-light-500" />
               {t`Nhãn`}
             </div>

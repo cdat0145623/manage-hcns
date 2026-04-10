@@ -15,6 +15,8 @@ import {
   HiOutlineTrash,
   HiOutlineUserMinus,
   HiOutlineUserPlus,
+  HiChevronDoubleDown,
+  HiChevronDoubleUp,
 } from "react-icons/hi2";
 
 import type {
@@ -26,7 +28,7 @@ import { authClient } from "@kan/auth/client";
 import Avatar from "~/components/Avatar";
 import { useLocalisation } from "~/hooks/useLocalisation";
 import { api } from "~/utils/api";
-import { getAvatarUrl } from "~/utils/helpers";
+import { getAvatarUrl, fixServerDate } from "~/utils/helpers";
 import Comment from "./Comment";
 
 
@@ -432,6 +434,9 @@ const ActivityList = ({
 
   const isFullyExpandedRef = useRef(false);
   const lastDataUpdatedAtRef = useRef<number | null>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const prevLengthRef = useRef(0);
+  const [showNav, setShowNav] = useState(false);
 
   const {
     data: firstPageData,
@@ -455,7 +460,59 @@ const ActivityList = ({
         {
           enabled: !!cardPublicId && cardPublicId.length >= 12,
         },
-      )) as { data: GetCardActivitiesOutput | undefined, isFetching: boolean, dataUpdatedAt: number };
+      )) as {
+    data: GetCardActivitiesOutput | undefined;
+    isFetching: boolean;
+    dataUpdatedAt: number;
+  };
+
+  const scrollToBottom = (behavior: ScrollBehavior = "smooth") => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTo({
+        top: scrollRef.current.scrollHeight,
+        behavior,
+      });
+    }
+  };
+
+  const scrollToTop = (behavior: ScrollBehavior = "smooth") => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTo({
+        top: 0,
+        behavior,
+      });
+    }
+  };
+
+  // Check if scrollable
+  useEffect(() => {
+    const checkScroll = () => {
+      if (scrollRef.current) {
+        setShowNav(
+          scrollRef.current.scrollHeight > scrollRef.current.clientHeight,
+        );
+      }
+    };
+    checkScroll();
+    // Re-check when activities change
+  }, [allActivities]);
+
+  // Auto-scroll on new comment by current user
+  useEffect(() => {
+    if (allActivities.length > prevLengthRef.current) {
+      const lastActivity = allActivities[allActivities.length - 1];
+      const isByMe = lastActivity?.user?.id === sessionData?.user.id;
+      const isComment =
+        lastActivity?.type === "comment" ||
+        lastActivity?.type === "updated_comment_added";
+
+      if (isByMe && isComment) {
+        // Small delay to ensure the new activity is rendered
+        setTimeout(() => scrollToBottom(), 100);
+      }
+    }
+    prevLengthRef.current = allActivities.length;
+  }, [allActivities, sessionData?.user.id]);
 
   useEffect(() => {
     if (firstPageData && dataUpdatedAt !== lastDataUpdatedAtRef.current) {
@@ -554,7 +611,11 @@ const ActivityList = ({
     cardIsLoading || (isFetchingFirst && allActivities.length === 0);
 
   return (
-    <div className="flex max-h-[350px] flex-col overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-light-400 dark:scrollbar-thumb-dark-300 space-y-4 pt-4">
+    <div className="group/activity-list relative w-full">
+      <div
+        ref={scrollRef}
+        className="flex max-h-[350px] flex-col overflow-y-auto scrollbar-thin scrollbar-thumb-light-400 dark:scrollbar-thumb-dark-300 space-y-4 pt-1"
+      >
       {allActivities
         .filter((activity) => {
           if (includedTypes) return includedTypes.includes(activity.type);
@@ -594,7 +655,7 @@ const ActivityList = ({
               email={activity.user?.email ?? ""}
               image={activity.user?.image ?? null}
               isLoading={isLoading}
-              createdAt={activity.createdAt.toISOString()}
+              createdAt={fixServerDate(activity.createdAt).toISOString()}
               comment={activity.comment?.comment}
               isEdited={!!activity.comment?.updatedAt}
               isAuthor={activity.comment?.createdBy === sessionData?.user.id}
@@ -633,7 +694,7 @@ const ActivityList = ({
               </span>
               <span className="mx-1 text-light-900 dark:text-dark-800">·</span>
               <span className="space-x-1 text-light-900 dark:text-dark-800">
-                {formatDistanceToNow(new Date(activity.createdAt), {
+                {formatDistanceToNow(fixServerDate(activity.createdAt), {
                   addSuffix: true,
                   locale: dateLocale,
                 })}
@@ -650,6 +711,27 @@ const ActivityList = ({
             className="text-sm font-medium text-light-900 hover:text-light-1000 disabled:opacity-50 dark:text-dark-800 dark:hover:text-dark-1000"
           >
             {isFetching ? t`Loading...` : t`Load more activities`}
+          </button>
+        </div>
+      )}
+      </div>
+
+      {/* Navigation Buttons */}
+      {showNav && (
+        <div className="absolute bottom-2 right-4 z-20 flex flex-col gap-1.5 opacity-0 transition-opacity duration-200 group-hover/activity-list:opacity-100">
+          <button
+            onClick={() => scrollToTop()}
+            title={t`Go to top`}
+            className="flex h-7 w-7 items-center justify-center rounded-lg border border-white/40 bg-white/20 text-neutral-900 shadow-lg backdrop-blur-md outline-none transition-all hover:bg-white/40 active:scale-90 dark:border-white/10 dark:bg-dark-100/40 dark:text-dark-1000 dark:hover:bg-dark-100/60"
+          >
+            <HiChevronDoubleUp className="h-3.5 w-3.5" />
+          </button>
+          <button
+            onClick={() => scrollToBottom()}
+            title={t`Go to bottom`}
+            className="flex h-7 w-7 items-center justify-center rounded-lg border border-white/40 bg-white/20 text-neutral-900 shadow-lg backdrop-blur-md outline-none transition-all hover:bg-white/40 active:scale-90 dark:border-white/10 dark:bg-dark-100/40 dark:text-dark-1000 dark:hover:bg-dark-100/60"
+          >
+            <HiChevronDoubleDown className="h-3.5 w-3.5" />
           </button>
         </div>
       )}

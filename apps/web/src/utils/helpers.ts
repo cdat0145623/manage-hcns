@@ -70,3 +70,16 @@ export const getAttachmentUrl = (key: string | null | undefined, contentType?: s
 
   return `/${bucket}/${key}`;
 };
+
+export const fixServerDate = (date: Date | string | number) => {
+  const d = new Date(date);
+  const now = new Date();
+  
+  // If the date is more than 30 minutes in the future, it's almost certainly the timezone shift bug
+  // We subtract 7 hours (25200000 ms) to restore it to the correct local time
+  if (d.getTime() - now.getTime() > 30 * 60 * 1000) {
+    return new Date(d.getTime() - 7 * 60 * 60 * 1000);
+  }
+  
+  return d;
+};

@@ -31,7 +31,6 @@ export const cronRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx }) => {
-      console.log("updateMissedStatuses")
       const db = ctx.db;
       const now = new Date();
       let cardsUpdated = 0;

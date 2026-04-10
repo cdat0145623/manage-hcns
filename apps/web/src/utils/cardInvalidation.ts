@@ -27,7 +27,8 @@ export async function invalidateTaskInstance(
 
   await Promise.all([
     utils.taskInstance.getActivities.invalidate({ id: taskInstanceId }),
-    utils.attachment.getByTaskInstanceId.invalidate({ taskInstanceId }),
+    // utils.attachment.getByTaskInstanceId.invalidate({ taskInstanceId }),
+    utils.taskInstance.byId.invalidate({ id: taskInstanceId }),
     utils.taskInstance.getVirtual.invalidate(),
   ]);
 }

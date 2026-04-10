@@ -53,6 +53,8 @@ function toEditableEntry(entry: CalendarEntry): EditableEntry {
     recurrence: entry.recurrence,
     rruleString: entry.rruleString,
     attendees: [],
+    checklists: entry.checklists,
+    createdBy: entry.createdBy,
   };
 }
 
@@ -182,6 +184,15 @@ export function Calendar() {
     },
   });
 
+  const createInstance = api.taskInstance.create.useMutation({
+    onSuccess: () => {
+      void utils.taskInstance.getVirtual.invalidate();
+    },
+    onError: (error: any) => {
+      console.error("Mutation failed:", error);
+    },
+  });
+
   const handleCellClick = (date: Date) => {
     const d = new Date(date);
     if (viewMode === "MONTH") {
@@ -194,16 +205,64 @@ export function Calendar() {
     setIsFormOpen(true);
   };
 
-  const handleTaskClick = (entry: CalendarEntry) => {
-    const editable = toEditableEntry(entry);
-    // if (entry.type === "VIRTUAL") {
-    //   setSelectedDate(new Date(entry.date));
-    //   setEditEntry(editable);
-    //   setIsFormOpen(true);
-    // } else {
-    setDetailEntry(editable);
-    setIsDetailOpen(true);
-    // }
+  const handleTaskClick = async (entry: CalendarEntry) => {
+    if (entry.type === "VIRTUAL") {
+      try {
+        const userId = currentUser?.id;
+        if (!userId) {
+          showPopup({
+            header: "Yêu cầu đăng nhập",
+            message: "Bạn cần đăng nhập để hoàn thành công việc.",
+            icon: "info",
+          });
+          return;
+        }
+
+        const newInstance = await createInstance.mutateAsync({
+          taskMasterId: entry.masterId,
+          targetDate: new Date(entry.date),
+          actualDate: new Date(entry.date),
+          status: "pending",
+        });
+
+        const editable = toEditableEntry(entry);
+        editable.type = "INSTANCE";
+        editable.instanceId = newInstance.id;
+        editable.status = newInstance.status;
+
+        setDetailEntry(editable);
+        setIsDetailOpen(true);
+      } catch (error: any) {
+        console.error("Caught error in handleTaskClick createInstance:", error);
+        const isDuplicate =
+          error.message?.toLowerCase().includes("unique constraint") ||
+          error.message?.toLowerCase().includes("duplicate") ||
+          error.shape?.message?.toLowerCase().includes("unique constraint") ||
+          JSON.stringify(error).toLowerCase().includes("unique constraint");
+
+        if (isDuplicate) {
+          showPopup({
+            header: "Lỗi xung đột",
+            message:
+              "Công việc này đã được hoàn thành trước đó. Lịch sẽ tự động làm mới.",
+            icon: "info",
+          });
+          void utils.taskInstance.getVirtual.invalidate();
+        } else {
+          showPopup({
+            header: "Lỗi",
+            message:
+              error.message ||
+              "Không thể tạo công việc. Vui lòng thử lại sau.",
+            icon: "error",
+          });
+        }
+      }
+    } else {
+      const editable = toEditableEntry(entry);
+      setDetailEntry(editable);
+      setIsDetailOpen(true);
+    }
   };
 
   const handleViewDay = (date: Date) => {

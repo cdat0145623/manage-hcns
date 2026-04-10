@@ -193,7 +193,6 @@ export function AttachmentThumbnails({
   const selectedAttachment =
     selectedIndex !== null ? imageAttachments[selectedIndex] : null;
 
-  console.log("selectedAttachment", selectedAttachment);
   return (
     <>
       <div className="mb-3 flex flex-wrap gap-2 pt-1">

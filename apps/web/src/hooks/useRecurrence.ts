@@ -41,6 +41,8 @@ export interface CalendarEntry {
   type: "VIRTUAL" | "INSTANCE";
   recurrence: RecurrenceType;
   rruleString: string;
+  checklists: any[];
+  createdBy?: string;
 }
 
 export function useRecurrence(currentDate: Date, selectedUserId: string | undefined) {
@@ -88,6 +90,8 @@ export function useRecurrence(currentDate: Date, selectedUserId: string | undefi
         duration: task.duration ?? 60,
         recurrence: (task.taskMaster?.recurrence || task.recurrence || "NONE") as RecurrenceType,
         rruleString: task.taskMaster?.rruleString || task.rruleString || "",
+        checklists: task.checklists || [],
+        createdBy: task.taskMaster.createdBy,
       } as CalendarEntry;
     });
   }, [virtualTasks]);

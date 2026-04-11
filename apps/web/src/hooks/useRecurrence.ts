@@ -57,6 +57,8 @@ export function useRecurrence(currentDate: Date, selectedUserId: string | undefi
     from: monthStart,
     to: monthEnd,
     targetUser: selectedUserId === "all" ? undefined : selectedUserId,
+  }, {
+    staleTime: 1000 * 60 * 5, // 5 minutes
   });
 
   const utils = api.useUtils();
@@ -122,7 +124,9 @@ export function useRecurrence(currentDate: Date, selectedUserId: string | undefi
     });
   };
 
-  const data = api.card.getByUserId.useQuery({ userId: selectedUserId });
+  const data = api.card.getByUserId.useQuery({ userId: selectedUserId }, {
+    staleTime: 1000 * 60 * 5, // 5 minutes
+  });
 
   return { calendarEntries, cards: data.data?.filterCards, formattedResult: data.data?.formattedResult , moveTask };
 }

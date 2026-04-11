@@ -16,7 +16,9 @@ import { FontSizeProvider } from "~/providers/font-size";
 import { KeyboardShortcutProvider } from "~/providers/keyboard-shortcuts";
 import { LinguiProviderWrapper } from "~/providers/lingui";
 import { ModalProvider } from "~/providers/modal";
+import { PageProgress } from "~/components/PageProgress";
 import { PopupProvider } from "~/providers/popup";
+import { WorkspaceProvider } from "~/providers/workspace";
 import { api } from "~/utils/api";
 
 const jakarta = Plus_Jakarta_Sans({
@@ -82,19 +84,22 @@ const MyApp: AppType = ({ Component, pageProps }: AppPropsWithLayout) => {
       )}
       <script src="/__ENV.js" />
       <main className="font-sans">
+        <PageProgress />
         <KeyboardShortcutProvider>
           <LinguiProviderWrapper>
             <FontSizeProvider>
               <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
                 <ModalProvider>
                   <PopupProvider>
-                    {posthogKey ? (
-                      <PostHogProvider client={posthog}>
-                        {getLayout(<Component {...pageProps} />)}
-                      </PostHogProvider>
-                    ) : (
-                      getLayout(<Component {...pageProps} />)
-                    )}
+                    <WorkspaceProvider>
+                      {posthogKey ? (
+                        <PostHogProvider client={posthog}>
+                          {getLayout(<Component {...pageProps} />)}
+                        </PostHogProvider>
+                      ) : (
+                        getLayout(<Component {...pageProps} />)
+                      )}
+                    </WorkspaceProvider>
                   </PopupProvider>
                 </ModalProvider>
               </ThemeProvider>

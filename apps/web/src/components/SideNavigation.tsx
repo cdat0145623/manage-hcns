@@ -11,7 +11,9 @@ import {
   TbLayoutSidebarLeftCollapse,
   TbLayoutSidebarLeftExpand,
 } from "react-icons/tb";
+import { startOfMonth, endOfMonth } from "date-fns";
 import { twMerge } from "tailwind-merge";
+import { memo } from "react";
 
 import type { Subscription } from "@kan/shared/utils";
 import { hasActiveSubscription } from "@kan/shared/utils";
@@ -47,7 +49,7 @@ interface UserType {
   image?: string | null | undefined;
 }
 
-export default function SideNavigation({
+function SideNavigation({
   user,
   isLoading,
   onCloseSideNav,
@@ -62,6 +64,8 @@ export default function SideNavigation({
     { workspacePublicId: workspace.publicId },
     { enabled: !!workspace.publicId && workspace.publicId.length >= 12 },
   );
+
+  const utils = api.useUtils();
 
   const subscriptions = workspaceData?.subscriptions as
     | Subscription[]
@@ -233,6 +237,22 @@ export default function SideNavigation({
                   isCollapsed={isCollapsed}
                   onCloseSideNav={onCloseSideNav}
                   keyboardShortcut={item.keyboardShortcut}
+                  onMouseEnter={() => {
+                    if (item.href === "/calendar") {
+                      const now = new Date();
+                      void utils.taskInstance.getVirtual.prefetch({
+                        from: startOfMonth(now),
+                        to: endOfMonth(now),
+                        targetUser: undefined,
+                      });
+                    } else if (item.href === "/boards") {
+                      void utils.workspace.all.prefetch();
+                    } else if (item.href === "/reports") {
+                      void utils.workspace.byId.prefetch({ 
+                        workspacePublicId: workspace.publicId 
+                      });
+                    }
+                  }}
                 />
               </li>
             ))}
@@ -280,3 +300,6 @@ export default function SideNavigation({
     </>
   );
 }
+
+const MemoizedSideNavigation = memo(SideNavigation);
+export default MemoizedSideNavigation;

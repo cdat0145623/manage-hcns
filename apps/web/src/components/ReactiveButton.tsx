@@ -15,6 +15,7 @@ const Button: React.FC<{
   isCollapsed?: boolean;
   onCloseSideNav?: () => void;
   keyboardShortcut: KeyboardShortcut;
+  onMouseEnter?: () => void;
 }> = ({
   href,
   current,
@@ -23,6 +24,7 @@ const Button: React.FC<{
   isCollapsed = false,
   keyboardShortcut,
   onCloseSideNav,
+  onMouseEnter: onHover,
 }) => {
   const [isHovered, setIsHovered] = useState(false);
   const [index, setIndex] = useState(0);
@@ -32,6 +34,7 @@ const Button: React.FC<{
   const handleMouseEnter = () => {
     setIsHovered(true);
     setIndex((index) => index + 1);
+    if (onHover) onHover();
   };
 
   const handleClick = () => {

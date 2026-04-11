@@ -27,11 +27,9 @@ export function getDashboardLayout(
   hasRightPanel = false,
 ) {
   return (
-    <WorkspaceProvider>
-      <Dashboard rightPanel={rightPanel} hasRightPanel={hasRightPanel}>
-        {page}
-      </Dashboard>
-    </WorkspaceProvider>
+    <Dashboard rightPanel={rightPanel} hasRightPanel={hasRightPanel}>
+      {page}
+    </Dashboard>
   );
 }
 

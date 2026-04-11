@@ -284,6 +284,7 @@ export function EventDetailModal({
   }
 
   return (
+<<<<<<< HEAD
     <Modal
       isVisible={isVisible}
       centered
@@ -317,6 +318,64 @@ export function EventDetailModal({
                 <p className="text-sm italic text-light-500 dark:text-dark-500">
                   Không có mô tả
                 </p>
+=======
+    <Modal isVisible={isVisible} centered modalSize="lg" className="bg-transparent border-0 shadow-none">
+      <div className="flex w-full items-center justify-center font-sans antialiased [-webkit-font-smoothing:antialiased]">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.97 }}
+          animate={{ opacity: 1, scale: 1 }}
+          exit={{ opacity: 0, scale: 0.97 }}
+          transition={{ duration: 0.18, ease: "easeOut" }}
+          className="flex h-[92vh] w-[95vw] max-w-[1200px] overflow-hidden rounded-2xl border border-light-200 bg-white shadow-2xl dark:border-dark-300 dark:bg-dark-100"
+        >
+          <div className="flex w-1/2 flex-col overflow-hidden border-r border-light-100 dark:border-dark-300">
+            <div className="shrink-0 border-b border-light-100 px-10 py-7 dark:border-dark-300">
+              <h3 className="block w-full resize-none overflow-hidden border-0 bg-transparent p-0 text-2xl font-bold leading-snug text-neutral-900 dark:text-dark-1000">
+                {entry.title}
+              </h3>
+            </div>
+            <div className="shrink-0 border-b border-light-100 px-10 py-6 dark:border-dark-300">
+              <p className="mb-3 text-[10px] font-semibold uppercase tracking-widest text-neutral-900 dark:text-dark-1000">
+                Mô tả
+              </p>
+              <div className="min-h-[120px] rounded-xl border border-light-100 bg-light-50/30 px-4 py-3 dark:border-dark-300/40 dark:bg-dark-200/10">
+                {entry.description ? (
+                  <p className="text-sm leading-relaxed text-neutral-600 dark:text-neutral-300">
+                    {entry.description}
+                  </p>
+                ) : (
+                  <p className="text-sm italic text-light-500 dark:text-dark-500">
+                    Không có mô tả
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {/* Checklists */}
+            <div className="flex-1 overflow-y-auto px-10 pb-10 pt-4">
+              <div className="flex items-center gap-3 mb-3">
+                <p className="text-[10px] font-semibold uppercase tracking-widest text-neutral-900 dark:text-dark-1000">
+                  Checklist
+                </p>
+                {canEdit && entry?.instanceId && (
+                  <button
+                    onClick={() => openModal("ADD_CHECKLIST", entry.instanceId ?? undefined)}
+                    className="flex items-center justify-center rounded-lg bg-light-100 p-1 text-neutral-600 transition-all hover:bg-light-200 hover:text-neutral-900 dark:bg-dark-300 dark:text-dark-800 dark:hover:bg-dark-400 dark:hover:text-dark-1000"
+                    title="Thêm Checklist"
+                  >
+                    <HiMiniPlus className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
+              {displayChecklists && (
+                <Checklists
+                  checklists={displayChecklists}
+                  taskInstanceId={entry.instanceId!}
+                  activeChecklistForm={activeChecklistForm}
+                  setActiveChecklistForm={setActiveChecklistForm}
+                  viewOnly={!canEdit}
+                />
+>>>>>>> 991f9e461f92f5e43c125bc9c92e43efddb21cb5
               )}
             </div>
           </div>
@@ -564,6 +623,7 @@ export function EventDetailModal({
                     </div>
                   </div>
 
+<<<<<<< HEAD
                   <div className="h-px bg-light-200 dark:bg-dark-300" />
                   {canComment && (
                     <div className="shrink-0 space-y-1">
@@ -574,19 +634,83 @@ export function EventDetailModal({
                         <NewCommentForm
                           taskInstanceId={entry.instanceId!}
                           workspaceMembers={[]} // Optional for now
+=======
+              <AnimatePresence mode="wait">
+                {activeTab === "history" ? (
+                  <motion.div
+                    key="history"
+                    initial={{ opacity: 0, y: 5 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -5 }}
+                    transition={{ duration: 0.15 }}
+                    className="flex-1 px-6 pb-6"
+                  >
+                    <ActivityList
+                      taskInstanceId={entry.instanceId as string}
+                      isLoading={false}
+                      excludedTypes={[
+                        "comment",
+                        "updated_comment_added",
+                        "updated_comment_updated",
+                        "updated_comment_deleted",
+                      ]}
+                    />
+                  </motion.div>
+                ) : (
+                  <motion.div
+                    key="comments"
+                    initial={{ opacity: 0, y: 5 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -5 }}
+                    transition={{ duration: 0.15 }}
+                    className="flex flex-1 flex-col gap-2 px-6 pb-6"
+                  >
+                    <div className="shrink-0 space-y-3">
+                      <div className="flex items-center justify-between mt-2">
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-neutral-900 dark:text-dark-1000">
+                          Tài liệu đính kèm
+                        </p>
+                        {attachments && attachments.length > 0 && (
+                          <span className="flex h-5 items-center justify-center rounded-full bg-light-100 px-2 text-[10px] font-bold text-neutral-900 dark:bg-dark-300 dark:text-dark-600">
+                            {attachments.length}
+                          </span>
+                        )}
+                      </div>
+                      <div className="rounded-xl border border-light-200 bg-white/50 p-3 shadow-sm dark:border-dark-300 dark:bg-dark-100/50">
+                        {attachments && attachments.length > 0 && (
+                          <div className="mb-3 max-h-40 overflow-y-auto rounded-lg bg-light-50/50 p-2 dark:bg-dark-200/50">
+                            <AttachmentThumbnails
+                              attachments={attachments}
+                              taskInstanceId={entry.instanceId as string}
+                            />
+                          </div>
+                        )}
+                        <AttachmentUpload
+                          taskInstanceId={entry.instanceId as string}
+                          hideChecklistButton={true}
+>>>>>>> 991f9e461f92f5e43c125bc9c92e43efddb21cb5
                         />
                       </div>
                     </div>
                   )}
 
+<<<<<<< HEAD
                   {hasComments && (
                     <div className="mt-2 flex-1 space-y-1">
                       <div className="flex items-center gap-2">
                         <p className="text-[10px] font-bold uppercase tracking-widest text-neutral-900 dark:text-dark-500">
                           Lịch sử bình luận
+=======
+                    <div className="h-px bg-light-200 dark:bg-dark-300" />
+                    {canComment && (
+                      <div className="shrink-0 space-y-1">
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-neutral-900 dark:text-dark-1000">
+                          Viết bình luận
+>>>>>>> 991f9e461f92f5e43c125bc9c92e43efddb21cb5
                         </p>
                         <div className="h-px flex-1 bg-light-200/50 dark:bg-dark-300/50" />
                       </div>
+<<<<<<< HEAD
                       <div className="flex-1">
                         <ActivityList
                           taskInstanceId={entry.instanceId!}
@@ -598,6 +722,30 @@ export function EventDetailModal({
                             "updated_comment_deleted",
                           ]}
                         />
+=======
+                    )}
+
+                    {hasComments && (
+                      <div className="flex-1 space-y-1 mt-2">
+                        <div className="flex items-center gap-2">
+                          <p className="text-[10px] font-bold uppercase tracking-widest text-neutral-900 dark:text-dark-1000">
+                            Lịch sử bình luận
+                          </p>
+                          <div className="h-px flex-1 bg-light-200/50 dark:bg-dark-300/50" />
+                        </div>
+                        <div className="flex-1 overflow-y-auto">
+                          <ActivityList
+                            taskInstanceId={entry.instanceId as string}
+                            isLoading={false}
+                            includedTypes={[
+                              "comment",
+                              "updated_comment_added",
+                              "updated_comment_updated",
+                              "updated_comment_deleted",
+                            ]}
+                          />
+                        </div>
+>>>>>>> 991f9e461f92f5e43c125bc9c92e43efddb21cb5
                       </div>
                     </div>
                   )}

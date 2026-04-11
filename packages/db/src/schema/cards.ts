@@ -56,6 +56,11 @@ export const activityTypes = [
   "start_date_added",
   "start_date_removed",
   "start_date_changed",
+  "updated_rruleString",
+  "updated_password",
+  "updated_username",
+  "updated_name",
+  "updated_email"
 ] as const;
 
 export type ActivityType = (typeof activityTypes)[number];

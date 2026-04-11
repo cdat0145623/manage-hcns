@@ -168,6 +168,7 @@ export const getByPublicId = (db: dbClient, workspacePublicId: string) => {
       name: true,
       plan: true,
       slug: true,
+      createdBy: true,
     },
     where: eq(workspaces.publicId, workspacePublicId),
   });
@@ -202,6 +203,7 @@ export const getByPublicIdWithMembers = (
     with: {
       members: {
         columns: {
+          id: true,
           publicId: true,
           email: true,
           role: true,
@@ -220,6 +222,8 @@ export const getByPublicIdWithMembers = (
               name: true,
               email: true,
               image: true,
+              username: true,
+              isActive: true,
             },
           },
         },
@@ -445,4 +449,23 @@ export const searchBoardsAndCards = async (
 
   // Ensure we don't exceed the total limit
   return allResults.slice(0, limit);
+};
+
+export const getMemberByPublicIdAndUserId = async (db: dbClient, workspacePublicId: string, userId: string) => {
+  const workspaceSubquery = db
+    .select({ id: workspaces.id })
+    .from(workspaces)
+    .where(and(
+      eq(workspaces.publicId, workspacePublicId),
+      isNull(workspaces.deletedAt),
+    ));
+
+  return db.query.workspaceMembers.findFirst({
+    columns: { id: true },
+    where: and(
+      eq(workspaceMembers.workspaceId, sql`(${workspaceSubquery})`),
+      eq(workspaceMembers.userId, userId),
+      isNull(workspaceMembers.deletedAt),
+    ),
+  });
 };

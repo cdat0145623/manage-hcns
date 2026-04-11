@@ -38,6 +38,7 @@ export const permissionRouter = createTRPCRouter({
       z.object({
         permissions: z.array(z.string()),
         role: z.string(),
+        createdBy: z.string().nullable(),
       }),
     )
     .query(async ({ ctx, input }) => {
@@ -71,7 +72,10 @@ export const permissionRouter = createTRPCRouter({
         });
       }
 
-      return result;
+      return {
+        ...result,
+        createdBy: workspace.createdBy,
+      };
     }),
   getMemberPermissions: protectedProcedure
     .meta({

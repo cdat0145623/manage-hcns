@@ -481,3 +481,28 @@ export const getPaginatedBoardActivities = async (
 export type PaginatedActivitiesResult = Awaited<
   ReturnType<typeof getPaginatedActivities>
 >;
+
+export const updateAccountInformation = async (
+  db: dbClient,
+  data: {
+    type: ActivityType;
+    oldValue?: string;
+    newValue?: string;
+    createdBy: string;
+    workspaceMemberId: number;
+  },
+) => {
+  const [result] = await db
+    .insert(cardActivities)
+    .values({
+      publicId: generateUID(),
+      type: data.type,
+      workspaceMemberId: data.workspaceMemberId,
+      oldValue: data.oldValue,
+      newValue: data.newValue,
+      createdBy: data.createdBy,
+    })
+    .returning({ id: cardActivities.id });
+
+  return result;
+};

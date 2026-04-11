@@ -342,7 +342,7 @@ export function InviteMemberForm({
       </div>
 
       <div className="mt-12 flex items-center justify-end border-t border-light-600 px-5 pb-5 pt-5 dark:border-dark-600">
-        <Toggle
+        {/* <Toggle
           label={
             isShareInviteLinkEnabled
               ? t`Deactivate invite link`
@@ -350,15 +350,15 @@ export function InviteMemberForm({
           }
           isChecked={isShareInviteLinkEnabled}
           onChange={handleInviteLinkToggle}
-        />
+        /> */}
         <div>
-          {env("NEXT_PUBLIC_KAN_ENV") === "cloud" &&
+          {/* {env("NEXT_PUBLIC_KAN_ENV") === "cloud" &&
           !hasTeamSubscription &&
           !hasProSubscription ? (
             <Button type="button" onClick={handleUpgrade}>
               {t`Start 14 day free trial`}
             </Button>
-          ) : (
+          ) : ( */}
             <Button
               type="submit"
               disabled={inviteMember.isPending || !isEmailEnabled}
@@ -366,7 +366,7 @@ export function InviteMemberForm({
             >
               {t`Thêm thành viên`}
             </Button>
-          )}
+          {/* )} */}
         </div>
       </div>
     </form>

@@ -249,7 +249,7 @@ export default function MembersPage() {
         <div className="mb-8 flex w-full justify-between">
           <div className="flex items-center gap-3">
             <h1 className="font-bold tracking-tight text-neutral-900 dark:text-dark-1000 sm:text-[1.2rem]">
-              {t`Thành viên`}
+              {t`Quyền`}
             </h1>
           </div>
           <div className="flex items-center gap-3">

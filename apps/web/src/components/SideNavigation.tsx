@@ -152,7 +152,7 @@ function SideNavigation({
       },
     },
     {
-      name: "Thành viên",
+      name: "Quyền",
       href: "/members",
       icon: isDarkMode ? membersIconDark : membersIconLight,
       keyboardShortcut: {

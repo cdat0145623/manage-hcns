@@ -12,6 +12,7 @@ interface Props {
   closeOnClickOutside?: boolean;
   centered?: boolean;
   className?: string;
+  widthCustom?: string;
 }
 
 const Modal: React.FC<Props> = ({
@@ -22,6 +23,7 @@ const Modal: React.FC<Props> = ({
   closeOnClickOutside,
   centered = false,
   className,
+  widthCustom,
 }) => {
   const {
     isOpen,

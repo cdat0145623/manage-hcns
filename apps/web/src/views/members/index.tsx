@@ -30,21 +30,40 @@ import { getAvatarUrl } from "~/utils/helpers";
 import { DeleteMemberConfirmation } from "./components/DeleteMemberConfirmation";
 import { InviteMemberForm } from "./components/InviteMemberForm";
 import { EditMemberPermissionsModal } from "./components/EditMemberPermissionsModal";
+import { RoleSelect } from "./components/RoleSelector";
 
-export default function MembersPage() {
-  const { modalContentType, openModal, isOpen } = useModal();
+interface TableRowProps {
+  memberPublicId?: string;
+  memberId?: string | null | undefined;
+  memberName?: string | null | undefined;
+  memberEmail?: string | null | undefined;
+  memberImage?: string | null | undefined;
+  memberRole?: Role;
+  memberStatus?: string;
+  isLastRow?: boolean;
+  showSkeleton?: boolean;
+  showPendingIcon?: boolean;
+  showEmailsToMembers?: boolean;
+}
+
+const TableRow = ({
+  memberPublicId,
+  memberId,
+  memberName,
+  memberEmail,
+  memberImage,
+  memberRole,
+  memberStatus,
+  isLastRow,
+  showSkeleton,
+  showPendingIcon,
+  showEmailsToMembers,
+}: TableRowProps) => {
   const { workspace } = useWorkspace();
+  const { canEditMember, createdBy } = usePermissions();
+  const { openModal } = useModal();
   const { showPopup } = usePopup();
-
-  const { data, isLoading } = api.workspace.byId.useQuery(
-    { workspacePublicId: workspace.publicId },
-    { enabled: !!workspace.publicId && workspace.publicId.length >= 12 },
-  );
-
   const { data: session } = authClient.useSession();
-
-  const { canEditMember } = usePermissions();
-
   const utils = api.useUtils();
 
   const updateRoleMutation = api.member.updateRole.useMutation({
@@ -70,190 +89,158 @@ export default function MembersPage() {
     },
   });
 
+  const handleRoleChange = (newRole: Role) => {
+    if (!memberPublicId) return;
+
+    updateRoleMutation.mutate({
+      workspacePublicId: workspace.publicId,
+      memberPublicId,
+      role: newRole,
+    });
+  };
+
+  return (
+    <tr className="rounded-b-lg">
+      <td
+        className={twMerge(
+          "w-full sm:w-[65%]",
+          isLastRow ? "rounded-bl-lg" : "",
+        )}
+      >
+        <div className="flex items-center p-2 sm:p-4">
+          <div className="flex-shrink-0">
+            {showSkeleton ? (
+              <div className="h-8 w-8 animate-pulse rounded-full bg-light-200 dark:bg-dark-200 sm:h-9 sm:w-9" />
+            ) : (
+              <Avatar
+                name={memberName ?? ""}
+                email={memberEmail ?? ""}
+                imageUrl={memberImage ? getAvatarUrl(memberImage) : undefined}
+              />
+            )}
+          </div>
+          <div className="ml-2 min-w-0 flex-1">
+            <div>
+              <div className="flex items-center">
+                <p
+                  className={twMerge(
+                    "mr-2 truncate text-xs font-medium text-neutral-900 dark:text-dark-1000 sm:text-sm",
+                    showSkeleton &&
+                      "md mb-2 h-3 w-[125px] animate-pulse rounded-sm bg-light-200 dark:bg-dark-200",
+                    showPendingIcon &&
+                      "italic text-neutral-500 dark:text-dark-900",
+                  )}
+                >
+                  {memberName}
+                </p>
+              </div>
+              {((workspace.role === "ADMIN" || showEmailsToMembers === true) ||
+                showSkeleton) && (
+                <p
+                  className={twMerge(
+                    "truncate text-xs text-dark-900 sm:text-sm",
+                    showSkeleton &&
+                      "h-3 w-[175px] animate-pulse rounded-sm bg-light-200 dark:bg-dark-200",
+                  )}
+                >
+                  {memberEmail}
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+      </td>
+      <td
+        className={twMerge(
+          "w-auto min-w-[120px] overflow-visible sm:w-[35%] sm:min-w-[150px]",
+          isLastRow && "rounded-br-lg",
+        )}
+      >
+        <div className="flex w-full items-center justify-between px-2 sm:px-3">
+          <div className="flex items-center gap-2">
+            {showSkeleton ? (
+              <span
+                className={twMerge(
+                  "inline-flex items-center rounded-md bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-medium text-emerald-400 ring-1 ring-inset ring-emerald-500/20 sm:text-[11px]",
+                  "h-5 w-[50px] animate-pulse bg-light-200 ring-0 dark:bg-dark-200",
+                )}
+              />
+            ) : (
+              <div className="relative inline-flex items-center">
+                {canEditMember && (
+                  <RoleSelect
+                    value={memberRole ?? "NVVP"}
+                    onChange={handleRoleChange}
+                    disabled={updateRoleMutation.isPending}
+                  />
+                )}
+              </div>
+            )}
+            {(memberStatus === "invited" || memberStatus === "paused") && (
+              <span className="inline-flex items-center rounded-md bg-gray-500/10 px-1.5 py-0.5 text-[10px] font-medium text-gray-400 ring-1 ring-inset ring-gray-500/20 sm:text-[11px]">
+                {memberStatus === "invited" ? t`Pending` : t`Paused`}
+              </span>
+            )}
+          </div>
+          <div
+            className={twMerge(
+              "relative",
+              (workspace.role !== "ADMIN" || showSkeleton) && "hidden",
+            )}
+          >
+            {session?.user.id !== memberId && (
+              <Dropdown
+                items={[
+                  {
+                    label: t`Sửa quyền`,
+                    action: () =>
+                      openModal(
+                        "EDIT_MEMBER_PERMISSIONS",
+                        memberPublicId,
+                        memberEmail ?? "",
+                      ),
+                  },
+                  {
+                    label: t`Xóa thành viên`,
+                    action: () =>
+                      openModal(
+                        "REMOVE_MEMBER",
+                        memberPublicId,
+                        memberEmail ?? "",
+                      ),
+                  },
+                ]}
+              >
+                <HiEllipsisHorizontal
+                  size={20}
+                  className="text-light-900 dark:text-dark-900 sm:size-[20px]"
+                />
+              </Dropdown>
+            )}
+          </div>
+        </div>
+      </td>
+    </tr>
+  );
+};
+
+export default function MembersPage() {
+  const { modalContentType, openModal, isOpen } = useModal();
+  const { workspace } = useWorkspace();
+
+  const { data, isLoading } = api.workspace.byId.useQuery(
+    { workspacePublicId: workspace.publicId },
+    { enabled: !!workspace.publicId && workspace.publicId.length >= 12 },
+  );
+
+  const { data: session } = authClient.useSession();
+
   const subscriptions = data?.subscriptions as Subscription[] | undefined;
 
   const teamSubscription = getSubscriptionByPlan(subscriptions, "team");
   const proSubscription = getSubscriptionByPlan(subscriptions, "pro");
 
   const unlimitedSeats = hasUnlimitedSeats(subscriptions);
-
-  const TableRow = ({
-    memberPublicId,
-    memberId,
-    memberName,
-    memberEmail,
-    memberImage,
-    memberRole,
-    memberStatus,
-    isLastRow,
-    showSkeleton,
-    showPendingIcon,
-  }: {
-    memberPublicId?: string;
-    memberId?: string | null | undefined;
-    memberName?: string | null | undefined;
-    memberEmail?: string | null | undefined;
-    memberImage?: string | null | undefined;
-    memberRole?: string;
-    memberStatus?: string;
-    isLastRow?: boolean;
-    showSkeleton?: boolean;
-    showPendingIcon?: boolean;
-  }) => {
-    const handleRoleChange = (newRole: Role) => {
-      if (!memberPublicId) return;
-
-      updateRoleMutation.mutate({
-        workspacePublicId: workspace.publicId,
-        memberPublicId,
-        role: newRole,
-      });
-    };
-
-    return (
-      <tr className="rounded-b-lg">
-        <td
-          className={twMerge(
-            "w-full sm:w-[65%]",
-            isLastRow ? "rounded-bl-lg" : "",
-          )}
-        >
-          <div className="flex items-center p-2 sm:p-4">
-            <div className="flex-shrink-0">
-              {showSkeleton ? (
-                <div className="h-8 w-8 animate-pulse rounded-full bg-light-200 dark:bg-dark-200 sm:h-9 sm:w-9" />
-              ) : (
-                <Avatar
-                  name={memberName ?? ""}
-                  email={memberEmail ?? ""}
-                  imageUrl={memberImage ? getAvatarUrl(memberImage) : undefined}
-                />
-              )}
-            </div>
-            <div className="ml-2 min-w-0 flex-1">
-              <div>
-                <div className="flex items-center">
-                  <p
-                    className={twMerge(
-                      "mr-2 truncate text-xs font-medium text-neutral-900 dark:text-dark-1000 sm:text-sm",
-                      showSkeleton &&
-                        "md mb-2 h-3 w-[125px] animate-pulse rounded-sm bg-light-200 dark:bg-dark-200",
-                      showPendingIcon &&
-                        "italic text-neutral-500 dark:text-dark-900",
-                    )}
-                  >
-                    {memberName}
-                  </p>
-                </div>
-                {((workspace.role === "ADMIN" ||
-                  data?.showEmailsToMembers === true) ||
-                  showSkeleton) && (
-                  <p
-                    className={twMerge(
-                      "truncate text-xs text-dark-900 sm:text-sm",
-                      showSkeleton &&
-                        "h-3 w-[175px] animate-pulse rounded-sm bg-light-200 dark:bg-dark-200",
-                    )}
-                  >
-                    {memberEmail}
-                  </p>
-                )}
-              </div>
-            </div>
-          </div>
-        </td>
-        <td
-          className={twMerge(
-            "w-auto min-w-[120px] overflow-visible sm:w-[35%] sm:min-w-[150px]",
-            isLastRow && "rounded-br-lg",
-          )}
-        >
-          <div className="flex w-full items-center justify-between px-2 sm:px-3">
-            <div className="flex items-center gap-2">
-              {showSkeleton ? (
-                <span
-                  className={twMerge(
-                    "inline-flex items-center rounded-md bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-medium text-emerald-400 ring-1 ring-inset ring-emerald-500/20 sm:text-[11px]",
-                    "h-5 w-[50px] animate-pulse bg-light-200 ring-0 dark:bg-dark-200",
-                  )}
-                />
-              ) : (
-                <div className="relative inline-flex items-center">
-                  <span className="inline-flex items-center gap-1 rounded-md bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-medium text-emerald-400 ring-1 ring-inset ring-emerald-500/20 sm:text-[11px]">
-                    {memberRole &&
-                      memberRole.charAt(0).toUpperCase() +
-                        memberRole.slice(1)}
-                    {canEditMember && session?.user.id !== memberId && (
-                      <HiChevronDown className="h-3 w-3" />
-                    )}
-                  </span>
-
-                  {canEditMember && session?.user.id !== memberId && (
-                    <select
-                      value={memberRole}
-                      onChange={(e) =>
-                        handleRoleChange(
-                          e.target.value as Role,
-                        )
-                      }
-                      disabled={updateRoleMutation.isPending}
-                      className="absolute inset-0 h-full w-full cursor-pointer appearance-none border-none bg-transparent p-0 text-[10px] leading-none opacity-0 focus:outline-none focus-visible:outline-none sm:text-[11px]"
-                    >
-                      <option value="ADMIN">{t`Admin`}</option>
-                      <option value="NVKT_MANAGER">{t`Technical Manager`}</option>
-                      <option value="NVKD_MANAGER">{t`Business Manager`}</option>
-                      <option value="NVVP">{t`Staff`}</option>
-                    </select>
-                  )}
-                </div>
-              )}
-              {(memberStatus === "invited" || memberStatus === "paused") && (
-                <span className="inline-flex items-center rounded-md bg-gray-500/10 px-1.5 py-0.5 text-[10px] font-medium text-gray-400 ring-1 ring-inset ring-gray-500/20 sm:text-[11px]">
-                  {memberStatus === "invited" ? t`Pending` : t`Paused`}
-                </span>
-              )}
-            </div>
-            <div
-              className={twMerge(
-                "relative",
-                (workspace.role !== "ADMIN" || showSkeleton) && "hidden",
-              )}
-            >
-              {session?.user.id !== memberId && (
-                <Dropdown
-                  items={[
-                    {
-                      label: t`Sửa quyền`,
-                      action: () =>
-                        openModal(
-                          "EDIT_MEMBER_PERMISSIONS",
-                          memberPublicId,
-                          memberEmail ?? "",
-                        ),
-                    },
-                    {
-                      label: t`Xóa thành viên`,
-                      action: () =>
-                        openModal(
-                          "REMOVE_MEMBER",
-                          memberPublicId,
-                          memberEmail ?? "",
-                        ),
-                    },
-                  ]}
-                >
-                  <HiEllipsisHorizontal
-                    size={20}
-                    className="text-light-900 dark:text-dark-900 sm:size-[20px]"
-                  />
-                </Dropdown>
-              )}
-            </div>
-          </div>
-        </td>
-      </tr>
-    );
-  };
 
   return (
     <>
@@ -348,6 +335,7 @@ export default function MembersPage() {
                             memberStatus={member.status}
                             isLastRow={index === data.members.length - 1}
                             showPendingIcon={isPendingInvite}
+                            showEmailsToMembers={data?.showEmailsToMembers}
                           />
                         );
                       })}

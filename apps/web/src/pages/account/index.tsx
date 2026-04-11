@@ -1,9 +1,9 @@
 import type { NextPageWithLayout } from "~/pages/_app";
 import { getDashboardLayout } from "~/components/Dashboard";
-import CreateAccountView from "~/views/account";
+import Account from "~/views/account";
 
 const AccountPage: NextPageWithLayout = () => {
-  return <CreateAccountView />;
+  return <Account />;
 };
 
 AccountPage.getLayout = (page) => getDashboardLayout(page);

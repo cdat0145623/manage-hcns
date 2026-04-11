@@ -227,3 +227,12 @@ export const initAuth = (db: dbClient) => {
     },
   });
 };
+
+import { hashPassword as betterHashPassword } from "better-auth/crypto";
+
+export const hashPassword = async (
+  auth: ReturnType<typeof initAuth>,
+  password: string,
+) => {
+  return await betterHashPassword(password);
+};

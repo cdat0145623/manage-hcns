@@ -2,13 +2,16 @@ import { t } from "@lingui/core/macro";
 import { useForm } from "react-hook-form";
 import { HiOutlineArrowUp } from "react-icons/hi2";
 
-import Editor from "~/components/Editor";
 import type { WorkspaceMember } from "~/components/Editor";
+import Editor from "~/components/Editor";
 import LoadingSpinner from "~/components/LoadingSpinner";
 import { usePermissions } from "~/hooks/usePermissions";
 import { usePopup } from "~/providers/popup";
 import { api } from "~/utils/api";
-import { invalidateCard, invalidateTaskInstance } from "~/utils/cardInvalidation";
+import {
+  invalidateCard,
+  invalidateTaskInstance,
+} from "~/utils/cardInvalidation";
 
 interface FormValues {
   comment: string;
@@ -59,45 +62,51 @@ const NewCommentForm = ({
     },
   });
 
-  const isPending = addCardCommentMutation.isPending || addTaskCommentMutation.isPending;
+  const isPending =
+    addCardCommentMutation.isPending || addTaskCommentMutation.isPending;
 
   const onSubmit = (data: FormValues) => {
     if (cardPublicId) {
-        addCardCommentMutation.mutate({
-            cardPublicId,
-            comment: data.comment,
-        });
+      addCardCommentMutation.mutate({
+        cardPublicId,
+        comment: data.comment,
+      });
     } else if (taskInstanceId) {
-        addTaskCommentMutation.mutate({
-            id: taskInstanceId,
-            comment: data.comment,
-        });
+      addTaskCommentMutation.mutate({
+        id: taskInstanceId,
+        comment: data.comment,
+      });
     }
   };
 
   return (
     <form
       onSubmit={handleSubmit(onSubmit)}
-      className="flex w-full max-w-[800px] flex-col rounded-xl border border-light-600 bg-light-100 p-4 text-light-900 focus-visible:outline-none dark:border-dark-400 dark:bg-dark-100 dark:text-dark-1000 sm:text-sm sm:leading-6"
+      className="group relative flex w-full max-w-[800px] flex-col rounded-xl border border-light-200 bg-white shadow-sm transition-all focus-within:border-light-400 focus-within:shadow-md dark:border-dark-300 dark:bg-dark-100 dark:focus-within:border-dark-500"
     >
-      <Editor
-        content={watch("comment")}
-        onChange={(value) => setValue("comment", value)}
-        workspaceMembers={workspaceMembers}
-        enableYouTubeEmbed={false}
-        placeholder={t`Bình luận... (gõ '/' để mở lệnh hoặc '@' để đề cập)`}
-        disableHeadings={true}
-      />
-      <div className="flex justify-end">
+      <div className="flex-1">
+        <Editor
+          content={watch("comment")}
+          onChange={(value) => setValue("comment", value)}
+          workspaceMembers={workspaceMembers}
+          enableYouTubeEmbed={false}
+          placeholder={t`Bình luận...`}
+          disableHeadings={true}
+          popoverPlacement="top"
+        />
+      </div>
+      <div className="absolute bottom-3 right-3 z-30">
         <button
           type="submit"
-          disabled={isPending}
-          className="flex h-8 w-8 items-center justify-center rounded-full border border-light-600 bg-light-300 hover:bg-light-400 disabled:opacity-50 dark:border-dark-400 dark:bg-dark-200 dark:hover:bg-dark-400"
+          disabled={
+            isPending || !watch("comment") || watch("comment") === "<p></p>"
+          }
+          className="flex h-7 w-7 items-center justify-center rounded-lg bg-light-950 text-white shadow-sm transition-all hover:scale-110 hover:bg-light-1000 active:scale-95 disabled:opacity-30 disabled:hover:scale-100 dark:bg-dark-950"
         >
           {isPending ? (
             <LoadingSpinner size="sm" />
           ) : (
-            <HiOutlineArrowUp />
+            <HiOutlineArrowUp strokeWidth={3} className="h-3.5 w-3.5" />
           )}
         </button>
       </div>

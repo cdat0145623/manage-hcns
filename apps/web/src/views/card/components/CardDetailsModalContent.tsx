@@ -206,17 +206,18 @@ export default function CardDetailsModalContent({
 
   const { data: activitiesData } = api.card.getActivities.useQuery(
     { cardPublicId: cardId ?? "", limit: 100 },
-    { enabled: !!cardId && activeTab === "comments" }
+    { enabled: !!cardId && activeTab === "comments" },
   );
 
-  const hasComments = activitiesData?.activities.some((a) =>
-    [
-      "comment",
-      "updated_comment_added",
-      "updated_comment_updated",
-      "updated_comment_deleted",
-    ].includes(a.type),
-  ) ?? false;
+  const hasComments =
+    activitiesData?.activities.some((a) =>
+      [
+        "comment",
+        "updated_comment_added",
+        "updated_comment_updated",
+        "updated_comment_deleted",
+      ].includes(a.type),
+    ) ?? false;
 
   if (!cardId) return null;
 
@@ -232,7 +233,7 @@ export default function CardDetailsModalContent({
         transition={{ duration: 0.18, ease: "easeOut" }}
         className="flex h-[92vh] w-[95vw] max-w-[1200px] overflow-hidden rounded-2xl border border-light-200 bg-white shadow-2xl dark:border-dark-300 dark:bg-dark-100"
       >
-        <div className="flex w-1/2 flex-col overflow-hidden border-r border-light-100 dark:border-dark-300">
+        <div className="flex w-1/2 flex-col border-r border-light-100 text-left dark:border-dark-300">
           <div className="shrink-0 border-b border-light-100 px-10 py-7 dark:border-dark-300">
             {!card && isLoading ? (
               <div className="h-10 w-3/4 animate-pulse rounded-lg bg-light-200 dark:bg-dark-300" />
@@ -259,9 +260,12 @@ export default function CardDetailsModalContent({
             <p className="mb-3 text-[10px] font-semibold uppercase tracking-widest text-neutral-900 dark:text-dark-1000">
               {t`Mô tả`}
             </p>
-            <div className="min-h-[120px] rounded-xl border border-light-100 bg-light-50/30 px-1 dark:border-dark-300/40 dark:bg-dark-200/10">
+            <div className="group relative flex min-h-[120px] w-full flex-col rounded-xl border border-light-200 bg-white shadow-sm transition-all focus-within:border-light-400 focus-within:shadow-md dark:border-dark-300 dark:bg-dark-100 dark:focus-within:border-dark-500">
               {card && (
-                <form onSubmit={handleSubmit(onSubmit)}>
+                <form
+                  className="flex flex-1 flex-col"
+                  onSubmit={handleSubmit(onSubmit)}
+                >
                   <Editor
                     content={card.description}
                     onChange={
@@ -277,6 +281,7 @@ export default function CardDetailsModalContent({
                       ) ?? []
                     }
                     readOnly={!canEdit}
+                    maxHeightClass="max-h-[250px]"
                   />
                 </form>
               )}
@@ -310,7 +315,7 @@ export default function CardDetailsModalContent({
             )}
           </div>
         </div>
-        <div className="flex w-1/2 shrink-0 flex-col overflow-hidden bg-light-50/50 dark:bg-dark-50/30">
+        <div className="flex w-1/2 shrink-0 flex-col overflow-hidden bg-light-50/50 text-left dark:bg-dark-50/30">
           <div className="relative z-50 flex shrink-0 items-center justify-end bg-white/50 py-4 pl-8 pr-8 backdrop-blur-sm dark:bg-dark-100/50">
             <div className="flex items-center gap-3">
               {card && (
@@ -333,7 +338,7 @@ export default function CardDetailsModalContent({
             </div>
           </div>
 
-          <div className="flex flex-1 flex-col overflow-y-auto">
+          <div className="flex flex-1 flex-col overflow-y-auto scrollbar-thin scrollbar-thumb-light-400 dark:scrollbar-thumb-dark-300">
             <CardMetadataGrid
               cardId={cardId}
               card={card}
@@ -394,6 +399,7 @@ export default function CardDetailsModalContent({
                     cardPublicId={cardId}
                     isLoading={!card}
                     isAdmin={workspace.role === "ADMIN"}
+                    isExpanded={true}
                     excludedTypes={[
                       "comment",
                       "updated_comment_added",
@@ -446,12 +452,10 @@ export default function CardDetailsModalContent({
                       <p className="text-[10px] font-bold uppercase tracking-widest text-neutral-900 dark:text-dark-1000">
                         {t`Viết bình luận`}
                       </p>
-                      <div className="overflow-hidden rounded-xl border border-light-200 bg-white shadow-sm ring-1 ring-light-100/50 dark:border-dark-300 dark:bg-dark-100 dark:ring-white/5">
-                        <NewCommentForm
-                          cardPublicId={cardId}
-                          workspaceMembers={editorWorkspaceMembers}
-                        />
-                      </div>
+                      <NewCommentForm
+                        cardPublicId={cardId}
+                        workspaceMembers={editorWorkspaceMembers}
+                      />
                     </div>
                   )}
                   {hasComments && (
@@ -462,7 +466,7 @@ export default function CardDetailsModalContent({
                         </p>
                         <div className="h-px flex-1 bg-light-200/50 dark:bg-dark-300/50" />
                       </div>
-                      <div className="flex-1 overflow-y-auto">
+                      <div className="flex-1">
                         <ActivityList
                           cardPublicId={cardId}
                           isLoading={!card}

@@ -6,13 +6,15 @@ import { useModal } from "~/providers/modal";
 
 interface Props {
   children: React.ReactNode;
-  modalSize?: "sm" | "md" | "lg" | "hh";
+  modalSize?: "sm" | "md" | "lg" | "hh" | "xl";
   positionFromTop?: "sm" | "md" | "lg";
   isVisible?: boolean;
   closeOnClickOutside?: boolean;
   centered?: boolean;
   className?: string;
   widthCustom?: string;
+  hideDefaultStyles?: boolean;
+  onClose?: () => void;
 }
 
 const Modal: React.FC<Props> = ({
@@ -24,6 +26,8 @@ const Modal: React.FC<Props> = ({
   centered = false,
   className,
   widthCustom,
+  hideDefaultStyles = false,
+  onClose,
 }) => {
   const {
     isOpen,
@@ -40,6 +44,7 @@ const Modal: React.FC<Props> = ({
     md: "max-w-[550px]",
     hh: "max-w-[800px]",
     lg: "max-w-[1100px]",
+    xl: "max-w-[1240px]",
   };
 
   const positionFromTopMap = {
@@ -53,7 +58,9 @@ const Modal: React.FC<Props> = ({
       <Dialog
         as="div"
         className={twMerge("relative z-50", className)}
-        onClose={shouldCloseOnClickOutside ? closeModal : () => null}
+        onClose={
+          shouldCloseOnClickOutside ? (onClose ?? closeModal) : () => null
+        }
       >
         <Transition.Child
           as={Fragment}
@@ -81,7 +88,13 @@ const Modal: React.FC<Props> = ({
               leaveTo="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
             >
               <Dialog.Panel
-                className={`relative ${centered ? "" : positionFromTopMap[positionFromTop]} w-full transform rounded-lg border border-light-600 bg-white/90 text-left shadow-3xl-light backdrop-blur-[6px] transition-all dark:border-dark-600 dark:bg-dark-100/90 dark:shadow-3xl-dark ${modalSizeMap[modalSize]}`}
+                className={twMerge(
+                  "relative transform transition-all w-full",
+                  !centered && positionFromTopMap[positionFromTop],
+                  modalSizeMap[modalSize],
+                  !hideDefaultStyles &&
+                    "rounded-lg border border-light-600 bg-white/90 text-left shadow-3xl-light backdrop-blur-[6px] dark:border-dark-600 dark:bg-dark-100/90 dark:shadow-3xl-dark",
+                )}
               >
                 {children}
               </Dialog.Panel>

@@ -1,21 +1,24 @@
 import { t } from "@lingui/core/macro";
+import { skipToken } from "@tanstack/react-query";
 import { formatDistanceToNow } from "date-fns";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { HiEllipsisHorizontal, HiPencil, HiTrash } from "react-icons/hi2";
 
+import type { WorkspaceMember } from "~/components/Editor";
 import Avatar from "~/components/Avatar";
 import Button from "~/components/Button";
-import Editor from "~/components/Editor";
-import type { WorkspaceMember } from "~/components/Editor";
 import Dropdown from "~/components/Dropdown";
+import Editor from "~/components/Editor";
 import { usePermissions } from "~/hooks/usePermissions";
 import { useModal } from "~/providers/modal";
 import { usePopup } from "~/providers/popup";
 import { api } from "~/utils/api";
-import { invalidateCard, invalidateTaskInstance } from "~/utils/cardInvalidation";
-import { getAvatarUrl, fixServerDate } from "~/utils/helpers";
-import { skipToken } from "@tanstack/react-query";
+import {
+  invalidateCard,
+  invalidateTaskInstance,
+} from "~/utils/cardInvalidation";
+import { fixServerDate, getAvatarUrl } from "~/utils/helpers";
 
 interface FormValues {
   comment: string;
@@ -60,14 +63,14 @@ const Comment = ({
   });
 
   const { data: cardData } = api.card.byId.useQuery(
-    cardPublicId && cardPublicId.length >= 12
-      ? { cardPublicId }
-      : skipToken,
+    cardPublicId && cardPublicId.length >= 12 ? { cardPublicId } : skipToken,
   );
 
   const workspaceMembers: WorkspaceMember[] =
     cardData?.list.board.workspace.members
-      .filter((member): member is typeof member & { email: string } => !!member.email)
+      .filter(
+        (member): member is typeof member & { email: string } => !!member.email,
+      )
       .map((member) => ({
         publicId: member.publicId,
         email: member.email,
@@ -96,12 +99,12 @@ const Comment = ({
     },
   });
 
-  // Task instance comments might use the same update procedure if updated to support it, 
+  // Task instance comments might use the same update procedure if updated to support it,
   // or a new one. For now, let's assume api.card.updateComment is updated or use a placeholder.
-  // Actually, I haven't added updateComment to taskInstanceRouter. 
+  // Actually, I haven't added updateComment to taskInstanceRouter.
   // Let's use card.updateComment but ensure it works with taskInstanceId in backend if needed.
   // Wait, card.updateComment probably requires cardPublicId.
-  
+
   const updateTaskCommentMutation = api.taskInstance.updateComment.useMutation({
     onSuccess: async () => {
       if (taskInstanceId) await invalidateTaskInstance(utils, taskInstanceId);
@@ -142,7 +145,7 @@ const Comment = ({
           },
         ]
       : []),
-    ...((isAuthor || canDeleteComment)
+    ...(isAuthor || canDeleteComment
       ? [
           {
             label: t`Delete comment`,
@@ -156,7 +159,7 @@ const Comment = ({
   return (
     <div
       key={publicId}
-      className="group relative flex w-full flex-col rounded-xl border border-light-600 bg-light-200 p-4 text-light-900 focus-visible:outline-none dark:border-dark-400 dark:bg-dark-100 dark:text-dark-1000 sm:text-sm sm:leading-6"
+      className="group relative flex w-full flex-col rounded-xl border border-light-600 bg-light-200 px-3 py-2 text-left text-light-900 focus-visible:outline-none transition-all focus-within:border-light-900 focus-within:shadow-sm dark:border-dark-400 dark:bg-dark-100 dark:text-dark-1000 dark:focus-within:border-dark-600 sm:text-xs sm:leading-5"
     >
       <div className="flex justify-between">
         <div className="flex items-center space-x-2">
@@ -193,18 +196,19 @@ const Comment = ({
         )}
       </div>
       {!isEditing ? (
-        <div className="mt-2">
+        <div className="mt-1">
           <Editor
             content={comment ?? null}
             readOnly={true}
             workspaceMembers={workspaceMembers}
             enableYouTubeEmbed={false}
             disableHeadings={true}
+            size="sm"
           />
         </div>
       ) : (
         <form onSubmit={handleSubmit(onSubmit)}>
-          <div className="mt-2">
+          <div className="mt-1">
             <Editor
               content={watch("comment")}
               onChange={(value) => setValue("comment", value)}
@@ -212,9 +216,10 @@ const Comment = ({
               enableYouTubeEmbed={false}
               placeholder={t`Bình luận... (gõ '/' để mở lệnh hoặc '@' để đề cập)`}
               disableHeadings={true}
+              size="sm"
             />
           </div>
-          <div className="flex justify-end space-x-2 mt-2">
+          <div className="mt-2 flex justify-end space-x-2">
             <Button
               size="sm"
               variant="ghost"
@@ -223,7 +228,10 @@ const Comment = ({
               {t`Cancel`}
             </Button>
             <Button
-              isLoading={updateCardCommentMutation.isPending || updateTaskCommentMutation.isPending}
+              isLoading={
+                updateCardCommentMutation.isPending ||
+                updateTaskCommentMutation.isPending
+              }
               type="submit"
               size="sm"
             >

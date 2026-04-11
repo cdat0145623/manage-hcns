@@ -686,6 +686,7 @@ export function Calendar() {
       <Modal
         isVisible={isCardModalOpen}
         centered
+        hideDefaultStyles
         // onClose={() => setIsCardModalOpen(false)}
         modalSize="lg"
       >

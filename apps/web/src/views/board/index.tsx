@@ -166,7 +166,7 @@ export default function BoardPage({ isTemplate }: { isTemplate?: boolean }) {
     ) {
       openModal("CARD_DETAILS", router.query.cardId);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router.isReady, router.query.cardId]);
 
   const refetchBoard = async () => {
@@ -442,11 +442,13 @@ export default function BoardPage({ isTemplate }: { isTemplate?: boolean }) {
         <Modal
           modalSize="lg"
           centered
+          hideDefaultStyles
           isVisible={
             isOpen &&
             (modalContentType === "CARD_DETAILS" ||
               cardChildModalTypes.includes(modalContentType))
           }
+          onClose={handleCloseCardModal}
         >
           <CardDetailsModalContent
             cardId={(router.query.cardId as string) || entityId || undefined}

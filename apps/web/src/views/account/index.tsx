@@ -325,7 +325,7 @@ export default function Account() {
       {/* Edit Account Modal */}
       {showEditModal && editingMember && (
         <Modal
-          widthCustom="w-[40vw]"
+        //   widthCustom="w-[40vw]"
           isVisible={showEditModal}
           closeOnClickOutside
           centered
@@ -345,7 +345,7 @@ export default function Account() {
       {/* Create Account Modal */}
       {showCreateModal && (
         <Modal
-          widthCustom="w-[40vw]"
+        //   widthCustom="w-[40vw]"
           isVisible={showCreateModal}
           closeOnClickOutside
           centered

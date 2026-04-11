@@ -66,11 +66,11 @@ export function DayTasksPopover({
         </div>
 
         {/* Task List */}
-        <div className="max-h-[380px] w-full overflow-y-auto p-4 custom-scrollbar">
+        <div className="max-h-[420px] w-full overflow-y-auto p-4 custom-scrollbar">
           <div className="flex flex-col gap-1">
             {entries.length > 0 ? (
               entries.map((entry, idx) => (
-                <div key={entry.id} className="min-h-[30px]">
+                <div key={entry.id} className="min-h-[40px]">
                    <CalendarTask
                       entry={entry}
                       onClick={(clickedEntry) => {

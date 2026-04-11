@@ -68,7 +68,7 @@ export function CalendarCard({
       }}
       className={`${
         variant === "SUMMARY"
-          ? `relative mx-0.5 mb-1 flex w-[calc(100%-4px)] items-center overflow-hidden rounded-xl border border-l-[3px] px-2.5 py-1.5 text-[10px] font-black transition-all ${colors.bg} ${colors.border} ${colors.text}`
+          ? `relative h-[10vh] min-h-[40px] max-h-[50px] mx-0.5 mb-1 flex w-[calc(100%-4px)] items-center overflow-hidden rounded-xl border border-l-[3px] px-2.5 py-1.5 text-[10px] font-black transition-all ${colors.bg} ${colors.border} ${colors.text}`
           : `relative flex w-full flex-col overflow-hidden rounded-2xl border border-l-[6px] px-3 py-2.5 shadow-sm backdrop-blur-md transition-all ${colors.bg} ${colors.border} ${colors.text}`
       }`}
     >

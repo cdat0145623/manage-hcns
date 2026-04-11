@@ -51,7 +51,7 @@ export default function CardPage({ isTemplate }: { isTemplate?: boolean }) {
         title={t`${card?.title ?? t`Card`} | ${board?.name ?? t`Board`}`}
       />
       <div className="flex h-full flex-1 flex-col overflow-hidden bg-light-100 dark:bg-dark-50">
-        <div className="mx-auto flex h-full w-full max-w-6xl flex-col bg-white shadow-xl dark:bg-dark-100">
+        <div className="mx-auto flex h-full flex-col bg-white shadow-xl dark:bg-dark-100">
           <CardDetailsModalContent
             cardId={cardId}
             isTemplate={isTemplate}

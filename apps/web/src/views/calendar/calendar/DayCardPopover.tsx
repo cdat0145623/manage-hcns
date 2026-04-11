@@ -66,7 +66,7 @@ export function DayCardPopover({
 
         {/* Card List */}
         <div className="max-h-[420px] overflow-y-auto p-4 custom-scrollbar">
-          <div className="flex flex-col gap-3">
+          <div className="flex flex-col gap-1">
             {cards.length > 0 ? (
               cards.map((card, idx) => (
                 <div key={card.publicId} className="min-h-[40px]">
@@ -77,7 +77,6 @@ export function DayCardPopover({
                       onClose();
                     }}
                     index={idx}
-                    variant="DETAILED"
                   />
                 </div>
               ))

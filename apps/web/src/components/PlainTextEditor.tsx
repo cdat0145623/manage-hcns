@@ -49,6 +49,7 @@ export default function PlainTextEditor({
 
   const editor = useEditor(
     {
+      immediatelyRender: false,
       extensions: [
         StarterKit.configure({
           bold: false,
@@ -80,7 +81,7 @@ export default function PlainTextEditor({
           if (event.key === "Escape") {
             event.preventDefault();
             // Reset to original content before calling the callback
-            editor?.commands.setContent(contentRef.current, false);
+            editor?.commands.setContent(contentRef.current, { emitUpdate: false });
             editor?.commands.blur();
             onEscapeRef.current?.();
             return true;
@@ -98,7 +99,7 @@ export default function PlainTextEditor({
   useEffect(() => {
     if (!editor) return;
     if (content !== editor.getText()) {
-      editor.commands.setContent(content, false);
+      editor.commands.setContent(content, { emitUpdate: false });
     }
   }, [content, editor]);
 

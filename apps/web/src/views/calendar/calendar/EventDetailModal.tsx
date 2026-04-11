@@ -327,7 +327,7 @@ export function EventDetailModal({
           animate={{ opacity: 1, scale: 1 }}
           exit={{ opacity: 0, scale: 0.97 }}
           transition={{ duration: 0.18, ease: "easeOut" }}
-          className="flex h-[92vh] w-[95vw] max-w-[1200px] rounded-2xl border border-light-200 bg-white shadow-2xl dark:border-dark-300 dark:bg-dark-100"
+          className="flex h-[92vh] rounded-2xl border border-light-200 bg-white shadow-2xl dark:border-dark-300 dark:bg-dark-100"
         >
         <div className="flex w-1/2 flex-col border-r border-light-100 text-left dark:border-dark-300">
           <div className="shrink-0 border-b border-light-100 px-10 py-7 dark:border-dark-300">

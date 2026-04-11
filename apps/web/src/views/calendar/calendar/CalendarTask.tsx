@@ -19,52 +19,58 @@ interface CalendarTaskProps {
 const STATUS_COLORS: Record<
   "pending" | "done" | "missed",
   { bg: string; 
-    // border: string; 
-    accent: string; text: string }
+    border: string; 
+    accent: string; text: string; boxShadow: string }
 > = {
   pending: {
-    bg: "bg-blue-400 shadow-sm dark:bg-blue-600",
-    // border: "border-blue-400 dark:border-blue-600",
+    bg: "bg-blue-400 shadow-sm dark:bg-blue-500",
+    border: "border-blue-200 dark:border-blue-500/40",
     accent: "bg-blue-700",
     text: "text-blue-900 dark:text-blue-50",
+    boxShadow: "0 15px 35px -5px rgba(32, 118, 248, 0.24), 0 10px 15px -6px rgba(11, 198, 245, 0.1)",
   },
   done: {
-    bg: "bg-green-400 shadow-sm dark:bg-green-600",
-    // border: "border-green-300 dark:border-green-500/50",
+    bg: "bg-green-500 shadow-sm dark:bg-green-600/40",
+    border: "border-green-300 dark:border-green-500/50",
     accent: "bg-green-700",
     text: "text-green-900 dark:text-green-50",
+    boxShadow: "0 15px 35px -5px rgba(79, 204, 21, 0.63), 0 10px 15px -6px rgba(11, 245, 81, 0.1)",
   },
   missed: {
-    bg: "bg-red-400 shadow-sm dark:bg-red-600",
-    // border: "border-red-200 dark:border-red-500/40",
+    bg: "bg-red-400 shadow-sm dark:bg-red-600/30",
+    border: "border-red-200 dark:border-red-500/40",
     accent: "bg-red-700",
     text: "text-red-900 dark:text-red-50",
+    boxShadow: "0 15px 35px -5px rgba(245, 27, 11, 0.15), 0 10px 15px -6px rgba(245, 27, 11, 0.1)",
   },
 };
 
 const VIRTUAL_COLORS: Record<
   "pending" | "done" | "missed",
   { bg: string; 
-    // border: string; 
-    accent: string; text: string }
+    border: string; 
+    accent: string; text: string; boxShadow: string }
 > = {
   pending: {
-    bg: "bg-blue-500/50 dark:bg-blue-600/50",
-    // border: "border-blue-500/50 dark:border-blue-500",
+    bg: "bg-blue-100 shadow-sm dark:bg-blue-600/30",
+    border: "border-blue-500/50 dark:border-blue-500",
     accent: "bg-blue-500/50",
     text: "text-blue-900/70 dark:text-blue-100/70",
+    boxShadow: "0 15px 35px -5px rgba(32, 118, 248, 0.24), 0 10px 15px -6px rgba(11, 198, 245, 0.1)",
   },
   done: {
     bg: "bg-green-500/50 dark:bg-green-600/50",
-    // border: "border-green-200/50 dark:border-green-500/30",
+    border: "border-green-200/50 dark:border-green-500/30",
     accent: "bg-green-500/50",
     text: "text-green-900/80 dark:text-green-100/80",
+    boxShadow: "0 15px 35px -5px rgba(122, 241, 67, 1), 0 10px 15px -6px rgba(11, 245, 81, 0.1)",
   },
   missed: {
     bg: "bg-red-50/70 dark:bg-red-500/10",
-    // border: "border-red-100/50 dark:border-red-500/20",
+    border: "border-red-100/50 dark:border-red-500/20",
     accent: "bg-red-500/50",
     text: "text-red-900/70 dark:text-red-100/70",
+    boxShadow: "0 15px 35px -5px rgba(245, 27, 11, 0.15), 0 10px 15px -6px rgba(245, 27, 11, 0.1)",
   },
 };
 
@@ -135,8 +141,7 @@ export function CalendarTask({
         whileHover={{
           scale: 1.02,
           y: -2,
-          boxShadow:
-            "0 15px 35px -5px rgba(0, 0, 0, 0.1), 0 10px 15px -6px rgba(0, 0, 0, 0.05)",
+          boxShadow: colors.boxShadow,
           zIndex: 40,
           opacity: 1,
         }}
@@ -155,8 +160,8 @@ export function CalendarTask({
         {...safeDragHandleProps}
         className={`${
           variant === "SUMMARY"
-            ? `relative ${overlapIndex > 0 ? "ml-0.5" : ""} flex min-h-[30px] w-[calc(100%-4px)] items-center overflow-hidden rounded-xl px-2.5 text-[10px] font-black transition-all ${colors.bg}  ${colors.text}`
-            : `relative flex w-full flex-col overflow-hidden rounded-2xl px-2 py-1 shadow-sm backdrop-blur-md transition-all ${colors.bg}  ${colors.text}`
+            ? `relative ${overlapIndex > 0 ? "ml-0.5" : ""} h-[10vh] min-h-[40px] max-h-[50px] mb-1 flex w-[calc(100%-4px)] items-center overflow-hidden rounded-xl border border-l-[3px] px-2.5 py-1.5 text-[10px] font-black transition-all ${colors.bg} ${colors.border} ${colors.text}`
+            : `relative flex w-full flex-col overflow-hidden rounded-2xl border border-l-[6px] px-3 py-2.5 shadow-sm backdrop-blur-md transition-all ${colors.bg} ${colors.border} ${colors.text}`
         }`}
         style={{
           ...draggableProps?.style,
@@ -173,7 +178,7 @@ export function CalendarTask({
         )}
 
         {variant === "SUMMARY" ? (
-          <div className="pointer-events-none ml-1 flex flex-row h-full align-center items-center justify-start w-full items-center gap-2 overflow-hidden">
+          <div className={`pointer-events-none ml-1 flex flex-row h-full align-center items-center justify-start w-full items-center gap-2 overflow-hidden ${colors}`}>
             <span className="truncate leading-none">
               {entry.title || "(No title)"}
             </span>
@@ -182,7 +187,7 @@ export function CalendarTask({
             </span>
           </div>
         ) : (
-          <div className="pointer-events-none ml-1 flex flex-row h-full align-center items-center justify-start gap-2 overflow-hidden">
+          <div className={`pointer-events-none ml-1 flex flex-row h-full align-center items-center justify-start gap-2 overflow-hidden ${colors}`}>
             {/* <div className="flex items-start justify-between"> */}
               <span className="truncate text-xs font-black leading-tight">
                 {entry.title || "(No title)"}

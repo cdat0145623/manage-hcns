@@ -1,193 +1,358 @@
-import React, { useState } from "react";
-import { useRouter } from "next/router";
+import { useState } from "react";
 import { t } from "@lingui/core/macro";
+import {
+  HiEllipsisHorizontal,
+  HiPencilSquare,
+  HiNoSymbol,
+  HiPlus
+} from "react-icons/hi2";
 
-import { api } from "~/utils/api";
-import Input from "~/components/Input";
+import type { Role } from "@kan/shared";
 import Button from "~/components/Button";
 
-const ROLES = ["ADMIN", "NVKT_MANAGER", "NVKD_MANAGER", "NVVP"] as const;
+import { PageHead } from "~/components/PageHead";
+import Dropdown from "~/components/Dropdown";
+import Modal from "~/components/modal";
+import { useWorkspace } from "~/providers/workspace";
+import { usePopup } from "~/providers/popup";
+import { api } from "~/utils/api";
+import { RoleSelect } from "~/views/members/components/RoleSelector";
+import { EditAccountModal } from "./components/EditAccountModal";
+import CreateAccount from "./components/CreateAccount";
 
-export default function CreateAccountView() {
-  const router = useRouter();
-  const { data: user, isLoading: isUserLoading } = api.user.getUser.useQuery();
-  const createMutation = api.user.create.useMutation();
+interface MemberData {
+  publicId: string;
+  email: string | null;
+  role: Role;
+  status: string;
+  user: {
+    id: string;
+    name: string | null;
+    email: string | null;
+    image: string | null;
+    username: string | null;
+    isActive: boolean;
+  } | null;
+}
 
-  const [form, setForm] = useState({
-    name: "",
-    email: "",
-    username: "",
-    password: "",
-    confirmPassword: "",
-    role: "NVVP" as typeof ROLES[number],
+interface AccountTableRowProps {
+  member: MemberData;
+  isLastRow: boolean;
+  onEdit: (member: MemberData) => void;
+  onUpdateStatus: (member: MemberData, isActive: boolean, workspacePublicId: string) => void;
+}
+
+function AccountTableRow({
+  member,
+  isLastRow,
+  onEdit,
+  onUpdateStatus,
+}: AccountTableRowProps) {
+  const { workspace } = useWorkspace();
+  const { showPopup } = usePopup();
+  const utils = api.useUtils();
+
+  const updateRoleMutation = api.member.updateRole.useMutation({
+    onSuccess: async () => {
+      if (workspace.publicId && workspace.publicId.length >= 12) {
+        await utils.workspace.byId.invalidate({
+          workspacePublicId: workspace.publicId,
+        });
+      }
+      showPopup({
+        header: t`Cập nhật vai trò`,
+        message: t`Vai trò đã được cập nhật thành công.`,
+        icon: "success",
+      });
+    },
+    onError: () => {
+      showPopup({
+        header: t`Lỗi cập nhật vai trò`,
+        message: t`Không thể cập nhật vai trò. Vui lòng thử lại.`,
+        icon: "error",
+      });
+    },
   });
-  
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
 
-  if (isUserLoading) {
-    return <div className="p-8 text-center text-light-1000 dark:text-dark-1000">{t`Đang tải...`}</div>;
-  }
-
-  if (!user || user.role !== "ADMIN") {
-    return (
-      <div className="mx-auto mt-12 max-w-md rounded-lg bg-light-50 p-8 shadow-md dark:bg-dark-300">
-        <h2 className="text-center text-lg font-semibold text-red-500">
-          {t`Bạn không có quyền truy cập trang này.`}
-        </h2>
-      </div>
-    );
-  }
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError("");
-    setSuccess("");
-
-    if (!form.name || !form.email || !form.username || !form.password || !form.role) {
-      setError(t`Vui lòng nhập đầy đủ thông tin.`);
-      return;
-    }
-
-    if (form.username.length < 3 || form.username.length > 25) {
-        setError(t`Tên đăng nhập phải từ 3 đến 25 ký tự.`);
-        return;
-    }
-
-    if (form.password.length < 8) {
-        setError(t`Mật khẩu phải có ít nhất 8 ký tự.`);
-        return;
-    }
-
-    if (form.password !== form.confirmPassword) {
-      setError(t`Mật khẩu không khớp.`);
-      return;
-    }
-
-    try {
-      await createMutation.mutateAsync({
-        name: form.name,
-        email: form.email,
-        username: form.username,
-        password: form.password,
-        role: form.role as any,
-      });
-      setSuccess(t`Tạo tài khoản thành công!`);
-      setForm({
-        name: "",
-        email: "",
-        username: "",
-        password: "",
-        confirmPassword: "",
-        role: "NVVP",
-      });
-    } catch (err: any) {
-      setError(err.message || t`Đã có lỗi xảy ra.`);
-    }
+  const handleRoleChange = (newRole: Role) => {
+    if (!member.publicId) return;
+    updateRoleMutation.mutate({
+      workspacePublicId: workspace.publicId,
+      memberPublicId: member.publicId,
+      role: newRole,
+    });
   };
 
   return (
-    <div className="mx-auto mt-12 max-w-lg rounded-lg bg-light-50 p-6 shadow-md dark:bg-dark-300">
-      <h1 className="mb-6 text-xl font-bold text-light-1000 dark:text-dark-1000">
-        {t`Tạo người dùng mới`}
-      </h1>
-      
-      {error && (
-        <div className="mb-4 rounded bg-red-100 p-3 text-sm text-red-600 dark:bg-red-500/20 dark:text-red-400">
-          {error}
-        </div>
-      )}
-      
-      {success && (
-        <div className="mb-4 rounded bg-green-100 p-3 text-sm text-green-600 dark:bg-green-500/20 dark:text-green-400">
-          {success}
-        </div>
-      )}
-      
-      <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-        <div className="flex flex-row gap-2">
-            <div className="flex-1">
-                <label className="mb-1 block text-sm font-medium text-light-1000 dark:text-dark-1000">
-                    {t`Họ tên`}
-                </label>
-                <Input 
-                    value={form.name} 
-                    onChange={(e) => setForm({ ...form, name: e.target.value })} 
-                    placeholder={t`Nhập họ tên`}
-                />
-            </div>
-            
-            <div className="flex-1">
-                <label className="mb-1 block text-sm font-medium text-light-1000 dark:text-dark-1000">
-                    {t`Email`}
-                </label>
-                <Input 
-                    type="email"
-                    value={form.email} 
-                    onChange={(e) => setForm({ ...form, email: e.target.value })} 
-                    placeholder={t`Nhập email`}
-                />
-            </div>
-        </div>
+    <tr
+      className={`border-b border-light-600 dark:border-dark-600 ${isLastRow ? "border-b-0" : ""}`}
+    >
+      {/* Name */}
+      <td className={`px-4 py-3 ${isLastRow ? "rounded-bl-lg" : ""}`}>
+        <span className="text-sm font-medium text-neutral-900 dark:text-white">
+          {member.user?.name ?? "—"}
+        </span>
+      </td>
 
-        <div>
-          <label className="mb-1 block text-sm font-medium text-light-1000 dark:text-dark-1000">
-            {t`Tên đăng nhập`}
-          </label>
-          <Input 
-            value={form.username} 
-            onChange={(e) => setForm({ ...form, username: e.target.value })} 
-            placeholder={t`Nhập tên đăng nhập`}
+      {/* Username */}
+      <td className="px-4 py-3">
+        <span className="text-sm text-neutral-600 dark:text-neutral-400">
+          {member.user?.username ?? "—"}
+        </span>
+      </td>
+
+      {/* Email */}
+      <td className="px-4 py-3">
+        <span className="text-sm text-neutral-600 dark:text-neutral-400">
+          {member.user?.email ?? member.email ?? "—"}
+        </span>
+      </td>
+
+      {/* Role */}
+      <td className="px-4 py-3">
+        <div className="inline-flex items-center">
+          <RoleSelect
+            value={member.role ?? "NVVP"}
+            onChange={handleRoleChange}
+            disabled={updateRoleMutation.isPending}
           />
         </div>
+      </td>
 
-        <div className="flex flex-row gap-2">
-            <div className="flex-1">
-                <label className="mb-1 block text-sm font-medium text-light-1000 dark:text-dark-1000">
-                    {t`Mật khẩu`}
-                </label>
-                <Input 
-                    type="password"
-                    value={form.password} 
-                    onChange={(e) => setForm({ ...form, password: e.target.value })} 
-                    placeholder={t`Nhập mật khẩu`}
-                />
-            </div>
+      {/* Status */}
+      <td className="px-4 py-3">
+        <span className="text-sm text-neutral-600 dark:text-neutral-400">
+          {member.user?.isActive ? "Hoạt động" : "Không hoạt động"}
+        </span>
+      </td>
 
-            <div className="flex-1">
-                <label className="mb-1 block text-sm font-medium text-light-1000 dark:text-dark-1000">
-                    {t`Xác nhận mật khẩu`}
-                </label>
-                <Input 
-                    type="password"
-                    value={form.confirmPassword} 
-                    onChange={(e) => setForm({ ...form, confirmPassword: e.target.value })} 
-                    placeholder={t`Nhập mật khẩu`}
-                />
-            </div>
-        </div>
+      {/* Actions */}
+      <td className={`px-4 py-3 ${isLastRow ? "rounded-br-lg" : ""}`}>
+        <Dropdown
+          items={[
+            {
+              label: t`Chỉnh sửa tài khoản`,
+              icon: <HiPencilSquare className="h-4 w-4" />,
+              action: () => onEdit(member),
+            },
+            {
+              label: member.user?.isActive ? t`Vô hiệu hóa tài khoản` : t`Kích hoạt tài khoản`,
+              icon: <HiNoSymbol className="h-4 w-4" />,
+              action: () => onUpdateStatus(member, !member.user?.isActive, workspace.publicId),
+            },
+          ]}
+        >
+          <HiEllipsisHorizontal
+            size={20}
+            className="text-light-900 dark:text-dark-900"
+          />
+        </Dropdown>
+      </td>
+    </tr>
+  );
+}
 
-        <div>
-          <label className="mb-1 block text-sm font-medium text-light-1000 dark:text-dark-1000">
-            {t`Vai trò`}
-          </label>
-          <select 
-            value={form.role} 
-            onChange={(e) => setForm({ ...form, role: e.target.value as any })}
-            className="block w-full rounded-md border-0 bg-dark-300 bg-white/5 py-1.5 pl-3 pr-8 text-sm shadow-sm ring-1 ring-inset ring-light-600 placeholder:text-dark-800 focus:ring-2 focus:ring-inset focus:ring-light-700 dark:text-dark-1000 dark:ring-dark-700 dark:focus:ring-dark-700 sm:leading-6"
-          >
-            {ROLES.map(r => (
-              <option key={r} value={r}>{r}</option>
-            ))}
-          </select>
-        </div>
+function SkeletonRow({ isLastRow }: { isLastRow?: boolean }) {
+  return (
+    <tr
+      className={`border-b border-light-600 dark:border-dark-600 ${isLastRow ? "border-b-0" : ""}`}
+    >
+      <td className={`px-4 py-3 ${isLastRow ? "rounded-bl-lg" : ""}`}>
+        <div className="h-4 w-24 animate-pulse rounded bg-light-200 dark:bg-dark-200" />
+      </td>
+      <td className="px-4 py-3">
+        <div className="h-4 w-20 animate-pulse rounded bg-light-200 dark:bg-dark-200" />
+      </td>
+      <td className="px-4 py-3">
+        <div className="h-4 w-32 animate-pulse rounded bg-light-200 dark:bg-dark-200" />
+      </td>
+      <td className="px-4 py-3">
+        <div className="h-8 w-36 animate-pulse rounded-xl bg-light-200 dark:bg-dark-200" />
+      </td>
+      <td className={`px-4 py-3 ${isLastRow ? "rounded-br-lg" : ""}`}>
+        <div className="h-7 w-7 animate-pulse rounded bg-light-200 dark:bg-dark-200" />
+      </td>
+    </tr>
+  );
+}
 
-        <div className="mt-4">
-          <Button type="submit" isLoading={createMutation.isPending} fullWidth>
-            {t`Tạo tài khoản`}
+export default function Account() {
+  const { workspace } = useWorkspace();
+  const { showPopup } = usePopup();
+  const utils = api.useUtils();
+
+  const { data, isLoading } = api.workspace.byId.useQuery(
+    { workspacePublicId: workspace.publicId },
+    { enabled: !!workspace.publicId && workspace.publicId.length >= 12 },
+  );
+
+  const [editingMember, setEditingMember] = useState<MemberData | null>(null);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+
+  const updateStatusUser = api.user.updateStatus.useMutation({
+    onSuccess: async () => {
+      if (workspace.publicId && workspace.publicId.length >= 12) {
+        await utils.workspace.byId.invalidate({
+          workspacePublicId: workspace.publicId,
+        });
+      }
+      showPopup({
+        header: t`Cập nhật trạng thái tài khoản`,
+        message: t`Tài khoản đã được cập nhật trạng thái thành công.`,
+        icon: "success",
+      });
+    },
+    onError: () => {
+      showPopup({
+        header: t`Lỗi`,
+        message: t`Không thể vô hiệu hóa tài khoản. Vui lòng thử lại.`,
+        icon: "error",
+      });
+    },
+  });
+
+  const handleEdit = (member: MemberData) => {
+    setEditingMember(member);
+    setShowEditModal(true);
+  };
+
+  const handleUpdateStatus = (member: MemberData, isActive: boolean, workspacePublicId: string) => {
+    if (!member.user?.id) return;
+    if (confirm(t`Bạn có chắc chắn muốn ${isActive ? "kích hoạt" : "vô hiệu hóa"} tài khoản này?`)) {
+      updateStatusUser.mutate({ targetUserId: member.user.id, isActive, workspacePublicId });
+    }
+  };
+
+  const handleCloseEditModal = () => {
+    setShowEditModal(false);
+    setEditingMember(null);
+  };
+
+  const members = data?.members ?? [];
+
+  return (
+    <>
+      <PageHead title={t`Tài khoản | ${workspace.name ?? t`Workspace`}`} />
+      <div className="m-auto h-full w-full p-6 px-5 md:px-28 md:py-12">
+        <div className="mb-8 flex w-full justify-between">
+          <div className="flex items-center gap-3">
+            <h1 className="font-bold tracking-tight text-neutral-900 dark:text-dark-1000 sm:text-[1.2rem]">
+              {t`Quản lý tài khoản`}
+            </h1>
+          </div>
+          <Button
+            onClick={() => setShowCreateModal(true)}
+            iconLeft={<HiPlus className="h-4 w-4" />}
+            disabled={workspace.role !== "ADMIN"}
+            >
+            {t`Thêm`}
           </Button>
         </div>
-      </form>
-    </div>
+
+        <div className="mt-8 flow-root">
+          <div className="-mx-4 -my-2 sm:-mx-6 lg:-mx-8">
+            <div className="inline-block min-w-full overflow-x-auto px-4 py-2 pb-16 align-middle sm:px-6 lg:px-8">
+              <div className="h-full shadow ring-1 ring-black ring-opacity-5 sm:rounded-lg">
+                <table className="min-w-full divide-y divide-light-600 overflow-visible dark:divide-dark-600">
+                  <thead className="rounded-t-lg bg-light-300 dark:bg-dark-200">
+                    <tr>
+                      <th
+                        scope="col"
+                        className="rounded-tl-lg px-4 py-3.5 text-left text-sm font-semibold text-light-900 dark:text-dark-900"
+                      >
+                        {t`Tên`}
+                      </th>
+                      <th
+                        scope="col"
+                        className="px-4 py-3.5 text-left text-sm font-semibold text-light-900 dark:text-dark-900"
+                      >
+                        {t`Tên đăng nhập`}
+                      </th>
+                      <th
+                        scope="col"
+                        className="px-4 py-3.5 text-left text-sm font-semibold text-light-900 dark:text-dark-900"
+                      >
+                        {t`Email`}
+                      </th>
+                      <th
+                        scope="col"
+                        className="px-4 py-3.5 text-left text-sm font-semibold text-light-900 dark:text-dark-900"
+                      >
+                        {t`Vai trò`}
+                      </th>
+                      <th
+                        scope="col"
+                        className="px-4 py-3.5 text-left text-sm font-semibold text-light-900 dark:text-dark-900"
+                      >
+                        {t`Trạng thái`}
+                      </th>
+                      <th
+                        scope="col"
+                        className="rounded-tr-lg px-4 py-3.5 text-left text-sm font-semibold text-light-900 dark:text-dark-900"
+                      >
+                        {t`Hành động`}
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-light-600 overflow-visible bg-light-50 dark:divide-dark-600 dark:bg-dark-100">
+                    {!isLoading &&
+                      members.map((member, index) => (
+                        <AccountTableRow
+                          key={member.publicId}
+                          member={member as MemberData}
+                          isLastRow={index === members.length - 1}
+                          onEdit={handleEdit}
+                          onUpdateStatus={handleUpdateStatus}
+                        />
+                      ))}
+
+                    {isLoading && (
+                      <>
+                        <SkeletonRow />
+                        <SkeletonRow />
+                        <SkeletonRow isLastRow />
+                      </>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Edit Account Modal */}
+      {showEditModal && editingMember && (
+        <Modal
+        //   widthCustom="w-[40vw]"
+          isVisible={showEditModal}
+          closeOnClickOutside
+          centered
+        >
+          <EditAccountModal
+            memberId={editingMember.user?.id ?? ""}
+            memberPublicId={editingMember.publicId}
+            memberName={editingMember.user?.name ?? ""}
+            memberUsername={editingMember.user?.username ?? ""}
+            memberEmail={editingMember.user?.email ?? editingMember.email ?? ""}
+            memberRole={editingMember.role as Role}
+            onClose={handleCloseEditModal}
+          />
+        </Modal>
+      )}
+
+      {/* Create Account Modal */}
+      {showCreateModal && (
+        <Modal
+        //   widthCustom="w-[40vw]"
+          isVisible={showCreateModal}
+          closeOnClickOutside
+          centered
+        >
+          <CreateAccount onClose={() => setShowCreateModal(false)} />
+        </Modal>
+      )}
+    </>
   );
 }

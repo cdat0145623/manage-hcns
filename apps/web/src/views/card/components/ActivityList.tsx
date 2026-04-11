@@ -4,6 +4,8 @@ import { Trans } from "@lingui/react/macro";
 import { format, formatDistanceToNow, isSameYear } from "date-fns";
 import { useEffect, useRef, useState } from "react";
 import {
+  HiChevronDoubleDown,
+  HiChevronDoubleUp,
   HiOutlineArrowLeft,
   HiOutlineArrowRight,
   HiOutlineCheckCircle,
@@ -15,22 +17,16 @@ import {
   HiOutlineTrash,
   HiOutlineUserMinus,
   HiOutlineUserPlus,
-  HiChevronDoubleDown,
-  HiChevronDoubleUp,
 } from "react-icons/hi2";
 
-import type {
-  ActivityType,
-  GetCardActivitiesOutput,
-} from "@kan/api/types";
+import type { ActivityType, GetCardActivitiesOutput } from "@kan/api/types";
 import { authClient } from "@kan/auth/client";
 
 import Avatar from "~/components/Avatar";
 import { useLocalisation } from "~/hooks/useLocalisation";
 import { api } from "~/utils/api";
-import { getAvatarUrl, fixServerDate } from "~/utils/helpers";
+import { fixServerDate, getAvatarUrl } from "~/utils/helpers";
 import Comment from "./Comment";
-
 
 type ActivityWithMergedLabels =
   GetCardActivitiesOutput["activities"][number] & {
@@ -125,37 +121,37 @@ export const getActivityText = ({
   }
 
   const ACTIVITY_TYPE_MAP = {
-    "created": t`created the card`,
-    "updated_title": t`updated the title`,
-    "updated_description": t`updated the description`,
-    "updated_list": t`moved the card to another list`,
-    "updated_index": t`changed the card's position`,
-    "updated_label_added": t`added a label to the card`,
-    "updated_label_removed": t`removed a label from the card`,
-    "member_assigned": t`added a member to the card`,
-    "member_unassigned": t`removed a member from the card`,
-    "updated_comment_added": t`added a comment`,
-    "updated_comment_updated": t`updated a comment`,
-    "updated_comment_deleted": t`deleted a comment`,
-    "comment": t`added a comment`,
-    "updated_checklist_added": t`added a checklist`,
-    "updated_checklist_renamed": t`renamed a checklist`,
-    "updated_checklist_deleted": t`deleted a checklist`,
-    "updated_checklist_item_added": t`added a checklist item`,
-    "updated_checklist_item_updated": t`updated a checklist item`,
-    "updated_checklist_item_completed": t`completed a checklist item`,
-    "updated_checklist_item_uncompleted": t`marked a checklist item as incomplete`,
-    "updated_checklist_item_deleted": t`deleted a checklist item`,
-    "updated_attachment_added": t`added an attachment`,
-    "updated_attachment_renamed": t`renamed an attachment`,
-    "updated_attachment_removed": t`removed an attachment`,
-    "deadline_changed": t`changed the due date`,
-    "deadline_added": t`added a due date`,
-    "deadline_removed": t`removed a due date`,
-    "archived": t`archived the card`,
-    "start_date_added": t`added a start date`,
-    "start_date_changed": t`changed a start date`,
-    "start_date_removed": t`removed a start date`,
+    created: t`created the card`,
+    updated_title: t`updated the title`,
+    updated_description: t`updated the description`,
+    updated_list: t`moved the card to another list`,
+    updated_index: t`changed the card's position`,
+    updated_label_added: t`added a label to the card`,
+    updated_label_removed: t`removed a label from the card`,
+    member_assigned: t`added a member to the card`,
+    member_unassigned: t`removed a member from the card`,
+    updated_comment_added: t`added a comment`,
+    updated_comment_updated: t`updated a comment`,
+    updated_comment_deleted: t`deleted a comment`,
+    comment: t`added a comment`,
+    updated_checklist_added: t`added a checklist`,
+    updated_checklist_renamed: t`renamed a checklist`,
+    updated_checklist_deleted: t`deleted a checklist`,
+    updated_checklist_item_added: t`added a checklist item`,
+    updated_checklist_item_updated: t`updated a checklist item`,
+    updated_checklist_item_completed: t`completed a checklist item`,
+    updated_checklist_item_uncompleted: t`marked a checklist item as incomplete`,
+    updated_checklist_item_deleted: t`deleted a checklist item`,
+    updated_attachment_added: t`added an attachment`,
+    updated_attachment_renamed: t`renamed an attachment`,
+    updated_attachment_removed: t`removed an attachment`,
+    deadline_changed: t`changed the due date`,
+    deadline_added: t`added a due date`,
+    deadline_removed: t`removed a due date`,
+    archived: t`archived the card`,
+    start_date_added: t`added a start date`,
+    start_date_changed: t`changed a start date`,
+    start_date_removed: t`removed a start date`,
   } as const;
 
   if (!(type in ACTIVITY_TYPE_MAP)) return null;
@@ -363,30 +359,30 @@ export const getActivityText = ({
 
 const ACTIVITY_ICON_MAP: Partial<Record<ActivityType, React.ReactNode | null>> =
   {
-    "created": <HiOutlinePlus />,
-    "updated_title": <HiOutlinePencil />,
-    "updated_description": <HiOutlinePencil />,
-    "updated_label_added": <HiOutlineTag />,
-    "updated_label_removed": <HiOutlineTag />,
-    "member_assigned": <HiOutlineUserPlus />,
-    "member_unassigned": <HiOutlineUserMinus />,
-    "updated_checklist_added": <HiOutlinePlus />,
-    "updated_checklist_renamed": <HiOutlinePencil />,
-    "updated_checklist_deleted": <HiOutlineTrash />,
-    "updated_checklist_item_added": <HiOutlinePlus />,
-    "updated_checklist_item_updated": <HiOutlinePencil />,
-    "updated_checklist_item_completed": <HiOutlineCheckCircle />,
-    "updated_checklist_item_uncompleted": <HiOutlineCheckCircle />,
-    "updated_checklist_item_deleted": <HiOutlineTrash />,
-    "updated_attachment_added": <HiOutlinePaperClip />,
-    "updated_attachment_renamed": <HiOutlinePaperClip />,
-    "updated_attachment_removed": <HiOutlinePaperClip />,
-    "deadline_changed": <HiOutlineClock />,
-    "deadline_added": <HiOutlineClock />,
-    "deadline_removed": <HiOutlineClock />,
-    "start_date_changed": <HiOutlineClock />,
-    "start_date_added": <HiOutlineClock />,
-    "start_date_removed": <HiOutlineClock />,
+    created: <HiOutlinePlus />,
+    updated_title: <HiOutlinePencil />,
+    updated_description: <HiOutlinePencil />,
+    updated_label_added: <HiOutlineTag />,
+    updated_label_removed: <HiOutlineTag />,
+    member_assigned: <HiOutlineUserPlus />,
+    member_unassigned: <HiOutlineUserMinus />,
+    updated_checklist_added: <HiOutlinePlus />,
+    updated_checklist_renamed: <HiOutlinePencil />,
+    updated_checklist_deleted: <HiOutlineTrash />,
+    updated_checklist_item_added: <HiOutlinePlus />,
+    updated_checklist_item_updated: <HiOutlinePencil />,
+    updated_checklist_item_completed: <HiOutlineCheckCircle />,
+    updated_checklist_item_uncompleted: <HiOutlineCheckCircle />,
+    updated_checklist_item_deleted: <HiOutlineTrash />,
+    updated_attachment_added: <HiOutlinePaperClip />,
+    updated_attachment_renamed: <HiOutlinePaperClip />,
+    updated_attachment_removed: <HiOutlinePaperClip />,
+    deadline_changed: <HiOutlineClock />,
+    deadline_added: <HiOutlineClock />,
+    deadline_removed: <HiOutlineClock />,
+    start_date_changed: <HiOutlineClock />,
+    start_date_added: <HiOutlineClock />,
+    start_date_removed: <HiOutlineClock />,
   } as const;
 
 export const getActivityIcon = (
@@ -414,6 +410,7 @@ const ActivityList = ({
   isViewOnly,
   includedTypes,
   excludedTypes,
+  isExpanded = false,
 }: {
   cardPublicId?: string;
   taskInstanceId?: string;
@@ -422,6 +419,7 @@ const ActivityList = ({
   isViewOnly?: boolean;
   includedTypes?: ActivityType[];
   excludedTypes?: ActivityType[];
+  isExpanded?: boolean;
 }) => {
   const { dateLocale } = useLocalisation();
   const { data: sessionData } = authClient.useSession();
@@ -431,36 +429,39 @@ const ActivityList = ({
   >([]);
   const [hasMore, setHasMore] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [showNav, setShowNav] = useState(false);
 
   const isFullyExpandedRef = useRef(false);
   const lastDataUpdatedAtRef = useRef<number | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const prevLengthRef = useRef(0);
-  const [showNav, setShowNav] = useState(false);
+  const hasInitiallyScrolledRef = useRef(false);
 
   const {
     data: firstPageData,
     isFetching: isFetchingFirst,
     dataUpdatedAt,
-  } = (taskInstanceId 
-    ? api.taskInstance.getActivities.useQuery(
-        {
-          id: taskInstanceId,
-          limit: ACTIVITIES_PAGE_SIZE,
-        },
-        {
-          enabled: !!taskInstanceId,
-        },
-      )
-    : api.card.getActivities.useQuery(
-        {
-          cardPublicId: cardPublicId!,
-          limit: ACTIVITIES_PAGE_SIZE,
-        },
-        {
-          enabled: !!cardPublicId && cardPublicId.length >= 12,
-        },
-      )) as {
+  } = (
+    taskInstanceId
+      ? api.taskInstance.getActivities.useQuery(
+          {
+            id: taskInstanceId,
+            limit: ACTIVITIES_PAGE_SIZE,
+          },
+          {
+            enabled: !!taskInstanceId,
+          },
+        )
+      : api.card.getActivities.useQuery(
+          {
+            cardPublicId: cardPublicId!,
+            limit: ACTIVITIES_PAGE_SIZE,
+          },
+          {
+            enabled: !!cardPublicId && cardPublicId.length >= 12,
+          },
+        )
+  ) as {
     data: GetCardActivitiesOutput | undefined;
     isFetching: boolean;
     dataUpdatedAt: number;
@@ -468,19 +469,58 @@ const ActivityList = ({
 
   const scrollToBottom = (behavior: ScrollBehavior = "smooth") => {
     if (scrollRef.current) {
-      scrollRef.current.scrollTo({
-        top: scrollRef.current.scrollHeight,
-        behavior,
-      });
+      if (isExpanded) {
+        let parent = scrollRef.current.parentElement;
+        while (parent) {
+          const overflowY = window.getComputedStyle(parent).overflowY;
+          if (
+            (overflowY === "auto" ||
+              overflowY === "scroll" ||
+              overflowY === "overlay") &&
+            parent.scrollHeight > parent.clientHeight
+          ) {
+            parent.scrollTo({
+              top: parent.scrollHeight,
+              behavior,
+            });
+          }
+          parent = parent.parentElement;
+        }
+      } else {
+        scrollRef.current.scrollTo({
+          top: scrollRef.current.scrollHeight,
+          behavior,
+        });
+      }
     }
   };
 
   const scrollToTop = (behavior: ScrollBehavior = "smooth") => {
     if (scrollRef.current) {
-      scrollRef.current.scrollTo({
-        top: 0,
-        behavior,
-      });
+      if (isExpanded) {
+        // Scroll all scrollable parents
+        let parent = scrollRef.current.parentElement;
+        while (parent) {
+          const overflowY = window.getComputedStyle(parent).overflowY;
+          if (
+            (overflowY === "auto" ||
+              overflowY === "scroll" ||
+              overflowY === "overlay") &&
+            parent.scrollHeight > parent.clientHeight
+          ) {
+            parent.scrollTo({
+              top: 0,
+              behavior,
+            });
+          }
+          parent = parent.parentElement;
+        }
+      } else {
+        scrollRef.current.scrollTo({
+          top: 0,
+          behavior,
+        });
+      }
     }
   };
 
@@ -498,6 +538,7 @@ const ActivityList = ({
   }, [allActivities]);
 
   // Auto-scroll on new comment by current user
+
   useEffect(() => {
     if (allActivities.length > prevLengthRef.current) {
       const lastActivity = allActivities[allActivities.length - 1];
@@ -532,17 +573,19 @@ const ActivityList = ({
             if (!lastActivity) break;
 
             const nextCursor = new Date(lastActivity.createdAt).toISOString();
-            const nextPage = (taskInstanceId 
+            const nextPage = (
+              taskInstanceId
                 ? await utils.taskInstance.getActivities.fetch({
                     id: taskInstanceId,
                     limit: ACTIVITIES_PAGE_SIZE,
                     cursor: nextCursor,
-                })
+                  })
                 : await utils.card.getActivities.fetch({
                     cardPublicId: cardPublicId!,
                     limit: ACTIVITIES_PAGE_SIZE,
                     cursor: nextCursor,
-                })) as GetCardActivitiesOutput;
+                  })
+            ) as GetCardActivitiesOutput;
 
             const existingIds = new Set(
               currentActivities.map((a) => a.publicId),
@@ -579,17 +622,19 @@ const ActivityList = ({
     setIsLoadingMore(true);
     try {
       const nextCursor = new Date(lastActivity.createdAt).toISOString();
-      const nextPage = (taskInstanceId 
-        ? await utils.taskInstance.getActivities.fetch({
-            id: taskInstanceId,
-            limit: ACTIVITIES_PAGE_SIZE,
-            cursor: nextCursor,
-        })
-        : await utils.card.getActivities.fetch({
-            cardPublicId: cardPublicId!,
-            limit: ACTIVITIES_PAGE_SIZE,
-            cursor: nextCursor,
-        })) as GetCardActivitiesOutput;
+      const nextPage = (
+        taskInstanceId
+          ? await utils.taskInstance.getActivities.fetch({
+              id: taskInstanceId,
+              limit: ACTIVITIES_PAGE_SIZE,
+              cursor: nextCursor,
+            })
+          : await utils.card.getActivities.fetch({
+              cardPublicId: cardPublicId!,
+              limit: ACTIVITIES_PAGE_SIZE,
+              cursor: nextCursor,
+            })
+      ) as GetCardActivitiesOutput;
 
       const existingIds = new Set(allActivities.map((a) => a.publicId));
       const newActivities = nextPage.activities.filter(
@@ -614,128 +659,124 @@ const ActivityList = ({
     <div className="group/activity-list relative w-full">
       <div
         ref={scrollRef}
-        className="flex max-h-[350px] flex-col overflow-y-auto scrollbar-thin scrollbar-thumb-light-400 dark:scrollbar-thumb-dark-300 space-y-4 pt-1"
+        className={`flex flex-col space-y-4 pt-1 ${
+          !isExpanded
+            ? "max-h-[350px] overflow-y-auto scrollbar-thin scrollbar-thumb-light-400 dark:scrollbar-thumb-dark-300"
+            : ""
+        }`}
       >
-      {allActivities
-        .filter((activity) => {
-          if (includedTypes) return includedTypes.includes(activity.type);
-          if (excludedTypes) return !excludedTypes.includes(activity.type);
-          return true;
-        })
-        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-        .map((activity, index) => {
-        const activityText = getActivityText({
-          type: activity.type,
-          toTitle: activity.toTitle,
-          fromList: activity.fromList?.name ?? null,
-          toList: activity.toList?.name ?? null,
-          memberName: activity.member?.user?.name ?? null,
-          memberEmail: activity.member?.user?.email ?? null,
-          isSelf: activity.member?.user?.id === sessionData?.user.id,
-          label: activity.label?.name ?? null,
-          fromTitle: activity.fromTitle ?? null,
-          fromDueDate: activity.fromDueDate ?? null,
-          toDueDate: activity.toDueDate ?? null,
-          oldValue: activity.oldValue ?? null,
-          newValue: activity.newValue ?? null,
-          dateLocale: dateLocale,
-          mergedLabels: (activity as ActivityWithMergedLabels).mergedLabels,
-          attachmentName:
-            (activity as ActivityWithMergedLabels).attachment?.originalFilename ??
-            null,
-        });
+        {allActivities
+          .filter((activity) => {
+            if (includedTypes) return includedTypes.includes(activity.type);
+            if (excludedTypes) return !excludedTypes.includes(activity.type);
+            return true;
+          })
+          .sort(
+            (a, b) =>
+              new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+          )
+          .map((activity, index) => {
+            const activityText = getActivityText({
+              type: activity.type,
+              toTitle: activity.toTitle,
+              fromList: activity.fromList?.name ?? null,
+              toList: activity.toList?.name ?? null,
+              memberName: activity.member?.user?.name ?? null,
+              memberEmail: activity.member?.user?.email ?? null,
+              isSelf: activity.member?.user?.id === sessionData?.user.id,
+              label: activity.label?.name ?? null,
+              fromTitle: activity.fromTitle ?? null,
+              fromDueDate: activity.fromDueDate ?? null,
+              toDueDate: activity.toDueDate ?? null,
+              oldValue: activity.oldValue ?? null,
+              newValue: activity.newValue ?? null,
+              dateLocale: dateLocale,
+              mergedLabels: (activity as ActivityWithMergedLabels).mergedLabels,
+              attachmentName:
+                (activity as ActivityWithMergedLabels).attachment
+                  ?.originalFilename ?? null,
+            });
 
-        if (activity.type === "comment" || activity.type === "updated_comment_added")
-          return (
-            <Comment
-              key={activity.publicId}
-              publicId={activity.comment?.publicId}
-              cardPublicId={cardPublicId}
-              taskInstanceId={taskInstanceId}
-              name={activity.user?.name ?? ""}
-              email={activity.user?.email ?? ""}
-              image={activity.user?.image ?? null}
-              isLoading={isLoading}
-              createdAt={fixServerDate(activity.createdAt).toISOString()}
-              comment={activity.comment?.comment}
-              isEdited={!!activity.comment?.updatedAt}
-              isAuthor={activity.comment?.createdBy === sessionData?.user.id}
-              isViewOnly={!!isViewOnly}
-            />
-          );
+            if (
+              activity.type === "comment" ||
+              activity.type === "updated_comment_added"
+            )
+              return (
+                <Comment
+                  key={activity.publicId}
+                  publicId={activity.comment?.publicId}
+                  cardPublicId={cardPublicId}
+                  taskInstanceId={taskInstanceId}
+                  name={activity.user?.name ?? ""}
+                  email={activity.user?.email ?? ""}
+                  image={activity.user?.image ?? null}
+                  isLoading={isLoading}
+                  createdAt={fixServerDate(activity.createdAt).toISOString()}
+                  comment={activity.comment?.comment}
+                  isEdited={!!activity.comment?.updatedAt}
+                  isAuthor={
+                    activity.comment?.createdBy === sessionData?.user.id
+                  }
+                  isViewOnly={!!isViewOnly}
+                />
+              );
 
-        if (!activityText) return null;
+            if (!activityText) return null;
 
-        return (
-          <div
-            key={activity.publicId}
-            className="relative flex items-center space-x-2"
-          >
-            <div className="relative">
-              <Avatar
-                size="sm"
-                name={activity.user?.name ?? ""}
-                email={activity.user?.email ?? ""}
-                imageUrl={getAvatarUrl(activity.user?.image ?? null) || undefined}
-                icon={getActivityIcon(
-                  activity.type,
-                  activity.fromList?.index,
-                  activity.toList?.index,
-                )}
-                isLoading={isLoading}
-              />
-              {index !== allActivities.length - 1 && (
-                <div className="absolute bottom-[-14px] left-1/2 top-[30px] w-0.5 -translate-x-1/2 bg-light-600 dark:bg-dark-600" />
-              )}
-            </div>
-            <p className="text-sm">
-              <span className="font-medium dark:text-dark-1000">{`${getUserDisplayName(activity.user)} `}</span>
-              <span className="space-x-1 text-light-900 dark:text-dark-800">
-                {activityText}
-              </span>
-              <span className="mx-1 text-light-900 dark:text-dark-800">·</span>
-              <span className="space-x-1 text-light-900 dark:text-dark-800">
-                {formatDistanceToNow(fixServerDate(activity.createdAt), {
-                  addSuffix: true,
-                  locale: dateLocale,
-                })}
-              </span>
-            </p>
+            return (
+              <div
+                key={activity.publicId}
+                className="relative flex items-center space-x-2"
+              >
+                <div className="relative">
+                  <Avatar
+                    size="sm"
+                    name={activity.user?.name ?? ""}
+                    email={activity.user?.email ?? ""}
+                    imageUrl={
+                      getAvatarUrl(activity.user?.image ?? null) || undefined
+                    }
+                    icon={getActivityIcon(
+                      activity.type,
+                      activity.fromList?.index,
+                      activity.toList?.index,
+                    )}
+                    isLoading={isLoading}
+                  />
+                  {index !== allActivities.length - 1 && (
+                    <div className="absolute bottom-[-14px] left-1/2 top-[30px] w-0.5 -translate-x-1/2 bg-light-600 dark:bg-dark-600" />
+                  )}
+                </div>
+                <p className="text-sm">
+                  <span className="font-medium dark:text-dark-1000">{`${getUserDisplayName(activity.user)} `}</span>
+                  <span className="space-x-1 text-light-900 dark:text-dark-800">
+                    {activityText}
+                  </span>
+                  <span className="mx-1 text-light-900 dark:text-dark-800">
+                    ·
+                  </span>
+                  <span className="space-x-1 text-light-900 dark:text-dark-800">
+                    {formatDistanceToNow(fixServerDate(activity.createdAt), {
+                      addSuffix: true,
+                      locale: dateLocale,
+                    })}
+                  </span>
+                </p>
+              </div>
+            );
+          })}
+        {hasMore && (
+          <div className="flex justify-center py-4">
+            <button
+              onClick={handleLoadMore}
+              disabled={isFetching}
+              className="text-sm font-medium text-light-900 hover:text-light-1000 disabled:opacity-50 dark:text-dark-800 dark:hover:text-dark-1000"
+            >
+              {isFetching ? t`Loading...` : t`Load more activities`}
+            </button>
           </div>
-        );
-      })}
-      {hasMore && (
-        <div className="flex justify-center py-4">
-          <button
-            onClick={handleLoadMore}
-            disabled={isFetching}
-            className="text-sm font-medium text-light-900 hover:text-light-1000 disabled:opacity-50 dark:text-dark-800 dark:hover:text-dark-1000"
-          >
-            {isFetching ? t`Loading...` : t`Load more activities`}
-          </button>
-        </div>
-      )}
+        )}
       </div>
-
-      {/* Navigation Buttons */}
-      {showNav && (
-        <div className="absolute bottom-2 right-4 z-20 flex flex-col gap-1.5 opacity-0 transition-opacity duration-200 group-hover/activity-list:opacity-100">
-          <button
-            onClick={() => scrollToTop()}
-            title={t`Go to top`}
-            className="flex h-7 w-7 items-center justify-center rounded-lg border border-white/40 bg-white/20 text-neutral-900 shadow-lg backdrop-blur-md outline-none transition-all hover:bg-white/40 active:scale-90 dark:border-white/10 dark:bg-dark-100/40 dark:text-dark-1000 dark:hover:bg-dark-100/60"
-          >
-            <HiChevronDoubleUp className="h-3.5 w-3.5" />
-          </button>
-          <button
-            onClick={() => scrollToBottom()}
-            title={t`Go to bottom`}
-            className="flex h-7 w-7 items-center justify-center rounded-lg border border-white/40 bg-white/20 text-neutral-900 shadow-lg backdrop-blur-md outline-none transition-all hover:bg-white/40 active:scale-90 dark:border-white/10 dark:bg-dark-100/40 dark:text-dark-1000 dark:hover:bg-dark-100/60"
-          >
-            <HiChevronDoubleDown className="h-3.5 w-3.5" />
-          </button>
-        </div>
-      )}
     </div>
   );
 };

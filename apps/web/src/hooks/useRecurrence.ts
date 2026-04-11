@@ -2,6 +2,7 @@ import {
   addMonths,
   endOfMonth,
   startOfMonth,
+  differenceInMinutes,
 } from "date-fns";
 import { useMemo } from "react";
 import { api } from "~/utils/api";
@@ -56,6 +57,8 @@ export function useRecurrence(currentDate: Date, selectedUserId: string | undefi
     from: monthStart,
     to: monthEnd,
     targetUser: selectedUserId === "all" ? undefined : selectedUserId,
+  }, {
+    staleTime: 1000 * 60 * 5, // 5 minutes
   });
 
   const utils = api.useUtils();
@@ -77,6 +80,14 @@ export function useRecurrence(currentDate: Date, selectedUserId: string | undefi
         currentStatus = "pending";
       }
 
+      const start = new Date(task.taskMaster?.startDate);
+      const end = new Date(task.taskMaster?.endDate);
+
+      const duration =
+        start && end && !isNaN(start.getTime()) && !isNaN(end.getTime())
+          ? differenceInMinutes(end, start)
+          : task.duration ?? 60;
+
       return {
         id: task.id,
         masterId: task.taskMasterId || task.masterId,
@@ -91,7 +102,7 @@ export function useRecurrence(currentDate: Date, selectedUserId: string | undefi
         status: currentStatus,
         type: isVirtual ? "VIRTUAL" : "INSTANCE",
         color: task.color ?? "bg-blue-500",
-        duration: task.duration ?? 60,
+        duration: duration,
         recurrence: (task.taskMaster?.recurrence || task.recurrence || "NONE") as RecurrenceType,
         rruleString: task.taskMaster?.rruleString || task.rruleString || "",
         checklists: task.checklists || [],
@@ -113,7 +124,9 @@ export function useRecurrence(currentDate: Date, selectedUserId: string | undefi
     });
   };
 
-  const data = api.card.getByUserId.useQuery({ userId: selectedUserId });
+  const data = api.card.getByUserId.useQuery({ userId: selectedUserId }, {
+    staleTime: 1000 * 60 * 5, // 5 minutes
+  });
 
   return { calendarEntries, cards: data.data?.filterCards, formattedResult: data.data?.formattedResult , moveTask };
 }

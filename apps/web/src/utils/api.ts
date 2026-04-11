@@ -45,7 +45,16 @@ const getBaseUrl = () => {
   return `http://localhost:${process.env.PORT ?? 3000}`; // dev SSR should use localhost
 };
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 1000 * 60 * 5, // 5 minutes
+      gcTime: 1000 * 60 * 30, // 30 minutes
+      retry: 1,
+      refetchOnWindowFocus: false,
+    },
+  },
+});
 
 // @ts-expect-error
 export const api = createTRPCNext<AppRouter>({
@@ -61,6 +70,8 @@ export const api = createTRPCNext<AppRouter>({
         httpBatchLink({
           url: `${getBaseUrl()}/api/trpc`,
           transformer: superjson,
+          // @ts-expect-error - 'method' is supported at runtime in tRPC v11 but might missing in the types version
+          method: "GET",
         }),
       ],
       queryClient: queryClient,

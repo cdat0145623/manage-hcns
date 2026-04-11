@@ -49,7 +49,7 @@ export function DayCardPopover({
         {/* Header */}
         <div className="flex items-center justify-between border-b border-neutral-100 p-5 dark:border-white/5">
           <div className="flex flex-col">
-            <span className="text-[10px] font-black uppercase tracking-[0.2em] text-neutral-500">
+            <span className="text-[10px] font-black uppercase tracking-[0.2em] text-neutral-500 dark:text-white">
                CÔNG VIỆC KHÁC
             </span>
             <span className="text-xl font-black text-neutral-900 dark:text-white">
@@ -58,7 +58,7 @@ export function DayCardPopover({
           </div>
           <button
             onClick={onClose}
-            className="flex h-10 w-10 items-center justify-center rounded-2xl bg-neutral-50 text-neutral-400 transition-all hover:bg-neutral-100 hover:text-neutral-900 dark:bg-neutral-800 dark:hover:bg-neutral-700 dark:hover:text-white"
+            className="flex h-10 w-10 items-center justify-center rounded-2xl text-neutral-400 transition-all hover:bg-neutral-200 hover:text-neutral-900 dark:hover:bg-neutral-700 dark:hover:text-white"
           >
             <MdClose size={24} />
           </button>
@@ -66,7 +66,7 @@ export function DayCardPopover({
 
         {/* Card List */}
         <div className="max-h-[420px] overflow-y-auto p-4 custom-scrollbar">
-          <div className="flex flex-col gap-3">
+          <div className="flex flex-col gap-1">
             {cards.length > 0 ? (
               cards.map((card, idx) => (
                 <div key={card.publicId} className="min-h-[40px]">
@@ -77,7 +77,6 @@ export function DayCardPopover({
                       onClose();
                     }}
                     index={idx}
-                    variant="DETAILED"
                   />
                 </div>
               ))

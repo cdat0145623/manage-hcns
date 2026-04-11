@@ -147,7 +147,7 @@ export const update = async (
 
     if (taskMasterInput.rruleString && taskMasterInput.rruleString !== oldFreq.rruleString) {
       const cardActivitesInsert = [{
-        type: "updated_index" as const,
+        type: "updated_rruleString" as const,
         taskMasterId: taskMaster.id,
         oldValue: oldFreq.rruleString ?? undefined,
         newValue: taskMasterInput.rruleString ?? undefined,

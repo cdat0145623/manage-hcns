@@ -7,6 +7,7 @@ import { api } from "~/utils/api";
 interface UsePermissionsResult {
   permissions: Permission[];
   role: string | null;
+  createdBy: string | null;
   isLoading: boolean;
   hasPermission: (permission: Permission) => boolean;
   canViewCard: boolean;
@@ -42,6 +43,7 @@ export function usePermissions(): UsePermissionsResult {
     const emptyPermissions: UsePermissionsResult = {
       permissions: [],
       role: null,
+      createdBy: null,
       isLoading: false,
       hasPermission: () => false,
       canViewCard: false,
@@ -81,6 +83,7 @@ export function usePermissions(): UsePermissionsResult {
 
   const permissions = (data?.permissions ?? []) as Permission[];
   const role = data?.role ?? null;
+  const createdBy = data?.createdBy ?? null;
 
   const hasPermission = (permission: Permission): boolean => {
     return permissions.includes(permission);
@@ -89,6 +92,7 @@ export function usePermissions(): UsePermissionsResult {
   return {
     permissions,
     role,
+    createdBy,
     isLoading,
     hasPermission,
     canViewCard: hasPermission("card:view"),

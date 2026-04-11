@@ -2,7 +2,7 @@ import { count, desc, eq, or } from "drizzle-orm";
 import { v4 as uuidv4 } from "uuid";
 
 import type { dbClient } from "@kan/db/client";
-import { apikey, users } from "@kan/db/schema";
+import { apikey, users, workspaceMembers } from "@kan/db/schema";
 import { memberRoles } from "@kan/db/schema";
 
 export type UserRole = (typeof memberRoles)[number];
@@ -105,6 +105,7 @@ export const update = async (
   updates: {
     image?: string;
     name?: string;
+    email?: string;
     username?: string;
     password?: string;
     stripeCustomerId?: string;
@@ -115,6 +116,7 @@ export const update = async (
     .set({
       name: updates.name,
       image: updates.image,
+      email: updates.email,
       username: updates.username,
       password: updates.password,
       stripeCustomerId: updates.stripeCustomerId,
@@ -123,8 +125,33 @@ export const update = async (
     .returning({
       name: users.name,
       image: users.image,
+      email: users.email,
       username: users.username,
       stripeCustomerId: users.stripeCustomerId,
+    });
+
+  return result;
+};
+
+export const updateEmailInWorkspaceMembers = async (
+  db: dbClient,
+  userId: string,
+  newEmail: string,
+) => {
+  await db
+    .update(workspaceMembers)
+    .set({ email: newEmail })
+    .where(eq(workspaceMembers.userId, userId));
+};
+
+export const updateStatus = async (db: dbClient, userId: string, isActive: boolean) => {
+  const [result] = await db
+    .update(users)
+    .set({ isActive })
+    .where(eq(users.id, userId))
+    .returning({
+      id: users.id,
+      isActive: users.isActive,
     });
 
   return result;
@@ -137,6 +164,7 @@ export const getAll = async (db: dbClient) => {
       name: true,
       email: true,
       username: true,
+      role: true,
     },
     where: or(
       eq(users.role, "NVKD_MANAGER"),

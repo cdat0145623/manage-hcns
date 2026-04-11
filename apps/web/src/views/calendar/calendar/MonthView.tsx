@@ -104,7 +104,7 @@ export function MonthView({
         {WEEKDAYS.map((day) => (
           <div
             key={day}
-            className="p-3 text-center text-[10px] font-black uppercase tracking-[0.2em] text-neutral-600 dark:text-neutral-600"
+            className="p-3 text-center text-[10px] font-black uppercase tracking-[0.2em] text-neutral-1000 dark:text-neutral-1000"
           >
             {day}
           </div>
@@ -132,18 +132,18 @@ export function MonthView({
                   : "bg-white dark:bg-neutral-900"
               }`}
             >
-              <div className="mb-1 flex items-center justify-between p-1.5 h-6">
+              <div className="flex items-center justify-between pb-1 h-6">
                 <div
                   onClick={(e) => {
                     e.stopPropagation();
                     onViewDay(day);
                   }}
-                  className={`flex h-4 w-8 cursor-pointer items-center justify-center rounded-xl text-[10px] font-black transition-all hover:bg-blue-600 hover:text-white hover:shadow-sm dark:hover:bg-neutral-700 ${
+                  className={`flex h-4 w-8 cursor-pointer items-center justify-center rounded-xl text-[10px] font-black transition-all hover:bg-blue-600 hover:text-white hover:shadow-sm dark:text-neutral-100 dark:hover:bg-blue-600 ${
                     isDayToday
                       ? "bg-blue-600 text-white shadow-lg shadow-blue-500/30"
                       : isCurrentMonth
-                        ? "text-neutral-900 hover:bg-blue-600 hover:text-white hover:shadow-sm dark:text-neutral-100 dark:hover:bg-neutral-800"
-                        : "text-neutral-500 dark:text-neutral-700 font-bold"
+                        ? "text-neutral-900 hover:bg-blue-600"
+                        : "text-neutral-500 dark:text-neutral-700 dark:hover:text-white"
                   }`}
                 >
                   {format(day, "d")}
@@ -176,7 +176,7 @@ export function MonthView({
                   <div
                     ref={provided.innerRef}
                     {...provided.droppableProps}
-                    className="flex-1 flex flex-col items-center align-center justify-center space-y-1 overflow-y-auto overflow-x-hidden"
+                    className="flex-1 flex flex-col items-center justify-center space-y-1 overflow-y-auto overflow-x-hidden"
                   >
                     {/* {dayEntries.slice(0, 3).map((entry, idx) => (
                       <CalendarTask
@@ -192,7 +192,7 @@ export function MonthView({
                           e.stopPropagation();
                           setPopoverDay(day);
                         }}
-                        className="mt-1.5 gap-1.5 rounded-full bg-blue-50 px-2 py-0.5 text-[9px] font-black text-blue-600 ring-1 ring-blue-500/20 transition-all hover:bg-blue-100 dark:bg-blue-900/30 dark:text-blue-400"
+                        className="mt-1 rounded-full bg-blue-50 px-2 py-0.5 text-[11px] font-black text-blue-600 ring-1 ring-blue-500/20 transition-all hover:bg-blue-100 dark:bg-blue-600/30 dark:text-blue-400 dark:hover:bg-blue-600 dark:hover:text-white"
                       >
                         {dayEntries.length} công việc hằng ngày
                       </button>
@@ -204,7 +204,7 @@ export function MonthView({
                           e.stopPropagation();
                           setPopoverCard(day);
                         }}
-                        className="mt-1.5 gap-1.5 rounded-full bg-amber-50 px-2 py-0.5 text-[9px] font-black text-amber-600 ring-1 ring-amber-500/20 transition-all hover:bg-amber-100 dark:bg-amber-900/30 dark:text-amber-400"
+                        className="mt-1 rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-black text-amber-600 ring-1 ring-amber-500/20 transition-all hover:bg-amber-100 dark:bg-amber-600/30 dark:text-amber-500 dark:hover:bg-amber-600 dark:hover:text-white"
                       >
                         {dayCards.length} công việc khác
                       </button>

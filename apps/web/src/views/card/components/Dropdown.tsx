@@ -105,7 +105,7 @@ export default function CardDropdown({
 
   return (
     <Dropdown items={items}>
-      <HiEllipsisHorizontal className="h-3.5 w-3.5 text-light-950 transition-colors hover:text-light-1000 dark:text-dark-600 dark:hover:text-dark-1000" />
+      <HiEllipsisHorizontal className="h-3.5 w-3.5 text-light-950 transition-colors hover:text-light-1000 dark:text-dark-800 dark:hover:text-dark-1000" />
     </Dropdown>
   );
 }

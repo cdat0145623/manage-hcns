@@ -448,9 +448,12 @@ export function CreateEventModal({
 
   const handleSave = (updateType?: "single" | "all") => {
     setHasAttemptedSave(true);
-    if (!title.trim()) return alert("Để thiếu tiêu đề.");
+    if (!title.trim()) return alert("Thiếu tiêu đề.");
     if (recurrence === "UNSELECTED") {
-      return alert("Để chọn tuỳ chọn lặp lại.");
+      return alert("Chọn tuỳ chọn lặp lại.");
+    }
+    if (!selectedUserId) {
+      return alert("Chọn người thực hiện.");
     }
 
     if (isEditMode && editEntry?.masterId && !updateType) {
@@ -572,7 +575,7 @@ export function CreateEventModal({
         description,
         startDate: startDT,
         endDate: finalEndDate,
-        selectedUserId: selectedUserId || currentUserId,
+        selectedUserId: selectedUserId,
         rruleString,
         from: startOfMonth(startDT),
         to: endOfMonth(startDT),
@@ -638,14 +641,19 @@ export function CreateEventModal({
 
           <div className="flex-1 space-y-4 overflow-y-auto px-5 py-4">
             <div className="space-y-1.5">
-              <Label>Tiêu đề sự kiện *</Label>
+              <Label>Tiêu đề sự kiện</Label>
               <input
                 type="text"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 placeholder="Nhập tiêu đề"
                 autoFocus
-                className="w-full rounded-xl border border-neutral-200/70 bg-neutral-50/50 px-4 py-2.5 text-base font-semibold text-neutral-900 placeholder-neutral-400 shadow-[inset_0_2px_4px_rgba(0,0,0,0.02)] transition-all hover:bg-neutral-50 focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-[3px] focus:ring-blue-500/10 dark:border-dark-400/50 dark:bg-dark-300/50 dark:text-white dark:focus:bg-dark-200"
+                className={`
+                  w-full rounded-xl border border-neutral-200/70 bg-neutral-50/50 px-4 py-2.5 text-base font-semibold text-neutral-900 placeholder-neutral-400 shadow-[inset_0_2px_4px_rgba(0,0,0,0.02)] transition-all hover:bg-neutral-50 focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-[3px] focus:ring-blue-500/10 dark:border-dark-400/50 dark:bg-dark-300/50 dark:text-white dark:focus:bg-dark-200
+                  ${hasAttemptedSave && title === ""
+                    ? "border-red-400 bg-red-50/60 dark:border-red-800/50 dark:bg-red-900/20"
+                    : ""}
+                `}
               />
             </div>
 
@@ -941,9 +949,11 @@ export function CreateEventModal({
                           setShowAssigneeOptions(!showAssigneeOptions)
                         }
                         className={`flex w-full items-center justify-between rounded-2xl border px-4 py-4 text-sm font-medium shadow-[0_2px_10px_rgba(0,0,0,0.06)] transition-all hover:shadow-[0_4px_16px_rgba(0,0,0,0.1)] focus:outline-none ${
-                          selectedUserId
-                            ? "border-blue-200 bg-blue-50/60 text-blue-700 dark:border-blue-800/50 dark:bg-blue-900/20 dark:text-blue-300"
-                            : "border-neutral-200/70 bg-neutral-50/50 text-neutral-400 dark:border-dark-400/50 dark:bg-dark-300/50 dark:text-neutral-500"
+                          hasAttemptedSave && !selectedUserId
+                            ? "border-red-400 bg-red-50/60 text-red-500 dark:border-red-900/50 dark:bg-red-900/20 dark:text-red-400"
+                            : selectedUserId
+                              ? "border-blue-200 bg-blue-50/60 text-blue-700 dark:border-blue-800/50 dark:bg-blue-900/20 dark:text-blue-300"
+                              : "border-neutral-200/70 bg-neutral-50/50 text-neutral-400 dark:border-dark-400/50 dark:bg-dark-300/50 dark:text-neutral-500"
                         }`}
                       >
                         <span className="flex items-center gap-2">
@@ -1031,15 +1041,11 @@ export function CreateEventModal({
                                     setSelectedUserId(user.id);
                                     setShowAssigneeOptions(false);
                                   }}
-                                  className={`flex w-full items-center gap-3 px-4 py-2 text-left text-sm font-medium transition-colors ${
-                                    idx !== filteredUsers.length - 1
-                                      ? "border-b border-neutral-100 dark:border-dark-300"
-                                      : ""
-                                  } ${
-                                    isSelected
+                                  className={`flex w-full items-center gap-3 px-4 py-2 text-left text-sm font-medium transition-colors 
+                                    ${isSelected
                                       ? "bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-300"
                                       : "text-neutral-700 hover:bg-neutral-50 dark:text-neutral-300 dark:hover:bg-dark-200"
-                                  }`}
+                                    }`}
                                 >
                                   <span
                                     className={`flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full text-xs font-bold text-white ${color}`}

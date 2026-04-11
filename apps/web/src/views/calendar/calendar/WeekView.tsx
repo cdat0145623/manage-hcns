@@ -126,7 +126,7 @@ export function WeekView({
                 }`}
                 onClick={() => onCellClick(day)}
               >
-                <span className="text-neutral-600 text-[10px] font-black uppercase tracking-[0.2em]">
+                <span className="text-neutral-900 text-[10px] font-black uppercase tracking-[0.2em]">
                   {["CN", "T2", "T3", "T4", "T5", "T6", "T7"][day.getDay()]}
                 </span>
                 <div

@@ -2,7 +2,7 @@ import { t } from "@lingui/core/macro";
 import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
-import { HiXMark } from "react-icons/hi2";
+import { HiXMark, HiMiniPlus } from "react-icons/hi2";
 
 import { authClient } from "@kan/auth/client";
 
@@ -49,7 +49,7 @@ export default function CardDetailsModalContent({
   onClose,
 }: CardDetailsModalContentProps) {
   const utils = api.useUtils();
-  const { modalContentType, entityId, clearModalState, isOpen, modalStates } =
+  const { modalContentType, entityId, clearModalState, isOpen, modalStates, openModal } =
     useModal();
   const { showPopup } = usePopup();
   const { workspace } = useWorkspace();
@@ -256,7 +256,7 @@ export default function CardDetailsModalContent({
             ) : null}
           </div>
           <div className="shrink-0 border-b border-light-100 px-10 py-6 dark:border-dark-300">
-            <p className="mb-3 text-[10px] font-semibold uppercase tracking-widest text-neutral-900 dark:text-dark-500">
+            <p className="mb-3 text-[10px] font-semibold uppercase tracking-widest text-neutral-900 dark:text-dark-1000">
               {t`Mô tả`}
             </p>
             <div className="min-h-[120px] rounded-xl border border-light-100 bg-light-50/30 px-1 dark:border-dark-300/40 dark:bg-dark-200/10">
@@ -285,9 +285,20 @@ export default function CardDetailsModalContent({
 
           {/* Checklists */}
           <div className="flex-1 overflow-y-auto px-10 pb-10 pt-4">
-            <p className="mb-3 text-[10px] font-semibold uppercase tracking-widest text-neutral-900 dark:text-dark-500">
-              {t`Checklist`}
-            </p>
+            <div className="flex items-center gap-3 mb-3">
+              <p className="text-[11px] font-semibold uppercase tracking-widest text-neutral-900 dark:text-dark-1000">
+                {t`Checklist`}
+              </p>
+              {canEdit && cardId && (
+                <button
+                  onClick={() => openModal("ADD_CHECKLIST", cardId)}
+                  className="flex items-center justify-center rounded-lg bg-light-100 p-1 text-neutral-600 transition-all hover:bg-light-200 hover:text-neutral-900 dark:bg-dark-300 dark:text-dark-800 dark:hover:bg-dark-400 dark:hover:text-dark-1000"
+                  title="Thêm Checklist"
+                >
+                  <HiMiniPlus className="h-4 w-4" />
+                </button>
+              )}
+            </div>
             {card && (
               <Checklists
                 checklists={card.checklists}
@@ -303,7 +314,7 @@ export default function CardDetailsModalContent({
           <div className="relative z-50 flex shrink-0 items-center justify-end bg-white/50 py-4 pl-8 pr-8 backdrop-blur-sm dark:bg-dark-100/50">
             <div className="flex items-center gap-3">
               {card && (
-                <div className="flex h-7 w-7 items-center justify-center rounded-xl transition-all hover:bg-light-100 active:scale-95 dark:hover:bg-dark-200">
+                <div className="flex h-7 w-7 items-center justify-center rounded-xl transition-all">
                   <Dropdown
                     cardPublicId={cardId}
                     isTemplate={isTemplate}
@@ -315,7 +326,7 @@ export default function CardDetailsModalContent({
               <div className="h-3 w-px bg-light-200 dark:bg-dark-300" />
               <button
                 onClick={onClose}
-                className="flex h-7 w-7 items-center justify-center rounded-xl text-light-950 transition-all hover:bg-light-100 hover:text-light-1000 active:scale-95 dark:text-dark-600 dark:hover:bg-dark-200 dark:hover:text-dark-1000"
+                className="flex h-7 w-7 items-center justify-center rounded-xl text-light-950 transition-all hover:bg-light-100 hover:text-light-1000 active:scale-95 dark:text-dark-800 dark:hover:bg-dark-200 dark:hover:text-dark-1000"
               >
                 <HiXMark className="h-4 w-4" />
               </button>
@@ -403,7 +414,7 @@ export default function CardDetailsModalContent({
                   {card && !isTemplate && (
                     <div className="shrink-0 space-y-3">
                       <div className="flex items-center justify-between">
-                        <p className="text-[10px] font-bold uppercase tracking-widest text-neutral-900 dark:text-dark-500">
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-neutral-900 dark:text-dark-1000">
                           {t`Tài liệu đính kèm`}
                         </p>
                         {card.attachments.length > 0 && (
@@ -432,7 +443,7 @@ export default function CardDetailsModalContent({
                   <div className="h-px bg-light-200 dark:bg-dark-300" />
                   {canComment && (
                     <div className="shrink-0 space-y-1">
-                      <p className="text-[10px] font-bold uppercase tracking-widest text-neutral-900 dark:text-dark-500">
+                      <p className="text-[10px] font-bold uppercase tracking-widest text-neutral-900 dark:text-dark-1000">
                         {t`Viết bình luận`}
                       </p>
                       <div className="overflow-hidden rounded-xl border border-light-200 bg-white shadow-sm ring-1 ring-light-100/50 dark:border-dark-300 dark:bg-dark-100 dark:ring-white/5">
@@ -446,7 +457,7 @@ export default function CardDetailsModalContent({
                   {hasComments && (
                     <div className="flex-1 space-y-1">
                       <div className="flex items-center gap-2">
-                        <p className="text-[10px] font-bold uppercase tracking-widest text-neutral-900 dark:text-dark-500">
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-neutral-900 dark:text-dark-1000">
                           {t`Lịch sử bình luận`}
                         </p>
                         <div className="h-px flex-1 bg-light-200/50 dark:bg-dark-300/50" />

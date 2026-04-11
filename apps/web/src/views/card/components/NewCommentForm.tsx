@@ -92,6 +92,7 @@ const NewCommentForm = ({
           enableYouTubeEmbed={false}
           placeholder={t`Bình luận...`}
           disableHeadings={true}
+          popoverPlacement="top"
         />
       </div>
       <div className="absolute bottom-3 right-3 z-30">

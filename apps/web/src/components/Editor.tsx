@@ -476,6 +476,7 @@ export default function Editor({
   hideCharacterCount = true,
   size = "md",
   maxHeightClass,
+  popoverPlacement = "bottom",
 }: {
   content: string | null;
   onChange?: (value: string) => void;
@@ -488,6 +489,7 @@ export default function Editor({
   hideCharacterCount?: boolean;
   size?: "sm" | "md";
   maxHeightClass?: string;
+  popoverPlacement?: "top" | "bottom";
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -645,7 +647,7 @@ export default function Editor({
   return (
     <div
       ref={containerRef}
-      className={twMerge("group flex flex-col transition-all")}
+      className={twMerge("relative group flex flex-col transition-all")}
     >
       <style jsx global>{`
         .tiptap p.is-empty::before {
@@ -695,8 +697,12 @@ export default function Editor({
       `}</style>
 
       {!readOnly && editor && (
-        <div className="sticky top-0 z-40 bg-white/80 backdrop-blur-md dark:bg-dark-100/80">
-          <EditorProToolbar editor={editor} disableHeadings={disableHeadings} />
+        <div className="sticky top-0 z-40 rounded-t-xl bg-white/80 backdrop-blur-md dark:bg-dark-100/80">
+          <EditorProToolbar 
+            editor={editor} 
+            disableHeadings={disableHeadings} 
+            popoverPlacement={popoverPlacement}
+          />
         </div>
       )}
 
@@ -724,11 +730,13 @@ function ColorPicker({
   title,
   icon,
   type,
+  popoverPlacement = "bottom",
 }: {
   editor: TiptapEditor;
   title: string;
   icon: React.ReactNode;
   type: "text" | "highlight";
+  popoverPlacement?: "top" | "bottom";
 }) {
   const colors = [
     "#000000",
@@ -753,7 +761,10 @@ function ColorPicker({
 
   return (
     <Popover className="relative">
-      <Popover.Button className="flex h-7 w-7 items-center justify-center rounded-lg text-light-500 transition-all hover:bg-light-100 hover:text-light-1000 dark:text-dark-600 dark:hover:bg-dark-300 dark:hover:text-dark-1000">
+      <Popover.Button
+        type="button"
+        className="flex h-7 w-7 items-center justify-center rounded-lg text-light-500 transition-all hover:bg-light-100 hover:text-light-1000 dark:text-dark-600 dark:hover:bg-dark-300 dark:hover:text-dark-1000"
+      >
         <div className="flex flex-col items-center">
           {icon}
           <div
@@ -777,11 +788,15 @@ function ColorPicker({
         leaveFrom="transform opacity-100 scale-100"
         leaveTo="transform opacity-0 scale-95"
       >
-        <Popover.Panel className="absolute left-0 z-50 mt-1 w-44 origin-top-left rounded-xl border border-light-200 bg-white p-2 shadow-xl dark:border-dark-300 dark:bg-dark-100">
+        <Popover.Panel 
+          anchor={popoverPlacement === "top" ? "top start" : "bottom start"}
+          className="z-[100] w-44 rounded-xl border border-light-200 bg-white p-2 shadow-xl focus:outline-none dark:border-dark-300 dark:bg-dark-100"
+        >
           <div className="grid grid-cols-6 gap-1">
             {colors.map((color) => (
               <button
                 key={color}
+                type="button"
                 onClick={() => {
                   if (type === "text") {
                     editor.chain().focus().setColor(color).run();
@@ -795,6 +810,7 @@ function ColorPicker({
               />
             ))}
             <button
+              type="button"
               onClick={() => {
                 if (type === "text") {
                   editor.chain().focus().unsetColor().run();
@@ -826,6 +842,7 @@ function ToolbarButton({
 }) {
   return (
     <button
+      type="button"
       onClick={onClick}
       title={title}
       className={twMerge(
@@ -840,17 +857,21 @@ function ToolbarButton({
   );
 }
 
+interface ToolbarProps {
+  editor: TiptapEditor;
+  disableHeadings: boolean;
+  popoverPlacement?: "top" | "bottom";
+}
+
 function EditorProToolbar({
   editor,
   disableHeadings,
-}: {
-  editor: TiptapEditor;
-  disableHeadings: boolean;
-}) {
+  popoverPlacement = "bottom",
+}: ToolbarProps) {
   const extraItems = getCommandItems(disableHeadings);
 
   return (
-    <div className="flex flex-nowrap items-center gap-1 rounded-t-[11px] border-b border-light-100/80 bg-light-50/50 p-1.5 backdrop-blur-sm dark:border-dark-300/80 dark:bg-dark-100/50">
+    <div className="flex flex-nowrap items-center gap-1 rounded-t-[10px] border-b border-light-100/80 bg-light-50/50 p-1.5 px-2.5 backdrop-blur-sm dark:border-dark-300/80 dark:bg-dark-100/50">
       <div className="mx-0.5 h-4 w-px shrink-0 bg-light-200 dark:bg-dark-300" />
 
       <div className="flex shrink-0 items-center gap-0.5 pr-1">
@@ -927,6 +948,7 @@ function EditorProToolbar({
           editor={editor}
           title={t`Màu chữ`}
           type="text"
+          popoverPlacement={popoverPlacement}
           icon={
             <span className="mt-0.5 font-serif text-xs font-bold leading-none">
               A
@@ -937,6 +959,7 @@ function EditorProToolbar({
           editor={editor}
           title={t`Màu nền`}
           type="highlight"
+          popoverPlacement={popoverPlacement}
           icon={
             <div className="flex h-3 w-3 items-center justify-center rounded-sm border border-light-400 dark:border-dark-500">
               <div className="h-1.5 w-1.5 bg-yellow-400" />
@@ -948,7 +971,10 @@ function EditorProToolbar({
       <div className="min-w-1 flex-1 shrink-0" />
 
       <Menu as="div" className="relative inline-block shrink-0 text-left">
-        <Menu.Button className="flex h-7 w-7 items-center justify-center rounded-lg text-light-500 transition-all hover:bg-light-100 hover:text-light-1000 dark:text-dark-600 dark:hover:bg-dark-300 dark:hover:text-dark-1000">
+        <Menu.Button
+          type="button"
+          className="flex h-7 w-7 items-center justify-center rounded-lg text-light-500 transition-all hover:bg-light-100 hover:text-light-1000 dark:text-dark-600 dark:hover:bg-dark-300 dark:hover:text-dark-1000"
+        >
           <HiEllipsisVertical className="h-4 w-4" />
         </Menu.Button>
 
@@ -961,7 +987,10 @@ function EditorProToolbar({
           leaveFrom="transform opacity-100 scale-100"
           leaveTo="transform opacity-0 scale-95"
         >
-          <Menu.Items className="absolute right-0 z-[60] mt-1 w-48 origin-top-right rounded-xl border border-light-200 bg-white p-1.5 shadow-xl ring-1 ring-light-100/50 focus:outline-none dark:border-dark-300 dark:bg-dark-100 dark:ring-white/5">
+          <Menu.Items 
+            anchor={popoverPlacement === "top" ? "top end" : "bottom end"}
+            className="z-[100] w-48 rounded-xl border border-light-200 bg-white p-1.5 shadow-xl ring-1 ring-light-100/50 focus:outline-none dark:border-dark-300 dark:bg-dark-100 dark:ring-white/5"
+          >
             <div className="max-h-[350px] space-y-0.5 overflow-y-auto p-0.5 scrollbar-thin scrollbar-thumb-light-200 dark:scrollbar-thumb-dark-300">
               {!disableHeadings && (
                 <>
@@ -969,6 +998,7 @@ function EditorProToolbar({
                     <Menu.Item key={level}>
                       {({ active }) => (
                         <button
+                          type="button"
                           onClick={() =>
                             editor
                               .chain()
@@ -994,6 +1024,7 @@ function EditorProToolbar({
                   <Menu.Item>
                     {({ active }) => (
                       <button
+                        type="button"
                         onClick={() =>
                           editor.chain().focus().setParagraph().run()
                         }
@@ -1091,6 +1122,7 @@ function EditorProToolbar({
               <Menu.Item>
                 {({ active }) => (
                   <button
+                    type="button"
                     onClick={() =>
                       editor.chain().focus().setHorizontalRule().run()
                     }
@@ -1109,6 +1141,7 @@ function EditorProToolbar({
               <Menu.Item>
                 {({ active }) => (
                   <button
+                    type="button"
                     onClick={() =>
                       editor.chain().focus().toggleTaskList().run()
                     }
@@ -1128,6 +1161,7 @@ function EditorProToolbar({
               <Menu.Item>
                 {({ active }) => (
                   <button
+                    type="button"
                     onClick={() => {
                       const url = window.prompt("URL:");
                       if (url)
@@ -1148,6 +1182,7 @@ function EditorProToolbar({
               <Menu.Item>
                 {({ active }) => (
                   <button
+                    type="button"
                     onClick={() => editor.chain().focus().unsetLink().run()}
                     disabled={!editor.isActive("link")}
                     className={twMerge(
@@ -1167,6 +1202,7 @@ function EditorProToolbar({
               <Menu.Item>
                 {({ active }) => (
                   <button
+                    type="button"
                     onClick={() => editor.chain().focus().clearNodes().run()}
                     className={twMerge(
                       "flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs font-semibold transition-colors",
@@ -1227,6 +1263,7 @@ function EditorBubbleMenu({ editor }: { editor: TiptapEditor | null }) {
         {bubbleMenuItems.map((item) => (
           <Button
             key={item.title}
+            type="button"
             className={twMerge(
               "rounded p-1 text-light-900 focus:ring-2 focus:ring-light-600 dark:text-dark-900 dark:focus:ring-dark-600",
               item.active && "bg-light-100 dark:bg-dark-400",

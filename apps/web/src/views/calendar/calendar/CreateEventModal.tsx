@@ -9,7 +9,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { authClient } from "@kan/auth/client";
 import { generateRRuleString } from "@kan/shared/utils";
 
+import type { WorkspaceMember } from "~/components/Editor";
 import type { RecurrenceType } from "~/hooks/useRecurrence";
+import Editor from "~/components/Editor";
 import { usePopup } from "~/providers/popup";
 import { api } from "~/utils/api";
 import Modal from "../../../components/modal";
@@ -176,6 +178,18 @@ export function CreateEventModal({
     if (currentUser.role === "ADMIN") return users;
     return users.filter((u) => u.id === currentUser.id);
   }, [currentUser, users]);
+
+  const workspaceMembers = useMemo<WorkspaceMember[]>(() => {
+    return users.map((u) => ({
+      publicId: u.id,
+      email: u.email ?? "",
+      user: {
+        id: u.id,
+        name: u.name,
+        image: null,
+      },
+    }));
+  }, [users]);
 
   const createTask = api.taskMaster.create.useMutation({
     onSuccess: () => {
@@ -650,24 +664,25 @@ export function CreateEventModal({
                 onChange={(e) => setTitle(e.target.value)}
                 placeholder="Nhập tiêu đề"
                 autoFocus
-                className={`
-                  w-full rounded-xl border border-neutral-200/70 bg-neutral-50/50 px-4 py-2.5 text-base font-semibold text-neutral-900 placeholder-neutral-400 shadow-[inset_0_2px_4px_rgba(0,0,0,0.02)] transition-all hover:bg-neutral-50 focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-[3px] focus:ring-blue-500/10 dark:border-dark-400/50 dark:bg-dark-300/50 dark:text-white dark:focus:bg-dark-200
-                  ${hasAttemptedSave && title === ""
+                className={`w-full rounded-xl border border-neutral-200/70 bg-neutral-50/50 px-4 py-2.5 text-base font-semibold text-neutral-900 placeholder-neutral-400 shadow-[inset_0_2px_4px_rgba(0,0,0,0.02)] transition-all hover:bg-neutral-50 focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-[3px] focus:ring-blue-500/10 dark:border-dark-400/50 dark:bg-dark-300/50 dark:text-white dark:focus:bg-dark-200 ${
+                  hasAttemptedSave && title === ""
                     ? "border-red-400 bg-red-50/60 dark:border-red-800/50 dark:bg-red-900/20"
-                    : ""}
-                `}
+                    : ""
+                } `}
               />
             </div>
 
             <div className="space-y-1.5">
               <Label>Mô tả</Label>
-              <textarea
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="Nhập mô tả (tùy chọn)"
-                rows={5}
-                className="w-full resize-none rounded-xl border border-neutral-200/70 bg-neutral-50/50 px-4 py-2.5 text-sm text-neutral-900 placeholder-neutral-400 shadow-[inset_0_2px_4px_rgba(0,0,0,0.02)] transition-all hover:bg-neutral-50 focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-[3px] focus:ring-blue-500/10 dark:border-dark-400/50 dark:bg-dark-300/50 dark:text-white dark:focus:bg-dark-200"
-              />
+              <div className="rounded-xl border border-neutral-200/70 bg-neutral-50/50 shadow-[inset_0_2px_4px_rgba(0,0,0,0.02)] transition-all focus-within:border-blue-500 focus-within:bg-white focus-within:ring-[3px] focus-within:ring-blue-500/10 dark:border-dark-400/50 dark:bg-dark-300/50">
+                <Editor
+                  content={description}
+                  onChange={setDescription}
+                  workspaceMembers={workspaceMembers}
+                  placeholder="Nhập mô tả (tùy chọn)"
+                  maxHeightClass="max-h-[200px]"
+                />
+              </div>
             </div>
 
             <motion.div
@@ -941,9 +956,7 @@ export function CreateEventModal({
 
             <div className="space-y-2.5">
               <Label>Giao việc cho</Label>
-
               <div className="relative" ref={assigneeRef}>
-<<<<<<< HEAD
                 {currentUser?.role === "ADMIN" ? (
                   <>
                     <button
@@ -966,83 +979,7 @@ export function CreateEventModal({
                               const name = u
                                 ? u.name || u.username || u.email || ""
                                 : "";
-=======
-                  {currentUser?.role === "ADMIN" ? (
-                    <>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setShowAssigneeOptions(!showAssigneeOptions)
-                        }
-                        className={`flex w-full items-center justify-between rounded-2xl border px-4 py-4 text-sm font-medium shadow-[0_2px_10px_rgba(0,0,0,0.06)] transition-all hover:shadow-[0_4px_16px_rgba(0,0,0,0.1)] focus:outline-none ${
-                          hasAttemptedSave && !selectedUserId
-                            ? "border-red-400 bg-red-50/60 text-red-500 dark:border-red-900/50 dark:bg-red-900/20 dark:text-red-400"
-                            : selectedUserId
-                              ? "border-blue-200 bg-blue-50/60 text-blue-700 dark:border-blue-800/50 dark:bg-blue-900/20 dark:text-blue-300"
-                              : "border-neutral-200/70 bg-neutral-50/50 text-neutral-400 dark:border-dark-400/50 dark:bg-dark-300/50 dark:text-neutral-500"
-                        }`}
-                      >
-                        <span className="flex items-center gap-2">
-                          {selectedUserId && users
-                            ? (() => {
-                                const u = users.find(
-                                  (x) => x.id === selectedUserId,
-                                );
-                                const name = u
-                                  ? u.name || u.username || u.email || ""
-                                  : "";
-                                const initials = name
-                                  .split(" ")
-                                  .map((w: string) => w[0])
-                                  .join("")
-                                  .slice(0, 2)
-                                  .toUpperCase();
-                                return (
-                                  <>
-                                    <span className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-500 text-[10px] font-bold text-white">
-                                      {initials}
-                                    </span>
-                                    <span>{name}</span>
-                                  </>
-                                );
-                              })()
-                            : "Chọn người thực hiện..."}
-                        </span>
-                        <motion.svg
-                          animate={{ rotate: showAssigneeOptions ? 180 : 0 }}
-                          transition={{ duration: 0.2 }}
-                          className={`h-4 w-4 flex-shrink-0 ${
-                            selectedUserId
-                              ? "text-blue-500"
-                              : "text-neutral-400"
-                          }`}
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          stroke="currentColor"
-                          strokeWidth={2.5}
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            d="M19 9l-7 7-7-7"
-                          />
-                        </motion.svg>
-                      </button>
 
-                      {/* Dropdown list for Admins */}
-                      <AnimatePresence>
-                        {showAssigneeOptions && (
-                          <motion.div
-                            initial={{ opacity: 0, scale: 0.96, y: -6 }}
-                            animate={{ opacity: 1, scale: 1, y: 0 }}
-                            exit={{ opacity: 0, scale: 0.96, y: -6 }}
-                            transition={{ duration: 0.15, ease: "easeOut" }}
-                            className="absolute left-0 right-0 top-full z-50 mt-2 max-h-72 overflow-y-auto rounded-2xl border border-neutral-200/80 bg-white shadow-[0_8px_30px_rgba(0,0,0,0.12)] dark:border-dark-300 dark:bg-dark-100"
-                          >
-                            {filteredUsers.map((user, idx) => {
-                              const name =
-                                user.name || user.username || user.email || "";
->>>>>>> 991f9e461f92f5e43c125bc9c92e43efddb21cb5
                               const initials = name
                                 .split(" ")
                                 .map((w: string) => w[0])
@@ -1050,28 +987,8 @@ export function CreateEventModal({
                                 .slice(0, 2)
                                 .toUpperCase();
                               return (
-<<<<<<< HEAD
                                 <>
                                   <span className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-500 text-[10px] font-bold text-white">
-=======
-                                <button
-                                  key={user.id}
-                                  type="button"
-                                  onMouseDown={(e) => {
-                                    e.preventDefault();
-                                    setSelectedUserId(user.id);
-                                    setShowAssigneeOptions(false);
-                                  }}
-                                  className={`flex w-full items-center gap-3 px-4 py-2 text-left text-sm font-medium transition-colors 
-                                    ${isSelected
-                                      ? "bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-300"
-                                      : "text-neutral-700 hover:bg-neutral-50 dark:text-neutral-300 dark:hover:bg-dark-200"
-                                    }`}
-                                >
-                                  <span
-                                    className={`flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full text-xs font-bold text-white ${color}`}
-                                  >
->>>>>>> 991f9e461f92f5e43c125bc9c92e43efddb21cb5
                                     {initials}
                                   </span>
                                   <span>{name}</span>

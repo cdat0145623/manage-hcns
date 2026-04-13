@@ -56,30 +56,37 @@ export const getAvatarUrl = (imageOrKey: string | null | undefined) => {
   return `/${avatarBucket}/${imageOrKey}`;
 };
 
-export const getAttachmentUrl = (key: string | null | undefined, contentType?: string | null) => {
+export const getAttachmentUrl = (
+  key: string | null | undefined,
+  contentType?: string | null,
+) => {
   if (!key) return "";
 
-  if (key.startsWith("http://") || key.startsWith("https://") || key.startsWith("/")) {
+  if (
+    key.startsWith("http://") ||
+    key.startsWith("https://") ||
+    key.startsWith("/")
+  ) {
     return key;
   }
 
-  const isImage = contentType?.startsWith("image/");
-  const bucket = isImage 
-    ? (env.NEXT_PUBLIC_AVATAR_BUCKET_NAME ?? "images")
-    : (env.NEXT_PUBLIC_ATTACHMENTS_BUCKET_NAME ?? "my-app");
-
-  return `/${bucket}/${key}`;
+  // Use download endpoint to proxy through server (for MinIO/S3 access)
+  const bucket = env.NEXT_PUBLIC_ATTACHMENTS_BUCKET_NAME ?? "attachments";
+  const encodedKey = encodeURIComponent(key);
+  const filename = key.split("/").pop() ?? "attachment";
+  const encodedFilename = encodeURIComponent(filename);
+  return `/api/download/attatchment?url=${encodedKey}&filename=${encodedFilename}&bucket=${bucket}`;
 };
 
 export const fixServerDate = (date: Date | string | number) => {
   const d = new Date(date);
   const now = new Date();
-  
+
   // If the date is more than 30 minutes in the future, it's almost certainly the timezone shift bug
   // We subtract 7 hours (25200000 ms) to restore it to the correct local time
   if (d.getTime() - now.getTime() > 30 * 60 * 1000) {
     return new Date(d.getTime() - 7 * 60 * 60 * 1000);
   }
-  
+
   return d;
 };

@@ -53,6 +53,9 @@ RUN --mount=type=cache,id=pnpm,target=~/.pnpm-store pnpm install --frozen-lockfi
 # ============================================
 FROM alpine AS builder
 ARG APP_VERSION
+ARG NEXT_PUBLIC_AVATAR_BUCKET_NAME
+ARG NEXT_PUBLIC_ATTACHMENTS_BUCKET_NAME
+ARG NEXT_PUBLIC_STORAGE_URL
 
 WORKDIR /app
 
@@ -63,6 +66,9 @@ COPY --from=pruner /app/AUTO_VERSION /tmp/AUTO_VERSION
 # Force standalone output for production Docker image
 ENV NEXT_PUBLIC_USE_STANDALONE_OUTPUT=true
 ENV CI=true
+ENV NEXT_PUBLIC_AVATAR_BUCKET_NAME=$NEXT_PUBLIC_AVATAR_BUCKET_NAME
+ENV NEXT_PUBLIC_ATTACHMENTS_BUCKET_NAME=$NEXT_PUBLIC_ATTACHMENTS_BUCKET_NAME
+ENV NEXT_PUBLIC_STORAGE_URL=$NEXT_PUBLIC_STORAGE_URL
 
 RUN VERSION="${APP_VERSION:-$(cat /tmp/AUTO_VERSION 2>/dev/null | tr -d '\n\r' || echo 'unknown')}" && \
     NEXT_PUBLIC_APP_VERSION="$VERSION" pnpm build --filter=@kan/web

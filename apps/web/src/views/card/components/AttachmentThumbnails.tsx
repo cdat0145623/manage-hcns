@@ -1,27 +1,30 @@
 import Image from "next/image";
 import { Dialog, Transition } from "@headlessui/react";
 import { t } from "@lingui/core/macro";
+import { skipToken } from "@tanstack/react-query";
 import { Fragment, useEffect, useState } from "react";
 import {
+  HiArchiveBox,
   HiArrowDownTray,
   HiChevronLeft,
   HiChevronRight,
-  HiDocumentText,
-  HiOutlineTrash,
-  HiXMark,
-  HiDocument,
-  HiPhoto,
-  HiFilm,
-  HiArchiveBox,
   HiCodeBracket,
+  HiDocument,
+  HiDocumentText,
+  HiFilm,
+  HiOutlineTrash,
   HiPencil,
+  HiPhoto,
+  HiXMark,
 } from "react-icons/hi2";
 
 import { usePopup } from "~/providers/popup";
 import { api } from "~/utils/api";
-import { invalidateCard, invalidateTaskInstance } from "~/utils/cardInvalidation";
-import { skipToken } from "@tanstack/react-query";
-import { getAttachmentUrl, fixServerDate } from "~/utils/helpers";
+import {
+  invalidateCard,
+  invalidateTaskInstance,
+} from "~/utils/cardInvalidation";
+import { fixServerDate, getAttachmentUrl } from "~/utils/helpers";
 
 interface Attachment {
   publicId: string;
@@ -82,24 +85,24 @@ export function AttachmentThumbnails({
 
   const deleteAttachment = api.attachment.delete.useMutation({
     onMutate: async (args) => {
-    if (isReadOnly || !cardPublicId) return;
+      if (isReadOnly || !cardPublicId) return;
 
-    await utils.card.byId.cancel({ cardPublicId });
-    const currentState = utils.card.byId.getData({ cardPublicId });
+      await utils.card.byId.cancel({ cardPublicId });
+      const currentState = utils.card.byId.getData({ cardPublicId });
 
-    utils.card.byId.setData({ cardPublicId }, (oldCard) => {
-      if (!oldCard) return oldCard;
-      const updatedAttachments = oldCard.attachments.filter(
-        (attachment) => attachment.publicId !== args.attachmentPublicId,
-      );
-      return { ...oldCard, attachments: updatedAttachments };
-    });
+      utils.card.byId.setData({ cardPublicId }, (oldCard) => {
+        if (!oldCard) return oldCard;
+        const updatedAttachments = oldCard.attachments.filter(
+          (attachment) => attachment.publicId !== args.attachmentPublicId,
+        );
+        return { ...oldCard, attachments: updatedAttachments };
+      });
 
-    return { previousState: currentState };
-  },
-  onError: (_error, _args, context) => {
-    if (isReadOnly || !cardPublicId) return;
-    utils.card.byId.setData({ cardPublicId }, context?.previousState);
+      return { previousState: currentState };
+    },
+    onError: (_error, _args, context) => {
+      if (isReadOnly || !cardPublicId) return;
+      utils.card.byId.setData({ cardPublicId }, context?.previousState);
       showPopup({
         header: t`Unable to delete attachment`,
         message: t`Please try again later, or contact customer support.`,
@@ -203,7 +206,10 @@ export function AttachmentThumbnails({
               key={attachment.publicId}
               attachment={{
                 publicId: attachment.publicId,
-                url: getAttachmentUrl(attachment.newFileUrl, attachment.mimeType),
+                url: getAttachmentUrl(
+                  attachment.newFileUrl,
+                  attachment.mimeType,
+                ),
                 originalFilename: attachment.fileName ?? "",
                 contentType: attachment.mimeType ?? "",
               }}
@@ -374,10 +380,11 @@ export function AttachmentThumbnails({
                     <div className="relative">
                       <div className="relative mx-auto max-h-[90vh] w-full">
                         <img
-                          src={getAttachmentUrl(selectedAttachment.newFileUrl, selectedAttachment.mimeType)}
-                          alt={
-                            selectedAttachment.fileName ?? "Attachment"
-                          }
+                          src={getAttachmentUrl(
+                            selectedAttachment.newFileUrl,
+                            selectedAttachment.mimeType,
+                          )}
+                          alt={selectedAttachment.fileName ?? "Attachment"}
                           className="mx-auto max-h-[90vh] w-auto object-contain"
                         />
                       </div>
@@ -421,12 +428,10 @@ function AttachmentThumbnail({
       aria-label={`View ${attachment.originalFilename}`}
     >
       {isImage ? (
-        <Image
+        <img
           src={attachment.url}
           alt={attachment.originalFilename}
-          fill
-          className="object-cover"
-          sizes="64px"
+          className="h-full w-full object-cover"
         />
       ) : (
         <div className="flex h-full w-full items-center justify-center bg-light-100 dark:bg-dark-100">
@@ -472,12 +477,17 @@ function FileListItem({
         await utils.card.byId.cancel({ cardPublicId });
         const previousCard = utils.card.byId.getData({ cardPublicId });
         if (previousCard) {
-          utils.card.byId.setData({ cardPublicId }, {
-            ...previousCard,
-            attachments: previousCard.attachments.map(att => 
-              att.publicId === args.attachmentPublicId ? { ...att, originalFilename: args.originalFilename } : att
-            )
-          });
+          utils.card.byId.setData(
+            { cardPublicId },
+            {
+              ...previousCard,
+              attachments: previousCard.attachments.map((att) =>
+                att.publicId === args.attachmentPublicId
+                  ? { ...att, originalFilename: args.originalFilename }
+                  : att,
+              ),
+            },
+          );
         }
         return { previousCard };
       }
@@ -524,7 +534,7 @@ function FileListItem({
   }
 
   return (
-    <div className="group flex w-full items-center gap-3 rounded-lg border border-light-300 bg-light-50 px-3 py-2 dark:border-dark-200 dark:bg-dark-100 transition-colors hover:bg-light-100 dark:hover:bg-dark-200">
+    <div className="group flex w-full items-center gap-3 rounded-lg border border-light-300 bg-light-50 px-3 py-2 transition-colors hover:bg-light-100 dark:border-dark-200 dark:bg-dark-100 dark:hover:bg-dark-200">
       <div className="flex-shrink-0">
         <Icon className="h-6 w-6 text-light-700 dark:text-dark-700" />
       </div>
@@ -557,8 +567,8 @@ function FileListItem({
           </span>
         )} */}
       </div>
-      <div className="flex items-center gap-2 opacity-100 sm:opacity-0 transition-opacity sm:group-hover:opacity-100">
-        <div className="flex flex-col items-end text-xs text-light-500 dark:text-dark-900 pr-2">
+      <div className="flex items-center gap-2 opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100">
+        <div className="flex flex-col items-end pr-2 text-xs text-light-500 dark:text-dark-900">
           <span>
             {attachment.fileSize != null &&
               !isNaN(attachment.fileSize) &&

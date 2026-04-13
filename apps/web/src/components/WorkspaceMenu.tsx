@@ -20,6 +20,8 @@ export default function WorkspaceMenu({
   const { openModal } = useModal();
   const [isOpen, setIsOpen] = useState(false);
 
+  const isAdmin = workspace.role === "ADMIN";
+
   const { tooltipContent: commandPaletteShortcutTooltipContent } =
     useKeyboardShortcut({
       type: "PRESS",
@@ -144,16 +146,18 @@ export default function WorkspaceMenu({
                 </div>
               ))}
             </div>
-            <div className="border-t-[1px] border-light-600 p-1 dark:border-dark-500">
-              <Menu.Item>
-                <button
-                  onClick={() => openModal("NEW_WORKSPACE")}
-                  className="flex w-full items-center justify-between rounded-[5px] px-3 py-2 text-left text-xs text-neutral-900 hover:bg-light-200 dark:text-dark-1000 dark:hover:bg-dark-400"
-                >
-                  {t`Create workspace`}
-                </button>
-              </Menu.Item>
-            </div>
+            {isAdmin && (
+              <div className="border-t-[1px] border-light-600 p-1 dark:border-dark-500">
+                <Menu.Item>
+                  <button
+                    onClick={() => openModal("NEW_WORKSPACE")}
+                    className="flex w-full items-center justify-between rounded-[5px] px-3 py-2 text-left text-xs text-neutral-900 hover:bg-light-200 dark:text-dark-1000 dark:hover:bg-dark-400"
+                  >
+                    {t`Create workspace`}
+                  </button>
+                </Menu.Item>
+              </div>
+            )}
           </Menu.Items>
         </Transition>
       </Menu>

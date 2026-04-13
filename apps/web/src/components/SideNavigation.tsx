@@ -55,14 +55,15 @@ function SideNavigation({
   onCloseSideNav,
 }: SideNavigationProps) {
   const router = useRouter();
-  const { workspace } = useWorkspace();
+  const { workspace, hasLoaded } = useWorkspace();
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isInitialised, setIsInitialised] = useState(false);
   const { openModal } = useModal();
+  const { data: currentUser } = api.user.getUser.useQuery();
 
   const { data: workspaceData } = api.workspace.byId.useQuery(
     { workspacePublicId: workspace.publicId },
-    { enabled: !!workspace.publicId && workspace.publicId.length >= 12 },
+    { enabled: hasLoaded && !!workspace.publicId && workspace.publicId.length >= 12 },
   );
 
   const utils = api.useUtils();
@@ -139,55 +140,60 @@ function SideNavigation({
         description: t`Go to calendar`,
       },
     },
-    {
-      name: "Mẫu bảng",
-      href: "/templates",
-      icon: isDarkMode ? templatesIconDark : templatesIconLight,
-      keyboardShortcut: {
-        type: "SEQUENCE",
-        strokes: [{ key: "G" }, { key: "T" }],
-        action: () => router.push("/templates"),
-        group: "NAVIGATION",
-        description: t`Go to templates`,
-      },
-    },
-    {
-      name: "Quyền",
-      href: "/members",
-      icon: isDarkMode ? membersIconDark : membersIconLight,
-      keyboardShortcut: {
-        type: "SEQUENCE",
-        strokes: [{ key: "G" }, { key: "M" }],
-        action: () => router.push("/members"),
-        group: "NAVIGATION",
-        description: t`Go to members`,
-      },
-    },
-    {
-      name: "Tài khoản",
-      href: "/account",
-      icon: isDarkMode ? membersIconDark : membersIconLight,
-      keyboardShortcut: {
-        type: "SEQUENCE",
-        strokes: [{ key: "G" }, { key: "A" }],
-        action: () => router.push("/account"),
-        group: "NAVIGATION",
-        description: t`Go to account`,
-      },
-    },
-    {
-      name: "Cài đặt",
-      href: "/settings",
-      icon: isDarkMode ? settingsIconDark : settingsIconLight,
-      keyboardShortcut: {
-        type: "SEQUENCE",
-        strokes: [{ key: "G" }, { key: "S" }],
-        action: () => router.push("/settings"),
-        group: "NAVIGATION",
-        description: t`Go to settings`,
-      },
-    },
   ];
+
+  if (currentUser?.role === "ADMIN") {
+    navigation.push(
+      {
+        name: "Mẫu bảng",
+        href: "/templates",
+        icon: isDarkMode ? templatesIconDark : templatesIconLight,
+        keyboardShortcut: {
+          type: "SEQUENCE",
+          strokes: [{ key: "G" }, { key: "T" }],
+          action: () => router.push("/templates"),
+          group: "NAVIGATION",
+          description: t`Go to templates`,
+        },
+      },
+      {
+        name: "Quyền",
+        href: "/members",
+        icon: isDarkMode ? membersIconDark : membersIconLight,
+        keyboardShortcut: {
+          type: "SEQUENCE",
+          strokes: [{ key: "G" }, { key: "M" }],
+          action: () => router.push("/members"),
+          group: "NAVIGATION",
+          description: t`Go to members`,
+        },
+      },
+      {
+        name: "Tài khoản",
+        href: "/account",
+        icon: isDarkMode ? membersIconDark : membersIconLight,
+        keyboardShortcut: {
+          type: "SEQUENCE",
+          strokes: [{ key: "G" }, { key: "A" }],
+          action: () => router.push("/account"),
+          group: "NAVIGATION",
+          description: t`Go to account`,
+        },
+      },
+      {
+        name: "Cài đặt",
+        href: "/settings",
+        icon: isDarkMode ? settingsIconDark : settingsIconLight,
+        keyboardShortcut: {
+          type: "SEQUENCE",
+          strokes: [{ key: "G" }, { key: "S" }],
+          action: () => router.push("/settings"),
+          group: "NAVIGATION",
+          description: t`Go to settings`,
+        },
+      },
+    )
+  }
 
   const toggleCollapse = () => {
     setIsCollapsed(!isCollapsed);
@@ -248,9 +254,11 @@ function SideNavigation({
                     } else if (item.href === "/boards") {
                       void utils.workspace.all.prefetch();
                     } else if (item.href === "/reports") {
-                      void utils.workspace.byId.prefetch({ 
-                        workspacePublicId: workspace.publicId 
-                      });
+                      if (hasLoaded && workspace.publicId && workspace.publicId.length >= 12) {
+                        void utils.workspace.byId.prefetch({ 
+                          workspacePublicId: workspace.publicId 
+                        });
+                      }
                     }
                   }}
                 />

@@ -50,7 +50,7 @@ export const WorkspaceProvider: React.FC<{ children: ReactNode }> = ({
 
   const workspacePublicId = useSearchParams().get("workspacePublicId");
 
-  const { data, isLoading } = api.workspace.all.useQuery();
+  const { data, isLoading, isSuccess } = api.workspace.all.useQuery();
   const utils = api.useUtils();
 
   const switchWorkspace = (_workspace: Workspace) => {
@@ -65,68 +65,76 @@ export const WorkspaceProvider: React.FC<{ children: ReactNode }> = ({
   };
 
   useEffect(() => {
-    if (!data?.length) {
-      if (!isLoading) setHasLoaded(true);
+    if (isLoading) {
+      setHasLoaded(false);
       return;
     }
+
+    if (!isSuccess) {
+      return;
+    }
+
+    if (data == null || data.length === 0) {
+      setHasLoaded(true);
+      return;
+    }
+
+    const workspaces = data.map(({ workspace, role }) => ({
+      role,
+      publicId: workspace.publicId,
+      name: workspace.name,
+      slug: workspace.slug,
+      description: workspace.description,
+      plan: workspace.plan,
+      weekStartDay: workspace.weekStartDay,
+    })) as Workspace[];
+
+    setAvailableWorkspaces(workspaces);
 
     const storedWorkspaceId: string | null =
       workspacePublicId ?? localStorage.getItem("workspacePublicId");
 
-    if (data.length) {
-      const workspaces = data.map(({ workspace, role }) => ({
-        role,
-        publicId: workspace.publicId,
-        name: workspace.name,
-        slug: workspace.slug,
-        description: workspace.description,
-        plan: workspace.plan,
-        weekStartDay: workspace.weekStartDay,
-        hasLoaded: true,
-      })) as Workspace[];
-
-      if (workspaces.length) setAvailableWorkspaces(workspaces);
-    }
-
     if (storedWorkspaceId !== null) {
-      const newData = data;
-      const selectedWorkspace = newData.find(
+      const selectedWorkspace = data.find(
         ({ workspace }) => workspace.publicId === storedWorkspaceId,
       );
 
-      if (!selectedWorkspace?.workspace) return;
+      if (selectedWorkspace?.workspace) {
+        setWorkspace({
+          publicId: selectedWorkspace.workspace.publicId,
+          name: selectedWorkspace.workspace.name,
+          slug: selectedWorkspace.workspace.slug,
+          plan: selectedWorkspace.workspace.plan,
+          description: selectedWorkspace.workspace.description,
+          role: selectedWorkspace.role,
+          weekStartDay: selectedWorkspace.workspace.weekStartDay as 0 | 1 | 6,
+        });
 
-      setWorkspace({
-        publicId: selectedWorkspace.workspace.publicId,
-        name: selectedWorkspace.workspace.name,
-        slug: selectedWorkspace.workspace.slug,
-        plan: selectedWorkspace.workspace.plan,
-        description: selectedWorkspace.workspace.description,
-        role: selectedWorkspace.role,
-        weekStartDay: selectedWorkspace.workspace.weekStartDay as 0 | 1 | 6,
-      });
-
-      if (workspacePublicId) {
-        router.push(`/boards`);
-        localStorage.setItem("workspacePublicId", workspacePublicId);
+        if (workspacePublicId) {
+          localStorage.setItem("workspacePublicId", workspacePublicId);
+          router.push(`/boards`);
+        }
       }
     } else {
       const primaryWorkspace = data[0]?.workspace;
       const primaryWorkspaceRole = data[0]?.role;
 
-      if (!primaryWorkspace || !primaryWorkspaceRole) return;
-      localStorage.setItem("workspacePublicId", primaryWorkspace.publicId);
-      setWorkspace({
-        publicId: primaryWorkspace.publicId,
-        name: primaryWorkspace.name,
-        slug: primaryWorkspace.slug,
-        plan: primaryWorkspace.plan,
-        description: primaryWorkspace.description,
-        role: primaryWorkspaceRole,
-        weekStartDay: primaryWorkspace.weekStartDay as 0 | 1 | 6,
-      });
+      if (primaryWorkspace && primaryWorkspaceRole) {
+        localStorage.setItem("workspacePublicId", primaryWorkspace.publicId);
+        setWorkspace({
+          publicId: primaryWorkspace.publicId,
+          name: primaryWorkspace.name,
+          slug: primaryWorkspace.slug,
+          plan: primaryWorkspace.plan,
+          description: primaryWorkspace.description,
+          role: primaryWorkspaceRole,
+          weekStartDay: primaryWorkspace.weekStartDay as 0 | 1 | 6,
+        });
+      }
     }
-  }, [data, isLoading, workspacePublicId, router]);
+
+    setHasLoaded(true);
+  }, [data, isLoading, isSuccess, workspacePublicId, router]);
 
   return (
     <WorkspaceContext.Provider

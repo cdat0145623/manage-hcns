@@ -6,6 +6,7 @@ import { api } from "~/utils/api";
 import Input from "~/components/Input";
 import Button from "~/components/Button";
 import { HiXMark } from "react-icons/hi2";
+import { useWorkspace } from "~/providers/workspace";
 
 const ROLES = ["ADMIN", "NVKT_MANAGER", "NVKD_MANAGER", "NVVP"] as const;
 
@@ -13,6 +14,7 @@ export default function CreateAccount({ onClose }: { onClose: () => void }) {
   const router = useRouter();
   const { data: user, isLoading: isUserLoading } = api.user.getUser.useQuery();
   const createMutation = api.user.create.useMutation();
+  const { workspace } = useWorkspace();
 
   const [form, setForm] = useState({
     name: "",
@@ -21,6 +23,7 @@ export default function CreateAccount({ onClose }: { onClose: () => void }) {
     password: "",
     confirmPassword: "",
     role: "NVVP" as typeof ROLES[number],
+    workspacePublicId: workspace?.publicId ?? "",
   });
   
   const [error, setError] = useState("");
@@ -72,6 +75,7 @@ export default function CreateAccount({ onClose }: { onClose: () => void }) {
         username: form.username,
         password: form.password,
         role: form.role as any,
+        workspacePublicId: workspace?.publicId ?? "",
       });
       setSuccess(t`Tạo tài khoản thành công!`);
       setForm({
@@ -81,6 +85,7 @@ export default function CreateAccount({ onClose }: { onClose: () => void }) {
         password: "",
         confirmPassword: "",
         role: "NVVP",
+        workspacePublicId: workspace?.publicId ?? "",
       });
     } catch (err: any) {
       setError(err.message || t`Đã có lỗi xảy ra.`);

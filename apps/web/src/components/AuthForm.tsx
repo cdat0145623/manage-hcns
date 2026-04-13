@@ -2,6 +2,7 @@ import { useSearchParams } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { t } from "@lingui/core/macro";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
@@ -38,9 +39,14 @@ export function Auth({ isSignUp }: AuthProps) {
   const [isLoginPending, setIsLoginPending] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
   const { showPopup } = usePopup();
+  const router = useRouter();
+  const ALLOWED_REDIRECTS = ["/boards", "/reports"];
 
   const redirect = useSearchParams().get("next");
-  const callbackURL = redirect ?? "/boards";
+  const callbackURL =
+    redirect && ALLOWED_REDIRECTS.includes(redirect)
+      ? redirect
+      : "/boards";
 
   const {
     register,
@@ -66,12 +72,14 @@ export function Auth({ isSignUp }: AuthProps) {
           callbackURL,
         },
         {
-          onSuccess: () =>
+          onSuccess: () =>{
             showPopup({
               header: t`Success`,
               message: t`You have been signed up successfully.`,
               icon: "success",
             }),
+            router.push(callbackURL);
+          },
           onError: (ctx: { error: { message?: string } }) =>
             setLoginError(ctx.error.message || t`An error occurred`),
         },
@@ -86,12 +94,14 @@ export function Auth({ isSignUp }: AuthProps) {
           callbackURL,
         },
         {
-          onSuccess: () =>
+          onSuccess: () =>{
             showPopup({
               header: t`Success`,
               message: t`You have been logged in successfully.`,
               icon: "success",
             }),
+            router.push(callbackURL);
+          },
           onError: (ctx: { error: { message?: string } }) =>
             setLoginError(ctx.error.message || t`An error occurred`),
         },

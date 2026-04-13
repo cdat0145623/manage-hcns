@@ -48,13 +48,13 @@ function AccountTableRow({
   onEdit,
   onUpdateStatus,
 }: AccountTableRowProps) {
-  const { workspace } = useWorkspace();
+  const { workspace, hasLoaded } = useWorkspace();
   const { showPopup } = usePopup();
   const utils = api.useUtils();
 
   const updateRoleMutation = api.member.updateRole.useMutation({
     onSuccess: async () => {
-      if (workspace.publicId && workspace.publicId.length >= 12) {
+      if (hasLoaded && workspace.publicId && workspace.publicId.length >= 12) {
         await utils.workspace.byId.invalidate({
           workspacePublicId: workspace.publicId,
         });
@@ -177,13 +177,13 @@ function SkeletonRow({ isLastRow }: { isLastRow?: boolean }) {
 }
 
 export default function Account() {
-  const { workspace } = useWorkspace();
+  const { workspace, hasLoaded } = useWorkspace();
   const { showPopup } = usePopup();
   const utils = api.useUtils();
 
   const { data, isLoading } = api.workspace.byId.useQuery(
     { workspacePublicId: workspace.publicId },
-    { enabled: !!workspace.publicId && workspace.publicId.length >= 12 },
+    { enabled: hasLoaded && !!workspace.publicId && workspace.publicId.length >= 12 },
   );
 
   const [editingMember, setEditingMember] = useState<MemberData | null>(null);
@@ -192,7 +192,7 @@ export default function Account() {
 
   const updateStatusUser = api.user.updateStatus.useMutation({
     onSuccess: async () => {
-      if (workspace.publicId && workspace.publicId.length >= 12) {
+      if (hasLoaded && workspace.publicId && workspace.publicId.length >= 12) {
         await utils.workspace.byId.invalidate({
           workspacePublicId: workspace.publicId,
         });

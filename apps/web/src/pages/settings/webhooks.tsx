@@ -11,6 +11,6 @@ const WebhookSettingsPage: NextPageWithLayout = () => {
   );
 };
 
-WebhookSettingsPage.getLayout = (page) => getDashboardLayout(page);
+WebhookSettingsPage.getLayout = (page) => getDashboardLayout(page, undefined, false, "ADMIN");
 
 export default WebhookSettingsPage;

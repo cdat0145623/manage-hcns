@@ -45,12 +45,14 @@ const Filters = ({
   members,
   lists,
   isLoading,
+  isAdmin,
 }: {
   position?: "left" | "right";
   labels: Label[];
   members: Member[];
   lists: List[];
   isLoading: boolean;
+  isAdmin: boolean;
 }) => {
   const router = useRouter();
 
@@ -140,7 +142,7 @@ const Filters = ({
   ];
 
   const groups = [
-    ...(formattedMembers.length
+    ...(formattedMembers.length && isAdmin
       ? [
           {
             key: "members",

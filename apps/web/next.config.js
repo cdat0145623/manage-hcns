@@ -86,11 +86,10 @@ const config = {
     },
   },
   serverExternalPackages: ["pino"],
-
+  allowedDevOrigins: ["192.168.1.115"],
   experimental: {
     // instrumentationHook: true,
     swcPlugins: [["@lingui/swc-plugin", {}]],
-    // allowedDevOrigins: ["192.168.1.115"],
   },
 
   async rewrites() {

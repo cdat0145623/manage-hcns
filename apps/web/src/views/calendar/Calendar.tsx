@@ -29,6 +29,8 @@ import { EventDetailModal } from "./calendar/EventDetailModal";
 import { MonthView } from "./calendar/MonthView";
 import { SuccessModal } from "./calendar/SuccessModal";
 import { WeekView } from "./calendar/WeekView";
+import { NewWorkspaceForm } from "~/components/NewWorkspaceForm";
+import { useModal } from "~/providers/modal";
 
 function toEditableEntry(entry: CalendarEntry): EditableEntry {
   const startDate = new Date(entry.startDate);
@@ -63,6 +65,7 @@ export function Calendar() {
   const [currentDate, setCurrentDate] = useState(new Date());
   const prevDateRef = useRef(currentDate);
   const [direction, setDirection] = useState(0);
+  const { modalContentType, openModal, isOpen } = useModal();
 
   useEffect(() => {
     if (currentDate.getTime() > prevDateRef.current.getTime()) {
@@ -694,6 +697,13 @@ export function Calendar() {
           cardId={activeCardId || ""}
           onClose={() => setIsCardModalOpen(false)}
         />
+      </Modal>
+
+      <Modal
+        modalSize="sm"
+        isVisible={isOpen && modalContentType === "NEW_WORKSPACE"}
+      >
+        <NewWorkspaceForm />
       </Modal>
     </div>
   );

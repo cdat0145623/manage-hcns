@@ -26,7 +26,7 @@ import { UpgradeToProConfirmation } from "./components/UpgradeToProConfirmation"
 
 export default function WorkspaceSettings() {
   const { modalContentType, openModal, isOpen } = useModal();
-  const { workspace } = useWorkspace();
+  const { workspace, hasLoaded } = useWorkspace();
   const { canEditWorkspace } = usePermissions();
   const router = useRouter();
   const { data } = api.user.getUser.useQuery();
@@ -34,7 +34,7 @@ export default function WorkspaceSettings() {
 
   const { data: workspaceData } = api.workspace.byId.useQuery(
     { workspacePublicId: workspace.publicId },
-    { enabled: !!workspace.publicId && workspace.publicId.length >= 12 },
+    { enabled: hasLoaded && !!workspace.publicId && workspace.publicId.length >= 12 },
   );
 
   const subscriptions = workspaceData?.subscriptions as

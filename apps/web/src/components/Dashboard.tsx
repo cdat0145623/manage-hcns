@@ -1,4 +1,5 @@
 import { useTheme } from "next-themes";
+import { useRouter } from "next/router";
 import { useEffect, useRef, useState } from "react";
 import {
   TbLayoutSidebarLeftCollapse,
@@ -19,15 +20,21 @@ interface DashboardProps {
   children: React.ReactNode;
   rightPanel?: React.ReactNode;
   hasRightPanel?: boolean;
+  requiredRole?: string;
 }
 
 export function getDashboardLayout(
   page: React.ReactElement,
   rightPanel?: React.ReactNode,
   hasRightPanel = false,
+  requiredRole?: string,
 ) {
   return (
-    <Dashboard rightPanel={rightPanel} hasRightPanel={hasRightPanel}>
+    <Dashboard
+      rightPanel={rightPanel}
+      hasRightPanel={hasRightPanel}
+      requiredRole={requiredRole}
+    >
       {page}
     </Dashboard>
   );
@@ -37,10 +44,11 @@ export default function Dashboard({
   children,
   rightPanel,
   hasRightPanel = false,
+  requiredRole,
 }: DashboardProps) {
+  const router = useRouter();
   const { resolvedTheme } = useTheme();
   const { openModal } = useModal();
-  const { availableWorkspaces, hasLoaded } = useWorkspace();
 
   const { data: session, isPending: sessionLoading } = authClient.useSession();
   const { data: user, isLoading: userLoading } = api.user.getUser.useQuery(
@@ -57,6 +65,8 @@ export default function Dashboard({
   const rightPanelRef = useRef<HTMLDivElement>(null);
   const sideNavButtonRef = useRef<HTMLButtonElement>(null);
   const rightPanelButtonRef = useRef<HTMLButtonElement>(null);
+
+  const { availableWorkspaces, hasLoaded } = useWorkspace();
 
   const toggleSideNav = () => {
     setIsSideNavOpen(!isSideNavOpen);
@@ -95,13 +105,19 @@ export default function Dashboard({
   });
 
   useEffect(() => {
-    if (hasLoaded && availableWorkspaces.length === 0) {
-      openModal("NEW_WORKSPACE", undefined, undefined, false);
+    if (!userLoading && requiredRole && user?.role !== requiredRole) {
+      void router.push("/boards");
     }
-  }, [hasLoaded, availableWorkspaces.length, openModal]);
+  }, [userLoading, user?.role, requiredRole, router]);
 
   const isDarkMode = resolvedTheme === "dark";
 
+  useEffect(() => {
+    if (!sessionLoading && hasLoaded && availableWorkspaces.length === 0) {
+      openModal("NEW_WORKSPACE", undefined, undefined, false);
+    }
+  }, [sessionLoading, hasLoaded, availableWorkspaces.length, openModal]);
+  
   return (
     <>
       <style jsx global>{`

@@ -12,6 +12,6 @@ const MembersPage: NextPageWithLayout = () => {
   );
 };
 
-MembersPage.getLayout = (page) => getDashboardLayout(page);
+MembersPage.getLayout = (page) => getDashboardLayout(page, undefined, false, "ADMIN");
 
 export default MembersPage;

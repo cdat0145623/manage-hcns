@@ -26,7 +26,10 @@ const authLink: TRPCLink<AppRouter> = () => {
         },
         error(err) {
           if (typeof window !== "undefined" && err.message === "UNAUTHORIZED") {
-            window.location.href = "/login";
+            const path = window.location.pathname;
+            if (!path.startsWith("/login") && !path.startsWith("/signup")) {
+              window.location.href = "/login";
+            }
           }
           observer.error(err);
         },

@@ -74,12 +74,12 @@ export const memberRouter = createTRPCRouter({
       await assertPermission(ctx.db, userId, workspace.id, "member:invite");
 
       const isInvitedEmailAlreadyMember = workspace.members.some(
-        (member) => member.email === existingUser.email,
+        (member) => member.email === existingUser.email || member.user?.username === existingUser.username,
       );
 
       if (isInvitedEmailAlreadyMember) {
         throw new TRPCError({
-          message: `User with email ${existingUser.email} is already a member of this workspace`,
+          message: `User with email ${existingUser.email} or username ${existingUser.username} is already a member of this workspace`,
           code: "CONFLICT",
         });
       }

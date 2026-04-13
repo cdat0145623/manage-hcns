@@ -6,6 +6,6 @@ const AccountPage: NextPageWithLayout = () => {
   return <Account />;
 };
 
-AccountPage.getLayout = (page) => getDashboardLayout(page);
+AccountPage.getLayout = (page) => getDashboardLayout(page, undefined, false, "ADMIN");
 
 export default AccountPage;

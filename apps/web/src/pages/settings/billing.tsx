@@ -13,6 +13,6 @@ const BillingSettingsPage: NextPageWithLayout = () => {
   );
 };
 
-BillingSettingsPage.getLayout = (page) => getDashboardLayout(page);
+BillingSettingsPage.getLayout = (page) => getDashboardLayout(page, undefined, false, "ADMIN");
 
 export default BillingSettingsPage;

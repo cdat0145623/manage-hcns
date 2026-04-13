@@ -39,6 +39,10 @@ import PatternedBackground from "~/components/PatternedBackground";
 import { useWorkspace } from "~/providers/workspace";
 import { api } from "~/utils/api";
 
+import Modal from "~/components/modal";
+import { useModal } from "~/providers/modal";
+import { NewWorkspaceForm } from "~/components/NewWorkspaceForm";
+
 const CHART_COLORS = [
   "#6366f1", // Indigo
   "#06b6d4", // Cyan
@@ -520,8 +524,16 @@ const renderActiveShape = (props: any) => {
 // MAIN VIEW
 // ════════════════════════════════════════════════════════════════
 
+interface User {
+  id: string;
+  name: string | null;
+  username: string | null;
+  email: string | null;
+  role: "NVVP" | "ADMIN" | "NVKT_MANAGER" | "NVKD_MANAGER";
+}
+
 export default function ReportsView() {
-  const { workspace } = useWorkspace();
+  const { workspace, hasLoaded } = useWorkspace();
   const now = new Date();
 
   const [selectedUserId, setSelectedUserId] = useState<string>("");
@@ -532,26 +544,33 @@ export default function ReportsView() {
   const [year, setYear] = useState<number>(now.getFullYear());
   const [activeIndex, setActiveIndex] = useState(-1);
 
-  const { data: users } = api.user.getAll.useQuery();
+  const { modalContentType, openModal, isOpen } = useModal();
+
+  // const { data: users } = api.user.getAll.useQuery();
+  const { data: currentUser } = api.user.getUser.useQuery();
+  const [users, setUsers] = useState<User[]>([]);
+  const { data: allUsers } = api.user.getAll.useQuery(undefined, {
+    enabled: currentUser?.role === "ADMIN",
+  });
 
   const { data: workspaceData } = api.workspace.byId.useQuery(
     { workspacePublicId: workspace.publicId },
-    { enabled: !!workspace.publicId },
+    { enabled: hasLoaded && !!workspace.publicId },
   );
 
   const { data: boardsData } = api.board.all.useQuery(
     { workspacePublicId: workspace.publicId },
-    { enabled: !!workspace.publicId },
+    { enabled: hasLoaded && !!workspace.publicId },
   );
 
   useEffect(() => {
-    if (users && users.length > 0) {
-      const isValid = users.some((u) => u.id === selectedUserId);
-      if (!isValid) {
-        setSelectedUserId(users[0]?.id || "");
-      }
+    if (currentUser?.role === "ADMIN") {
+      setUsers(allUsers ?? []);
+    } else if (currentUser) {
+      setUsers([currentUser]);
+      setSelectedUserId(currentUser.id);
     }
-  }, [users, selectedUserId]);
+  }, [currentUser, allUsers]);
 
   useEffect(() => {
     if (boardsData) {
@@ -569,12 +588,12 @@ export default function ReportsView() {
     { enabled: !!selectedUserId && boardsData !== undefined },
   );
 
-  const memberOptions = (users || [])
+  const memberOptions = users
+    .filter((u) => u != null && !!u.id)
     .map((u) => ({
       label: u.name || "Unknown User",
-      value: u.id || "",
-    }))
-    .filter((o) => o.value !== "");
+      value: u.id,
+    }));
 
   const boardOptions = (boardsData || []).map((b) => ({
     label: b.name,
@@ -1178,6 +1197,13 @@ export default function ReportsView() {
           </div>
         </div>
       </div>
+
+      <Modal
+        modalSize="sm"
+        isVisible={isOpen && modalContentType === "NEW_WORKSPACE"}
+      >
+        <NewWorkspaceForm />
+      </Modal>
 
       <style jsx global>{`
         @keyframes shimmer {

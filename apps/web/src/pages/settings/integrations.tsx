@@ -13,6 +13,6 @@ const IntegrationsSettingsPage: NextPageWithLayout = () => {
   );
 };
 
-IntegrationsSettingsPage.getLayout = (page) => getDashboardLayout(page);
+IntegrationsSettingsPage.getLayout = (page) => getDashboardLayout(page, undefined, false, "ADMIN");
 
 export default IntegrationsSettingsPage;

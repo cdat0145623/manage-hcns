@@ -59,7 +59,7 @@ const TableRow = ({
   showPendingIcon,
   showEmailsToMembers,
 }: TableRowProps) => {
-  const { workspace } = useWorkspace();
+  const { workspace, hasLoaded } = useWorkspace();
   const { canEditMember, createdBy } = usePermissions();
   const { openModal } = useModal();
   const { showPopup } = usePopup();
@@ -68,7 +68,7 @@ const TableRow = ({
 
   const updateRoleMutation = api.member.updateRole.useMutation({
     onSuccess: async () => {
-      if (workspace.publicId && workspace.publicId.length >= 12) {
+      if (hasLoaded && workspace.publicId && workspace.publicId.length >= 12) {
         await utils.workspace.byId.invalidate({
           workspacePublicId: workspace.publicId,
         });
@@ -226,11 +226,11 @@ const TableRow = ({
 
 export default function MembersPage() {
   const { modalContentType, openModal, isOpen } = useModal();
-  const { workspace } = useWorkspace();
+  const { workspace, hasLoaded } = useWorkspace();
 
   const { data, isLoading } = api.workspace.byId.useQuery(
     { workspacePublicId: workspace.publicId },
-    { enabled: !!workspace.publicId && workspace.publicId.length >= 12 },
+    { enabled: hasLoaded && !!workspace.publicId && workspace.publicId.length >= 12 },
   );
 
   const { data: session } = authClient.useSession();

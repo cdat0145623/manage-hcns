@@ -1,7 +1,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { t } from "@lingui/core/macro";
 import { env } from "next-runtime-env";
-import { useEffect, useState } from "react";
+import { useEffect, useState, Fragment } from "react";
 import { useForm } from "react-hook-form";
 import {
   HiBolt,
@@ -9,6 +9,7 @@ import {
   HiCheckBadge,
   HiInformationCircle,
   HiXMark,
+  HiChevronDown,
 } from "react-icons/hi2";
 import { twMerge } from "tailwind-merge";
 import { z } from "zod";
@@ -22,6 +23,7 @@ import { usePopup } from "~/providers/popup";
 import { useWorkspace } from "~/providers/workspace";
 import { api } from "~/utils/api";
 import LoadingSpinner from "./LoadingSpinner";
+import { Listbox, Transition } from "@headlessui/react";
 
 const schema = z.object({
   name: z
@@ -42,6 +44,16 @@ const schema = z.object({
 });
 
 type FormValues = z.infer<typeof schema>;
+
+function generateYearList(pastYears = 0, futureYears = 3) {
+  const currentYear = new Date().getFullYear();
+  const startYear = currentYear - pastYears;
+  const totalYears = pastYears + futureYears + 1; // +1 để bao gồm năm hiện tại
+
+  return Array.from({ length: totalYears }, (_, i) => startYear + i);
+}
+
+const listYears = generateYearList(3, 3);
 
 export function NewWorkspaceForm() {
   const { closeModal } = useModal();
@@ -76,6 +88,13 @@ export function NewWorkspaceForm() {
   // Pro toggle state management
   const [isProToggleEnabled, setIsProToggleEnabled] = useState(false);
   const [lastAvailableSlug, setLastAvailableSlug] = useState<string>("");
+
+  const currentYear = new Date().getFullYear();
+  const [selectedYear, setSelectedYear] = useState(currentYear);
+
+  useEffect(() => {
+    setValue("name", `${selectedYear}`);
+  }, [selectedYear]);
 
   // Validate slug only after debounce
   useEffect(() => {
@@ -258,18 +277,66 @@ export function NewWorkspaceForm() {
           </button>
         </div>
 
-        <Input
-          id="workspace-name"
-          placeholder={t`Tên workspace`}
-          {...register("name")}
-          errorMessage={errors.name?.message}
-          onKeyDown={async (e) => {
-            if (e.key === "Enter") {
-              e.preventDefault();
-              await handleSubmit(onSubmit)();
-            }
+        <Listbox
+          value={selectedYear}
+          onChange={(option) => {
+            setSelectedYear(option);
+            setValue("name", `${option}`);
           }}
-        />
+        >
+          <div className="relative">
+            <Listbox.Button className="relative flex w-full items-center gap-2.5 rounded-xl border border-neutral-200 bg-white py-2.5 pl-3.5 pr-9 text-left text-[13px] text-neutral-900 shadow-sm transition-all hover:border-indigo-300 hover:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/10 dark:border-neutral-700 dark:bg-neutral-800 dark:text-white dark:hover:border-neutral-600 dark:hover:bg-neutral-800/80">
+              <span className="block truncate">{selectedYear}</span>
+              <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
+                <HiChevronDown
+                  className="text-neutral-400 dark:text-neutral-500"
+                  size={18}
+                />
+              </span>
+            </Listbox.Button>
+            <Transition
+              as={Fragment}
+              leave="transition ease-in duration-100"
+              leaveFrom="opacity-100"
+              leaveTo="opacity-0"
+            >
+              <Listbox.Options className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-xl border border-neutral-200 bg-white py-1 text-base shadow-lg focus:outline-none dark:border-neutral-700 dark:bg-neutral-800 sm:text-sm">
+                {listYears.map((year) => (
+                  <Listbox.Option
+                    key={year}
+                    className={({ active }) =>
+                      twMerge(
+                        "relative cursor-default select-none py-2 pl-10 pr-4",
+                        active
+                          ? "bg-indigo-50 text-indigo-900 dark:bg-indigo-500/10 dark:text-indigo-100"
+                          : "text-neutral-900 dark:text-dark-900",
+                      )
+                    }
+                    value={year}
+                  >
+                    {({ selected }) => (
+                      <>
+                        <span
+                          className={twMerge(
+                            "block truncate",
+                            selected ? "font-medium" : "font-normal",
+                          )}
+                        >
+                          {year}
+                        </span>
+                        {selected ? (
+                          <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-indigo-600 dark:text-indigo-400">
+                            <HiCheck size={18} />
+                          </span>
+                        ) : null}
+                      </>
+                    )}
+                  </Listbox.Option>
+                ))}
+              </Listbox.Options>
+            </Transition>
+          </div>
+        </Listbox>
 
         <div className="mt-4">
           <Input

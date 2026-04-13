@@ -12,6 +12,6 @@ const TemplatesPage: NextPageWithLayout = () => {
   );
 };
 
-TemplatesPage.getLayout = (page) => getDashboardLayout(page);
+TemplatesPage.getLayout = (page) => getDashboardLayout(page, undefined, false, "ADMIN");
 
 export default TemplatesPage;

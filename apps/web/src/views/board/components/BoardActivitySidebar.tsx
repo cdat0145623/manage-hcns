@@ -23,12 +23,14 @@ interface BoardActivitySidebarProps {
   isOpen: boolean;
   onClose: () => void;
   boardPublicId: string;
+  isAdmin: boolean;
 }
 
 export default function BoardActivitySidebar({
   isOpen,
   onClose,
   boardPublicId,
+  isAdmin,
 }: BoardActivitySidebarProps) {
   const { dateLocale } = useLocalisation();
   const { data: sessionData } = authClient.useSession();
@@ -55,8 +57,18 @@ export default function BoardActivitySidebar({
 
   useEffect(() => {
     if (firstPageData) {
-      setAllActivities(firstPageData.activities);
-      setHasMore(firstPageData.hasMore);
+      if (isAdmin) {
+        setAllActivities(firstPageData.activities);
+        setHasMore(firstPageData.hasMore);
+      } else {
+        const filteredActivities = firstPageData.activities.filter(
+          (activity) => {
+            return activity.user?.id === sessionData?.user.id;
+          },
+        );
+        setAllActivities(filteredActivities);
+        setHasMore(firstPageData.hasMore);
+      }
     }
   }, [firstPageData]);
 

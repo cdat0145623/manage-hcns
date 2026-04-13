@@ -220,6 +220,7 @@ export const getByPublicId = async (
             with: {
               user: {
                 columns: {
+                  id: true,
                   name: true,
                   email: true,
                   image: true,

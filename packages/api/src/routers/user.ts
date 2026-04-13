@@ -4,6 +4,8 @@ import { z } from "zod";
 import * as userRepo from "@kan/db/repository/user.repo";
 import * as activityRepo from "@kan/db/repository/cardActivity.repo";
 import * as workspaceRepo from "@kan/db/repository/workspace.repo";
+import * as memberRepo from "@kan/db/repository/member.repo";
+import * as permissionRepo from "@kan/db/repository/permission.repo";
 
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import { initAuth, hashPassword } from "@kan/auth/server";
@@ -32,7 +34,7 @@ export const userRouter = createTRPCRouter({
         name: z.string().nullable(),
         image: z.string().nullable(),
         stripeCustomerId: z.string().nullable(),
-        role: z.string().nullable(),
+        role: z.enum(memberRoles),
         apiKey: z
           .object({
             id: z.number(),
@@ -258,6 +260,7 @@ export const userRouter = createTRPCRouter({
         username: z.string(),
         password: z.string(),
         role: z.enum(memberRoles),
+        workspacePublicId: z.string(),
       }),
     )
     .output(
@@ -315,6 +318,37 @@ export const userRouter = createTRPCRouter({
       }
 
       const { id, email, username, name } = response.user;
+
+      const workspace = await workspaceRepo.getByPublicId(ctx.db, input.workspacePublicId);
+
+      if (!workspace) {
+        throw new TRPCError({
+          message: `Workspace not found`,
+          code: "NOT_FOUND",
+        });
+      }
+
+      const memberRole = await permissionRepo.getRoleByWorkspaceIdAndName(
+        ctx.db,
+        workspace.id,
+        input.role,
+      );
+
+      const invite = await memberRepo.create(ctx.db, {
+        workspaceId: workspace.id,
+        email: email,
+        userId: id,
+        createdBy: userId,
+        role: input.role,
+        roleId: memberRole?.id ?? null,
+        status: "active",
+      });
+
+      if (!invite)
+        throw new TRPCError({
+          message: `Unable to add user with username ${input.username} into workspace`,
+          code: "INTERNAL_SERVER_ERROR",
+        });
 
       return { id, email, username, name };
     }),

@@ -16,7 +16,7 @@ const PermissionsSettingsPage: NextPageWithLayout = () => {
   );
 };
 
-PermissionsSettingsPage.getLayout = (page) => getDashboardLayout(page);
+PermissionsSettingsPage.getLayout = (page) => getDashboardLayout(page, undefined, false, "ADMIN");
 
 export default PermissionsSettingsPage;
 

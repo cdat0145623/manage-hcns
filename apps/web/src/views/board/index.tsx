@@ -72,6 +72,9 @@ export default function BoardPage({ isTemplate }: { isTemplate?: boolean }) {
   const { canCreateList, canEditList, canEditCard, canEditBoard } =
     usePermissions();
 
+  const isAdmin = workspace.role === "ADMIN";
+  const { data: currentUser } = api.user.getUser.useQuery();
+
   const openCardDetails = (cardPublicId: string) => {
     openModal("CARD_DETAILS", cardPublicId);
     const newQuery = { ...router.query, cardId: cardPublicId };
@@ -127,9 +130,13 @@ export default function BoardPage({ isTemplate }: { isTemplate?: boolean }) {
 
   const boardType: "regular" | "template" = isTemplate ? "template" : "regular";
 
+  const [restrictedMemberId, setRestrictedMemberId] = useState<string | null>(null);
+
   const queryParams = {
     boardPublicId: boardId ?? "",
-    members: formatToArray(router.query.members),
+    members: isAdmin
+      ? formatToArray(router.query.members)
+      : (restrictedMemberId ? [restrictedMemberId] : []),
     labels: formatToArray(router.query.labels),
     lists: formatToArray(router.query.lists),
     ...(semanticFilters.length > 0 && {
@@ -147,6 +154,17 @@ export default function BoardPage({ isTemplate }: { isTemplate?: boolean }) {
     enabled: !!boardId,
     placeholderData: keepPreviousData,
   });
+
+  useEffect(() => {
+    if (!isAdmin && boardData && !restrictedMemberId) {
+      const member = boardData.workspace.members.find(
+        (m) => m.user?.id === currentUser?.id,
+      );
+      if (member) {
+        setRestrictedMemberId(member.publicId);
+      }
+    }
+  }, [isAdmin, boardData, currentUser, restrictedMemberId]);
 
   // Redirect to 404 if board doesn't exist
   useEffect(() => {
@@ -525,8 +543,11 @@ export default function BoardPage({ isTemplate }: { isTemplate?: boolean }) {
                   <Filters
                     labels={boardData.labels}
                     members={boardData.workspace.members
-
-                      .filter((member) => member.user !== null)
+                      .filter(
+                        (member) =>
+                          member.user !== null &&
+                          (isAdmin || member.user.id === currentUser?.id),
+                      )
                       .map((member) => ({
                         ...member,
                         email: member.email ?? "",
@@ -540,6 +561,7 @@ export default function BoardPage({ isTemplate }: { isTemplate?: boolean }) {
                     lists={boardData.allLists}
                     position="left"
                     isLoading={!boardData}
+                    isAdmin={isAdmin}
                   />
                 )}
               </>
@@ -721,6 +743,7 @@ export default function BoardPage({ isTemplate }: { isTemplate?: boolean }) {
           isOpen={isActivitySidebarOpen}
           onClose={() => setIsActivitySidebarOpen(false)}
           boardPublicId={boardId ?? ""}
+          isAdmin={isAdmin}
         />
       </div>
     </>

@@ -6,6 +6,8 @@ import { createTRPCContext } from "@kan/api/trpc";
 import { env } from "~/env";
 import { withRateLimit } from "@kan/api/utils/rateLimit";
 
+import { applyCors } from "~/utils/cors";
+
 const nextApiHandler = createNextApiHandler({
   router: appRouter,
   createContext: createTRPCContext,
@@ -22,11 +24,7 @@ const nextApiHandler = createNextApiHandler({
 export default withRateLimit(
   { points: 100, duration: 60 },
   async (req: NextApiRequest, res: NextApiResponse) => {
-    if (req.method === "OPTIONS") {
-      res.writeHead(200);
-      res.end();
-      return;
-    }
+    await applyCors(req, res);
 
     const result = await nextApiHandler(req, res);
     return result;

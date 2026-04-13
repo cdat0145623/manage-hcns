@@ -1,4 +1,5 @@
 import { RRule } from 'rrule';
+import type { Options } from 'rrule';
 
 type FreqType = 'dayOfWeek' | 'monthlyDate' | 'monthlyDayRank';
 
@@ -33,7 +34,7 @@ export const generateRRuleString = (config: FreqConfig): string => {
   const dtstart = new Date(startDate);
   dtstart.setHours(hour, minute, 0, 0);
 
-  let ruleOptions: any = {
+  const ruleOptions: Partial<Options> = {
     dtstart: dtstart,
     // TZID giúp rrule hiểu quy tắc lặp dựa trên múi giờ cụ thể 
     // (Quan trọng cho việc nhảy giờ mùa hè/đông nếu có, dù VN không có nhưng là chuẩn tốt)

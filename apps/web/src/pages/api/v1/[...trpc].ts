@@ -1,7 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import cors from "nextjs-cors";
 import { createOpenApiNextHandler } from "trpc-to-openapi";
-
+import { applyCors } from "~/utils/cors";
 import { appRouter } from "@kan/api";
 import { createRESTContext } from "@kan/api/trpc";
 
@@ -11,7 +11,7 @@ import { withRateLimit } from "@kan/api/utils/rateLimit";
 export default withRateLimit(
   { points: 100, duration: 60 },
   async (req: NextApiRequest, res: NextApiResponse) => {
-    await cors(req, res);
+    await applyCors(req, res);
 
     const openApiHandler = createOpenApiNextHandler({
       router: appRouter,

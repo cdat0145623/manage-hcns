@@ -720,6 +720,11 @@ export const boardRouter = createTRPCRouter({
         cursor: z.date().nullish(),
       }),
     )
+    .output(
+      z.custom<
+        Awaited<ReturnType<typeof activityRepo.getPaginatedBoardActivities>>
+      >(),
+    )
     .query(async ({ ctx, input }) => {
       const userId = ctx.user?.id;
 

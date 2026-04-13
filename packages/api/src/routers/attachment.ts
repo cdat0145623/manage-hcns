@@ -20,7 +20,7 @@ export const attachmentRouter = createTRPCRouter({
       openapi: {
         summary: "Generate presigned URL for attachment upload",
         method: "POST",
-        path: "/cards/{cardPublicId}/attachments/upload-url",
+        path: "/attachments/upload-url",
         description:
           "Generates a presigned URL for uploading an attachment to S3",
         tags: ["Attachments"],
@@ -138,7 +138,7 @@ export const attachmentRouter = createTRPCRouter({
       openapi: {
         summary: "Confirm attachment upload and save to database",
         method: "POST",
-        path: "/cards/{cardPublicId}/attachments/confirm",
+        path: "/attachments/confirm",
         description:
           "Confirms an attachment upload and saves the record to the database",
         tags: ["Attachments"],

@@ -79,6 +79,15 @@ export const env = createEnv({
     S3_FORCE_PATH_STYLE: z.string().optional(),
     EMAIL_FROM: z.string().optional(),
     REDIS_URL: z.string().url().optional().or(z.literal("")),
+    CORS_ORIGINS: z
+      .string()
+      .transform((s) => (s === "" ? undefined : s))
+      .refine(
+        (s) =>
+          !s ||
+          s.split(",").every((l) => z.string().url().safeParse(l).success),
+      )
+      .optional(),
   },
 
   /**
@@ -91,8 +100,18 @@ export const env = createEnv({
     NEXT_PUBLIC_POSTHOG_KEY: z.string().optional(),
     NEXT_PUBLIC_POSTHOG_HOST: z.string().optional(),
     NEXT_PUBLIC_USE_STANDALONE_OUTPUT: z.string().optional(),
-    NEXT_PUBLIC_BASE_URL: z.string().url().optional(),
-    NEXT_PUBLIC_STORAGE_URL: z.string().url().optional(),
+    NEXT_PUBLIC_BASE_URL: z
+      .string()
+      .url()
+      .optional()
+      .or(z.literal(""))
+      .transform((s) => (s === "" ? undefined : s)),
+    NEXT_PUBLIC_STORAGE_URL: z
+      .string()
+      .url()
+      .optional()
+      .or(z.literal(""))
+      .transform((s) => (s === "" ? undefined : s)),
     NEXT_PUBLIC_AVATAR_BUCKET_NAME: z.string().optional(),
     NEXT_PUBLIC_ATTACHMENTS_BUCKET_NAME: z.string().optional(),
     NEXT_PUBLIC_STORAGE_DOMAIN: z.string().optional(),

@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "pnpm with-env mint build",
+    "build": "pnpm with-env mintlify broken-links",
     "clean": "git clean -xdf .cache .turbo node_modules",
     "dev": "echo 'Skipping docs'",
     "format": "prettier --check . --ignore-path ../../.gitignore",

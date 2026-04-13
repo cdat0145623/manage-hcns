@@ -1,6 +1,5 @@
 services:
   migrate:
-    image: ghcr.io/kanbn/kan-migrate:latest
     container_name: ${MIGRATE_CONTAINER_NAME:-kan-migrate}
     networks:
       - kan-network
@@ -8,15 +7,16 @@ services:
       context: .
       dockerfile: ./apps/web/Dockerfile
       target: migrate
+    env_file:
+      - .env
     environment:
-      - POSTGRES_URL=postgresql://postgres:${POSTGRES_PASSWORD}@postgres:5432/progress
+      - POSTGRES_URL=${POSTGRES_URL}
     depends_on:
       postgres:
         condition: service_healthy
     restart: "no"
 
   web:
-    image: ghcr.io/kanbn/kan:latest
     container_name: ${WEB_CONTAINER_NAME:-kan-web}
     ports:
       - "${WEB_PORT:-3001}:3000"
@@ -26,30 +26,29 @@ services:
       context: .
       dockerfile: ./apps/web/Dockerfile
       target: web
-    volumes:
-      - .:/app:cached
-      - /app/node_modules 
     env_file:
       - .env
     environment:
       # Required environment variables
       - NEXT_PUBLIC_BASE_URL=${NEXT_PUBLIC_BASE_URL}
       - BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET}
-      - POSTGRES_URL=postgresql://postgres:${POSTGRES_PASSWORD}@postgres:5432/progress
+      - POSTGRES_URL=${POSTGRES_URL}
     depends_on:
       migrate:
-        condition: service_completed_successfully
+        condition: service_started
     restart: unless-stopped
 
   postgres:
     image: postgres:15
     container_name: kan-db
+    env_file:
+      - .env
     environment:
-      - POSTGRES_DB=progress
-      - POSTGRES_USER=postgres
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
     ports:
-      - 5432:5432
+      - 127.0.0.1:5452:5432
     volumes:
       - kan_postgres_data:/var/lib/postgresql/data
     healthcheck:

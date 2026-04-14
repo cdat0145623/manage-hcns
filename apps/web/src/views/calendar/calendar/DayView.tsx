@@ -26,7 +26,7 @@ interface DayViewProps {
   cards: Card[];
   formattedResult: any[];
 }
-const HOURS = Array.from({ length: 24 }, (_, i) => i);
+const DEFAULT_START_HOUR = 8;
 
 export function DayView({
   currentDate,
@@ -62,7 +62,17 @@ export function DayView({
     return () => clearInterval(timer);
   }, []);
 
-  const nowTop = now.getHours() * 96 + (now.getMinutes() * 96) / 60;
+  const startHour = useMemo(() => {
+    if (dayEntries.length === 0) return DEFAULT_START_HOUR;
+    const earliestTaskHour = Math.min(...dayEntries.map(e => new Date(e.date).getHours()));
+    return Math.min(DEFAULT_START_HOUR, earliestTaskHour);
+  }, [dayEntries]);
+
+  const hoursToRender = useMemo(() => {
+    return Array.from({ length: 24 - startHour }, (_, i) => i + startHour);
+  }, [startHour]);
+
+  const nowTop = (now.getHours() - startHour) * 96 + (now.getMinutes() * 96) / 60;
 
   const handleTimeSlotClick = (hour: number) => {
     const clickedDate = new Date(currentDate);
@@ -177,13 +187,13 @@ export function DayView({
       <div className="flex-1 overflow-y-auto">
         <div className="flex min-h-full pt-8">
           <div className="w-20 flex-shrink-0 border-r border-light-300 bg-neutral-50/30 dark:border-dark-300 dark:bg-neutral-900/10">
-            {HOURS.map((hour) => (
+            {hoursToRender.map((hour) => (
               <div
                 key={hour}
                 className="relative h-24 border-b border-neutral-100/30 dark:border-white/5"
               >
                 <span className="absolute -top-3 left-0 w-full pr-4 text-right text-[10px] font-black uppercase tracking-tighter text-neutral-600 dark:text-neutral-600">
-                  {format(addHours(startOfDay(new Date()), hour), "h a")}
+                  {format(addHours(startOfDay(currentDate), hour), "H:mm")}
                 </span>
               </div>
             ))}
@@ -191,10 +201,10 @@ export function DayView({
 
           <div
             className="relative flex-1 bg-white dark:bg-dark-100"
-            style={{ height: `${24 * 96}px` }}
+            style={{ height: `${(24 - startHour) * 96}px` }}
           >
             <div className="pointer-events-none absolute inset-0">
-              {HOURS.map((hour) => (
+              {hoursToRender.map((hour) => (
                 <div
                   key={hour}
                   className="h-24 border-b border-dark-400 dark:border-white/5"
@@ -231,7 +241,7 @@ export function DayView({
                   }`}
                 >
                   <div className="absolute inset-0 z-0 flex flex-col">
-                    {HOURS.map((hour) => (
+                    {hoursToRender.map((hour) => (
                       <div
                         key={`slot-${hour}`}
                         onClick={() => handleTimeSlotClick(hour)}
@@ -256,11 +266,12 @@ export function DayView({
                       ? (() => {
                           const d = new Date(firstHidden.date);
                           return (
-                            d.getHours() * hourHeight +
+                            (d.getHours() - startHour) * hourHeight +
                             (d.getMinutes() * hourHeight) / 60
                           );
                         })()
                       : 8;
+
 
                     return (
                       <>
@@ -280,6 +291,7 @@ export function DayView({
                               overlapIndex={overlapInfo?.overlapIndex}
                               index={index}
                               isDraggable={false}
+                              startHour={startHour}
                             />
                           );
                         })}

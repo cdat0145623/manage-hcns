@@ -14,6 +14,7 @@ interface CalendarTaskProps {
   totalOverlap?: number;
   overlapIndex?: number;
   isDraggable?: boolean;
+  startHour?: number;
 }
 
 const STATUS_COLORS: Record<
@@ -83,6 +84,7 @@ export function CalendarTask({
   totalOverlap = 1,
   overlapIndex = 0,
   isDraggable = true,
+  startHour = 0,
 }: CalendarTaskProps) {
   const isVirtual = entry.type === "VIRTUAL";
   const status = entry.status ?? "pending";
@@ -96,7 +98,7 @@ export function CalendarTask({
     const date = new Date(entry.date);
     const hours = date.getHours();
     const minutes = date.getMinutes();
-    const top = hours * hourHeight + (minutes * hourHeight) / 60;
+    const top = (hours - startHour) * hourHeight + (minutes * hourHeight) / 60;
 
     // Google Calendar style midnight cutoff
     const spaceUntilMidnight =
@@ -178,31 +180,28 @@ export function CalendarTask({
         )}
 
         {variant === "SUMMARY" ? (
-          <div className={`pointer-events-none ml-1 flex flex-row h-full align-center items-center justify-start w-full items-center gap-2 overflow-hidden ${colors}`}>
-            <span className="truncate leading-none">
+          <div className={`pointer-events-none ml-1 flex flex-row h-full items-center justify-start w-full gap-2 overflow-hidden ${colors.text}`}>
+            <span className="truncate leading-none text-[10px] font-black">
               {entry.title || "(No title)"}
             </span>
             <span className="shrink-0 text-[10px] font-black opacity-50">
-              {format(new Date(entry.date), "h:mm")}
+              {format(new Date(entry.date), "H:mm")}
             </span>
           </div>
         ) : (
-          <div className={`pointer-events-none ml-1 flex flex-row h-full align-center items-center justify-start gap-2 overflow-hidden ${colors}`}>
-            {/* <div className="flex items-start justify-between"> */}
-              <span className="truncate text-xs font-black leading-tight">
-                {entry.title || "(No title)"}
-              </span>
-            {/* </div> */}
-            <span className="block text-[10px] font-bold opacity-60">
-              {format(new Date(entry.date), "h:mm a")}
+          <div className={`pointer-events-none ml-1 flex flex-col h-full items-start justify-center gap-0.5 overflow-hidden ${colors.text}`}>
+            <span className="truncate w-full text-xs font-black leading-tight">
+              {entry.title || "(No title)"}
             </span>
-            {entry.duration && entry.duration > 40 && (
-              <p className="line-clamp-1 text-[11px] font-medium opacity-50">
-                {entry.duration} minutes
-              </p>
-            )}
+            <div className="flex items-center gap-1.5 opacity-60 w-full overflow-hidden">
+              <span className="block text-[10px] font-bold whitespace-nowrap">
+                {format(new Date(entry.date), "H:mm")} - {format(new Date(new Date(entry.date).getTime() + (entry.duration || 60) * 60000), "H:mm")}
+              </span>
+            </div>
+
           </div>
         )}
+
       </motion.button>
     );
   };

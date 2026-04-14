@@ -38,7 +38,7 @@ interface WeekViewProps {
   formattedResult: any[];
 }
 
-const HOURS = Array.from({ length: 24 }, (_, i) => i);
+const DEFAULT_START_HOUR = 8;
 
 export function WeekView({
   currentDate,
@@ -50,8 +50,8 @@ export function WeekView({
   cards,
   formattedResult,
 }: WeekViewProps) {
-  const weekStart = startOfWeek(currentDate);
-  const weekEnd = endOfWeek(currentDate);
+  const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 });
+  const weekEnd = endOfWeek(currentDate, { weekStartsOn: 1 });
   const [popoverDay, setPopoverDay] = useState<Date | null>(null);
   const [popoverCard, setPopoverCard] = useState<Date | null>(null);
 
@@ -72,7 +72,17 @@ export function WeekView({
     return () => clearInterval(timer);
   }, []);
 
-  const nowTop = now.getHours() * 96 + (now.getMinutes() * 96) / 60;
+  const startHour = useMemo(() => {
+    if (entries.length === 0) return DEFAULT_START_HOUR;
+    const earliestTaskHour = Math.min(...entries.map(e => new Date(e.date).getHours()));
+    return Math.min(DEFAULT_START_HOUR, earliestTaskHour);
+  }, [entries]);
+
+  const hoursToRender = useMemo(() => {
+    return Array.from({ length: 24 - startHour }, (_, i) => i + startHour);
+  }, [startHour]);
+
+  const nowTop = (now.getHours() - startHour) * 96 + (now.getMinutes() * 96) / 60;
 
   const handleTimeSlotClick = (day: Date, hour: number) => {
     const clickedDate = new Date(day);
@@ -191,13 +201,13 @@ export function WeekView({
       <div className="flex-1 overflow-y-auto">
         <div className="flex min-h-full pt-8">
           <div className="w-16 flex-shrink-0 border-r border-light-300 bg-neutral-100/30 dark:border-dark-600 dark:bg-neutral-900/10">
-            {HOURS.map((hour) => (
+            {hoursToRender.map((hour) => (
               <div
                 key={hour}
                 className="relative h-24 border-b border-neutral-100/30 dark:border-white/5"
               >
                 <span className="absolute -top-3 left-0 w-full pr-4 text-right text-[10px] font-black uppercase tracking-tighter text-neutral-600 dark:text-neutral-600">
-                  {format(addHours(startOfDay(new Date()), hour), "h a")}
+                  {format(addHours(startOfDay(currentDate), hour), "H:mm")}
                 </span>
               </div>
             ))}
@@ -218,7 +228,7 @@ export function WeekView({
                 }`}
               >
                 <div className="absolute inset-x-0 h-full">
-                  {HOURS.map((hour) => (
+                  {hoursToRender.map((hour) => (
                     <div
                       key={hour}
                       className="h-24 border-b border-dark-400 dark:border-white/5"
@@ -253,10 +263,10 @@ export function WeekView({
                           ? "bg-primary-500/10 dark:bg-primary-500/5"
                           : ""
                       }`}
-                      style={{ height: `${24 * 96}px` }}
+                      style={{ height: `${(24 - startHour) * 96}px` }}
                     >
                       <div className="absolute inset-x-0 z-0 h-full">
-                        {HOURS.map((hour) => (
+                        {hoursToRender.map((hour) => (
                           <div
                             key={`slot-${hour}`}
                             onClick={() => handleTimeSlotClick(day, hour)}
@@ -276,9 +286,10 @@ export function WeekView({
                         const badgeTop = firstHidden
                           ? (() => {
                               const d = new Date(firstHidden.date);
-                              return d.getHours() * hourHeight + (d.getMinutes() * hourHeight) / 60;
+                              return (d.getHours() - startHour) * hourHeight + (d.getMinutes() * hourHeight) / 60;
                             })()
                           : 8;
+
                         
                         return (
                           <>
@@ -289,11 +300,14 @@ export function WeekView({
                                   key={entry.id}
                                   entry={entry}
                                   onClick={onTaskClick}
+                                  variant="DETAILED"
                                   isPositioned={true}
                                   totalOverlap={Math.min(overlapInfo?.totalOverlap ?? 1, 2)}
                                   overlapIndex={overlapInfo?.overlapIndex}
                                   index={index}
+                                  startHour={startHour}
                                 />
+
                               );
                             })}
                             {hiddenCount > 0 && (

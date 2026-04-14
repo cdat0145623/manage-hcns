@@ -362,7 +362,7 @@ export function CreateEventModal({
       if (editEntry.recurrence === "CUSTOM" && editEntry.rruleString) {
         setSelectedWeekdays(parseWeekdaysFromRRule(editEntry.rruleString));
       } else {
-        setSelectedWeekdays([]);
+        setSelectedWeekdays([0, 1, 2, 3, 4, 5]);
       }
     } else {
       setTitle("");
@@ -400,7 +400,7 @@ export function CreateEventModal({
       setSelectedUserId(
         currentUser?.role !== "ADMIN" ? currentUser?.id || "" : "",
       );
-      setSelectedWeekdays([]);
+      setSelectedWeekdays([0, 1, 2, 3, 4, 5]);
       setAttendees([]);
       setHasAttemptedSave(false);
       setShowUpdateConfirm(false);
@@ -852,12 +852,9 @@ export function CreateEventModal({
                               e.preventDefault();
                               setRecurrence(opt.value);
                               if (opt.value === "CUSTOM") {
-                                const startDay = (getDay(currentDate) + 6) % 7;
-                                // If nothing is selected, or if we want to ensure current day is selected when switching
-                                if (!selectedWeekdays.includes(startDay)) {
-                                  setSelectedWeekdays((prev) =>
-                                    [...new Set([...prev, startDay])].sort(),
-                                  );
+                                // Default to T2-T7 if nothing selected
+                                if (selectedWeekdays.length === 0) {
+                                  setSelectedWeekdays([0, 1, 2, 3, 4, 5]);
                                 }
                               }
                               setShowRecurrenceOptions(false);
@@ -919,7 +916,7 @@ export function CreateEventModal({
                       className="overflow-hidden"
                     >
                       <div className="flex items-center justify-between px-1">
-                        {["T2", "T3", "T4", "T5", "T6", "T7", "Cn"].map(
+                        {["T2", "T3", "T4", "T5", "T6", "T7", "CN"].map(
                           (day, idx) => {
                             const isSelected = selectedWeekdays.includes(idx);
                             return (

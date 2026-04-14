@@ -38,7 +38,7 @@ interface MonthViewProps {
   formattedResult: any[];
 }
 
-const WEEKDAYS = ["CN", "T2", "T3", "T4", "T5", "T6", "T7"];
+const WEEKDAYS = ["T2", "T3", "T4", "T5", "T6", "T7", "CN"];
 
 export function MonthView({
   currentDate,
@@ -54,7 +54,7 @@ export function MonthView({
   const [popoverCard, setPopoverCard] = useState<Date | null>(null);
   const [popoverDay, setPopoverDay] = useState<Date | null>(null);
 
-  const calendarStart = startOfWeek(monthStart);
+  const calendarStart = startOfWeek(monthStart, { weekStartsOn: 1 });
   // BUG-4 FIX: Always generate 42 days (6 weeks) so months that start
   // near the end of a week (needing 6 rows) are never truncated
   const calendarEnd = addDays(calendarStart, 41);

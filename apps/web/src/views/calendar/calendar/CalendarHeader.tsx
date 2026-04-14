@@ -60,8 +60,8 @@ export function CalendarHeader({
             `Tháng ${currentDate.getMonth() + 1} ${currentDate.getFullYear()}`
           ) : viewMode === "WEEK" ? (
             <>
-              {format(startOfWeek(currentDate), "d")} Tháng {startOfWeek(currentDate).getMonth() + 1} — 
-              {format(endOfWeek(currentDate), "d")} Tháng {endOfWeek(currentDate).getMonth() + 1}, {format(endOfWeek(currentDate), "yyyy")}
+              {format(startOfWeek(currentDate, { weekStartsOn: 1 }), "d")} Tháng {startOfWeek(currentDate, { weekStartsOn: 1 }).getMonth() + 1} — 
+              {format(endOfWeek(currentDate, { weekStartsOn: 1 }), "d")} Tháng {endOfWeek(currentDate, { weekStartsOn: 1 }).getMonth() + 1}, {format(endOfWeek(currentDate, { weekStartsOn: 1 }), "yyyy")}
             </>
           ) : (
             `${currentDate.getDate()} Tháng ${currentDate.getMonth() + 1}, ${format(currentDate, "yyyy")}`

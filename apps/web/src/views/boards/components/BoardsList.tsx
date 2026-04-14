@@ -159,7 +159,7 @@ export function BoardsList({ isTemplate, archived = false }: { isTemplate?: bool
                 )}
               </button>
               <p className="px-4 text-[14px] font-bold text-neutral-700 dark:text-dark-1000">
-                {board.name}
+                {board.user?.name} - {board.name}
               </p>
             </div>
           </Link>

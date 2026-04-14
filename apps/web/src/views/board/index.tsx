@@ -48,6 +48,7 @@ import { NewTemplateForm } from "./components/NewTemplateForm";
 import UpdateBoardSlugButton from "./components/UpdateBoardSlugButton";
 import { UpdateBoardSlugForm } from "./components/UpdateBoardSlugForm";
 import VisibilityButton from "./components/VisibilityButton";
+import { listNames } from "../boards/components/NewBoardForm";
 
 type PublicListId = string;
 
@@ -113,10 +114,41 @@ export default function BoardPage({ isTemplate }: { isTemplate?: boolean }) {
   });
 
   const onSubmit = (values: UpdateBoardInput) => {
-    updateBoard.mutate({
-      boardPublicId: values.boardPublicId,
-      name: values.name,
-    });
+    if (values.name === boardData?.name) return;
+    if (values.name?.trim() === "") return;
+
+    if (!listNames.map((l) => l.name).includes(values.name?.trim() ?? "")) {
+      showPopup({
+        header: t`Không thể đổi tên`,
+        message: t`Tên bảng không hợp lệ`,
+        icon: "error",
+      });
+      return;
+    }
+
+    updateBoard.mutate(
+      {
+        boardPublicId: values.boardPublicId,
+        name: values.name,
+      },
+      {
+        onSuccess: () => {
+          void utils.board.byId.invalidate();
+          showPopup({
+            header: t`Đổi tên thành công`,
+            message: t`Tên bảng đã được đổi thành công`,
+            icon: "success",
+          });
+        },
+        onError: (error) => {
+          showPopup({
+            header: t`Không thể đổi tên`,
+            message: t`Tên bảng không hợp lệ`,
+            icon: "error",
+          });
+        },
+      }
+    );
   };
 
   const semanticFilters = formatToArray(router.query.dueDate) as (
@@ -496,6 +528,7 @@ export default function BoardPage({ isTemplate }: { isTemplate?: boolean }) {
               onSubmit={handleSubmit(onSubmit)}
               className="order-2 focus-visible:outline-none md:order-1"
             >
+              {boardData.user?.name}
               <input
                 id="name"
                 type="text"

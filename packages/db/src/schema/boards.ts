@@ -95,6 +95,11 @@ export const boardsRelations = relations(boards, ({ one, many }) => ({
     references: [workspaces.id],
     relationName: "boardWorkspace",
   }),
+  user: one(users, {
+    fields: [boards.createdBy],
+    references: [users.id],
+    relationName: "boardUser",
+  }),
 }));
 
 export const userBoardFavorites = pgTable(

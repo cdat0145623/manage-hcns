@@ -568,6 +568,16 @@ export const boardRouter = createTRPCRouter({
         }
       }
 
+      if (input.name) {
+        const existingBoard = await boardRepo.getByName(ctx.db, input.name, board.createdBy!);
+
+        if (existingBoard)
+          throw new TRPCError({
+            message: `Board with name ${input.name} already exists`,
+            code: "BAD_REQUEST",
+          });
+      }
+
       const result = await boardRepo.update(ctx.db, {
         name: input.name,
         slug: input.slug,

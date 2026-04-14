@@ -28,6 +28,7 @@ import {
   lists,
   userBoardFavorites,
   workspaceMembers,
+  users,
 } from "@kan/db/schema";
 import { generateUID } from "@kan/shared/utils";
 
@@ -75,6 +76,11 @@ export const getAllByWorkspaceId = async (
           colourCode: true,
         },
       },
+      user: {
+        columns: {
+          name: true,
+        },
+      }
     },
     where: and(
       eq(boards.workspaceId, workspaceId),
@@ -205,6 +211,11 @@ export const getByPublicId = async (
       isTemplateDefault: true,
     },
     with: {
+      user: {
+        columns: {
+          name: true,
+        },
+      },
       userFavorites: {
         where: eq(userBoardFavorites.userId, userId),
         columns: {

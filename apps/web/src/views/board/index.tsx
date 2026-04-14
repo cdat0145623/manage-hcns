@@ -594,6 +594,7 @@ export default function BoardPage({ isTemplate }: { isTemplate?: boolean }) {
               boardPublicId={boardId ?? ""}
               isArchived={boardData?.isArchived ?? false}
               isFavorite={boardData?.favorite}
+              isTemplateDefault={boardData?.isTemplateDefault}
               boardName={boardData?.name}
               onShowActivity={() => setIsActivitySidebarOpen(true)}
             />

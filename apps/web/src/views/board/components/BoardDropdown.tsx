@@ -20,6 +20,7 @@ export default function BoardDropdown({
   isArchived,
   boardPublicId,
   isFavorite,
+  isTemplateDefault,
   boardName,
   onShowActivity,
 }: {
@@ -28,6 +29,7 @@ export default function BoardDropdown({
   boardPublicId: string;
   isArchived?: boolean;
   isFavorite?: boolean;
+  isTemplateDefault?: boolean;
   boardName?: string;
   onShowActivity?: () => void;
 }) {
@@ -70,10 +72,36 @@ export default function BoardDropdown({
     },
   });
 
+  const updateTemplateDefault = api.board.setTemplateDefault.useMutation({
+    onSuccess: () => {
+      void utils.board.all.invalidate();
+      void utils.board.byId.invalidate();
+      showPopup({
+        header: t`Đã cập nhật mẫu mặc định`,
+        message: t`Bảng đã được cập nhật làm mẫu mặc định.`,
+        icon: "success",
+      });
+    },
+    onError: () => {
+      showPopup({
+        header: t`Không thể cập nhật mẫu mặc định`,
+        message: t`Vui lòng thử lại sau hoặc liên hệ bộ phận hỗ trợ khách hàng.`,
+        icon: "error",
+      });
+    },
+  });
+
   const handleToggleFavorite = () => {
     updateBoard.mutate({
       boardPublicId,
       favorite: !isFavorite,
+    });
+  };
+
+  const handleToggleTemplateDefault = () => {
+    updateTemplateDefault.mutate({
+      boardPublicId,
+      isTemplateDefault: !isTemplateDefault,
     });
   };
 
@@ -124,6 +152,17 @@ export default function BoardDropdown({
         : t`Thêm vào yêu thích`,
       action: handleToggleFavorite,
       icon: isFavorite ? (
+        <HiStar className="h-[16px] w-[16px] text-dark-900" />
+      ) : (
+        <HiOutlineStar className="h-[16px] w-[16px] text-dark-900" />
+      ),
+    },
+    {
+      label: isTemplateDefault
+        ? t`Bỏ mẫu mặc định`
+        : t`Đặt làm mẫu mặc định`,
+      action: handleToggleTemplateDefault,
+      icon: isTemplateDefault ? (
         <HiStar className="h-[16px] w-[16px] text-dark-900" />
       ) : (
         <HiOutlineStar className="h-[16px] w-[16px] text-dark-900" />

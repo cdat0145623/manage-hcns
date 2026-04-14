@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { t } from "@lingui/core/macro";
 import { HiOutlineRectangleStack, HiOutlineStar, HiStar } from "react-icons/hi2";
+import { ImCheckmark2, ImCheckmark } from "react-icons/im";
 import { motion } from "framer-motion";
 import Button from "~/components/Button";
 import PatternedBackground from "~/components/PatternedBackground";
@@ -17,6 +18,12 @@ export function BoardsList({ isTemplate, archived = false }: { isTemplate?: bool
 
   const utils = api.useUtils();
   const updateBoard = api.board.update.useMutation({
+    onSuccess: () => {
+      void utils.board.all.invalidate();
+    },
+  });
+
+  const setTemplateDefault = api.board.setTemplateDefault.useMutation({
     onSuccess: () => {
       void utils.board.all.invalidate();
     },
@@ -44,6 +51,18 @@ export function BoardsList({ isTemplate, archived = false }: { isTemplate?: bool
     });
   };
 
+  const handleSetDefault = (
+    e: React.MouseEvent,
+    boardPublicId: string,
+    currentDefault: boolean | undefined
+  ) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setTemplateDefault.mutate({
+      boardPublicId,
+      isTemplateDefault: !currentDefault,
+    });
+  };
 
   if (isLoading)
     return (
@@ -110,6 +129,19 @@ export function BoardsList({ isTemplate, archived = false }: { isTemplate?: bool
           >
             <div className="group relative mr-5 flex h-[150px] w-full items-center justify-center rounded-md border border-dashed border-light-400 bg-light-50 shadow-sm hover:bg-light-200 dark:border-dark-600 dark:bg-dark-50 dark:hover:bg-dark-100">
               <PatternedBackground />
+              <button
+                onClick={(e) => handleSetDefault(e, board.publicId, board.isTemplateDefault)}
+                className={`absolute right-10 top-3 z-10 rounded p-1 transition-all hover:bg-light-300 dark:hover:bg-dark-200 ${board.isTemplateDefault ? "" : "md:opacity-0 md:group-hover:opacity-100"
+                  }`}
+                aria-label={board.isTemplateDefault ? "Remove as default" : "Set as default"}
+                title={board.isTemplateDefault ? "Remove as default" : "Set as default"}
+              >
+                {board.isTemplateDefault ? (
+                  <ImCheckmark className="h-5 w-5 text-neutral-700 dark:text-dark-1000" />
+                ) : (
+                  <ImCheckmark2 className="h-5 w-5 text-neutral-700 dark:text-dark-800" />
+                )}
+              </button>
               <button
                 onClick={(e) => handleToggleFavorite(e, board.publicId, board.favorite)}
                 className={`absolute right-3 top-3 z-10 rounded p-1 transition-all hover:bg-light-300 dark:hover:bg-dark-200 ${board.favorite ? "" : "md:opacity-0 md:group-hover:opacity-100"

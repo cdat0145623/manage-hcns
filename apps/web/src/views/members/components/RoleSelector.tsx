@@ -90,7 +90,10 @@ export function RoleSelect({ value, onChange, disabled }: RoleSelectProps) {
           leaveFrom="opacity-100 scale-100 translate-y-0"
           leaveTo="opacity-0 scale-95 translate-y-1"
         >
-          <ListboxOptions className="absolute left-0 right-0 z-50 mt-1.5 overflow-hidden rounded-xl border border-black/10 bg-white p-1 shadow-lg outline-none dark:border-white/10 dark:bg-neutral-900 dark:shadow-black/40">
+          <ListboxOptions
+            anchor="bottom start"
+            className="z-50 w-48 overflow-hidden rounded-xl border border-black/10 bg-white p-1 shadow-lg outline-none dark:border-white/10 dark:bg-neutral-900 dark:shadow-black/40 [--anchor-gap:6px]"
+          >
             {ROLES.map((role, i) => (
               <Fragment key={role.value}>
                 {/* Divider before Staff */}

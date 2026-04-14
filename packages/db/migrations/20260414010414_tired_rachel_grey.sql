@@ -1,0 +1,1 @@
+ALTER TABLE "board" ADD COLUMN "isTemplateDefault" boolean DEFAULT false NOT NULL;

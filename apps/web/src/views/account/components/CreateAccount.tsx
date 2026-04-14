@@ -87,6 +87,7 @@ export default function CreateAccount({ onClose }: { onClose: () => void }) {
         role: "NVVP",
         workspacePublicId: workspace?.publicId ?? "",
       });
+      onClose();
     } catch (err: any) {
       setError(err.message || t`Đã có lỗi xảy ra.`);
     }

@@ -50,6 +50,7 @@ export const getAllByWorkspaceId = async (
     columns: {
       publicId: true,
       name: true,
+      isTemplateDefault: true,
     },
     with: {
       userFavorites: {
@@ -88,6 +89,7 @@ export const getAllByWorkspaceId = async (
       ...board,
       favorite: board.userFavorites.length > 0,
       userFavorites: undefined,
+      isTemplateDefault: board.isTemplateDefault,
     }))
     .sort((a, b) => {
       // Sort favorites first
@@ -198,6 +200,7 @@ export const getByPublicId = async (
       slug: true,
       visibility: true,
       isArchived: true,
+      isTemplateDefault: true,
     },
     with: {
       userFavorites: {
@@ -369,6 +372,7 @@ export const getByPublicId = async (
     ...board,
     favorite: board.userFavorites.length > 0,
     userFavorites: undefined,
+    isTemplateDefault: board.isTemplateDefault,
     lists: board.lists.map((list) => ({
       ...list,
       cards: list.cards.map((card) => {
@@ -1045,5 +1049,64 @@ export const removeUserFavorite = async (
         eq(userBoardFavorites.boardId, boardId)
       )
     )
+    .returning();
+};
+
+export const getByName = async (db: dbClient, name: string) => {
+  const result = await db
+    .select()
+    .from(boards)
+    .where(and(eq(boards.name, name), eq(boards.type, "regular")))
+    .limit(1);
+
+  return result[0] ?? null;
+};
+
+export const getTemplateDefault = async (db: dbClient) => {
+  const result = await db.query.boards.findFirst({
+    columns: {
+      id: true,
+      publicId: true,
+      name: true,
+      isTemplateDefault: true,
+    },
+    with: {
+      lists: {
+        columns: {
+          publicId: true,
+          name: true,
+          index: true,
+        },
+        orderBy: [asc(lists.index)],
+      },
+      labels: {
+        columns: {
+          publicId: true,
+          name: true,
+          colourCode: true,
+        },
+      },
+    },
+    where: and(
+      eq(boards.type, "template"),
+      eq(boards.isTemplateDefault, true),
+      isNull(boards.deletedAt)
+    ),
+  });
+
+  return result ?? null;
+};
+
+export const setTemplateDefault = async (
+  db: dbClient,
+  boardId: number,
+  isTemplateDefault: boolean,
+) => {
+  return db
+    .update(boards)
+    .set({
+      isTemplateDefault,
+    })
+    .where(eq(boards.id, boardId))
     .returning();
 };

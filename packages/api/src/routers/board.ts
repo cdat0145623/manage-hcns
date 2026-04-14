@@ -67,7 +67,7 @@ export const boardRouter = createTRPCRouter({
 
       await assertPermission(ctx.db, userId, workspace.id, "board:view");
 
-      const result = boardRepo.getAllByWorkspaceId(
+      const result = await boardRepo.getAllByWorkspaceId(
         ctx.db,
         workspace.id,
         userId,
@@ -313,6 +313,20 @@ export const boardRouter = createTRPCRouter({
           message: `User not authenticated`,
           code: "UNAUTHORIZED",
         });
+
+      if (input.type === "regular") {
+        const existingBoard = await boardRepo.getByName(
+          ctx.db,
+          input.name,
+        );
+
+        if (existingBoard) {
+          throw new TRPCError({
+            message: `Board with name ${input.name} already exists`,
+            code: "BAD_REQUEST",
+          });
+        }
+      }
 
       const workspace = await workspaceRepo.getByPublicId(
         ctx.db,
@@ -793,5 +807,78 @@ export const boardRouter = createTRPCRouter({
         ...result,
         activities: activitiesWithAvatarUrls,
       };
+    }),
+  getTemplateDefault: publicProcedure
+    .meta({
+      openapi: {
+        method: "GET",
+        path: "/boards/template-default",
+        summary: "Get template default",
+        description: "Retrieves template default",
+        tags: ["Boards"],
+        protect: false,
+      },
+    })
+    .output(z.custom<Awaited<ReturnType<typeof boardRepo.getTemplateDefault>>>())
+    .query(async ({ ctx }) => {
+      const result = await boardRepo.getTemplateDefault(ctx.db);
+      return result;
+    }),
+  setTemplateDefault: protectedProcedure
+    .meta({
+      openapi: {
+        method: "PUT",
+        path: "/boards/template-default",
+        summary: "Set template default",
+        description: "Sets a template as default",
+        tags: ["Boards"],
+        protect: true,
+      },
+    })
+    .input(
+      z.object({
+        boardPublicId: z.string().min(12),
+        isTemplateDefault: z.boolean(),
+      }),
+    )
+    .output(z.custom<Awaited<ReturnType<typeof boardRepo.setTemplateDefault>>>())
+    .mutation(async ({ ctx, input }) => {
+      const userId = ctx.user?.id;
+
+      if (!userId)
+        throw new TRPCError({
+          message: `User not authenticated`,
+          code: "UNAUTHORIZED",
+        });
+
+      const board = await boardRepo.getWorkspaceAndBoardIdByBoardPublicId(
+        ctx.db,
+        input.boardPublicId,
+      );
+
+      if (!board)
+        throw new TRPCError({
+          message: `Board with public ID ${input.boardPublicId} not found`,
+          code: "NOT_FOUND",
+        });
+
+      // Remove current template default if exists
+      const currentTemplateDefault = await boardRepo.getTemplateDefault(ctx.db);
+      if (currentTemplateDefault) {
+        await boardRepo.setTemplateDefault(
+          ctx.db,
+          currentTemplateDefault.id,
+          false,
+        );
+      }
+
+      await assertPermission(ctx.db, userId, board.workspaceId, "board:edit");
+
+      const result = await boardRepo.setTemplateDefault(
+        ctx.db,
+        board.id,
+        input.isTemplateDefault,
+      );
+      return result;
     }),
 });

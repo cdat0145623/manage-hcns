@@ -6,6 +6,7 @@ import * as activityRepo from "@kan/db/repository/cardActivity.repo";
 import * as workspaceRepo from "@kan/db/repository/workspace.repo";
 import * as memberRepo from "@kan/db/repository/member.repo";
 import * as permissionRepo from "@kan/db/repository/permission.repo";
+import * as positionRepo from "@kan/db/repository/position.repo";
 
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import { initAuth, hashPassword } from "@kan/auth/server";
@@ -438,6 +439,93 @@ export const userRouter = createTRPCRouter({
           },
         );
       }
+
+      return { success: true };
+    }),
+  updatePosition: protectedProcedure
+    .meta({
+      openapi: {
+        method: "PUT",
+        path: "/users/update-position",
+        summary: "Update position user",
+        description: "Updates a user's position",
+        tags: ["Users"],
+        protect: true,
+      },
+    })
+    .input(
+      z.object({
+        targetUserId: z.string(),
+        positionPublicId: z.string(),
+        workspacePublicId: z.string(),
+      }),
+    )
+    .output(
+      z.object({
+        success: z.boolean(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const userId = ctx.user?.id;
+
+      if (!userId)
+        throw new TRPCError({
+          message: `User not authenticated`,
+          code: "UNAUTHORIZED",
+        });
+
+      // Verify current user is ADMIN
+      const currentUser = await userRepo.getById(ctx.db, userId);
+      if (!currentUser || currentUser.role !== "ADMIN") {
+        throw new TRPCError({
+          message: `Only admins can update user positions`,
+          code: "UNAUTHORIZED",
+        });
+      }
+
+      // Prevent updating your own position
+      if (input.targetUserId === userId) {
+        throw new TRPCError({
+          message: `Cannot update your own position`,
+          code: "BAD_REQUEST",
+        });
+      }
+
+      const position = await positionRepo.getByPublicId(ctx.db, input.positionPublicId);
+
+      if (!position) {
+        throw new TRPCError({
+          message: `Position not found`,
+          code: "NOT_FOUND",
+        });
+      }
+
+      const result = await userRepo.updatePosition(ctx.db, input.targetUserId, position.id);
+
+      if (!result) {
+        throw new TRPCError({
+          message: `User not found`,
+          code: "NOT_FOUND",
+        });
+      }
+
+      // const workspaceMember = await workspaceRepo.getMemberByPublicIdAndUserId(ctx.db, input.workspacePublicId, input.targetUserId);
+
+      // if (!workspaceMember) {
+      //   throw new TRPCError({
+      //     message: `Workspace member not found`,
+      //     code: "NOT_FOUND",
+      //   });
+      // }
+
+      // await activityRepo.updateAccountInformation(ctx.db, {
+      //     type: "updated_position" as const,
+      //     workspaceMemberId: workspaceMember.id,
+      //     createdBy: userId,
+      //     oldValue: workspaceMember.position?.name ?? "",
+      //     newValue: result.position?.name ?? "",
+      //   },
+      // );
 
       return { success: true };
     }),

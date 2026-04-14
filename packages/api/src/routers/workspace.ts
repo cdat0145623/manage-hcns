@@ -88,6 +88,8 @@ export const workspaceRouter = createTRPCRouter({
       // Generate presigned URLs for member avatars
       const membersWithAvatarUrls = await Promise.all(
         result.members.map(async (member) => {
+          const position = member.user?.position?.deletedAt ? null : member.user?.position ?? null;
+
           if (!member.user?.image) {
             return member;
           }
@@ -98,6 +100,7 @@ export const workspaceRouter = createTRPCRouter({
             user: {
               ...member.user,
               image: avatarUrl,
+              position,
             },
           };
         }),

@@ -18,6 +18,7 @@ import {
   lists,
   workspaceMembers,
   workspaces,
+  positions,
 } from "@kan/db/schema";
 import type { Permission, Role } from "@kan/shared";
 import { generateUID, getDefaultPermissions } from "@kan/shared";
@@ -224,6 +225,16 @@ export const getByPublicIdWithMembers = (
               image: true,
               username: true,
               isActive: true,
+            },
+            with: {
+              position: {
+                columns: {
+                  publicId: true,
+                  name: true,
+                  description: true,
+                  deletedAt: true,
+                },
+              },
             },
           },
         },

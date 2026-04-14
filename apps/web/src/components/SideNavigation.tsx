@@ -169,6 +169,18 @@ function SideNavigation({
         },
       },
       {
+        name: "Vị trí",
+        href: "/positions",
+        icon: isDarkMode ? membersIconDark : membersIconLight,
+        keyboardShortcut: {
+          type: "SEQUENCE",
+          strokes: [{ key: "G" }, { key: "P" }],
+          action: () => router.push("/positions"),
+          group: "NAVIGATION",
+          description: t`Go to positions`,
+        },
+      },
+      {
         name: "Tài khoản",
         href: "/account",
         icon: isDarkMode ? membersIconDark : membersIconLight,

@@ -17,6 +17,7 @@ import { useWorkspace } from "~/providers/workspace";
 import { usePopup } from "~/providers/popup";
 import { api } from "~/utils/api";
 import { RoleSelect } from "~/views/members/components/RoleSelector";
+import { PositionSelect } from "~/views/members/components/PositionSelector";
 import { EditAccountModal } from "./components/EditAccountModal";
 import CreateAccount from "./components/CreateAccount";
 
@@ -32,6 +33,13 @@ interface MemberData {
     image: string | null;
     username: string | null;
     isActive: boolean;
+    position: {
+      id: number;
+      publicId: string;
+      name: string;
+      description: string | null;
+      deletedAt: Date | null;
+    } | null;
   } | null;
 }
 
@@ -83,6 +91,38 @@ function AccountTableRow({
     });
   };
 
+  const updatePositionMutation = api.user.updatePosition.useMutation({
+    onSuccess: async () => {
+      if (hasLoaded && workspace.publicId && workspace.publicId.length >= 12) {
+        await utils.workspace.byId.invalidate({
+          workspacePublicId: workspace.publicId,
+        });
+      }
+      showPopup({
+        header: t`Cập nhật vị trí`,
+        message: t`Vị trí đã được cập nhật thành công.`,
+        icon: "success",
+      });
+    },
+    onError: () => {
+      showPopup({
+        header: t`Lỗi cập nhật vị trí`,
+        message: t`Không thể cập nhật vị trí. Vui lòng thử lại.`,
+        icon: "error",
+      });
+    },
+  })
+
+  const handlePositionChange = (publicId: string) => {
+    if (!member.user) return;
+
+    updatePositionMutation.mutate({
+      targetUserId: member.user.id,
+      positionPublicId: publicId,
+      workspacePublicId: workspace.publicId
+    })
+  }
+
   return (
     <tr
       className={`border-b border-light-600 dark:border-dark-600 ${isLastRow ? "border-b-0" : ""}`}
@@ -115,6 +155,17 @@ function AccountTableRow({
             value={member.role ?? "NVVP"}
             onChange={handleRoleChange}
             disabled={updateRoleMutation.isPending}
+          />
+        </div>
+      </td>
+
+      {/* Position */}
+      <td className="px-4 py-3">
+        <div className="inline-flex items-center">
+          <PositionSelect
+            value={member.user?.position?.publicId ?? ""}
+            onChange={handlePositionChange}
+            disabled={updatePositionMutation.isPending}
           />
         </div>
       </td>
@@ -234,7 +285,7 @@ export default function Account() {
   return (
     <>
       <PageHead title={t`Tài khoản | ${workspace.name ?? t`Workspace`}`} />
-      <div className="m-auto h-full w-full p-6 px-5 md:px-28 md:py-12">
+      <div className="m-auto h-full w-full p-6 px-5 lg:px-18 lg:py-12">
         <div className="mb-8 flex w-full justify-between">
           <div className="flex items-center gap-3">
             <h1 className="font-bold tracking-tight text-neutral-900 dark:text-dark-1000 sm:text-[1.2rem]">
@@ -280,6 +331,12 @@ export default function Account() {
                         className="px-4 py-3.5 text-left text-sm font-semibold text-light-900 dark:text-dark-900"
                       >
                         {t`Vai trò`}
+                      </th>
+                      <th
+                        scope="col"
+                        className="px-4 py-3.5 text-left text-sm font-semibold text-light-900 dark:text-dark-900"
+                      >
+                        {t`Vị trí`}
                       </th>
                       <th
                         scope="col"

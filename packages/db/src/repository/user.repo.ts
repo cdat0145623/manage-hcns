@@ -173,3 +173,16 @@ export const getAll = async (db: dbClient) => {
     ),
   });
 };
+
+export const updatePosition = async (db: dbClient, userId: string, positionId: number) => {
+  const [result] = await db
+    .update(users)
+    .set({ positionId })
+    .where(eq(users.id, userId))
+    .returning({
+      id: users.id,
+      positionId: users.positionId,
+    });
+
+  return result;
+};

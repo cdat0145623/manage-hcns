@@ -17,3 +17,4 @@ export * from "./notifications";
 export * from "./webhooks";
 export * from "./tasks";
 export * from "./frequences";
+export * from "./positions";

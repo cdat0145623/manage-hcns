@@ -7,6 +7,7 @@ import {
   timestamp,
   uuid,
   varchar,
+  bigint,
 } from "drizzle-orm/pg-core";
 
 import { apikey } from "./auth";
@@ -16,6 +17,7 @@ import { imports } from "./imports";
 import { lists } from "./lists";
 import { workspaceMembers, workspaces, memberRoleEnum } from "./workspaces";
 import { integrations } from "./integrations";
+import type { AnyPgColumn } from "drizzle-orm/pg-core";
 
 export const users = pgTable("user", {
   id: uuid("id")
@@ -38,9 +40,15 @@ export const users = pgTable("user", {
   branchId: integer("branchId"),
   areaId: integer("areaId"),
   isActive: boolean("isActive").notNull().default(true),
+  positionId: bigint("positionId", { mode: "number" }).references(
+    (): AnyPgColumn => positions.id,
+    { onDelete: "restrict" },
+  ),
 }).enableRLS();
 
-export const usersRelations = relations(users, ({ many }) => ({
+import { positions } from "./positions";
+
+export const usersRelations = relations(users, ({ many, one }) => ({
   deletedBoards: many(boards, {
     relationName: "boardDeletedByUser",
   }),
@@ -68,6 +76,10 @@ export const usersRelations = relations(users, ({ many }) => ({
   }),
   apiKeys: many(apikey),
   integrations: many(integrations),
+  position: one(positions, {
+    fields: [users.positionId],
+    references: [positions.id],
+  }),
 }));
 
 export const usersToWorkspacesRelations = relations(

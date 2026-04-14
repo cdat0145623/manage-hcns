@@ -597,6 +597,7 @@ export default function BoardPage({ isTemplate }: { isTemplate?: boolean }) {
               isTemplateDefault={boardData?.isTemplateDefault}
               boardName={boardData?.name}
               onShowActivity={() => setIsActivitySidebarOpen(true)}
+              isAdmin
             />
           </div>
         </div>

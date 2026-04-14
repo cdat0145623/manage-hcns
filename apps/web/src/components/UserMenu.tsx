@@ -43,7 +43,7 @@ export default function UserMenu({
       onCloseSideNav();
     }
     await authClient.signOut();
-    router.push("/login");
+    window.location.href = "/login";
   };
 
   const handleLinkClick = () => {

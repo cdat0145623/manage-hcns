@@ -15,16 +15,31 @@ export function DeleteBoardConfirmation({
   const router = useRouter();
   const { closeModal } = useModal();
 
-  const deleteBoard = api.board.delete.useMutation({
+  const deleteBoard = api.board.update.useMutation({
     onSuccess: () => {
       closeModal();
       router.push(isTemplate ? `/templates` : `/boards`);
     },
   });
 
+  const deleteTemplateBoard = api.board.delete.useMutation({
+    onSuccess: () => {
+      closeModal();
+      router.push(`/templates`);
+    },
+  });
+
   const handleDeleteBoard = () => {
     if (boardPublicId)
       deleteBoard.mutate({
+        boardPublicId: boardPublicId,
+        isArchived: true,
+      });
+  };
+
+  const handleDeleteTemplateBoard = () => {
+    if (boardPublicId)
+      deleteTemplateBoard.mutate({
         boardPublicId: boardPublicId,
       });
   };
@@ -43,7 +58,7 @@ export function DeleteBoardConfirmation({
         <Button onClick={() => closeModal()} variant="secondary">
           {t`Cancel`}
         </Button>
-        <Button onClick={handleDeleteBoard} isLoading={deleteBoard.isPending}>
+        <Button onClick={isTemplate ? handleDeleteTemplateBoard : handleDeleteBoard} isLoading={isTemplate ? deleteTemplateBoard.isPending : deleteBoard.isPending}>
           {t`Delete`}
         </Button>
       </div>

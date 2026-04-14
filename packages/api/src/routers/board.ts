@@ -7,6 +7,7 @@ import * as cardRepo from "@kan/db/repository/card.repo";
 import * as activityRepo from "@kan/db/repository/cardActivity.repo";
 import * as labelRepo from "@kan/db/repository/label.repo";
 import * as listRepo from "@kan/db/repository/list.repo";
+import * as userRepo from "@kan/db/repository/user.repo";
 import * as workspaceRepo from "@kan/db/repository/workspace.repo";
 import { colours } from "@kan/shared/constants";
 import {
@@ -54,6 +55,14 @@ export const boardRouter = createTRPCRouter({
           code: "UNAUTHORIZED",
         });
 
+      const user = await userRepo.getById(ctx.db, userId);
+
+      if (!user)
+        throw new TRPCError({
+          message: `User with ID ${userId} not found`,
+          code: "NOT_FOUND",
+        });
+
       const workspace = await workspaceRepo.getByPublicId(
         ctx.db,
         input.workspacePublicId,
@@ -71,8 +80,9 @@ export const boardRouter = createTRPCRouter({
         ctx.db,
         workspace.id,
         userId,
+        user.role,
         {
-          type: input.type,
+          type: input.type, 
           archived: input.archived ?? false,
         },
       );
@@ -318,6 +328,7 @@ export const boardRouter = createTRPCRouter({
         const existingBoard = await boardRepo.getByName(
           ctx.db,
           input.name,
+          userId,
         );
 
         if (existingBoard) {

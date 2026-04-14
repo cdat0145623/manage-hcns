@@ -30,6 +30,7 @@ export default function PublicBoardView() {
   const { showPopup } = usePopup();
   const [isRouteLoaded, setIsRouteLoaded] = useState(false);
   const { openModal } = useModal();
+  const { data: currentUser } = api.user.getUser.useQuery();
 
   const { ref: scrollRef, onMouseDown } = useDragToScroll({
     enabled: true,
@@ -157,6 +158,7 @@ export default function PublicBoardView() {
                   members={[]}
                   lists={data.allLists ?? []}
                   isLoading={isLoading}
+                  isAdmin={currentUser?.role === "ADMIN"}
                 />
               </div>
             )}
@@ -228,6 +230,7 @@ export default function PublicBoardView() {
                               attachments={card.attachments}
                               dueDate={card.dueDate ?? null}
                               startDate={card.startDate ?? null}
+                              status={card.status}
                             />
                           </Link>
                         );

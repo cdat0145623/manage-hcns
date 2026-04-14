@@ -36,7 +36,7 @@ interface NewBoardInputWithTemplate {
 export const getTemplates = (): Template[] => [
   {
     id: "basic",
-    name: t`Basic Kanban`,
+    name: t`Basic template`,
     lists: [t`To Do`, t`In Progress`, t`Done`],
     labels: [t`High Priority`, t`Medium Priority`, t`Low Priority`],
   }
@@ -116,6 +116,8 @@ export function NewBoardForm({ isTemplate }: { isTemplate?: boolean }) {
     labels: template.labels.map((label) => label.name),
   }));
 
+  const { data: defaultTemplate } = api.board.getTemplateDefault.useQuery();
+
   const {
     register,
     handleSubmit,
@@ -171,9 +173,21 @@ export function NewBoardForm({ isTemplate }: { isTemplate?: boolean }) {
   });
 
   const onSubmit = (data: NewBoardInputWithTemplate) => {
-    if (workspace?.role !== "ADMIN") {
-      data.template = getTemplates()[0]!;
+    // if (workspace?.role !== "ADMIN") {
+    if (!data.template) {
+      if (defaultTemplate) {
+        data.template = {
+          id: defaultTemplate.publicId,
+          sourceBoardPublicId: defaultTemplate.publicId,
+          name: defaultTemplate.name,
+          lists: defaultTemplate.lists.map((list) => list.name),
+          labels: defaultTemplate.labels.map((label) => label.name),
+        };
+      } else {
+        data.template = getTemplates()[0]!;
+      }
     }
+    // }
 
     createBoard.mutate({
       name: data.name,

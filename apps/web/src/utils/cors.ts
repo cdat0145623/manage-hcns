@@ -41,6 +41,10 @@ export const applyCors = async (req: NextApiRequest, res: NextApiResponse) => {
         return;
       }
 
+      const isDev = process.env.NODE_ENV !== "production";
+
+      if (isDev) return callback(null, true);
+
       if (allowedOrigins.length === 0 || allowedOrigins.includes("*")) {
         callback(null, true);
         return;

@@ -18,7 +18,7 @@ export default function LoginPage() {
 
   const { data, isPending } = authClient.useSession();
 
-  if (!isPending && data?.user.id) router.push("/reports");
+  if (!isPending && data?.user.id) router.push("/boards");
 
   return (
     <>

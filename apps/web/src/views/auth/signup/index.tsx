@@ -18,7 +18,7 @@ export default function SignUpPage() {
 
   const { data, isPending } = authClient.useSession();
 
-  if (!isPending && data?.user.id) router.push("/reports");
+  if (!isPending && data?.user.id) router.push("/boards");
 
   const isInviteFlow = redirect?.startsWith("/invite/");
 

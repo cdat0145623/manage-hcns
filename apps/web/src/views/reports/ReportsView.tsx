@@ -176,7 +176,7 @@ function FilterSelector<T>({
             leaveFrom="opacity-100 scale-100"
             leaveTo="opacity-0 scale-95"
           >
-            <Listbox.Options className="absolute -left-1 z-[100] mt-2 max-h-72 min-w-[180px] overflow-auto rounded-2xl border border-light-200 bg-white p-1 text-sm focus:outline-none dark:border-dark-400 dark:bg-dark-200 sm:left-auto sm:right-0">
+            <Listbox.Options className="absolute left-0 right-0 z-[100] mt-2 max-h-72 overflow-auto rounded-2xl border border-light-200 bg-white p-1 text-sm shadow-xl focus:outline-none dark:border-dark-400 dark:bg-dark-200">
               {options.map((option, idx) => (
                 <Listbox.Option
                   key={idx}
@@ -804,22 +804,26 @@ export default function ReportsView() {
             </div>
           </div>
 
-          <div className="ml-auto rounded-[28px] border border-light-200/60 bg-white/40 p-6 shadow-xl ring-1 ring-light-100/50 backdrop-blur-3xl dark:border-dark-400/30 dark:bg-dark-200/30">
-            <div className="flex gap-4">
-              <FilterSelector
-                label="Nhân viên"
-                options={memberOptions}
-                value={selectedUserId}
-                onChange={setSelectedUserId}
-                icon={<HiUser size={18} />}
-              />
-              <FilterSelector
-                label="Bảng"
-                options={boardOptions}
-                value={boardPublicId}
-                onChange={setBoardPublicId}
-                icon={<HiTableCells size={18} />}
-              />
+          <div className="ml-auto flex items-center rounded-[32px] border border-light-200/60 bg-white/50 p-6 shadow-xl ring-1 ring-light-100/50 backdrop-blur-3xl dark:border-dark-400/30 dark:bg-dark-200/30">
+            <div className="flex flex-wrap items-center gap-6">
+              <div className="min-w-[220px]">
+                <FilterSelector
+                  label="Nhân viên"
+                  options={memberOptions}
+                  value={selectedUserId}
+                  onChange={setSelectedUserId}
+                  icon={<HiUser size={18} />}
+                />
+              </div>
+              <div className="min-w-[220px]">
+                <FilterSelector
+                  label="Bảng"
+                  options={boardOptions}
+                  value={boardPublicId}
+                  onChange={setBoardPublicId}
+                  icon={<HiTableCells size={18} />}
+                />
+              </div>
             </div>
           </div>
         </header>

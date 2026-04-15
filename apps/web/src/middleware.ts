@@ -1,6 +1,7 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { env } from "next-runtime-env";
+import { env as env_config } from "~/env";
 
 export async function middleware(request: NextRequest) {
   const url = request.nextUrl;
@@ -22,7 +23,14 @@ export async function middleware(request: NextRequest) {
     return proxyToMinio(request, path);
   }
 
-  return NextResponse.next();
+  const response = NextResponse.next();
+  const ancestors = (env_config.ALLOWED_FRAME_ANCESTORS ?? "'self'")
+    .replace(/,/g, " ") // Chuyen dau phay thanh dau cach
+    .replace(/\s+/g, " ") // Don dep dau cach du thua
+    .trim();
+  response.headers.set("Content-Security-Policy", `frame-ancestors ${ancestors}`);
+  
+  return response;
 }
 
 async function proxyToMinio(request: NextRequest, path: string[]) {

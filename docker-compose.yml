@@ -38,6 +38,7 @@ services:
       - NEXT_PUBLIC_BASE_URL=${NEXT_PUBLIC_BASE_URL}
       - BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET}
       - POSTGRES_URL=${POSTGRES_URL}
+      - ALLOWED_FRAME_ANCESTORS=${ALLOWED_FRAME_ANCESTORS}
     depends_on:
       migrate:
         condition: service_started

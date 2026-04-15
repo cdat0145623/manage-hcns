@@ -35,13 +35,12 @@ import {
 } from "recharts";
 import { twMerge } from "tailwind-merge";
 
+import Modal from "~/components/modal";
+import { NewWorkspaceForm } from "~/components/NewWorkspaceForm";
 import PatternedBackground from "~/components/PatternedBackground";
+import { useModal } from "~/providers/modal";
 import { useWorkspace } from "~/providers/workspace";
 import { api } from "~/utils/api";
-
-import Modal from "~/components/modal";
-import { useModal } from "~/providers/modal";
-import { NewWorkspaceForm } from "~/components/NewWorkspaceForm";
 
 const CHART_COLORS = [
   "#6366f1", // Indigo
@@ -805,8 +804,8 @@ export default function ReportsView() {
             </div>
           </div>
 
-          <div className="rounded-[28px] border border-light-200/60 bg-white/40 p-5 shadow-2xl ring-1 ring-light-100/50 backdrop-blur-3xl dark:border-dark-400/30 dark:bg-dark-200/30">
-            <div className="grid grid-cols-2 gap-x-4 gap-y-4 lg:grid-cols-4">
+          <div className="ml-auto rounded-[28px] border border-light-200/60 bg-white/40 p-6 shadow-xl ring-1 ring-light-100/50 backdrop-blur-3xl dark:border-dark-400/30 dark:bg-dark-200/30">
+            <div className="flex gap-4">
               <FilterSelector
                 label="Nhân viên"
                 options={memberOptions}
@@ -820,44 +819,6 @@ export default function ReportsView() {
                 value={boardPublicId}
                 onChange={setBoardPublicId}
                 icon={<HiTableCells size={18} />}
-              />
-              {/* <FilterSelector
-                label="Chế độ xem"
-                options={viewModeOptions}
-                value={viewMode}
-                onChange={setViewMode}
-                icon={<HiRectangleStack size={18} />}
-              />
-              {viewMode === "month" ? ( */}
-                <FilterSelector
-                  label="Tháng"
-                  options={monthOptions}
-                  value={month}
-                  onChange={setMonth}
-                  icon={<HiCalendar size={18} />}
-                />
-              {/* ) : viewMode === "week" ? (
-                <FilterSelector
-                  label="Tuần"
-                  options={weekOptions}
-                  value={week}
-                  onChange={setWeek}
-                  icon={<HiCalendar size={18} />}
-                />
-              ) : (
-                <div className="flex flex-col gap-2 opacity-30">
-                  <label className="text-[10px] font-extrabold uppercase tracking-[0.2em] text-light-500/80">
-                    Chế độ cố định
-                  </label>
-                  <div className="h-11 rounded-2xl border border-dashed border-light-300" />
-                </div>
-              )} */}
-              <FilterSelector
-                label="Năm"
-                options={yearOptions}
-                value={year}
-                onChange={setYear}
-                icon={<HiCalendar size={18} />}
               />
             </div>
           </div>

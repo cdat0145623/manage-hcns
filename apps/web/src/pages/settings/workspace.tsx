@@ -13,6 +13,6 @@ const WorkspaceSettingsPage: NextPageWithLayout = () => {
   );
 };
 
-WorkspaceSettingsPage.getLayout = (page) => getDashboardLayout(page, undefined, false, "ADMIN");
+WorkspaceSettingsPage.getLayout = (page) => getDashboardLayout(page);
 
 export default WorkspaceSettingsPage;

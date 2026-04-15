@@ -9,7 +9,121 @@ import { statusTypeEnum } from "@kan/db/schema";
 
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
+import pkg from "rrule";
+const { RRule } = pkg;
+
 const statusTypeEnumSchema = z.enum(statusTypeEnum.enumValues);
+
+import type { Language } from 'rrule/dist/esm/nlp/i18n'
+import { Weekday } from 'rrule'
+
+// ---- 1. Định nghĩa ngôn ngữ tiếng Việt ----
+const VIETNAMESE: Language = {
+  dayNames: [
+    'Chủ Nhật',
+    'Thứ Hai',
+    'Thứ Ba',
+    'Thứ Tư',
+    'Thứ Năm',
+    'Thứ Sáu',
+    'Thứ Bảy',
+  ],
+  monthNames: [
+    'tháng 1',
+    'tháng 2',
+    'tháng 3',
+    'tháng 4',
+    'tháng 5',
+    'tháng 6',
+    'tháng 7',
+    'tháng 8',
+    'tháng 9',
+    'tháng 10',
+    'tháng 11',
+    'tháng 12',
+  ],
+  tokens: {
+    SKIP: /^(thứ|ngày|vào|lúc)\b/i,
+    number: /^[1-9][0-9]*/,
+    numberAsText: /^(một|hai|ba|bốn|năm|sáu|bảy|tám|chín|mười)/i,
+    every: /^Hằng/i,
+    day: /^ngày/i,
+    days: /^ngày/i,
+    week: /^tuần/i,
+    weeks: /^tuần/i,
+    month: /^tháng/i,
+    months: /^tháng/i,
+    year: /^năm/i,
+    years: /^năm/i,
+    on: /^vào/i,
+    in: /^trong/i,
+    'on the': /^vào ngày/i,
+    for: /^trong/i,
+    and: /^và/i,
+    or: /^hoặc/i,
+    at: /^lúc/i,
+    last: /^cuối/i,
+    '(~ approximate)': /^(~)/,
+    until: /^đến/i,
+    time: /^(lần)/i,
+    times: /^(lần)/i,
+  },
+}
+
+// ---- 2. Hàm gettext dịch các token tiếng Anh sang tiếng Việt ----
+const vietnameseGettext = (id: string | number | Weekday): string => {
+  const key = id.toString()
+  
+  const translations: Record<string, string> = {
+    every: 'Hằng',
+    day: 'ngày',
+    days: 'ngày',
+    week: 'tuần',
+    weeks: 'tuần',
+    month: 'tháng',
+    months: 'tháng',
+    year: 'năm',
+    years: 'năm',
+    on: 'vào',
+    in: 'trong',
+    'on the': 'vào ngày',
+    for: 'trong',
+    and: 'và',
+    or: 'hoặc',
+    at: 'lúc',
+    last: 'cuối',
+    '(~ approximate)': '(~)',
+    until: 'đến',
+    time: 'lần',
+    times: 'lần',
+    Monday: 'Thứ Hai',
+    Tuesday: 'Thứ Ba',
+    Wednesday: 'Thứ Tư',
+    Thursday: 'Thứ Năm',
+    Friday: 'Thứ Sáu',
+    Saturday: 'Thứ Bảy',
+    Sunday: 'Chủ Nhật',
+    January: 'tháng 1',
+    February: 'tháng 2',
+    March: 'tháng 3',
+    April: 'tháng 4',
+    May: 'tháng 5',
+    June: 'tháng 6',
+    July: 'tháng 7',
+    August: 'tháng 8',
+    September: 'tháng 9',
+    October: 'tháng 10',
+    November: 'tháng 11',
+    December: 'tháng 12',
+    '1st': 'thứ 1',
+    '2nd': 'thứ 2',
+    '3rd': 'thứ 3',
+    '4th': 'thứ 4',
+    '5th': 'thứ 5',
+  }
+
+  return translations[key] ?? key
+}
 
 export const taskInstanceRouter = createTRPCRouter({
   byId: protectedProcedure
@@ -172,6 +286,10 @@ export const taskInstanceRouter = createTRPCRouter({
               return [];
             }
 
+            const normalizedRrule = taskMaster.frequence.rruleString.replace(/\\n/g, "\n");
+            const rule = RRule.fromString(normalizedRrule);
+            const ruleText = rule.toText(vietnameseGettext, VIETNAMESE)
+
             const from = input.from;
             const to = input.to;
 
@@ -222,6 +340,7 @@ export const taskInstanceRouter = createTRPCRouter({
                   startDate: taskMaster.startDate,
                   endDate: taskMaster.endDate,
                   createdBy: taskMaster.createdBy,
+                  rruleStringToText: ruleText
                 };
 
                 if (existing) {

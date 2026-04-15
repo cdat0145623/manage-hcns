@@ -1260,7 +1260,7 @@ export const cardRouter = createTRPCRouter({
     })
     .input(
       z.object({
-        userId: z.string().min(1),
+        userId: z.string().min(1).optional(),
       }),
     )
     .output(z.custom<Awaited<ReturnType<typeof cardRepo.getByUserId>>>())

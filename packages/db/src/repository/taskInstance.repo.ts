@@ -66,23 +66,74 @@ export const generateVirtualTaskInstances = async (params: {
   to: Date;
 }) => {
   const normalizedRrule = params.rruleString.replace(/\\n/g, "\n");
+
+  // Phân tách TZID từ chuỗi RRULE (ví dụ: Asia/Ho_Chi_Minh)
+  const tzidMatch = normalizedRrule.match(/TZID=([^;:]+)/);
+  const tzid = tzidMatch?.[1] ?? "UTC";
+
+  // Hàm lấy offset (ms) của múi giờ tại một thời điểm cụ thể
+  const getOffset = (date: Date, timeZone: string) => {
+    try {
+      const formatter = new Intl.DateTimeFormat("en-US", {
+        timeZone,
+        hour12: false,
+        year: "numeric",
+        month: "numeric",
+        day: "numeric",
+        hour: "numeric",
+        minute: "numeric",
+        second: "numeric",
+      });
+      const parts = formatter.formatToParts(date);
+      const map: any = {};
+      parts.forEach((p) => (map[p.type] = p.value));
+      const localDate = new Date(
+        Date.UTC(
+          Number(map.year),
+          Number(map.month) - 1,
+          Number(map.day),
+          Number(map.hour) % 24,
+          Number(map.minute),
+          Number(map.second),
+        ),
+      );
+      return localDate.getTime() - date.getTime();
+    } catch {
+      return 0;
+    }
+  };
+
+  const offset = getOffset(params.startDate, tzid);
+
+  // Chuyển đổi sang "Floating Time" (giờ Local trông như giờ UTC để RRule đánh giá đúng thứ trong tuần)
+  const floatingStart = new Date(params.startDate.getTime() + offset);
+  const floatingFrom = new Date(params.from.getTime() + offset);
+  const floatingTo = new Date(params.to.getTime() + offset);
+
   const rule = RRule.fromString(normalizedRrule);
 
-  const dates = rule.between(params.from, params.to, true);
+  // Ghi đè dtstart và các thành phần thời gian để RRule evaluation chuẩn xác
+  const evaluationRule = new RRule({
+    ...rule.options,
+    dtstart: floatingStart,
+    // Đảm bảo RRule sử dụng đúng giờ/phút của floatingStart
+    byhour: [floatingStart.getUTCHours()],
+    byminute: [floatingStart.getUTCMinutes()],
+    bysecond: [floatingStart.getUTCSeconds()],
+  });
+
+  const dates = evaluationRule.between(floatingFrom, floatingTo, true);
 
   if (dates.length > 100) {
     throw new Error("Too many instances generated");
   }
 
-  const hour = params.startDate.getUTCHours();
-  const minute = params.startDate.getUTCMinutes();
-
   return dates.map((date) => {
-    const target = new Date(date);
-    target.setUTCHours(hour, minute, 0, 0);
+    // Chuyển đổi ngược lại từ Floating Time về UTC thật sự
+    const target = new Date(date.getTime() - offset);
 
     return {
-      id: `virtual_${params.taskMasterId}_${date.getTime()}`,
+      id: `virtual_${params.taskMasterId}_${target.getTime()}`,
       userId: params.userId,
       taskMasterId: params.taskMasterId,
       targetDate: target,

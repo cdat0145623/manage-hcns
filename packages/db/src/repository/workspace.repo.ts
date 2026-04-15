@@ -315,6 +315,16 @@ export const getAllByUserId = async (db: dbClient, userId: string) => {
   return result.filter((member) => !member.workspace.deletedAt);
 };
 
+export const getAllForPublic = async (db: dbClient) => {
+  return db.query.workspaces.findMany({
+    columns: {
+      publicId: true,
+      name: true,
+    },
+    where: isNull(workspaces.deletedAt),
+  });
+}
+
 export const getMemberByPublicId = (db: dbClient, memberPublicId: string) => {
   return db.query.workspaceMembers.findFirst({
     columns: {

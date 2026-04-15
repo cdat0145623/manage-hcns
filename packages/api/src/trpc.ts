@@ -252,3 +252,17 @@ export const adminProcedure = publicProcedure.use(({ ctx, next }) => {
   }
   return next({ ctx });
 });
+
+export const apiKeyProcedure = t.procedure
+  .use(loggingMiddleware)
+  .use(async ({ ctx, next }) => {
+    const apiKey = ctx.headers.get("x-api-key");
+    console.log("apiKey", apiKey, process.env.KAN_PUBLIC_API_KEY)
+    if (apiKey && apiKey === process.env.KAN_PUBLIC_API_KEY) {
+      return next({ ctx: { ...ctx, user: ctx.user } });
+    }
+    if (!ctx.user) {
+      throw new TRPCError({ code: "UNAUTHORIZED" });
+    }
+    return next({ ctx });
+  });

@@ -41,6 +41,28 @@ export const getCount = async (db: dbClient) => {
   return result[0]?.count ?? 0;
 };
 
+export const getAllForPublic = async (
+  db: dbClient,
+  workspaceId: number,
+  opts?: { type?: "regular" | "template"; archived?: boolean },
+) => {
+  const boardsData = await db.query.boards.findMany({
+    columns: {
+      publicId: true,
+      name: true,
+      isTemplateDefault: true,
+    },
+    where: and(
+      eq(boards.workspaceId, workspaceId),
+      isNull(boards.deletedAt),
+      opts?.type ? eq(boards.type, opts.type) : undefined,
+      opts?.archived !== undefined ? eq(boards.isArchived, opts.archived) : undefined,
+    ),
+  });
+
+  return boardsData;
+};
+
 export const getAllByWorkspaceId = async (
   db: dbClient,
   workspaceId: number,

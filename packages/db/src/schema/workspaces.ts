@@ -17,7 +17,7 @@ import { workspaceMemberPermissions, workspaceRoles } from "./permissions";
 import { subscription } from "./subscriptions";
 import { users } from "./users";
 
-export const memberRoles = ["ADMIN", "NVKT_MANAGER", "NVKD_MANAGER", "NVVP"] as const;
+export const memberRoles = ["ADMIN", "AREA_MANAGER", "BRANCH_MANAGER", "NVVP"] as const;
 export type MemberRole = (typeof memberRoles)[number];
 export const memberRoleEnum = pgEnum("role", memberRoles);
 

@@ -529,7 +529,7 @@ interface User {
   name: string | null;
   username: string | null;
   email: string | null;
-  role: "NVVP" | "ADMIN" | "NVKT_MANAGER" | "NVKD_MANAGER";
+  role: "NVVP" | "ADMIN" | "AREA_MANAGER" | "BRANCH_MANAGER";
 }
 
 export default function ReportsView() {

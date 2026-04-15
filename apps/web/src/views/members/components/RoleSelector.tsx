@@ -30,19 +30,19 @@ const ROLES: RoleOption[] = [
     letter: "A",
   },
   {
-    value: "NVKT_MANAGER",
-    label: "Technical Manager",
-    shortLabel: "NVKT",
-    description: "Manage tech operations",
+    value: "AREA_MANAGER",
+    label: "Area Manager",
+    shortLabel: "Trưởng khu vực",
+    description: "Manage area operations",
     dotClass: "bg-[#1D9E75]",
     iconClass: "bg-[#E1F5EE] text-[#0F6E56]",
     letter: "T",
   },
   {
-    value: "NVKD_MANAGER",
-    label: "Business Manager",
-    shortLabel: "NVKD",
-    description: "Manage business ops",
+    value: "BRANCH_MANAGER",
+    label: "Branch Manager",
+    shortLabel: "Trưởng chi nhánh",
+    description: "Manage branch operations",
     dotClass: "bg-[#378ADD]",
     iconClass: "bg-[#E6F1FB] text-[#185FA5]",
     letter: "B",
@@ -62,16 +62,17 @@ interface RoleSelectProps {
   value: Role;
   onChange: (role: Role) => void;
   disabled?: boolean;
+  className?: string;
 }
 
-export function RoleSelect({ value, onChange, disabled }: RoleSelectProps) {
+export function RoleSelect({ value, onChange, disabled, className }: RoleSelectProps) {
   const selected = ROLES.find((r) => r.value === value) ?? ROLES[3];
 
   return (
     <Listbox value={value} onChange={onChange} disabled={disabled}>
-      <div className="relative w-full">
+      <div className={`relative ${className || "w-full"}`}>
         {/* Trigger button */}
-        <ListboxButton className="flex w-48 items-center gap-2 rounded-xl border border-black/10 bg-white px-3 py-2 text-sm font-medium text-gray-900 outline-none transition hover:border-black/20 hover:bg-gray-50 focus-visible:ring-2 focus-visible:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-45 dark:border-white/10 dark:bg-white/5 dark:text-white dark:hover:border-white/20 dark:hover:bg-white/10">
+        <ListboxButton className="flex w-full items-center gap-2 rounded-xl border border-black/10 bg-white px-3 py-2 text-sm font-medium text-gray-900 outline-none transition hover:border-black/20 hover:bg-gray-50 focus-visible:ring-2 focus-visible:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-45 dark:border-white/10 dark:bg-white/5 dark:text-white dark:hover:border-white/20 dark:hover:bg-white/10">
           <span className={`h-2 w-2 shrink-0 rounded-full ${selected?.dotClass}`} />
           <span className="flex-1 text-left">{selected?.label}</span>
           <span className="text-xs font-normal text-gray-400 dark:text-white/40">

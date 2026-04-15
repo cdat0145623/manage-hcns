@@ -18,7 +18,7 @@ interface Workspace {
   publicId: string;
   slug: string | undefined;
   plan: "free" | "pro" | "enterprise" | undefined;
-  role: "ADMIN" | "NVKT_MANAGER" | "NVKD_MANAGER" | "NVVP";
+  role: "ADMIN" | "AREA_MANAGER" | "BRANCH_MANAGER" | "NVVP";
   weekStartDay: 0 | 1 | 6;
 }
 

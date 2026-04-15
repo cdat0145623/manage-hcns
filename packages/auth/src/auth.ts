@@ -27,7 +27,7 @@ const signUpUsernamePlugin = () => ({
           email: z.string().email(),
           emailVerified: z.boolean(),
           callbackURL: z.string().optional(),
-          role: z.enum(["ADMIN", "NVKT_MANAGER", "NVKD_MANAGER", "NVVP"]).optional(),
+          role: z.enum(["ADMIN", "AREA_MANAGER", "BRANCH_MANAGER", "NVVP"]).optional(),
         }),
       },
       async (ctx) => {

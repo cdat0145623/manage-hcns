@@ -48,19 +48,19 @@ export const allPermissions = [
 
 export type Permission = (typeof allPermissions)[number];
 
-export const roles = ["ADMIN", "NVKT_MANAGER", "NVKD_MANAGER", "NVVP"] as const;
+export const roles = ["ADMIN", "AREA_MANAGER", "BRANCH_MANAGER", "NVVP"] as const;
 export type Role = (typeof roles)[number];
 
 export const roleHierarchy: Record<Role, number> = {
   ADMIN: 100,
-  NVKT_MANAGER: 80,
-  NVKD_MANAGER: 60,
+  AREA_MANAGER: 80,
+  BRANCH_MANAGER: 60,
   NVVP: 40,
 } as const;
 
 export const defaultRolePermissions: Record<Role, readonly Permission[]> = {
   ADMIN: allPermissions,
-  NVKT_MANAGER: [
+  AREA_MANAGER: [
     "workspace:view",
     "board:view",
     "board:create",
@@ -82,7 +82,7 @@ export const defaultRolePermissions: Record<Role, readonly Permission[]> = {
     "member:view",
     "member:invite",
   ],
-  NVKD_MANAGER: [
+  BRANCH_MANAGER: [
     "workspace:view",
     "board:view",
     "board:create",

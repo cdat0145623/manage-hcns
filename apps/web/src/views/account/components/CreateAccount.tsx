@@ -7,14 +7,17 @@ import Input from "~/components/Input";
 import Button from "~/components/Button";
 import { HiXMark } from "react-icons/hi2";
 import { useWorkspace } from "~/providers/workspace";
+import { PositionSelect } from "~/views/members/components/PositionSelector";
+import { RoleSelect } from "~/views/members/components/RoleSelector";
 
-const ROLES = ["ADMIN", "NVKT_MANAGER", "NVKD_MANAGER", "NVVP"] as const;
+const ROLES = ["ADMIN", "AREA_MANAGER", "BRANCH_MANAGER", "NVVP"] as const;
 
 export default function CreateAccount({ onClose }: { onClose: () => void }) {
   const router = useRouter();
   const { data: user, isLoading: isUserLoading } = api.user.getUser.useQuery();
   const createMutation = api.user.create.useMutation();
   const { workspace } = useWorkspace();
+  const { data: positions } = api.position.all.useQuery();
 
   const [form, setForm] = useState({
     name: "",
@@ -24,6 +27,7 @@ export default function CreateAccount({ onClose }: { onClose: () => void }) {
     confirmPassword: "",
     role: "NVVP" as typeof ROLES[number],
     workspacePublicId: workspace?.publicId ?? "",
+    position: positions?.find(p => p.name === "Nhân viên văn phòng")?.publicId ?? "",
   });
   
   const [error, setError] = useState("");
@@ -68,6 +72,11 @@ export default function CreateAccount({ onClose }: { onClose: () => void }) {
       return;
     }
 
+    if (!form.position) {
+      setError(t`Vui lòng chọn vị trí.`);
+      return;
+    }
+
     try {
       await createMutation.mutateAsync({
         name: form.name,
@@ -76,6 +85,7 @@ export default function CreateAccount({ onClose }: { onClose: () => void }) {
         password: form.password,
         role: form.role as any,
         workspacePublicId: workspace?.publicId ?? "",
+        positionPublicId: form.position,
       });
       setSuccess(t`Tạo tài khoản thành công!`);
       setForm({
@@ -86,6 +96,7 @@ export default function CreateAccount({ onClose }: { onClose: () => void }) {
         confirmPassword: "",
         role: "NVVP",
         workspacePublicId: workspace?.publicId ?? "",
+        position: positions?.find(p => p.name === "Nhân viên văn phòng")?.publicId ?? "",
       });
       onClose();
     } catch (err: any) {
@@ -177,19 +188,26 @@ export default function CreateAccount({ onClose }: { onClose: () => void }) {
             </div>
         </div>
 
-        <div>
-          <label className="mb-1 block text-sm font-medium text-light-1000 dark:text-dark-1000">
-            {t`Vai trò`}
-          </label>
-          <select 
-            value={form.role} 
-            onChange={(e) => setForm({ ...form, role: e.target.value as any })}
-            className="block w-full rounded-md border-0 bg-dark-300 bg-white/5 py-1.5 pl-3 pr-8 text-sm shadow-sm ring-1 ring-inset ring-light-600 placeholder:text-dark-800 focus:ring-2 focus:ring-inset focus:ring-light-700 dark:text-dark-1000 dark:ring-dark-700 dark:focus:ring-dark-700 sm:leading-6"
-          >
-            {ROLES.map(r => (
-              <option key={r} value={r}>{r}</option>
-            ))}
-          </select>
+        <div className="flex flex-row gap-2">
+          <div className="flex-1">
+            <label className="mb-1 block text-sm font-medium text-light-1000 dark:text-dark-1000">
+              {t`Vai trò`}
+            </label>
+            <RoleSelect 
+              value={form.role} 
+              onChange={(val) => setForm({ ...form, role: val })}
+            />
+          </div>
+
+          <div className="flex-1">
+            <label className="mb-1 block text-sm font-medium text-light-1000 dark:text-dark-1000">
+              {t`Vị trí`}
+            </label>
+            <PositionSelect 
+              value={form.position} 
+              onChange={(val) => setForm({ ...form, position: val })}
+            />
+          </div>
         </div>
 
         <div className="mt-4">

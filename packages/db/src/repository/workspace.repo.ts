@@ -37,13 +37,13 @@ const SYSTEM_ROLES: {
       hierarchyLevel: 100,
     },
     {
-      name: "NVKT_MANAGER",
-      description: "Technical manager with extensive permissions",
+      name: "AREA_MANAGER",
+      description: "Area manager with extensive permissions",
       hierarchyLevel: 80,
     },
     {
-      name: "NVKD_MANAGER",
-      description: "Business manager with standard permissions",
+      name: "BRANCH_MANAGER",
+      description: "Branch manager with standard permissions",
       hierarchyLevel: 60,
     },
     {

@@ -59,7 +59,7 @@ export function RolePermissions() {
     (roles).includes(role.name as Role),
   );
 
-  const orderedRoleNames: Role[] = ["ADMIN", "NVKT_MANAGER", "NVKD_MANAGER", "NVVP"].filter(
+  const orderedRoleNames: Role[] = ["ADMIN", "AREA_MANAGER", "BRANCH_MANAGER", "NVVP"].filter(
     (role) => systemRoles.some((r) => r.name === role),
   ) as Role[];
 

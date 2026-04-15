@@ -262,6 +262,7 @@ export const userRouter = createTRPCRouter({
         password: z.string(),
         role: z.enum(memberRoles),
         workspacePublicId: z.string(),
+        positionPublicId: z.string(),
       }),
     )
     .output(
@@ -297,6 +298,15 @@ export const userRouter = createTRPCRouter({
         });
       }
         
+      const position = await positionRepo.getByPublicId(ctx.db, input.positionPublicId);
+
+      if (!position) {
+        throw new TRPCError({
+          message: `Position not found`,
+          code: "NOT_FOUND",
+        });
+      }
+
       const auth = initAuth(ctx.db);
 
       const response = await auth.api.signUpUsername({
@@ -317,6 +327,8 @@ export const userRouter = createTRPCRouter({
           code: "INTERNAL_SERVER_ERROR",
         });
       }
+
+      await userRepo.updatePosition(ctx.db, response.user.id, position.id);
 
       const { id, email, username, name } = response.user;
 

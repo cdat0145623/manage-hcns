@@ -22,6 +22,7 @@
     "lint:fix": "turbo run lint --continue -- --fix --cache --cache-location .cache/.eslintcache",
     "lint:ws": "pnpm dlx sherif@latest",
     "postinstall": "pnpm lint:ws",
+    "start": "turbo run start",
     "typecheck": "turbo run typecheck",
     "ui-add": "turbo run ui-add"
   },

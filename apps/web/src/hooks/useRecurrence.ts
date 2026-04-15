@@ -44,6 +44,7 @@ export interface CalendarEntry {
   type: "VIRTUAL" | "INSTANCE";
   recurrence: RecurrenceType;
   rruleString: string;
+  rruleStringToText?: string;
   checklists: any[];
   createdBy?: string;
 }
@@ -105,6 +106,7 @@ export function useRecurrence(currentDate: Date, selectedUserId: string | undefi
         duration: duration,
         recurrence: (task.taskMaster?.recurrence || task.recurrence || "NONE") as RecurrenceType,
         rruleString: task.taskMaster?.rruleString || task.rruleString || "",
+        rruleStringToText: task.taskMaster?.rruleStringToText || "",
         checklists: task.checklists || [],
         createdBy: task.taskMaster.createdBy,
       } as CalendarEntry;

@@ -27,11 +27,20 @@ const signUpUsernamePlugin = () => ({
           email: z.string().email(),
           emailVerified: z.boolean(),
           callbackURL: z.string().optional(),
-          role: z.enum(["ADMIN", "NVKT_MANAGER", "NVKD_MANAGER", "NVVP"]).optional(),
+          role: z
+            .enum(["ADMIN", "NVKT_MANAGER", "NVKD_MANAGER", "NVVP"])
+            .optional(),
         }),
       },
       async (ctx) => {
-        const { username: normalizedUsername, password, name, email, emailVerified, role } = ctx.body;
+        const {
+          username: normalizedUsername,
+          password,
+          name,
+          email,
+          emailVerified,
+          role,
+        } = ctx.body;
         const usernameLower = normalizedUsername.toLowerCase();
 
         // Check if username exists
@@ -68,9 +77,7 @@ const signUpUsernamePlugin = () => ({
           },
         });
 
-        const session = await ctx.context.internalAdapter.createSession(
-          user.id,
-        );
+        const session = await ctx.context.internalAdapter.createSession(user.id);
         if (!session) {
           throw new APIError("INTERNAL_SERVER_ERROR", {
             message: "Failed to create session",
@@ -78,6 +85,20 @@ const signUpUsernamePlugin = () => ({
         }
 
         await setSessionCookie(ctx, { session, user: user as any });
+
+        // Overwrite the cookie attributes to ensure SameSite=None and Secure
+        const cookieName = `${
+          ctx.context.options.advanced?.cookiePrefix ?? "better-auth"
+        }_session_token`;
+        ctx.setCookie(cookieName, session.token, {
+          path: "/",
+          httpOnly: true,
+          secure: true,
+          sameSite: "none",
+          expires: new Date(
+            Date.now() + (ctx.context.options.session?.expiresIn ?? 2592000) * 1000,
+          ),
+        });
 
         return ctx.json({ user, session });
       },
@@ -141,6 +162,20 @@ const signInUsernamePlugin = () => ({
 
         await setSessionCookie(ctx, { session, user: user as any });
 
+        // Overwrite the cookie attributes to ensure SameSite=None and Secure
+        const cookieName = `${
+          ctx.context.options.advanced?.cookiePrefix ?? "better-auth"
+        }_session_token`;
+        ctx.setCookie(cookieName, session.token, {
+          path: "/",
+          httpOnly: true,
+          secure: true,
+          sameSite: "none",
+          expires: new Date(
+            Date.now() + (ctx.context.options.session?.expiresIn ?? 2592000) * 1000,
+          ),
+        });
+
         return ctx.json({ user, session });
       },
     ),
@@ -148,7 +183,7 @@ const signInUsernamePlugin = () => ({
 });
 
 export const initAuth = (db: dbClient) => {
-  const baseURL = env("NEXT_PUBLIC_BASE_URL") || env("BETTER_AUTH_URL");
+  const baseURL = env("NEXT_PUBLIC_BASE_URL") ?? env("BETTER_AUTH_URL");
   const authPath = "/api/auth";
   const fullBaseURL = baseURL ? `${baseURL}${authPath}` : undefined;
 
@@ -223,6 +258,38 @@ export const initAuth = (db: dbClient) => {
       cookiePrefix: "kan",
       database: {
         generateId: false,
+      },
+      cookies: {
+        sessionToken: {
+          attributes: {
+            sameSite: "none",
+            secure: true,
+          },
+        },
+        csrfToken: {
+          attributes: {
+            sameSite: "none",
+            secure: true,
+          },
+        },
+        callbackUrl: {
+          attributes: {
+            sameSite: "none",
+            secure: true,
+          },
+        },
+        state: {
+          attributes: {
+            sameSite: "none",
+            secure: true,
+          },
+        },
+        pkceCodeVerifier: {
+          attributes: {
+            sameSite: "none",
+            secure: true,
+          },
+        },
       },
     },
   });

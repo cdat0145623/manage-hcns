@@ -209,15 +209,17 @@ export function EventDetailModal({
     setDescription(entry?.description ?? "");
   }, [entry?.description, isVisible]);
 
+  const { data: currentUser } = api.user.getUser.useQuery();
+
   const canEdit =
     entry?.createdBy === session?.user?.id ||
-    entry?.selectedUserId === session?.user?.id;
-  // currentUser?.role === "ADMIN";
+    entry?.selectedUserId === session?.user?.id ||
+    currentUser?.role === "ADMIN";
 
   const canComment =
     entry?.createdBy === session?.user?.id ||
-    entry?.selectedUserId === session?.user?.id;
-  // currentUser?.role === "ADMIN";
+    entry?.selectedUserId === session?.user?.id ||
+    currentUser?.role === "ADMIN";
 
   const updateInstance = api.taskInstance.update.useMutation({
     onSuccess: () => {
@@ -336,7 +338,7 @@ export function EventDetailModal({
             </h3>
           </div>
             <div className="shrink-0 border-b border-light-100 px-10 py-6 dark:border-dark-300">
-              <p className="mb-3 text-[10px] font-semibold uppercase tracking-widest text-neutral-900 dark:text-dark-500">
+              <p className="mb-3 text-[10px] font-semibold uppercase tracking-widest text-neutral-900 dark:text-dark-1000">
                 Mô tả
               </p>
               <div className="group relative flex min-h-[120px] w-full flex-col rounded-xl border border-light-200 bg-white shadow-sm transition-all focus-within:border-light-400 focus-within:shadow-md dark:border-dark-300 dark:bg-dark-100 dark:focus-within:border-dark-500">
@@ -354,7 +356,7 @@ export function EventDetailModal({
           {/* Checklists */}
           <div className="flex-1 space-y-4 overflow-y-auto px-10 py-4">
             <div className="mb-3 flex items-center gap-3">
-              <p className="text-[10px] font-semibold uppercase tracking-widest text-neutral-900 dark:text-dark-500">
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-neutral-900 dark:text-dark-1000">
                 Checklist
               </p>
               {canEdit && entry?.instanceId && (
@@ -569,7 +571,7 @@ export function EventDetailModal({
                 >
                   <div className="shrink-0 space-y-3">
                     <div className="mt-2 flex items-center justify-between">
-                      <p className="text-[10px] font-bold uppercase tracking-widest text-neutral-900 dark:text-dark-500">
+                      <p className="text-[10px] font-bold uppercase tracking-widest text-neutral-900 dark:text-dark-1000">
                         Tài liệu đính kèm
                       </p>
                       {attachments && attachments.length > 0 && (
@@ -597,7 +599,7 @@ export function EventDetailModal({
                   <div className="h-px bg-light-200 dark:bg-dark-300" />
                   {canComment && (
                     <div className="shrink-0 space-y-1">
-                      <p className="text-[10px] font-bold uppercase tracking-widest text-neutral-900 dark:text-dark-500">
+                      <p className="text-[10px] font-bold uppercase tracking-widest text-neutral-900 dark:text-dark-1000">
                         Viết bình luận
                       </p>
                       <div className="rounded-xl border border-light-200 bg-white shadow-sm ring-1 ring-light-100/50 dark:border-dark-300 dark:bg-dark-100 dark:ring-white/5">
@@ -612,7 +614,7 @@ export function EventDetailModal({
                   {hasComments && (
                     <div className="mt-2 flex-1 space-y-1">
                       <div className="flex items-center gap-2">
-                        <p className="text-[10px] font-bold uppercase tracking-widest text-neutral-900 dark:text-dark-500">
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-neutral-900 dark:text-dark-1000">
                           Lịch sử bình luận
                         </p>
                         <div className="h-px flex-1 bg-light-200/50 dark:bg-dark-300/50" />

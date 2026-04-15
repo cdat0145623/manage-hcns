@@ -42,7 +42,7 @@ export const getTemplates = (): Template[] => [
   }
 ];
 
-const listNames = [
+export const listNames = [
   {
     name:"Tháng 1",
     id:1

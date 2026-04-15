@@ -42,6 +42,7 @@ export interface EditableEntry {
   color?: string;
   recurrence?: RecurrenceType;
   rruleString?: string;
+  rruleStringToText?: string;
   attendees?: Attendee[];
   checklists?: any[];
   createdBy?: string;
@@ -347,11 +348,7 @@ export function CreateEventModal({
       setTitle(editEntry.title);
       setDescription(editEntry.description ?? "");
       setCurrentDate(new Date(editEntry.date));
-      setEndDateVal(
-        editEntry.endDate
-          ? new Date(editEntry.endDate)
-          : new Date(editEntry.date),
-      );
+      setEndDateVal(new Date(editEntry.date));
       setStartTime(editEntry.startTime ?? "09:00");
       setEndTime(editEntry.endTime ?? "10:00");
       setRecurrence(editEntry.recurrence ?? "NONE");
@@ -362,7 +359,7 @@ export function CreateEventModal({
       if (editEntry.recurrence === "CUSTOM" && editEntry.rruleString) {
         setSelectedWeekdays(parseWeekdaysFromRRule(editEntry.rruleString));
       } else {
-        setSelectedWeekdays([]);
+        setSelectedWeekdays([0, 1, 2, 3, 4, 5]);
       }
     } else {
       setTitle("");
@@ -400,7 +397,7 @@ export function CreateEventModal({
       setSelectedUserId(
         currentUser?.role !== "ADMIN" ? currentUser?.id || "" : "",
       );
-      setSelectedWeekdays([]);
+      setSelectedWeekdays([0, 1, 2, 3, 4, 5]);
       setAttendees([]);
       setHasAttemptedSave(false);
       setShowUpdateConfirm(false);
@@ -443,7 +440,7 @@ export function CreateEventModal({
   useEffect(() => {
     const start = new Date(currentDate);
     start.setHours(0, 0, 0, 0);
-    const end = new Date(endDateVal);
+    const end = new Date(currentDate);
     end.setHours(0, 0, 0, 0);
 
     if (isEndNextDay) {
@@ -480,7 +477,7 @@ export function CreateEventModal({
     const { hours: sh, minutes: sm } = parseTime(startTime);
     startDT.setHours(sh, sm, 0, 0);
 
-    const endDT = new Date(endDateVal);
+    const endDT = new Date(currentDate);
     const { hours: eh, minutes: em } = parseTime(endTime);
     endDT.setHours(eh, em, 0, 0);
 
@@ -809,9 +806,13 @@ export function CreateEventModal({
                     }`}
                   >
                     <span>
-                      {recurrence !== "UNSELECTED" && selectedOpt
-                        ? selectedOpt.label
-                        : "Chọn tuỳ chọn lặp lại..."}
+                      {isEditMode && 
+                      editEntry?.rruleStringToText && 
+                      recurrence === editEntry.recurrence
+                        ? editEntry.rruleStringToText
+                        : recurrence !== "UNSELECTED" && selectedOpt
+                          ? selectedOpt.label
+                          : "Chọn tuỳ chọn lặp lại..."}
                     </span>
                     <motion.svg
                       animate={{ rotate: showRecurrenceOptions ? 180 : 0 }}
@@ -852,12 +853,9 @@ export function CreateEventModal({
                               e.preventDefault();
                               setRecurrence(opt.value);
                               if (opt.value === "CUSTOM") {
-                                const startDay = (getDay(currentDate) + 6) % 7;
-                                // If nothing is selected, or if we want to ensure current day is selected when switching
-                                if (!selectedWeekdays.includes(startDay)) {
-                                  setSelectedWeekdays((prev) =>
-                                    [...new Set([...prev, startDay])].sort(),
-                                  );
+                                // Default to T2-T7 if nothing selected
+                                if (selectedWeekdays.length === 0) {
+                                  setSelectedWeekdays([0, 1, 2, 3, 4, 5]);
                                 }
                               }
                               setShowRecurrenceOptions(false);
@@ -919,7 +917,7 @@ export function CreateEventModal({
                       className="overflow-hidden"
                     >
                       <div className="flex items-center justify-between px-1">
-                        {["T2", "T3", "T4", "T5", "T6", "T7", "Cn"].map(
+                        {["T2", "T3", "T4", "T5", "T6", "T7", "CN"].map(
                           (day, idx) => {
                             const isSelected = selectedWeekdays.includes(idx);
                             return (

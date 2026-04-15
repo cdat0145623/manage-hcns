@@ -23,6 +23,7 @@ export default function BoardDropdown({
   isTemplateDefault,
   boardName,
   onShowActivity,
+  isAdmin
 }: {
   isTemplate: boolean;
   isLoading: boolean;
@@ -32,6 +33,7 @@ export default function BoardDropdown({
   isTemplateDefault?: boolean;
   boardName?: string;
   onShowActivity?: () => void;
+  isAdmin: boolean;
 }) {
   const { openModal } = useModal();
   const { showPopup } = usePopup();
@@ -157,17 +159,19 @@ export default function BoardDropdown({
         <HiOutlineStar className="h-[16px] w-[16px] text-dark-900" />
       ),
     },
-    {
-      label: isTemplateDefault
-        ? t`Bỏ mẫu mặc định`
-        : t`Đặt làm mẫu mặc định`,
-      action: handleToggleTemplateDefault,
-      icon: isTemplateDefault ? (
-        <HiStar className="h-[16px] w-[16px] text-dark-900" />
-      ) : (
-        <HiOutlineStar className="h-[16px] w-[16px] text-dark-900" />
-      ),
-    },
+    ...(isTemplate && isAdmin ? [
+      {
+        label: isTemplateDefault
+          ? t`Bỏ mẫu mặc định`
+          : t`Đặt làm mẫu mặc định`,
+        action: handleToggleTemplateDefault,
+        icon: isTemplateDefault ? (
+          <HiStar className="h-[16px] w-[16px] text-dark-900" />
+        ) : (
+          <HiOutlineStar className="h-[16px] w-[16px] text-dark-900" />
+        ),
+      },
+    ] : []),
     ...(onShowActivity
       ? [
         {
@@ -177,10 +181,10 @@ export default function BoardDropdown({
         },
       ]
       : []),
-    ...(canDeleteBoard
+    ...(canDeleteBoard && isTemplate
       ? [
         {
-          label: isTemplate ? t`Xóa mẫu` : t`Xóa bảng`,
+          label: t`Xóa mẫu`,
           action: () => openModal("DELETE_BOARD"),
           icon: (
             <HiOutlineTrash className="h-[16px] w-[16px] text-dark-900" />

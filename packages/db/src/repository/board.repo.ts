@@ -28,6 +28,7 @@ import {
   lists,
   userBoardFavorites,
   workspaceMembers,
+  users,
 } from "@kan/db/schema";
 import { generateUID } from "@kan/shared/utils";
 
@@ -44,6 +45,7 @@ export const getAllByWorkspaceId = async (
   db: dbClient,
   workspaceId: number,
   userId: string,
+  userRole: string,
   opts?: { type?: "regular" | "template"; archived?: boolean },
 ) => {
   const boardsData = await db.query.boards.findMany({
@@ -74,10 +76,16 @@ export const getAllByWorkspaceId = async (
           colourCode: true,
         },
       },
+      user: {
+        columns: {
+          name: true,
+        },
+      }
     },
     where: and(
       eq(boards.workspaceId, workspaceId),
       isNull(boards.deletedAt),
+      userRole === "ADMIN" ? undefined : eq(boards.createdBy, userId),
       opts?.type ? eq(boards.type, opts.type) : undefined,
       opts?.archived !== undefined ? eq(boards.isArchived, opts.archived) : undefined,
     ),
@@ -203,6 +211,11 @@ export const getByPublicId = async (
       isTemplateDefault: true,
     },
     with: {
+      user: {
+        columns: {
+          name: true,
+        },
+      },
       userFavorites: {
         where: eq(userBoardFavorites.userId, userId),
         columns: {
@@ -481,6 +494,7 @@ export const getBySlug = async (
               index: true,
               dueDate: true,
               startDate: true,
+              status: true,
             },
             with: {
               labels: {
@@ -699,7 +713,7 @@ export const update = async (
       slug: boardInput.slug,
       visibility: boardInput.visibility,
       updatedAt: new Date(),
-      ...(boardInput.isArchived !== undefined && { isArchived: boardInput.isArchived })
+      ...(boardInput.isArchived !== undefined && { isArchived: boardInput.isArchived }) 
     })
     .where(eq(boards.publicId, boardInput.boardPublicId))
     .returning({
@@ -710,17 +724,45 @@ export const update = async (
   return result;
 };
 
+export const unArchived = async (
+  db: dbClient,
+  args: {
+    boardId: number;
+    isArchived?: boolean;
+  },
+) => {
+  const [result] = await db
+    .update(boards)
+    .set({ 
+      deletedAt: null, 
+      deletedBy: null,
+      ...(args.isArchived !== undefined && { isArchived: args.isArchived }) 
+    })
+    .where(and(eq(boards.id, args.boardId), isNull(boards.deletedAt)))
+    .returning({
+      publicId: boards.publicId,
+      name: boards.name,
+    });
+
+  return result;
+}
+
 export const softDelete = async (
   db: dbClient,
   args: {
     boardId: number;
     deletedAt: Date;
     deletedBy: string;
+    isArchived?: boolean;
   },
 ) => {
   const [result] = await db
     .update(boards)
-    .set({ deletedAt: args.deletedAt, deletedBy: args.deletedBy })
+    .set({ 
+      deletedAt: args.deletedAt, 
+      deletedBy: args.deletedBy,
+      ...(args.isArchived !== undefined && { isArchived: args.isArchived }) 
+    })
     .where(and(eq(boards.id, args.boardId), isNull(boards.deletedAt)))
     .returning({
       publicId: boards.publicId,
@@ -1052,11 +1094,19 @@ export const removeUserFavorite = async (
     .returning();
 };
 
-export const getByName = async (db: dbClient, name: string) => {
+export const getByName = async (
+  db: dbClient, 
+  name: string,
+  userId: string,
+) => {
   const result = await db
     .select()
     .from(boards)
-    .where(and(eq(boards.name, name), eq(boards.type, "regular")))
+    .where(and(
+      eq(boards.name, name),
+      eq(boards.type, "regular"),
+      eq(boards.createdBy, userId),
+    ))
     .limit(1);
 
   return result[0] ?? null;

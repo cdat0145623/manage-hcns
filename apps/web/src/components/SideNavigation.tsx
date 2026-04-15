@@ -157,7 +157,7 @@ function SideNavigation({
         },
       },
       {
-        name: "Quyền",
+        name: "Quyền & Thành viên",
         href: "/members",
         icon: isDarkMode ? membersIconDark : membersIconLight,
         keyboardShortcut: {
@@ -261,7 +261,7 @@ function SideNavigation({
                       void utils.taskInstance.getVirtual.prefetch({
                         from: startOfMonth(now),
                         to: endOfMonth(now),
-                        targetUser: undefined,
+                        targetUser: currentUser?.role === "ADMIN" ? undefined : currentUser?.id,
                       });
                     } else if (item.href === "/boards") {
                       void utils.workspace.all.prefetch();

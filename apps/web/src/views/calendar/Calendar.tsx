@@ -55,6 +55,7 @@ function toEditableEntry(entry: CalendarEntry): EditableEntry {
     color: entry.color,
     recurrence: entry.recurrence,
     rruleString: entry.rruleString,
+    rruleStringToText: entry.rruleStringToText,
     attendees: [],
     checklists: entry.checklists,
     createdBy: entry.createdBy,

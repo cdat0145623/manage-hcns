@@ -100,7 +100,7 @@ export function Auth({ isSignUp }: AuthProps) {
               message: t`You have been logged in successfully.`,
               icon: "success",
             }),
-            router.push(callbackURL);
+            window.location.href = callbackURL;
           },
           onError: (ctx: { error: { message?: string } }) =>
             setLoginError(ctx.error.message || t`An error occurred`),

@@ -13,6 +13,6 @@ const ApiSettingsPage: NextPageWithLayout = () => {
   );
 };
 
-ApiSettingsPage.getLayout = (page) => getDashboardLayout(page, undefined, false, "ADMIN");
+ApiSettingsPage.getLayout = (page) => getDashboardLayout(page);
 
 export default ApiSettingsPage;

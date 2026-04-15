@@ -10,6 +10,7 @@ import {
 } from "react-icons/hi2";
 
 import type { NewCardInput } from "@kan/api/types";
+import { authClient } from "@kan/auth/client";
 import { generateUID } from "@kan/shared/utils";
 
 import type { WorkspaceMember } from "~/components/Editor";
@@ -56,8 +57,12 @@ export function NewCardForm({
   const { showPopup } = usePopup();
   const { workspace } = useWorkspace();
   const { closeModal, openModal, modalStates, clearModalState } = useModal();
+  const { data: session } = authClient.useSession();
+
+  const isAdmin = workspace.role === "ADMIN";
 
   const utils = api.useUtils();
+  const addOrRemoveMember = api.card.addOrRemoveMember.useMutation();
 
   // persists the form values
   const { formState, saveFormState } = useModalFormState<NewCardFormInput>({
@@ -145,6 +150,7 @@ export function NewCardForm({
               title: args.title,
               listId: 2,
               description: "",
+              status: "pending" as const,
               dueDate: args.dueDate ?? null,
               startDate: null,
               fileActivities: [],
@@ -192,7 +198,23 @@ export function NewCardForm({
         icon: "error",
       });
     },
-    onSuccess: async () => {
+    onSuccess: async (createdCard) => {
+      if (!isAdmin && createdCard?.publicId && session?.user.id) {
+        const currentUserMember = boardData?.workspace.members.find(
+          (m) => m.user?.id === session.user.id || (m as any).userId === session.user.id
+        );
+        if (currentUserMember && !memberPublicIds.includes(currentUserMember.publicId)) {
+          try {
+            await addOrRemoveMember.mutateAsync({
+              cardPublicId: createdCard.publicId,
+              workspaceMemberPublicId: currentUserMember.publicId,
+            });
+          } catch (e) {
+            console.error(e);
+          }
+        }
+      }
+
       const isCreateAnotherEnabled = watch("isCreateAnotherEnabled");
       if (!isCreateAnotherEnabled) {
         // close modal (state will auto-clear due to resetOnClose: true)
@@ -371,7 +393,7 @@ export function NewCardForm({
               </div>
             </CheckboxDropdown>
           </div>
-          {!isTemplate && (
+          {!isTemplate && isAdmin && (
             <div className="w-fit">
               <CheckboxDropdown
                 items={formattedMembers}

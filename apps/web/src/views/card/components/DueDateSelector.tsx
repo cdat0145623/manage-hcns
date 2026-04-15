@@ -92,6 +92,20 @@ export function DueDateSelector({
     if (isOpen) {
       setIsOpen(false);
       setShowTimeOptions(false);
+
+      if (pendingDate && !currentTime) {
+        const now = new Date();
+        const timeStr = format(now, "HH:mm");
+        const fullDate = buildDate(pendingDate, timeStr);
+        if (
+          fullDate &&
+          !isNaN(fullDate.getTime()) &&
+          fullDate.getTime() !== dueDate?.getTime()
+        ) {
+          onDateSelect?.(fullDate);
+        }
+      }
+
       // Reset currentTime on close to ensure next open shows --:--
       setCurrentTime(null);
     }
@@ -143,11 +157,28 @@ export function DueDateSelector({
         dropdownRef.current?.contains(e.target as Node)
       )
         return;
-      handleClose();
+
+      // Inline thay vì gọi handleClose()
+      setIsOpen(false);
+      setShowTimeOptions(false);
+
+      if (pendingDate && !currentTime) {
+        const now = new Date();
+        const timeStr = format(now, "HH:mm");
+        const fullDate = buildDate(pendingDate, timeStr);
+        if (
+          fullDate &&
+          !isNaN(fullDate.getTime()) &&
+          fullDate.getTime() !== dueDate?.getTime()
+        ) {
+          onDateSelect?.(fullDate);
+        }
+      }
+      setCurrentTime(null);
     };
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [isOpen]);
+  }, [isOpen, pendingDate, currentTime, dueDate, onDateSelect]);
 
   const monthName = format(currentMonth, "MMM yyyy");
 
@@ -231,7 +262,10 @@ export function DueDateSelector({
     setPendingDate(undefined);
     setCurrentTime(null);
     onDateSelect?.(undefined);
-    handleClose();
+    if (isOpen) {
+      setIsOpen(false);
+      setShowTimeOptions(false);
+    }
   };
 
   const dropdown = isOpen

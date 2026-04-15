@@ -88,6 +88,10 @@ export const env = createEnv({
           s.split(",").every((l) => z.string().url().safeParse(l).success),
       )
       .optional(),
+    ALLOWED_FRAME_ANCESTORS: z
+      .string()
+      .transform((s) => (s === "" ? undefined : s))
+      .optional(),
   },
 
   /**

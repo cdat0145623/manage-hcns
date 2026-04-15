@@ -46,7 +46,7 @@ COPY --from=pruner /app/out/pnpm-workspace.yaml ./pnpm-workspace.yaml
 COPY --from=pruner /app/out/json/ .
 
 ENV CI=true
-RUN --mount=type=cache,id=pnpm,target=~/.pnpm-store pnpm install --frozen-lockfile
+RUN --mount=type=cache,id=pnpm,target=/root/.pnpm-store pnpm install --frozen-lockfile
 
 # ============================================
 # Stage 4: Build the web application
@@ -70,7 +70,8 @@ ENV NEXT_PUBLIC_AVATAR_BUCKET_NAME=$NEXT_PUBLIC_AVATAR_BUCKET_NAME
 ENV NEXT_PUBLIC_ATTACHMENTS_BUCKET_NAME=$NEXT_PUBLIC_ATTACHMENTS_BUCKET_NAME
 ENV NEXT_PUBLIC_STORAGE_URL=$NEXT_PUBLIC_STORAGE_URL
 
-RUN VERSION="${APP_VERSION:-$(cat /tmp/AUTO_VERSION 2>/dev/null | tr -d '\n\r' || echo 'unknown')}" && \
+RUN --mount=type=cache,id=next_cache,target=/app/apps/web/.next/cache \
+    VERSION="${APP_VERSION:-$(cat /tmp/AUTO_VERSION 2>/dev/null | tr -d '\n\r' || echo 'unknown')}" && \
     NEXT_PUBLIC_APP_VERSION="$VERSION" pnpm build --filter=@kan/web
 # ============================================
 # Stage 4.5: Development (hot reload enabled)
@@ -88,7 +89,7 @@ COPY apps/ ./apps/
 COPY tooling/ ./tooling/
 
 # Install ALL dependencies (including devDependencies)
-RUN --mount=type=cache,id=pnpm,target=~/.pnpm-store pnpm install
+RUN --mount=type=cache,id=pnpm,target=/root/.pnpm-store pnpm install
 
 # Set development environment variables
 ENV NODE_ENV=development

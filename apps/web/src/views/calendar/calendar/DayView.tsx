@@ -215,7 +215,7 @@ export function DayView({
 
           <div
             className="relative flex-1 bg-white dark:bg-dark-100"
-            style={{ height: `${(24 - startHour) * 96}px` }}
+            style={{ height: `${(24 - startHour) * 128}px` }}
           >
             <div className="pointer-events-none absolute inset-0">
               {hoursToRender.map((hour) => (

@@ -158,9 +158,17 @@ export function BoardsList({ isTemplate, archived = false }: { isTemplate?: bool
                   <HiOutlineStar className="h-5 w-5 text-neutral-700 dark:text-dark-800" />
                 )}
               </button>
-              <p className="px-4 text-[14px] font-bold text-neutral-700 dark:text-dark-1000">
-                {board.user?.name} - {board.name}
-              </p>
+              <div 
+                className="flex w-full flex-col px-8 text-center"
+                title={`${board.user?.name} - ${board.name}`}
+              >
+                <span className="mb-0.5 w-full truncate text-[11px] font-semibold text-neutral-500 uppercase tracking-wider dark:text-neutral-400">
+                  {board.user?.name}
+                </span>
+                <span className="w-full truncate text-[15px] font-bold text-neutral-800 dark:text-neutral-100">
+                  {board.name}
+                </span>
+              </div>
             </div>
           </Link>
         </motion.div>

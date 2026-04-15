@@ -156,7 +156,7 @@ function FilterSelector<T>({
         <div className="relative">
           <Listbox.Button className="relative flex w-full items-center gap-2.5 rounded-xl border border-neutral-200 bg-white py-2.5 pl-3.5 pr-9 text-left text-[13px] text-neutral-900 shadow-sm transition-all hover:border-indigo-300 hover:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/10 dark:border-neutral-700 dark:bg-neutral-800 dark:text-white dark:hover:border-neutral-600 dark:hover:bg-neutral-800/80">
             {icon && (
-              <span className="text-indigo-600 dark:text-indigo-400">
+              <span className="shrink-0 text-indigo-600 dark:text-indigo-400">
                 {icon}
               </span>
             )}
@@ -564,12 +564,19 @@ export default function ReportsView() {
 
   useEffect(() => {
     if (currentUser?.role === "ADMIN") {
-      setUsers(allUsers ?? []);
+      const u = allUsers ?? [];
+      setUsers(u);
+      const firstUser = u[0];
+      if (!selectedUserId && firstUser) {
+        setSelectedUserId(firstUser.id);
+      }
     } else if (currentUser) {
       setUsers([currentUser]);
-      setSelectedUserId(currentUser.id);
+      if (!selectedUserId) {
+        setSelectedUserId(currentUser.id);
+      }
     }
-  }, [currentUser, allUsers]);
+  }, [currentUser, allUsers, selectedUserId]);
 
   useEffect(() => {
     if (boardsData) {
@@ -790,12 +797,12 @@ export default function ReportsView() {
                 Bảng điều khiển
               </h1>
               <div className="mt-2 flex items-center gap-2">
-                <div className="h-4 rounded-full bg-indigo-500/10 px-2 text-[10px] font-extrabold uppercase tracking-widest text-indigo-600 dark:bg-indigo-500/20 dark:text-indigo-400">
+                <div className="h-4 max-w-[250px] truncate rounded-full bg-indigo-500/10 px-2 leading-4 text-[10px] font-extrabold uppercase tracking-widest text-indigo-600 dark:bg-indigo-500/20 dark:text-indigo-400">
                   {users?.find((u) => u.id === selectedUserId)?.name ||
                     workspace.name}
                 </div>
 
-                <div className="inline-flex items-center gap-1.5 rounded-md bg-indigo-50/50 px-2 py-0.5 ring-1 ring-indigo-500/10 dark:bg-indigo-900/20 dark:ring-indigo-400/20">
+                <div className="inline-flex shrink-0 items-center gap-1.5 rounded-md bg-indigo-50/50 px-2 py-0.5 ring-1 ring-indigo-500/10 dark:bg-indigo-900/20 dark:ring-indigo-400/20">
                   <p className="text-[10px] font-bold tracking-wide text-indigo-600/80 dark:text-indigo-400">
                     Thông số & chỉ số
                   </p>
@@ -804,9 +811,9 @@ export default function ReportsView() {
             </div>
           </div>
 
-          <div className="ml-auto flex items-center rounded-[32px] border border-light-200/60 bg-white/50 p-6 shadow-xl ring-1 ring-light-100/50 backdrop-blur-3xl dark:border-dark-400/30 dark:bg-dark-200/30">
-            <div className="flex flex-wrap items-center gap-6">
-              <div className="min-w-[220px]">
+          <div className="ml-auto flex shrink-0 items-center rounded-[32px] border border-light-200/60 bg-white/50 p-6 shadow-xl ring-1 ring-light-100/50 backdrop-blur-3xl dark:border-dark-400/30 dark:bg-dark-200/30">
+            <div className="flex flex-nowrap items-center gap-6">
+              <div className="w-[220px]">
                 <FilterSelector
                   label="Nhân viên"
                   options={memberOptions}
@@ -815,7 +822,7 @@ export default function ReportsView() {
                   icon={<HiUser size={18} />}
                 />
               </div>
-              <div className="min-w-[220px]">
+              <div className="w-[220px]">
                 <FilterSelector
                   label="Bảng"
                   options={boardOptions}

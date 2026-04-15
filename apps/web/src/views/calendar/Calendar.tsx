@@ -123,7 +123,7 @@ export function Calendar() {
     }
   }, [displayUsers, currentUser, selectedUserId]);
 
-  const [viewMode, setViewMode] = useState<ViewMode>("MONTH");
+  const [viewMode, setViewMode] = useState<ViewMode>("DAY");
   const { calendarEntries, cards, formattedResult, moveTask } = useRecurrence(
     currentDate,
     selectedUserId,

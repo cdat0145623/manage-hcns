@@ -13,17 +13,18 @@ interface PositionSelectProps {
   value: string;
   onChange: (role: string) => void;
   disabled?: boolean;
+  className?: string;
 }
 
-export function PositionSelect({ value, onChange, disabled }: PositionSelectProps) {
+export function PositionSelect({ value, onChange, disabled, className }: PositionSelectProps) {
     const {data: positions} = api.position.all.useQuery();
     const selected = positions?.find((r) => r.publicId === value);
 
   return (
     <Listbox value={value} onChange={onChange} disabled={disabled}>
-      <div className="relative w-full">
+      <div className={`relative ${className || "w-full"}`}>
         {/* Trigger button */}
-        <ListboxButton className="flex w-48 items-center gap-2 rounded-xl border border-black/10 bg-white px-3 py-2 text-sm font-medium text-gray-900 outline-none transition hover:border-black/20 hover:bg-gray-50 focus-visible:ring-2 focus-visible:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-45 dark:border-white/10 dark:bg-white/5 dark:text-white dark:hover:border-white/20 dark:hover:bg-white/10">
+        <ListboxButton className="flex w-full items-center gap-2 rounded-xl border border-black/10 bg-white px-3 py-2 text-sm font-medium text-gray-900 outline-none transition hover:border-black/20 hover:bg-gray-50 focus-visible:ring-2 focus-visible:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-45 dark:border-white/10 dark:bg-white/5 dark:text-white dark:hover:border-white/20 dark:hover:bg-white/10">
           <span className="flex-1 text-left">{selected?.name}</span>
           <HiChevronDown className="h-3.5 w-3.5 shrink-0 text-gray-400 transition duration-200 ui-open:rotate-180 dark:text-white/40" />
         </ListboxButton>

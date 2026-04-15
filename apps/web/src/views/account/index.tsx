@@ -155,6 +155,7 @@ function AccountTableRow({
             value={member.role ?? "NVVP"}
             onChange={handleRoleChange}
             disabled={updateRoleMutation.isPending}
+            className="w-48"
           />
         </div>
       </td>
@@ -166,6 +167,7 @@ function AccountTableRow({
             value={member.user?.position?.publicId ?? ""}
             onChange={handlePositionChange}
             disabled={updatePositionMutation.isPending}
+            className="w-48"
           />
         </div>
       </td>
@@ -394,6 +396,7 @@ export default function Account() {
             memberUsername={editingMember.user?.username ?? ""}
             memberEmail={editingMember.user?.email ?? editingMember.email ?? ""}
             memberRole={editingMember.role as Role}
+            memberPositionPublicId={editingMember.user?.position?.publicId}
             onClose={handleCloseEditModal}
           />
         </Modal>

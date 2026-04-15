@@ -167,9 +167,9 @@ export const getAll = async (db: dbClient) => {
       role: true,
     },
     where: or(
-      eq(users.role, "NVKD_MANAGER"),
+      eq(users.role, "BRANCH_MANAGER"),
       eq(users.role, "NVVP"),
-      eq(users.role, "NVKT_MANAGER"),
+      eq(users.role, "AREA_MANAGER"),
     ),
   });
 };

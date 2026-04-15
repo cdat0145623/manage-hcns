@@ -7,6 +7,7 @@ import { usePopup } from "~/providers/popup";
 import { useWorkspace } from "~/providers/workspace";
 import { api } from "~/utils/api";
 import { RoleSelect } from "~/views/members/components/RoleSelector";
+import { PositionSelect } from "~/views/members/components/PositionSelector";
 
 interface EditAccountModalProps {
   memberId: string;
@@ -15,6 +16,7 @@ interface EditAccountModalProps {
   memberUsername: string;
   memberEmail: string;
   memberRole: Role;
+  memberPositionPublicId?: string;
   onClose: () => void;
 }
 
@@ -25,6 +27,7 @@ export function EditAccountModal({
   memberUsername,
   memberEmail,
   memberRole,
+  memberPositionPublicId,
   onClose,
 }: EditAccountModalProps) {
   const { showPopup } = usePopup();
@@ -37,6 +40,7 @@ export function EditAccountModal({
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [role, setRole] = useState<Role>(memberRole);
+  const [positionPublicId, setPositionPublicId] = useState(memberPositionPublicId ?? "");
   const [passwordError, setPasswordError] = useState("");
 
   useEffect(() => {
@@ -45,8 +49,9 @@ export function EditAccountModal({
     setEmail(memberEmail ?? "");
     setPassword("");
     setRole(memberRole);
+    setPositionPublicId(memberPositionPublicId ?? "");
     setPasswordError("");
-  }, [memberName, memberUsername, memberEmail, memberRole]);
+  }, [memberName, memberUsername, memberEmail, memberRole, memberPositionPublicId]);
 
   const updateUser = api.user.update.useMutation({
     onSuccess: async () => {
@@ -92,6 +97,28 @@ export function EditAccountModal({
     },
   });
 
+  const updatePosition = api.user.updatePosition.useMutation({
+    onSuccess: async () => {
+      if (workspace.publicId && workspace.publicId.length >= 12) {
+        await utils.workspace.byId.invalidate({
+          workspacePublicId: workspace.publicId,
+        });
+      }
+      showPopup({
+        header: t`Cập nhật vị trí`,
+        message: t`Vị trí đã được cập nhật thành công.`,
+        icon: "success",
+      });
+    },
+    onError: () => {
+      showPopup({
+        header: t`Lỗi cập nhật vị trí`,
+        message: t`Không thể cập nhật vị trí. Vui lòng thử lại.`,
+        icon: "error",
+      });
+    },
+  });
+
   const handleSave = () => {
     // Validate password if provided
     if (password && password.length < 6) {
@@ -129,10 +156,19 @@ export function EditAccountModal({
       });
     }
 
+    // Check if position changed
+    if (positionPublicId !== memberPositionPublicId) {
+      updatePosition.mutate({
+        targetUserId: memberId,
+        positionPublicId,
+        workspacePublicId: workspace.publicId,
+      });
+    }
+
     onClose();
   };
 
-  const isPending = updateUser.isPending || updateRole.isPending;
+  const isPending = updateUser.isPending || updateRole.isPending || updatePosition.isPending;
 
   return (
     <div className="mx-auto w-full rounded-lg bg-light-50 p-6 shadow-md dark:bg-dark-300">
@@ -195,15 +231,27 @@ export function EditAccountModal({
           />
         </div>
 
-        {/* Role */}
-        <div>
-          <label className="mb-1.5 block text-sm font-medium text-neutral-700 dark:text-neutral-300">
-            {t`Vai trò`}
-          </label>
-          <RoleSelect
-            value={role}
-            onChange={setRole}
-          />
+        {/* Role & Position */}
+        <div className="flex flex-row gap-4">
+          <div className="flex-1">
+            <label className="mb-1.5 block text-sm font-medium text-neutral-700 dark:text-neutral-300">
+              {t`Vai trò`}
+            </label>
+            <RoleSelect
+              value={role}
+              onChange={setRole}
+            />
+          </div>
+
+          <div className="flex-1">
+            <label className="mb-1.5 block text-sm font-medium text-neutral-700 dark:text-neutral-300">
+              {t`Vị trí`}
+            </label>
+            <PositionSelect
+              value={positionPublicId}
+              onChange={setPositionPublicId}
+            />
+          </div>
         </div>
 
         {/* Password */}

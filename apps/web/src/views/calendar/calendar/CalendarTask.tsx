@@ -19,59 +19,73 @@ interface CalendarTaskProps {
 
 const STATUS_COLORS: Record<
   "pending" | "done" | "missed",
-  { bg: string; 
-    border: string; 
-    accent: string; text: string; boxShadow: string }
+  {
+    bg: string;
+    border: string;
+    accent: string;
+    text: string;
+    boxShadow: string;
+  }
 > = {
   pending: {
     bg: "bg-blue-400 shadow-sm dark:bg-blue-500",
     border: "border-blue-200 dark:border-blue-500/40",
     accent: "bg-blue-700",
     text: "text-blue-900 dark:text-blue-50",
-    boxShadow: "0 15px 35px -5px rgba(32, 118, 248, 0.24), 0 10px 15px -6px rgba(11, 198, 245, 0.1)",
+    boxShadow:
+      "0 15px 35px -5px rgba(32, 118, 248, 0.24), 0 10px 15px -6px rgba(11, 198, 245, 0.1)",
   },
   done: {
     bg: "bg-green-500 shadow-sm dark:bg-green-600/40",
     border: "border-green-300 dark:border-green-500/50",
     accent: "bg-green-700",
     text: "text-green-900 dark:text-green-50",
-    boxShadow: "0 15px 35px -5px rgba(79, 204, 21, 0.63), 0 10px 15px -6px rgba(11, 245, 81, 0.1)",
+    boxShadow:
+      "0 15px 35px -5px rgba(79, 204, 21, 0.63), 0 10px 15px -6px rgba(11, 245, 81, 0.1)",
   },
   missed: {
     bg: "bg-red-400 shadow-sm dark:bg-red-600/30",
     border: "border-red-200 dark:border-red-500/40",
     accent: "bg-red-700",
     text: "text-red-900 dark:text-red-50",
-    boxShadow: "0 15px 35px -5px rgba(245, 27, 11, 0.15), 0 10px 15px -6px rgba(245, 27, 11, 0.1)",
+    boxShadow:
+      "0 15px 35px -5px rgba(245, 27, 11, 0.15), 0 10px 15px -6px rgba(245, 27, 11, 0.1)",
   },
 };
 
 const VIRTUAL_COLORS: Record<
   "pending" | "done" | "missed",
-  { bg: string; 
-    border: string; 
-    accent: string; text: string; boxShadow: string }
+  {
+    bg: string;
+    border: string;
+    accent: string;
+    text: string;
+    boxShadow: string;
+  }
 > = {
   pending: {
     bg: "bg-blue-100 shadow-sm dark:bg-blue-600/30",
     border: "border-blue-500/50 dark:border-blue-500",
     accent: "bg-blue-500/50",
     text: "text-blue-900/70 dark:text-blue-100/70",
-    boxShadow: "0 15px 35px -5px rgba(32, 118, 248, 0.24), 0 10px 15px -6px rgba(11, 198, 245, 0.1)",
+    boxShadow:
+      "0 15px 35px -5px rgba(32, 118, 248, 0.24), 0 10px 15px -6px rgba(11, 198, 245, 0.1)",
   },
   done: {
     bg: "bg-green-500/50 dark:bg-green-600/50",
     border: "border-green-200/50 dark:border-green-500/30",
     accent: "bg-green-500/50",
     text: "text-green-900/80 dark:text-green-100/80",
-    boxShadow: "0 15px 35px -5px rgba(122, 241, 67, 1), 0 10px 15px -6px rgba(11, 245, 81, 0.1)",
+    boxShadow:
+      "0 15px 35px -5px rgba(122, 241, 67, 1), 0 10px 15px -6px rgba(11, 245, 81, 0.1)",
   },
   missed: {
     bg: "bg-red-50/70 dark:bg-red-500/10",
     border: "border-red-100/50 dark:border-red-500/20",
     accent: "bg-red-500/50",
     text: "text-red-900/70 dark:text-red-100/70",
-    boxShadow: "0 15px 35px -5px rgba(245, 27, 11, 0.15), 0 10px 15px -6px rgba(245, 27, 11, 0.1)",
+    boxShadow:
+      "0 15px 35px -5px rgba(245, 27, 11, 0.15), 0 10px 15px -6px rgba(245, 27, 11, 0.1)",
   },
 };
 
@@ -94,7 +108,7 @@ export function CalendarTask({
   const getPositionStyle = () => {
     if (!isPositioned) return {};
 
-    const hourHeight = 96; // Matching h-24
+    const hourHeight = 128; // Matching h-32
     const date = new Date(entry.date);
     const hours = date.getHours();
     const minutes = date.getMinutes();
@@ -162,13 +176,15 @@ export function CalendarTask({
         {...safeDragHandleProps}
         className={`${
           variant === "SUMMARY"
-            ? `relative ${overlapIndex > 0 ? "ml-0.5" : ""} h-[10vh] min-h-[40px] max-h-[50px] mb-1 flex w-[calc(100%-4px)] items-center overflow-hidden rounded-xl border border-l-[3px] px-2.5 py-1.5 text-[10px] font-black transition-all ${colors.bg} ${colors.border} ${colors.text}`
+            ? `relative ${overlapIndex > 0 ? "ml-0.5" : ""} mb-1 flex h-[10vh] max-h-[50px] min-h-[40px] w-[calc(100%-4px)] items-center overflow-hidden rounded-xl border border-l-[3px] px-2.5 py-1.5 text-[10px] font-black transition-all ${colors.bg} ${colors.border} ${colors.text}`
             : `relative flex w-full flex-col overflow-hidden rounded-2xl border border-l-[6px] px-3 py-2.5 shadow-sm backdrop-blur-md transition-all ${colors.bg} ${colors.border} ${colors.text}`
         }`}
         style={{
           ...draggableProps?.style,
           ...getPositionStyle(),
-          zIndex: isPositioned ? ((isVirtual ? 5 : 10) + overlapIndex) : undefined,
+          zIndex: isPositioned
+            ? (isVirtual ? 5 : 10) + overlapIndex
+            : undefined,
           borderLeftColor: entry.color ?? undefined,
         }}
       >
@@ -180,8 +196,10 @@ export function CalendarTask({
         )}
 
         {variant === "SUMMARY" ? (
-          <div className={`pointer-events-none ml-1 flex flex-row h-full items-center justify-start w-full gap-2 overflow-hidden ${colors.text}`}>
-            <span className="truncate leading-none text-[10px] font-black">
+          <div
+            className={`pointer-events-none ml-1 flex h-full w-full flex-row items-center justify-start gap-2 overflow-hidden ${colors.text}`}
+          >
+            <span className="truncate text-[10px] font-black leading-none text-left">
               {entry.title || "(No title)"}
             </span>
             <span className="shrink-0 text-[10px] font-black opacity-50">
@@ -189,19 +207,26 @@ export function CalendarTask({
             </span>
           </div>
         ) : (
-          <div className={`pointer-events-none ml-1 flex flex-col h-full items-start justify-center gap-0.5 overflow-hidden ${colors.text}`}>
-            <span className="truncate w-full text-xs font-black leading-tight">
+          <div
+            className={`pointer-events-none ml-1 flex h-full flex-col items-start justify-center gap-0.5 overflow-hidden ${colors.text}`}
+          >
+            <span className="w-full truncate text-xs font-black leading-tight text-left">
               {entry.title || "(No title)"}
             </span>
-            <div className="flex items-center gap-1.5 opacity-60 w-full overflow-hidden">
-              <span className="block text-[10px] font-bold whitespace-nowrap">
-                {format(new Date(entry.date), "H:mm")} - {format(new Date(new Date(entry.date).getTime() + (entry.duration || 60) * 60000), "H:mm")}
+            <div className="flex w-full items-center gap-1.5 overflow-hidden opacity-60">
+              <span className="block whitespace-nowrap text-[10px] font-bold">
+                {format(new Date(entry.date), "H:mm")} -{" "}
+                {format(
+                  new Date(
+                    new Date(entry.date).getTime() +
+                      (entry.duration || 60) * 60000,
+                  ),
+                  "H:mm",
+                )}
               </span>
             </div>
-
           </div>
         )}
-
       </motion.button>
     );
   };

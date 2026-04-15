@@ -39,13 +39,12 @@ export function PositionSelect({ value, onChange, disabled, className }: Positio
           leaveFrom="opacity-100 scale-100 translate-y-0"
           leaveTo="opacity-0 scale-95 translate-y-1"
         >
-          <ListboxOptions className="absolute left-0 right-0 z-50 mt-1.5 overflow-hidden rounded-xl border border-black/10 bg-white p-1 shadow-lg outline-none dark:border-white/10 dark:bg-neutral-900 dark:shadow-black/40">
+          <ListboxOptions
+            anchor={{ to: "bottom start", gap: 6 }}
+            className="z-50 w-[var(--button-width)] overflow-hidden rounded-xl border border-black/10 bg-white p-1 shadow-lg outline-none dark:border-white/10 dark:bg-neutral-900 dark:shadow-black/40 [--anchor-max-height:200px]"
+          >            
             {positions?.map((position, i) => (
               <Fragment key={position.publicId}>
-                {/* Divider before Staff */}
-                {i === positions.length - 1 && (
-                  <div className="my-1 h-px bg-black/5 dark:bg-white/5" />
-                )}
                 <ListboxOption
                   value={position.publicId}
                   className="flex cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm transition ui-active:bg-gray-50 dark:ui-active:bg-white/5"

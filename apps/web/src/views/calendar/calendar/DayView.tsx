@@ -1,14 +1,23 @@
-import { addHours, format, isSameDay, isToday, startOfDay, isAfter, isBefore, endOfMonth } from "date-fns";
+import {
+  addHours,
+  endOfMonth,
+  format,
+  isAfter,
+  isBefore,
+  isSameDay,
+  isToday,
+  startOfDay,
+} from "date-fns";
 import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useMemo, useState } from "react";
 
 import type { CalendarEntry } from "~/hooks/useRecurrence";
 import { StrictModeDroppable as Droppable } from "~/components/StrictModeDroppable";
 import { calculateOverlap } from "~/utils/calendar";
-import { CalendarTask } from "./CalendarTask";
-import { DayTasksPopover } from "./DayTasksPopover";
-import { DayCardPopover } from "./DayCardPopover";
 import { CalendarCard } from "./CalendarCard";
+import { CalendarTask } from "./CalendarTask";
+import { DayCardPopover } from "./DayCardPopover";
+import { DayTasksPopover } from "./DayTasksPopover";
 
 interface Card {
   publicId: string;
@@ -64,7 +73,9 @@ export function DayView({
 
   const startHour = useMemo(() => {
     if (dayEntries.length === 0) return DEFAULT_START_HOUR;
-    const earliestTaskHour = Math.min(...dayEntries.map(e => new Date(e.date).getHours()));
+    const earliestTaskHour = Math.min(
+      ...dayEntries.map((e) => new Date(e.date).getHours()),
+    );
     return Math.min(DEFAULT_START_HOUR, earliestTaskHour);
   }, [dayEntries]);
 
@@ -72,7 +83,8 @@ export function DayView({
     return Array.from({ length: 24 - startHour }, (_, i) => i + startHour);
   }, [startHour]);
 
-  const nowTop = (now.getHours() - startHour) * 96 + (now.getMinutes() * 96) / 60;
+  const nowTop =
+    (now.getHours() - startHour) * 128 + (now.getMinutes() * 128) / 60;
 
   const handleTimeSlotClick = (hour: number) => {
     const clickedDate = new Date(currentDate);
@@ -81,9 +93,10 @@ export function DayView({
   };
 
   const dayCards = useMemo(() => {
-    const cardMetas = cards.filter((card) => 
-      isAfter(card.dueDate ?? endOfMonth(currentDate), currentDate) && 
-      isBefore(card.startDate || card.createdAt, currentDate)
+    const cardMetas = cards.filter(
+      (card) =>
+        isAfter(card.dueDate ?? endOfMonth(currentDate), currentDate) &&
+        isBefore(card.startDate || card.createdAt, currentDate),
     );
 
     // Resolve full card data from formattedResult
@@ -91,7 +104,7 @@ export function DayView({
     formattedResult.forEach((board: any) => {
       board.lists.forEach((list: any) => {
         list.cards.forEach((card: any) => {
-          if (cardMetas.some(m => m.publicId === card.publicId)) {
+          if (cardMetas.some((m) => m.publicId === card.publicId)) {
             fullCards.push({
               ...card,
               boardName: board.name,
@@ -102,9 +115,10 @@ export function DayView({
       });
     });
 
-    return fullCards.sort((a, b) => 
-      (new Date(a.dueDate ?? endOfMonth(currentDate)).getTime()) - 
-      (new Date(b.dueDate ?? endOfMonth(currentDate)).getTime())
+    return fullCards.sort(
+      (a, b) =>
+        new Date(a.dueDate ?? endOfMonth(currentDate)).getTime() -
+        new Date(b.dueDate ?? endOfMonth(currentDate)).getTime(),
     );
   }, [cards, formattedResult, currentDate]);
 
@@ -142,7 +156,7 @@ export function DayView({
               <span className="text-lg font-black text-neutral-900 dark:text-white">
                 {format(currentDate, "MMMM yyyy")}
               </span>
-              <div className="flex flex-col gap-1 items-center justify-center">
+              <div className="flex flex-col items-center justify-center gap-1">
                 {dayEntries.length > 0 && (
                   <motion.button
                     initial={{ opacity: 0, x: 5 }}
@@ -190,7 +204,7 @@ export function DayView({
             {hoursToRender.map((hour) => (
               <div
                 key={hour}
-                className="relative h-24 border-b border-neutral-100/30 dark:border-white/5"
+                className="relative h-32 border-b border-neutral-100/30 dark:border-white/5"
               >
                 <span className="absolute -top-3 left-0 w-full pr-4 text-right text-[10px] font-black uppercase tracking-tighter text-neutral-600 dark:text-neutral-600">
                   {format(addHours(startOfDay(currentDate), hour), "H:mm")}
@@ -207,7 +221,7 @@ export function DayView({
               {hoursToRender.map((hour) => (
                 <div
                   key={hour}
-                  className="h-24 border-b border-dark-400 dark:border-white/5"
+                  className="h-32 border-b border-dark-400 dark:border-white/5"
                 />
               ))}
             </div>
@@ -245,7 +259,7 @@ export function DayView({
                       <div
                         key={`slot-${hour}`}
                         onClick={() => handleTimeSlotClick(hour)}
-                        className="h-24 w-full cursor-pointer transition-colors hover:bg-blue-100/30 dark:hover:bg-blue-900/20"
+                        className="h-32 w-full cursor-pointer transition-colors hover:bg-blue-100/30 dark:hover:bg-blue-900/20"
                       />
                     ))}
                   </div>
@@ -261,7 +275,7 @@ export function DayView({
 
                     // Calculate Y position for badge: position at the top of the first hidden task
                     const firstHidden = hiddenEntries[0];
-                    const hourHeight = 96;
+                    const hourHeight = 128;
                     const badgeTop = firstHidden
                       ? (() => {
                           const d = new Date(firstHidden.date);
@@ -271,7 +285,6 @@ export function DayView({
                           );
                         })()
                       : 8;
-
 
                     return (
                       <>
@@ -340,7 +353,7 @@ export function DayView({
           ))}
         </div>
       </div>
-      
+
       <AnimatePresence>
         {popoverDay && (
           <DayTasksPopover

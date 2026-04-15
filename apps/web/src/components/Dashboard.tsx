@@ -1,5 +1,5 @@
-import { useTheme } from "next-themes";
 import { useRouter } from "next/router";
+import { useTheme } from "next-themes";
 import { useEffect, useRef, useState } from "react";
 import {
   TbLayoutSidebarLeftCollapse,
@@ -104,11 +104,21 @@ export default function Dashboard({
     }
   });
 
+  // Only redirect on initial mount if role requirement is not met
+  const hasCheckedRoleRef = useRef(false);
   useEffect(() => {
-    if (!userLoading && requiredRole && user?.role !== requiredRole) {
+    if (
+      router.isReady &&
+      !hasCheckedRoleRef.current &&
+      !userLoading &&
+      requiredRole &&
+      user &&
+      user.role !== requiredRole
+    ) {
+      hasCheckedRoleRef.current = true;
       void router.push("/boards");
     }
-  }, [userLoading, user?.role, requiredRole, router]);
+  }, [router.isReady, userLoading, user?.role, requiredRole, router]);
 
   const isDarkMode = resolvedTheme === "dark";
 
@@ -117,7 +127,7 @@ export default function Dashboard({
       openModal("NEW_WORKSPACE", undefined, undefined, false);
     }
   }, [sessionLoading, hasLoaded, availableWorkspaces.length, openModal]);
-  
+
   return (
     <>
       <style jsx global>{`
@@ -175,20 +185,26 @@ export default function Dashboard({
             ref={sideNavRef}
             className={`fixed top-12 z-40 h-[calc(100dvh-3rem)] w-[calc(100vw-1.5rem)] transform transition-transform duration-300 ease-in-out md:relative md:top-0 md:h-full md:w-auto md:translate-x-0 ${isSideNavOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"} `}
           >
-            <SideNavigation
-              user={{
-                displayName: user?.name ?? session?.user.name,
-                email: user?.email ?? session?.user.email ?? "",
-                image: user?.image ?? undefined,
-              }}
-              isLoading={sessionLoading || userLoading}
-              onCloseSideNav={closeSideNav}
-            />
+            {requiredRole && userLoading ? (
+              <></>
+            ) : (
+              <SideNavigation
+                user={{
+                  displayName: user?.name ?? session?.user.name,
+                  email: user?.email ?? session?.user.email ?? "",
+                  image: user?.image ?? undefined,
+                }}
+                isLoading={sessionLoading || userLoading}
+                onCloseSideNav={closeSideNav}
+              />
+            )}
           </div>
 
           <div className="relative h-full min-h-0 w-full overflow-hidden md:rounded-lg md:border md:border-light-300 md:bg-light-50 md:dark:border-dark-300 md:dark:bg-dark-50">
             <div className="relative flex h-full min-h-0 w-full overflow-hidden">
-              <div className="h-full w-full overflow-y-auto">{children}</div>
+              <div className="h-full w-full overflow-y-auto">
+                {requiredRole && userLoading ? <></> : children}
+              </div>
 
               {/* Mobile Right Panel */}
               {hasRightPanel && rightPanel && (

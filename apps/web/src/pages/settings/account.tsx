@@ -11,6 +11,6 @@ const AccountSettingsPage: NextPageWithLayout = () => {
   );
 };
 
-AccountSettingsPage.getLayout = (page) => getDashboardLayout(page, undefined, false, "ADMIN");
+AccountSettingsPage.getLayout = (page) => getDashboardLayout(page);
 
 export default AccountSettingsPage;

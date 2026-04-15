@@ -35,13 +35,12 @@ import {
 } from "recharts";
 import { twMerge } from "tailwind-merge";
 
+import Modal from "~/components/modal";
+import { NewWorkspaceForm } from "~/components/NewWorkspaceForm";
 import PatternedBackground from "~/components/PatternedBackground";
+import { useModal } from "~/providers/modal";
 import { useWorkspace } from "~/providers/workspace";
 import { api } from "~/utils/api";
-
-import Modal from "~/components/modal";
-import { useModal } from "~/providers/modal";
-import { NewWorkspaceForm } from "~/components/NewWorkspaceForm";
 
 const CHART_COLORS = [
   "#6366f1", // Indigo
@@ -177,7 +176,7 @@ function FilterSelector<T>({
             leaveFrom="opacity-100 scale-100"
             leaveTo="opacity-0 scale-95"
           >
-            <Listbox.Options className="absolute -left-1 z-[100] mt-2 max-h-72 min-w-[180px] overflow-auto rounded-2xl border border-light-200 bg-white p-1 text-sm focus:outline-none dark:border-dark-400 dark:bg-dark-200 sm:left-auto sm:right-0">
+            <Listbox.Options className="absolute left-0 right-0 z-[100] mt-2 max-h-72 overflow-auto rounded-2xl border border-light-200 bg-white p-1 text-sm shadow-xl focus:outline-none dark:border-dark-400 dark:bg-dark-200">
               {options.map((option, idx) => (
                 <Listbox.Option
                   key={idx}
@@ -227,7 +226,7 @@ const DashboardCard = ({
   return (
     <div
       className={twMerge(
-        "group flex flex-col rounded-[24px] border border-light-200/50 bg-white/90 p-7 shadow-sm transition-all duration-700 hover:-translate-y-1 hover:shadow-2xl hover:shadow-indigo-500/5 dark:border-dark-300/40 dark:bg-dark-200/80",
+        "group relative flex flex-col rounded-[24px] border border-light-200/50 bg-white/90 p-7 shadow-sm transition-all duration-700 hover:-translate-y-1 hover:shadow-2xl hover:shadow-indigo-500/5 dark:border-dark-300/40 dark:bg-dark-200/80",
         isVisible ? "translate-y-0 opacity-100" : "translate-y-8 opacity-0",
         className,
       )}
@@ -805,60 +804,26 @@ export default function ReportsView() {
             </div>
           </div>
 
-          <div className="rounded-[28px] border border-light-200/60 bg-white/40 p-5 shadow-2xl ring-1 ring-light-100/50 backdrop-blur-3xl dark:border-dark-400/30 dark:bg-dark-200/30">
-            <div className="grid grid-cols-2 gap-x-4 gap-y-4 lg:grid-cols-4">
-              <FilterSelector
-                label="Nhân viên"
-                options={memberOptions}
-                value={selectedUserId}
-                onChange={setSelectedUserId}
-                icon={<HiUser size={18} />}
-              />
-              <FilterSelector
-                label="Bảng"
-                options={boardOptions}
-                value={boardPublicId}
-                onChange={setBoardPublicId}
-                icon={<HiTableCells size={18} />}
-              />
-              {/* <FilterSelector
-                label="Chế độ xem"
-                options={viewModeOptions}
-                value={viewMode}
-                onChange={setViewMode}
-                icon={<HiRectangleStack size={18} />}
-              />
-              {viewMode === "month" ? ( */}
+          <div className="ml-auto flex items-center rounded-[32px] border border-light-200/60 bg-white/50 p-6 shadow-xl ring-1 ring-light-100/50 backdrop-blur-3xl dark:border-dark-400/30 dark:bg-dark-200/30">
+            <div className="flex flex-wrap items-center gap-6">
+              <div className="min-w-[220px]">
                 <FilterSelector
-                  label="Tháng"
-                  options={monthOptions}
-                  value={month}
-                  onChange={setMonth}
-                  icon={<HiCalendar size={18} />}
+                  label="Nhân viên"
+                  options={memberOptions}
+                  value={selectedUserId}
+                  onChange={setSelectedUserId}
+                  icon={<HiUser size={18} />}
                 />
-              {/* ) : viewMode === "week" ? (
+              </div>
+              <div className="min-w-[220px]">
                 <FilterSelector
-                  label="Tuần"
-                  options={weekOptions}
-                  value={week}
-                  onChange={setWeek}
-                  icon={<HiCalendar size={18} />}
+                  label="Bảng"
+                  options={boardOptions}
+                  value={boardPublicId}
+                  onChange={setBoardPublicId}
+                  icon={<HiTableCells size={18} />}
                 />
-              ) : (
-                <div className="flex flex-col gap-2 opacity-30">
-                  <label className="text-[10px] font-extrabold uppercase tracking-[0.2em] text-light-500/80">
-                    Chế độ cố định
-                  </label>
-                  <div className="h-11 rounded-2xl border border-dashed border-light-300" />
-                </div>
-              )} */}
-              <FilterSelector
-                label="Năm"
-                options={yearOptions}
-                value={year}
-                onChange={setYear}
-                icon={<HiCalendar size={18} />}
-              />
+              </div>
             </div>
           </div>
         </header>
@@ -1065,7 +1030,27 @@ export default function ReportsView() {
               {isCalendarDataLoading ? (
                 <SkeletonPulse className="h-80 w-full" />
               ) : taskProgressData.length > 0 ? (
-                <div className="h-[400px] w-full overflow-hidden">
+                <div className="relative h-[400px] w-full">
+                  <div className="absolute right-0 top-0 z-10 flex items-center gap-6 pr-2 pt-2">
+                    <div className="flex items-center gap-2">
+                      <div className="h-2 w-2 rounded-full bg-[#10b981]" />
+                      <span className="text-[10px] font-black uppercase tracking-[0.2em] text-neutral-900 dark:text-neutral-100">
+                        {t`HOÀN THÀNH`}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="h-2 w-2 rounded-full bg-[#f43f5e]" />
+                      <span className="text-[10px] font-black uppercase tracking-[0.2em] text-neutral-900 dark:text-neutral-100">
+                        {t`BỎ LỠ`}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="h-2 w-2 rounded-full bg-[#94a3b8]" />
+                      <span className="text-[10px] font-black uppercase tracking-[0.2em] text-neutral-900 dark:text-neutral-100">
+                        {t`CHỜ`}
+                      </span>
+                    </div>
+                  </div>
                   <ResponsiveContainer
                     width={
                       taskProgressData.length < 4
@@ -1145,20 +1130,8 @@ export default function ReportsView() {
                           );
                         }}
                       />
-                      <Legend
-                        verticalAlign="top"
-                        align="right"
-                        iconType="circle"
-                        iconSize={8}
-                        wrapperStyle={{ paddingBottom: "30px" }}
-                        formatter={(value) => (
-                          <span className="text-[10px] font-extrabold uppercase tracking-[0.2em] text-light-500/80">
-                            {value}
-                          </span>
-                        )}
-                      />
                       <Bar
-                        name="Chờ"
+                        name="Pending"
                         dataKey="pendingRate"
                         stackId="stack"
                         fill="url(#pendingGradient)"
@@ -1166,7 +1139,7 @@ export default function ReportsView() {
                         isAnimationActive={false}
                       />
                       <Bar
-                        name="Hoàn thành"
+                        name="Done"
                         dataKey="completionRate"
                         stackId="stack"
                         fill="url(#doneGradient)"
@@ -1174,7 +1147,7 @@ export default function ReportsView() {
                         isAnimationActive={false}
                       />
                       <Bar
-                        name="Bỏ lỡ"
+                        name="Missed"
                         dataKey="missedRate"
                         stackId="stack"
                         fill="url(#missedGradient)"

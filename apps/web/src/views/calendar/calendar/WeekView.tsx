@@ -1,24 +1,25 @@
 import {
   addHours,
   eachDayOfInterval,
-  endOfWeek,
   endOfMonth,
+  endOfWeek,
   format,
+  isAfter,
+  isBefore,
   isSameDay,
   isToday,
   startOfDay,
   startOfWeek,
-  isAfter,
-  isBefore
 } from "date-fns";
-import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
+import { useEffect, useMemo, useState } from "react";
+
 import type { CalendarEntry } from "~/hooks/useRecurrence";
 import { StrictModeDroppable as Droppable } from "~/components/StrictModeDroppable";
-import { CalendarTask } from "./CalendarTask";
-import { DayTasksPopover } from "./DayTasksPopover";
 import { calculateOverlap } from "~/utils/calendar";
+import { CalendarTask } from "./CalendarTask";
 import { DayCardPopover } from "./DayCardPopover";
+import { DayTasksPopover } from "./DayTasksPopover";
 
 interface Card {
   publicId: string;
@@ -74,7 +75,9 @@ export function WeekView({
 
   const startHour = useMemo(() => {
     if (entries.length === 0) return DEFAULT_START_HOUR;
-    const earliestTaskHour = Math.min(...entries.map(e => new Date(e.date).getHours()));
+    const earliestTaskHour = Math.min(
+      ...entries.map((e) => new Date(e.date).getHours()),
+    );
     return Math.min(DEFAULT_START_HOUR, earliestTaskHour);
   }, [entries]);
 
@@ -82,7 +85,8 @@ export function WeekView({
     return Array.from({ length: 24 - startHour }, (_, i) => i + startHour);
   }, [startHour]);
 
-  const nowTop = (now.getHours() - startHour) * 96 + (now.getMinutes() * 96) / 60;
+  const nowTop =
+    (now.getHours() - startHour) * 128 + (now.getMinutes() * 128) / 60;
 
   const handleTimeSlotClick = (day: Date, hour: number) => {
     const clickedDate = new Date(day);
@@ -91,9 +95,10 @@ export function WeekView({
   };
 
   const getCardsForDay = (day: Date) => {
-    const cardMetas = cards.filter((card) => 
-      isAfter(card.dueDate ?? endOfMonth(day), day) && 
-      isBefore(card.startDate || card.createdAt, day)
+    const cardMetas = cards.filter(
+      (card) =>
+        isAfter(card.dueDate ?? endOfMonth(day), day) &&
+        isBefore(card.startDate || card.createdAt, day),
     );
 
     // Resolve full card data from formattedResult
@@ -101,7 +106,7 @@ export function WeekView({
     formattedResult.forEach((board: any) => {
       board.lists.forEach((list: any) => {
         list.cards.forEach((card: any) => {
-          if (cardMetas.some(m => m.publicId === card.publicId)) {
+          if (cardMetas.some((m) => m.publicId === card.publicId)) {
             fullCards.push({
               ...card,
               boardName: board.name,
@@ -112,9 +117,10 @@ export function WeekView({
       });
     });
 
-    return fullCards.sort((a, b) => 
-      (new Date(a.dueDate ?? endOfMonth(day)).getTime()) - 
-      (new Date(b.dueDate ?? endOfMonth(day)).getTime())
+    return fullCards.sort(
+      (a, b) =>
+        new Date(a.dueDate ?? endOfMonth(day)).getTime() -
+        new Date(b.dueDate ?? endOfMonth(day)).getTime(),
     );
   };
 
@@ -136,7 +142,7 @@ export function WeekView({
                 }`}
                 onClick={() => onCellClick(day)}
               >
-                <span className="text-neutral-900 text-[10px] font-black uppercase tracking-[0.2em]">
+                <span className="text-[10px] font-black uppercase tracking-[0.2em] text-neutral-900">
                   {["CN", "T2", "T3", "T4", "T5", "T6", "T7"][day.getDay()]}
                 </span>
                 <div
@@ -147,12 +153,12 @@ export function WeekView({
                   className={`mt-2 flex h-10 w-10 cursor-pointer items-center justify-center rounded-xl text-lg font-black transition-all ${
                     isToday(day)
                       ? "bg-blue-600 text-white shadow-lg shadow-blue-500/30"
-                      : "text-neutral-900 border border-neutral-100 bg-white shadow-sm hover:bg-blue-600 hover:text-white hover:shadow-sm dark:border-neutral-800 dark:bg-neutral-900 dark:text-white"
+                      : "border border-neutral-100 bg-white text-neutral-900 shadow-sm hover:bg-blue-600 hover:text-white hover:shadow-sm dark:border-neutral-800 dark:bg-neutral-900 dark:text-white"
                   }`}
                 >
                   {format(day, "d")}
                 </div>
-                <div className="flex flex-col gap-1 items-center justify-center">
+                <div className="flex flex-col items-center justify-center gap-1">
                   {dayEntries.length > 0 && (
                     <motion.button
                       initial={{ opacity: 0, y: 5 }}
@@ -191,7 +197,7 @@ export function WeekView({
                       {dayCards.length} công việc khác
                     </motion.button>
                   )}
-                  </div>
+                </div>
               </div>
             );
           })}
@@ -204,7 +210,7 @@ export function WeekView({
             {hoursToRender.map((hour) => (
               <div
                 key={hour}
-                className="relative h-24 border-b border-neutral-100/30 dark:border-white/5"
+                className="relative h-32 border-b border-neutral-100/30 dark:border-white/5"
               >
                 <span className="absolute -top-3 left-0 w-full pr-4 text-right text-[10px] font-black uppercase tracking-tighter text-neutral-600 dark:text-neutral-600">
                   {format(addHours(startOfDay(currentDate), hour), "H:mm")}
@@ -231,7 +237,7 @@ export function WeekView({
                   {hoursToRender.map((hour) => (
                     <div
                       key={hour}
-                      className="h-24 border-b border-dark-400 dark:border-white/5"
+                      className="h-32 border-b border-dark-400 dark:border-white/5"
                     />
                   ))}
                 </div>
@@ -242,7 +248,7 @@ export function WeekView({
                     style={{ top: `${nowTop}px` }}
                   >
                     <div className="relative flex items-center">
-                      <div className="absolute -left-[54px] z-40 rounded-full bg-rose-500/10 px-1.5 py-0.5 backdrop-blur-sm ring-1 ring-rose-500/20">
+                      <div className="absolute -left-[54px] z-40 rounded-full bg-rose-500/10 px-1.5 py-0.5 ring-1 ring-rose-500/20 backdrop-blur-sm">
                         <span className="text-[9px] font-black uppercase tracking-tighter text-rose-600 dark:text-rose-400">
                           Hiện tại
                         </span>
@@ -270,27 +276,35 @@ export function WeekView({
                           <div
                             key={`slot-${hour}`}
                             onClick={() => handleTimeSlotClick(day, hour)}
-                            className="h-24 cursor-pointer transition-colors hover:bg-blue-100/30 dark:hover:bg-blue-900/20"
+                            className="h-32 cursor-pointer transition-colors hover:bg-blue-100/30 dark:hover:bg-blue-900/20"
                           />
                         ))}
                       </div>
 
                       {(() => {
-                        const renderedEntries = dayEntries.filter(e => (overlapInfoMap.get(e.id)?.overlapIndex ?? 0) < 2);
-                        const hiddenEntries = dayEntries.filter(e => (overlapInfoMap.get(e.id)?.overlapIndex ?? 0) >= 2);
+                        const renderedEntries = dayEntries.filter(
+                          (e) =>
+                            (overlapInfoMap.get(e.id)?.overlapIndex ?? 0) < 2,
+                        );
+                        const hiddenEntries = dayEntries.filter(
+                          (e) =>
+                            (overlapInfoMap.get(e.id)?.overlapIndex ?? 0) >= 2,
+                        );
                         const hiddenCount = hiddenEntries.length;
-                        
+
                         // Calculate Y position for badge: position at the top of the first hidden task
                         const firstHidden = hiddenEntries[0];
-                        const hourHeight = 96;
+                        const hourHeight = 128;
                         const badgeTop = firstHidden
                           ? (() => {
                               const d = new Date(firstHidden.date);
-                              return (d.getHours() - startHour) * hourHeight + (d.getMinutes() * hourHeight) / 60;
+                              return (
+                                (d.getHours() - startHour) * hourHeight +
+                                (d.getMinutes() * hourHeight) / 60
+                              );
                             })()
                           : 8;
 
-                        
                         return (
                           <>
                             {renderedEntries.map((entry, index) => {
@@ -302,12 +316,14 @@ export function WeekView({
                                   onClick={onTaskClick}
                                   variant="DETAILED"
                                   isPositioned={true}
-                                  totalOverlap={Math.min(overlapInfo?.totalOverlap ?? 1, 2)}
+                                  totalOverlap={Math.min(
+                                    overlapInfo?.totalOverlap ?? 1,
+                                    2,
+                                  )}
                                   overlapIndex={overlapInfo?.overlapIndex}
                                   index={index}
                                   startHour={startHour}
                                 />
-
                               );
                             })}
                             {hiddenCount > 0 && (
@@ -320,7 +336,10 @@ export function WeekView({
                                   e.stopPropagation();
                                   setPopoverDay(day);
                                 }}
-                                style={{ top: `${badgeTop + 4}px`, right: "4px" }}
+                                style={{
+                                  top: `${badgeTop + 4}px`,
+                                  right: "4px",
+                                }}
                                 className="absolute z-[250] flex h-7 w-fit items-center gap-1.5 rounded-full border border-blue-200 bg-white/95 px-2.5 py-1 shadow-lg backdrop-blur-md transition-all hover:bg-blue-50 dark:border-white/10 dark:bg-neutral-800/95"
                               >
                                 <span className="relative flex h-1.5 w-1.5">

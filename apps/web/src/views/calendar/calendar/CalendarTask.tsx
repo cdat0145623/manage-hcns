@@ -133,7 +133,7 @@ export function CalendarTask({
       top: `${top}px`,
       height: `${height}px`,
       left: `${leftPercent}%`,
-      width: `${widthPercent - 0.5}%`,
+      width: maxLanes > 1 ? `calc(${widthPercent}% - 4px)` : "100%",
       zIndex: (isVirtual ? 5 : 10) + overlapIndex,
       display: isHidden ? "none" : "flex",
     };

@@ -38,7 +38,7 @@ export interface CalendarEntry {
   date: Date;
   startDate: Date;
   endDate: Date;
-  status?: "pending" | "done" | "missed";
+  status?: "pending" | "done" | "missed" | "draft" | "waiting_approval" | "approved" | "rejected" | "waiting_evaluation" | "completed";
   color: string;
   duration: number;
   type: "VIRTUAL" | "INSTANCE";

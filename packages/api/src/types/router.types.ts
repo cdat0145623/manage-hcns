@@ -11,3 +11,4 @@ export type NewCardInput = RouterInputs["card"]["create"];
 export type NewBoardInput = RouterInputs["board"]["create"];
 export type InviteMemberInput = RouterInputs["member"]["invite"];
 export type ActivityType = NonNullable<GetCardByIdOutput>["activities"][number]["type"];
+export type GetAllBoardsByUserIdOutput = RouterOutputs["board"]["allByUserId"];

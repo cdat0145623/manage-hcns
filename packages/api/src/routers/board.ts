@@ -89,6 +89,66 @@ export const boardRouter = createTRPCRouter({
 
       return result;
     }),
+  allByUserId: protectedProcedure
+    .meta({
+      openapi: {
+        method: "GET",
+        path: "/users/{userId}/boards",
+        summary: "Get all boards for a user",
+        description: "Retrieves all boards for a given user",
+        tags: ["Boards"],
+        protect: true,
+      },
+    })
+    .input(
+      z.object({
+        userId: z.string().min(12),
+        workspacePublicId: z.string().min(12),
+        archived: z.boolean().optional(),
+      }),
+    )
+    .output(
+      z.custom<Awaited<ReturnType<typeof boardRepo.getAllByUserId>>>(),
+    )
+    .query(async ({ ctx, input }) => {
+      const userId = ctx.user?.id;
+
+      if (!userId)
+        throw new TRPCError({
+          message: `User not authenticated`,
+          code: "UNAUTHORIZED",
+        });
+
+      const user = await userRepo.getById(ctx.db, input.userId);
+
+      if (!user)
+        throw new TRPCError({
+          message: `User with ID ${input.userId} not found`,
+          code: "NOT_FOUND",
+        });
+
+      const workspace = await workspaceRepo.getByPublicId(
+        ctx.db,
+        input.workspacePublicId,
+      );
+
+      if (!workspace)
+        throw new TRPCError({
+          message: `Workspace with public ID ${input.workspacePublicId} not found`,
+          code: "NOT_FOUND",
+        });
+
+      const result = await boardRepo.getAllByUserId(
+        ctx.db,
+        input.userId,
+        workspace.id,
+        {
+          archived: input.archived ?? false,
+        },
+      );
+
+      return result;
+    }),
   byId: protectedProcedure
     .meta({
       openapi: {

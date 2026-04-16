@@ -63,6 +63,70 @@ export const getAllForPublic = async (
   return boardsData;
 };
 
+export const getAllByUserId = async (
+  db: dbClient,
+  userId: string,
+  workspaceId: number,
+  opts?: { archived?: boolean },
+) => {
+  const boardsData = await db.query.boards.findMany({
+    columns: {
+      publicId: true,
+      name: true,
+      isTemplateDefault: true,
+    },
+    with: {
+      userFavorites: {
+        where: eq(userBoardFavorites.userId, userId),
+        columns: {
+          userId: true,
+        },
+      },
+      lists: {
+        columns: {
+          publicId: true,
+          name: true,
+          index: true,
+        },
+        orderBy: [asc(lists.index)],
+      },
+      labels: {
+        columns: {
+          publicId: true,
+          name: true,
+          colourCode: true,
+        },
+      },
+      user: {
+        columns: {
+          name: true,
+        },
+      }
+    },
+    where: and(
+      eq(boards.workspaceId, workspaceId),
+      isNull(boards.deletedAt),
+      eq(boards.createdBy, userId),
+      opts?.archived !== undefined ? eq(boards.isArchived, opts.archived) : undefined,
+    ),
+  });
+
+  return boardsData
+    .map((board) => ({
+      ...board,
+      favorite: board.userFavorites.length > 0,
+      userFavorites: undefined,
+      isTemplateDefault: board.isTemplateDefault,
+    }))
+    .sort((a, b) => {
+      // Sort favorites first
+      if (a.favorite && !b.favorite) return -1;
+      if (!a.favorite && b.favorite) return 1;
+      // Then alphabetically by name
+      return a.name.localeCompare(b.name);
+    });
+};
+
 export const getAllByWorkspaceId = async (
   db: dbClient,
   workspaceId: number,

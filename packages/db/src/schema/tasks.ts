@@ -16,7 +16,17 @@ import { users } from "./users";
 import { cards } from "./cards";
 import { checklists } from "./checklists";
 
-export const statusTypeEnum = pgEnum("statusType", ["pending", "done", "missed"]);
+export const statusTypeEnum = pgEnum("statusType", [
+  "pending",
+  "done",
+  "missed",
+  "draft",
+  "waiting_approval",
+  "approved",
+  "rejected",
+  "waiting_evaluation",
+  "completed"
+]);
 export const fileActivityTypeEnum = pgEnum("file_activity_type", [
   "file_uploaded",
   "file_deleted",

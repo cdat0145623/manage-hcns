@@ -407,6 +407,20 @@
       "when": 1776224339050,
       "tag": "20260415_updateColumnInWorkspaceRoles",
       "breakpoints": true
+    },
+    {
+      "idx": 58,
+      "version": "7",
+      "when": 1776313449270,
+      "tag": "20260416_addStatusType",
+      "breakpoints": true
+    },
+    {
+      "idx": 59,
+      "version": "7",
+      "when": 1776313449287,
+      "tag": "20260416042408_ancient_red_ghost",
+      "breakpoints": true
     }
   ]
 }

@@ -30,7 +30,7 @@ interface EventDetailModalProps {
   isDeleting?: boolean;
 }
 
-type TaskStatus = "pending" | "done" | "missed";
+type TaskStatus = "pending" | "done" | "missed" | "draft" | "waiting_approval" | "approved" | "rejected" | "waiting_evaluation" | "completed";
 
 const STATUS_CONFIG: Record<
   TaskStatus,

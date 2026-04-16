@@ -108,15 +108,15 @@ export const rewardConfigRouter = createTRPCRouter({
   upsert: protectedProcedure
     .input(upsertConfigSchema)
     .mutation(async ({ ctx, input }) => {
-    //   const userId = ctx.user?.id;
+      const userId = ctx.user?.id;
 
-    //   if (!userId) {
-    //     throw new TRPCError({
-    //       message: "User not authenticated",
-    //       code: "UNAUTHORIZED",
-    //     });
-    //   }
-const userId = "c326499c-be94-419b-8d10-08dac6442e49"
+      if (!userId) {
+        throw new TRPCError({
+          message: "User not authenticated",
+          code: "UNAUTHORIZED",
+        });
+      }
+
       const { cardPublicId, rewardType, bonusAmount, currency, deductions } = input;
       const now = new Date();
 
@@ -277,10 +277,7 @@ const userId = "c326499c-be94-419b-8d10-08dac6442e49"
         throw new TRPCError({ code: "NOT_FOUND", message: "Không tìm thấy cấu hình." });
       }
 
-      if (
-        config.createdBy !== userId &&
-        !["AREA_MANAGER", "BRANCH_MANAGER", "ADMIN"].includes(user.role)
-      ) {
+      if (config.createdBy !== userId) {
         throw new TRPCError({ code: "FORBIDDEN", message: "Bạn không có quyền submit cấu hình này." });
       }
 
@@ -332,10 +329,7 @@ const userId = "c326499c-be94-419b-8d10-08dac6442e49"
         throw new TRPCError({ code: "NOT_FOUND", message: "Không tìm thấy cấu hình." });
       }
 
-      if (
-        config.createdBy !== userId &&
-        !["AREA_MANAGER", "BRANCH_MANAGER", "ADMIN"].includes(user.role)
-      ) {
+      if (config.createdBy !== userId) {
         throw new TRPCError({ code: "FORBIDDEN", message: "Bạn không có quyền rút lại cấu hình này." });
       }
 
@@ -432,19 +426,36 @@ const userId = "c326499c-be94-419b-8d10-08dac6442e49"
           throw new TRPCError({ code: "NOT_FOUND", message: "Không tìm thấy thẻ liên kết." });
         }
 
-        await tx.insert(cardRewardSnapshots).values({
-          configId: input.configId,
-          snappedCardTitle: card.title,
-          snappedStartDate: card.startDate,
-          snappedDueDate: card.dueDate,
-          snappedTargetUser: card.targetUser,
-          snappedRewardType: config.rewardType,
-          snappedBonusAmount: config.bonusAmount,
-          snappedCurrency: config.currency ?? "VND",
-          snappedDeductions: deductions,
-          snapshotAt: now,
-          snapshotBy: userId,
-        });
+        await tx
+          .insert(cardRewardSnapshots)
+          .values({
+            configId: input.configId,
+            snappedCardTitle: card.title,
+            snappedStartDate: card.startDate,
+            snappedDueDate: card.dueDate,
+            snappedTargetUser: card.targetUser,
+            snappedRewardType: config.rewardType,
+            snappedBonusAmount: config.bonusAmount,
+            snappedCurrency: config.currency ?? "VND",
+            snappedDeductions: deductions,
+            snapshotAt: now,
+            snapshotBy: userId,
+          })
+          .onConflictDoUpdate({
+            target: cardRewardSnapshots.configId,
+            set: {
+              snappedCardTitle: card.title,
+              snappedStartDate: card.startDate,
+              snappedDueDate: card.dueDate,
+              snappedTargetUser: card.targetUser,
+              snappedRewardType: config.rewardType,
+              snappedBonusAmount: config.bonusAmount,
+              snappedCurrency: config.currency ?? "VND",
+              snappedDeductions: deductions,
+              snapshotAt: now,
+              snapshotBy: userId,
+            },
+          });
       });
 
       return { success: true };

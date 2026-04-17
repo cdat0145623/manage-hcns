@@ -14,6 +14,7 @@ interface SelectProps {
   options: Option[];
   disabled?: boolean;
   className?: string;
+  buttonClassName?: string;
 }
 
 export default function Select({
@@ -22,13 +23,14 @@ export default function Select({
   options,
   disabled,
   className = "",
+  buttonClassName = "",
 }: SelectProps) {
   const selected = options.find((opt) => opt.value === value) || options[0];
 
   return (
     <Listbox value={value} onChange={onChange} disabled={disabled}>
       <div className={`relative ${className}`}>
-        <Listbox.Button className="relative w-full cursor-pointer rounded-xl border border-light-200 bg-white py-2.5 pl-4 pr-10 text-left text-sm font-medium outline-none transition-all hover:border-emerald-500/50 focus:border-emerald-500 focus:ring-[3px] focus:ring-emerald-500/10 dark:border-dark-300/50 dark:bg-dark-200 dark:text-white dark:focus:border-emerald-500/50">
+        <Listbox.Button className={`relative w-full cursor-pointer rounded-xl border border-light-200 bg-white py-2.5 pl-4 pr-10 text-left text-sm font-medium outline-none transition-all hover:border-emerald-500/50 focus:border-emerald-500 focus:ring-[3px] focus:ring-emerald-500/10 dark:border-dark-300/50 dark:bg-dark-200 dark:text-white dark:focus:border-emerald-500/50 ${buttonClassName}`}>
           <span className="block truncate">{selected?.label}</span>
           <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
             <HiChevronUpDown

@@ -11,6 +11,8 @@ import {
   cardRewardSnapshots,
   cardRewardLogs,
   cardRewardFinalizations,
+  lists,
+  boards,
 } from "@kan/db/schema";
 import * as userRepo from "@kan/db/repository/user.repo";
 import * as cardActivityRepo from "@kan/db/repository/cardActivity.repo";
@@ -71,6 +73,115 @@ function assertEditable(
   }
 }
 
+type ViolationCandidate = {
+  violationType: string;
+  beforeValue: unknown;
+  afterValue: unknown;
+};
+ 
+// ─── Helper: detect violations ────────────────────────────────────────────────
+// Tách ra function riêng để dùng chung giữa preview và approve.
+ 
+function detectViolations(params: {
+  card: { title: string; startDate: Date | null; dueDate: Date | null; targetUser: string | null };
+  config: { rewardType: string; bonusAmount: string | null; currency: string | null };
+  snapshot: {
+    snappedStartDate: Date | null;
+    snappedDueDate: Date | null;
+    snappedTargetUser: string | null;
+    snappedRewardType: string;
+    snappedBonusAmount: string | null;
+    snappedCurrency: string;
+    snappedDeductions: unknown;
+  };
+  currentDeductions: Array<{ reason: string; unitType: string; value: string; displayOrder: number }>;
+}): ViolationCandidate[] {
+  const { card, config, snapshot, currentDeductions } = params;
+  const candidates: ViolationCandidate[] = [];
+ 
+  // 1. Deadline extended
+  if (card.dueDate && snapshot.snappedDueDate) {
+    if (card.dueDate.getTime() > snapshot.snappedDueDate.getTime()) {
+      candidates.push({
+        violationType: "deadline_extended",
+        beforeValue: snapshot.snappedDueDate.toISOString(),
+        afterValue: card.dueDate.toISOString(),
+      });
+    } else if (card.dueDate.getTime() < snapshot.snappedDueDate.getTime()) {
+      candidates.push({
+        violationType: "deadline_shortened",
+        beforeValue: snapshot.snappedDueDate.toISOString(),
+        afterValue: card.dueDate.toISOString(),
+      });
+    }
+  }
+ 
+  // 2. Start date changed
+  if (card.startDate) {
+    if (
+      !snapshot.snappedStartDate ||
+      card.startDate.getTime() !== snapshot.snappedStartDate.getTime()
+    ) {
+      candidates.push({
+        violationType: "start_date_changed",
+        beforeValue: snapshot.snappedStartDate?.toISOString() ?? null,
+        afterValue: card.startDate.toISOString(),
+      });
+    }
+  }
+ 
+  // 3. Assignee changed
+  if (card.targetUser !== snapshot.snappedTargetUser) {
+    candidates.push({
+      violationType: "assignee_changed",
+      beforeValue: { targetUser: snapshot.snappedTargetUser },
+      afterValue: { targetUser: card.targetUser },
+    });
+  }
+ 
+  // 4. Reward config changed (chỉ ghi nhận để audit, không nhất thiết trừ tiền)
+  if (
+    config.rewardType !== snapshot.snappedRewardType ||
+    String(config.bonusAmount) !== String(snapshot.snappedBonusAmount) ||
+    config.currency !== snapshot.snappedCurrency
+  ) {
+    candidates.push({
+      violationType: "reward_config_changed",
+      beforeValue: {
+        rewardType: snapshot.snappedRewardType,
+        bonusAmount: snapshot.snappedBonusAmount,
+        currency: snapshot.snappedCurrency,
+      },
+      afterValue: {
+        rewardType: config.rewardType,
+        bonusAmount: config.bonusAmount,
+        currency: config.currency,
+      },
+    });
+  }
+ 
+  // 5. Deductions changed
+  type SnappedItem = { reason: string; unitType: string; value: string; displayOrder: number };
+  const snapped = (snapshot.snappedDeductions as SnappedItem[] | null) ?? [];
+  const isDiff =
+    snapped.length !== currentDeductions.length ||
+    snapped.some(
+      (sd, i) =>
+        sd.reason !== currentDeductions[i]?.reason ||
+        String(sd.value) !== String(currentDeductions[i]?.value) ||
+        sd.unitType !== currentDeductions[i]?.unitType
+    );
+  if (isDiff) {
+    candidates.push({
+      violationType: "deduction_changed",
+      beforeValue: snapped,
+      afterValue: currentDeductions,
+    });
+  }
+ 
+  return candidates;
+}
+
 export const rewardConfigRouter = createTRPCRouter({
   // ───────────────────────────────────────────────────────────────────────────
   // [QUERY] Lấy config (kèm deductions) theo cardId
@@ -106,6 +217,64 @@ export const rewardConfigRouter = createTRPCRouter({
         });
 
         return { ...config, deductions, snapshot: snapshot ?? null };
+    }),
+
+  // ───────────────────────────────────────────────────────────────────────────
+  // [QUERY] Lấy danh sách config đang chờ duyệt của board
+  // ───────────────────────────────────────────────────────────────────────────
+  getPendingApprovals: protectedProcedure
+    .input(
+      z.object({
+        boardPublicId: z.string().min(1),
+        selectedUserId: z.string().optional(),
+      })
+    )
+    .query(async ({ ctx, input }) => {
+      const board = await ctx.db.query.boards.findFirst({
+        where: eq(boards.publicId, input.boardPublicId),
+      });
+
+      if (!board) {
+        throw new TRPCError({
+          message: "Board not found",
+          code: "NOT_FOUND",
+        });
+      }
+
+      const queryParams: any = [
+        eq(cardRewardConfigs.approvalStatus, "waiting_approval"),
+        eq(lists.boardId, board.id),
+      ];
+
+      if (input.selectedUserId) {
+        queryParams.push(eq(cards.targetUser, input.selectedUserId));
+      }
+
+      const pendingConfigs = await ctx.db
+        .select({
+          config: cardRewardConfigs,
+        })
+        .from(cardRewardConfigs)
+        .innerJoin(cards, eq(cardRewardConfigs.cardId, cards.id))
+        .innerJoin(lists, eq(cards.listId, lists.id))
+        .where(and(...queryParams));
+
+      const results = [];
+
+      for (const { config } of pendingConfigs) {
+        const deductions = await ctx.db.query.cardRewardDeductions.findMany({
+          where: eq(cardRewardDeductions.configId, config.id),
+          orderBy: (t, { asc }) => [asc(t.displayOrder)],
+        });
+
+        const snapshot = await ctx.db.query.cardRewardSnapshots.findFirst({
+          where: eq(cardRewardSnapshots.configId, config.id),
+        });
+
+        results.push({ ...config, deductions, snapshot: snapshot ?? null });
+      }
+
+      return results;
     }),
 
   // ───────────────────────────────────────────────────────────────────────────
@@ -395,22 +564,123 @@ export const rewardConfigRouter = createTRPCRouter({
       return { success: true };
     }),
 
+// ───────────────────────────────────────────────────────────────────────────
+  // BƯỚC 1: Preview violations
+  //
+  // Admin gọi trước khi bấm Approve để xem danh sách vi phạm.
+  // Server detect violations so với snapshot cũ (nếu có), trả về:
+  //   - violations: danh sách vi phạm phát hiện được
+  //   - availableDeductions: danh sách deduction hiện tại để Admin chọn map
+  //
+  // FE dùng data này để render UI cho Admin:
+  //   - Mỗi violation → dropdown chọn deductionId (hoặc "không áp dụng")
+  //   - Checkbox "Bỏ qua (isSkipped)"
+  //
+  // Không ghi gì vào DB ở bước này.
   // ───────────────────────────────────────────────────────────────────────────
-  // [MUTATION] Approve: WAITING_APPROVAL → APPROVED
-  // Quyền: admin only
-  // Side-effect: trigger snapshot (gọi service riêng)
+  previewViolations: protectedProcedure
+    .input(z.object({ configId: z.number().int().positive() }))
+    .query(async ({ ctx, input }) => {
+      const userId = ctx.user?.id;
+
+      if (!userId) {
+        throw new TRPCError({
+          message: "User not authenticated",
+          code: "UNAUTHORIZED",
+        });
+      }
+
+      const config = await ctx.db.query.cardRewardConfigs.findFirst({
+        where: eq(cardRewardConfigs.id, input.configId),
+      });
+      if (!config) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Không tìm thấy cấu hình." });
+      }
+      if (config.approvalStatus !== "waiting_approval") {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Chỉ xem preview khi config đang ở waiting_approval.",
+        });
+      }
+ 
+      const [card, currentDeductions, existingSnapshot] = await Promise.all([
+        ctx.db.query.cards.findFirst({ where: eq(cards.id, config.cardId) }),
+        ctx.db.query.cardRewardDeductions.findMany({
+          where: eq(cardRewardDeductions.configId, input.configId),
+          orderBy: (t, { asc }) => [asc(t.displayOrder)],
+        }),
+        ctx.db.query.cardRewardSnapshots.findFirst({
+          where: eq(cardRewardSnapshots.configId, input.configId),
+        }),
+      ]);
+ 
+      if (!card) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Không tìm thấy card." });
+      }
+ 
+      // Chưa có snapshot → lần approve đầu tiên, không có violation cũ
+      const violations = existingSnapshot
+        ? detectViolations({ card, config, snapshot: existingSnapshot, currentDeductions })
+        : [];
+ 
+      return {
+        /**
+         * Danh sách vi phạm phát hiện so với snapshot cũ.
+         * Mỗi item chứa violationType, beforeValue, afterValue.
+         * FE dùng violationType để hiển thị label thân thiện.
+         */
+        violations,
+        /**
+         * Danh sách deduction hiện tại để Admin map vào từng violation.
+         * FE render dropdown: "Vi phạm X → áp dụng deduction nào?"
+         */
+        availableDeductions: currentDeductions.map((d) => ({
+          id: d.id,
+          reason: d.reason,
+          unitType: d.unitType,
+          value: d.value,
+          displayOrder: d.displayOrder,
+        })),
+        /** Thông tin card hiện tại để Admin đối chiếu */
+        cardSnapshot: {
+          title: card.title,
+          startDate: card.startDate,
+          dueDate: card.dueDate,
+          targetUser: card.targetUser,
+        },
+      };
+    }),
+ 
+  // ───────────────────────────────────────────────────────────────────────────
+  // BƯỚC 2: Approve (chính thức)
+  //
+  // FE gửi lên quyết định của Admin cho từng violation:
+  //   logDecisions: [
+  //     { violationType: "deadline_extended", deductionId: 5, isSkipped: false },
+  //     { violationType: "assignee_changed",  deductionId: null, isSkipped: true },
+  //   ]
+  //
+  // Server:
+  //   1. Re-detect violations (không tin FE — server is source of truth)
+  //   2. Ghi card_reward_logs với deductionId + isSkipped từ Admin
+  //   3. Upsert snapshot mới
+  //   4. Update approvalStatus → approved
   // ───────────────────────────────────────────────────────────────────────────
   approve: protectedProcedure
-    .input(z.object({ 
-      configId: z.number().int().positive(),
-      violationDecisions: z.array(
-        z.object({
-          violationType: z.string(),
-          isSkipped: z.boolean().default(false),
-          deductionId: z.number().int().positive().optional(),
-        })
-      ).optional()
-    }))
+    .input(
+      z.object({
+        configId: z.number().int().positive(),
+        logDecisions: z
+          .array(
+            z.object({
+              violationType: z.string(),
+              deductionId: z.number().int().positive().nullable().optional(),
+              isSkipped: z.boolean().default(false),
+            })
+          )
+          .default([]),
+      })
+    )
     .mutation(async ({ ctx, input }) => {
       const userId = ctx.user?.id;
 
@@ -421,130 +691,73 @@ export const rewardConfigRouter = createTRPCRouter({
         });
       }
 
-      const user = await userRepo.getById(ctx.db, userId);
-
-      if (!user) {
-        throw new TRPCError({
-          message: "User not found",
-          code: "NOT_FOUND",
-        });
-      }
-
-      if (user.role !== "ADMIN") {
-        throw new TRPCError({
-          message: "User is not admin",
-          code: "UNAUTHORIZED",
-        });
-      }
-
       const config = await ctx.db.query.cardRewardConfigs.findFirst({
         where: eq(cardRewardConfigs.id, input.configId),
       });
-
       if (!config) {
         throw new TRPCError({ code: "NOT_FOUND", message: "Không tìm thấy cấu hình." });
       }
-
       if (config.approvalStatus !== "waiting_approval") {
         throw new TRPCError({
           code: "BAD_REQUEST",
           message: `Chỉ có thể duyệt khi đang ở trạng thái waiting_approval (hiện tại: ${config.approvalStatus}).`,
         });
       }
-
+ 
       const now = new Date();
-
+ 
       await ctx.db.transaction(async (tx) => {
-        // 1. Update status → approved
-        await tx
-          .update(cardRewardConfigs)
-          .set({
-            approvalStatus: "approved",
-            approvedBy: userId,
-            approvedAt: now,
-            rejectedReason: null, // xóa lý do reject cũ nếu có
-            updatedAt: now,
-          })
-          .where(eq(cardRewardConfigs.id, input.configId));
-
-        // 2. Tạo Snapshot
-        //    Lấy thông tin card gốc từ DB và toàn bộ deductions hiện tại để bake vào JSON.
-        const deductions = await tx.query.cardRewardDeductions.findMany({
-          where: eq(cardRewardDeductions.configId, input.configId),
-          orderBy: (t, { asc }) => [asc(t.displayOrder)],
-        });
-
-        const card = await tx.query.cards.findFirst({
-          where: eq(cards.id, config.cardId),
-        });
-
+        const [card, currentDeductions, existingSnapshot] = await Promise.all([
+          tx.query.cards.findFirst({ where: eq(cards.id, config.cardId) }),
+          tx.query.cardRewardDeductions.findMany({
+            where: eq(cardRewardDeductions.configId, input.configId),
+            orderBy: (t, { asc }) => [asc(t.displayOrder)],
+          }),
+          tx.query.cardRewardSnapshots.findFirst({
+            where: eq(cardRewardSnapshots.configId, input.configId),
+          }),
+        ]);
+ 
         if (!card) {
-          throw new TRPCError({ code: "NOT_FOUND", message: "Không tìm thấy thẻ liên kết." });
+          throw new TRPCError({ code: "NOT_FOUND", message: "Không tìm thấy card." });
         }
-
-        // 2.5 Sinh logs (violations) trước khi snapshot mới ghi đè
-        const snapshot = await tx.query.cardRewardSnapshots.findFirst({
-          where: eq(cardRewardSnapshots.configId, input.configId),
-        });
-
-        if (snapshot) {
-          const candidates: { violationType: string; beforeValue: unknown; afterValue: unknown }[] = [];
-
-          // deadline_extended / shortened
-          if (card.dueDate !== null && card.dueDate !== undefined) {
-            const snappedDue = snapshot.snappedDueDate;
-            if (snappedDue) {
-              if (card.dueDate.getTime() > snappedDue.getTime()) {
-                candidates.push({ violationType: "deadline_extended", beforeValue: snappedDue.toISOString(), afterValue: card.dueDate.toISOString() });
-              } else if (card.dueDate.getTime() < snappedDue.getTime()) {
-                candidates.push({ violationType: "deadline_shortened", beforeValue: snappedDue.toISOString(), afterValue: card.dueDate.toISOString() });
-              }
-            }
-          }
-
-          // start_date_changed
-          if (card.startDate !== null && card.startDate !== undefined) {
-            const snappedStart = snapshot.snappedStartDate;
-            if (!snappedStart || card.startDate.getTime() !== snappedStart.getTime()) {
-              candidates.push({ violationType: "start_date_changed", beforeValue: snappedStart?.toISOString() ?? null, afterValue: card.startDate.toISOString() });
-            }
-          }
-
-          // assignee_changed
-          if (card.targetUser !== snapshot.snappedTargetUser) {
-            candidates.push({ violationType: "assignee_changed", beforeValue: { targetUser: snapshot.snappedTargetUser }, afterValue: { targetUser: card.targetUser } });
-          }
-
-          // reward_config_changed
-          if (config.rewardType !== snapshot.snappedRewardType || config.bonusAmount !== snapshot.snappedBonusAmount || config.currency !== snapshot.snappedCurrency) {
-            candidates.push({ violationType: "reward_config_changed", beforeValue: { rewardType: snapshot.snappedRewardType, bonusAmount: snapshot.snappedBonusAmount, currency: snapshot.snappedCurrency }, afterValue: { rewardType: config.rewardType, bonusAmount: config.bonusAmount, currency: config.currency } });
-          }
-
-          // deduction_changed
-          type SnappedDeductionItem = { reason: string; unitType: "percent" | "vnd"; value: string; displayOrder: number };
-          const snappedDeds = (snapshot.snappedDeductions as SnappedDeductionItem[] | null) ?? [];
-          const isDedsDifferent = snappedDeds.length !== deductions.length || snappedDeds.some((sd, i) => sd.reason !== deductions[i]?.reason || String(sd.value) !== String(deductions[i]?.value) || sd.unitType !== deductions[i]?.unitType);
-          
-          if (isDedsDifferent) {
-            candidates.push({ violationType: "deduction_changed", beforeValue: { count: snappedDeds.length, deductions: snappedDeds }, afterValue: { count: deductions.length, deductions } });
-          }
-
-          if (candidates.length > 0) {
-            await tx.insert(cardRewardLogs).values(candidates.map((c) => {
-              const decision = input.violationDecisions?.find((d) => d.violationType === c.violationType);
+ 
+        // ── 1. Re-detect violations phía server ───────────────────────────────
+        // Server không tin FE tự sinh violationType.
+        // FE chỉ được gửi decision (deductionId + isSkipped) cho từng type
+        // mà server đã announce ở bước previewViolations.
+        const violations = existingSnapshot
+          ? detectViolations({ card, config, snapshot: existingSnapshot, currentDeductions })
+          : [];
+ 
+        // ── 2. Ghi logs với quyết định của Admin ─────────────────────────────
+        if (violations.length > 0) {
+          // Build lookup map: violationType → decision của Admin
+          const decisionMap = new Map(
+            input.logDecisions.map((d) => [d.violationType, d])
+          );
+ 
+          await tx.insert(cardRewardLogs).values(
+            violations.map((v) => {
+              const decision = decisionMap.get(v.violationType);
               return {
                 configId: input.configId,
-                violationType: c.violationType as any,
-                beforeValue: c.beforeValue,
-                afterValue: c.afterValue,
+                violationType: v.violationType as any,
+                beforeValue: v.beforeValue,
+                afterValue: v.afterValue,
                 detectedAt: now,
+                // Nếu Admin skip → deductionId = null dù có truyền lên hay không
                 isSkipped: decision?.isSkipped ?? false,
-                deductionId: decision?.deductionId ?? null,
+                deductionId:
+                  decision?.isSkipped
+                    ? null
+                    : (decision?.deductionId ?? null),
               };
-            }));
-          }
+            })
+          );
         }
-
+ 
+        // ── 3. Upsert snapshot ────────────────────────────────────────────────
         await tx
           .insert(cardRewardSnapshots)
           .values({
@@ -556,7 +769,7 @@ export const rewardConfigRouter = createTRPCRouter({
             snappedRewardType: config.rewardType,
             snappedBonusAmount: config.bonusAmount,
             snappedCurrency: config.currency ?? "VND",
-            snappedDeductions: deductions,
+            snappedDeductions: currentDeductions,
             snapshotAt: now,
             snapshotBy: userId,
           })
@@ -570,15 +783,28 @@ export const rewardConfigRouter = createTRPCRouter({
               snappedRewardType: config.rewardType,
               snappedBonusAmount: config.bonusAmount,
               snappedCurrency: config.currency ?? "VND",
-              snappedDeductions: deductions,
+              snappedDeductions: currentDeductions,
               snapshotAt: now,
               snapshotBy: userId,
             },
           });
+ 
+        // ── 4. Update status → approved ───────────────────────────────────────
+        await tx
+          .update(cardRewardConfigs)
+          .set({
+            approvalStatus: "approved",
+            approvedBy: userId,
+            approvedAt: now,
+            rejectedReason: null,
+            updatedAt: now,
+          })
+          .where(eq(cardRewardConfigs.id, input.configId));
       });
-
+ 
       return { success: true };
     }),
+
 
   // ───────────────────────────────────────────────────────────────────────────
   // [MUTATION] Reject: WAITING_APPROVAL → REJECTED

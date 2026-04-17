@@ -421,6 +421,13 @@
       "when": 1776313449287,
       "tag": "20260416042408_ancient_red_ghost",
       "breakpoints": true
+    },
+    {
+      "idx": 60,
+      "version": "7",
+      "when": 1776389929981,
+      "tag": "20260417013849_parallel_reptil",
+      "breakpoints": true
     }
   ]
 }

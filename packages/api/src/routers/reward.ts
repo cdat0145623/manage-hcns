@@ -8,8 +8,11 @@ import {
   cards,
   cardRewardConfigs,
   cardRewardDeductions,
+  cardRewardSnapshots,
 } from "@kan/db/schema";
 import * as userRepo from "@kan/db/repository/user.repo";
+import * as cardActivityRepo from "@kan/db/repository/cardActivity.repo";
+import { logConfigAudit } from "../utils/rewardViolation";
 
 const deductionItemSchema = z.object({
   id: z.number().optional(),
@@ -96,7 +99,11 @@ export const rewardConfigRouter = createTRPCRouter({
             orderBy: (t, { asc }) => [asc(t.displayOrder)],
         });
 
-        return { ...config, deductions };
+        const snapshot = await ctx.db.query.cardRewardSnapshots.findFirst({
+            where: eq(cardRewardSnapshots.configId, config.id),
+        });
+
+        return { ...config, deductions, snapshot: snapshot ?? null };
     }),
 
   // ───────────────────────────────────────────────────────────────────────────
@@ -120,7 +127,8 @@ export const rewardConfigRouter = createTRPCRouter({
       const { cardPublicId, rewardType, bonusAmount, currency, deductions } = input;
       const now = new Date();
 
-      return ctx.db.transaction(async (tx) => {
+      // Main transaction: upsert config + deductions + insert card_activities
+      const txResult = await ctx.db.transaction(async (tx) => {
         const card = await tx.query.cards.findFirst({
           where: eq(cards.publicId, cardPublicId),
         });
@@ -181,11 +189,10 @@ export const rewardConfigRouter = createTRPCRouter({
           configId = existing.id;
         }
 
-        // 2. Upsert deductions (diff approach)
+        // Upsert deductions (diff approach)
         const incomingWithId = deductions.filter((d) => d.id != null);
         const incomingNew = deductions.filter((d) => d.id == null);
 
-        // Xóa các deduction không còn trong danh sách gửi lên
         const keepIds = incomingWithId.map((d) => d.id!);
         if (keepIds.length > 0) {
           await tx
@@ -193,7 +200,6 @@ export const rewardConfigRouter = createTRPCRouter({
             .where(
               and(
                 eq(cardRewardDeductions.configId, configId),
-                // Xóa những id KHÔNG nằm trong keepIds
                 sql`${cardRewardDeductions.id} NOT IN (${sql.join(
                   keepIds.map((id) => sql`${id}`),
                   sql`, `
@@ -201,13 +207,11 @@ export const rewardConfigRouter = createTRPCRouter({
               )
             );
         } else {
-          // Không giữ lại id nào → xóa hết
           await tx
             .delete(cardRewardDeductions)
             .where(eq(cardRewardDeductions.configId, configId));
         }
 
-        // Update các deduction đã có id
         for (const d of incomingWithId) {
           await tx
             .update(cardRewardDeductions)
@@ -226,7 +230,6 @@ export const rewardConfigRouter = createTRPCRouter({
             );
         }
 
-        // Insert các deduction mới
         if (incomingNew.length > 0) {
           await tx.insert(cardRewardDeductions).values(
             incomingNew.map((d) => ({
@@ -240,9 +243,51 @@ export const rewardConfigRouter = createTRPCRouter({
           );
         }
 
-        return { configId };
+        // Ghi card_activity để hiển thị trong feed
+        const activityEntries: Parameters<typeof cardActivityRepo.bulkCreate>[1] = [
+          {
+            type: "updated_reward_config" as const,
+            cardId: card.id,
+            createdBy: userId,
+            metadata: { configId, rewardType, bonusAmount: bonusAmount ?? null } as Record<string, unknown>,
+          },
+        ];
+        if (deductions.length > 0) {
+          activityEntries.push({
+            type: "updated_deduction" as const,
+            cardId: card.id,
+            createdBy: userId,
+            metadata: { configId, count: deductions.length } as Record<string, unknown>,
+          });
+        }
+        await cardActivityRepo.bulkCreate(tx, activityEntries);
+
+        return { configId, hasDeductions: deductions.length > 0 };
       });
+
+      // Fire-and-forget audit logs in card_reward_logs —
+      // triggered by the newly-inserted "updated_reward_config" / "updated_deduction" activities.
+      logConfigAudit({
+        db: ctx.db,
+        configId: txResult.configId,
+        violationType: "reward_config_changed",
+        beforeValue: null,
+        afterValue: { rewardType, bonusAmount: bonusAmount ?? null, currency },
+      }).catch(() => void 0);
+
+      if (txResult.hasDeductions) {
+        logConfigAudit({
+          db: ctx.db,
+          configId: txResult.configId,
+          violationType: "deduction_changed",
+          beforeValue: null,
+          afterValue: { count: deductions.length },
+        }).catch(() => void 0);
+      }
+
+      return { configId: txResult.configId };
     }),
+
 
   // ───────────────────────────────────────────────────────────────────────────
   // [MUTATION] Submit: DRAFT → WAITING_APPROVAL
@@ -527,7 +572,124 @@ export const rewardConfigRouter = createTRPCRouter({
 
       return { success: true };
     }),
-});
 
-// Import thêm để dùng trong approve (tránh circular)
-import { cardRewardSnapshots } from "@kan/db/schema";
+  // ───────────────────────────────────────────────────────────────────────────
+  // [MUTATION] Revert: Khôi phục Card về đúng Snapshot và tái-APPROVE config
+  // Quyền: member
+  // Khi nào dùng: Sau khi config bị auto-downgrade về DRAFT do vi phạm
+  // ───────────────────────────────────────────────────────────────────────────
+  revert: protectedProcedure
+    .input(z.object({ configId: z.number().int().positive() }))
+    .mutation(async ({ ctx, input }) => {
+      const userId = ctx.user?.id;
+
+      if (!userId) {
+        throw new TRPCError({ code: "UNAUTHORIZED", message: "User not authenticated" });
+      }
+
+      // const user = await userRepo.getById(ctx.db, userId);
+      // if (!user) {
+      //   throw new TRPCError({ code: "NOT_FOUND", message: "User not found" });
+      // }
+      // if (user.role !== "ADMIN") {
+      //   throw new TRPCError({ code: "UNAUTHORIZED", message: "Chỉ Admin mới được revert cấu hình." });
+      // }
+
+      return ctx.db.transaction(async (tx) => {
+        // 1. Lấy config — phải đang ở DRAFT (đã bị auto-downgrade)
+        const config = await tx.query.cardRewardConfigs.findFirst({
+          where: eq(cardRewardConfigs.id, input.configId),
+        });
+
+        if (!config) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Không tìm thấy cấu hình." });
+        }
+
+        if (config.approvalStatus !== "draft") {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: `Chỉ có thể revert khi config đang ở trạng thái draft (hiện tại: ${config.approvalStatus}).`,
+          });
+        }
+
+        // 2. Lấy snapshot (bản chụp tại thời điểm approve gần nhất)
+        const snapshot = await tx.query.cardRewardSnapshots.findFirst({
+          where: eq(cardRewardSnapshots.configId, input.configId),
+        });
+
+        if (!snapshot) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Không tìm thấy snapshot. Config chưa từng được approve.",
+          });
+        }
+
+        // 3. Kiểm tra card tồn tại
+        const card = await tx.query.cards.findFirst({
+          where: eq(cards.id, config.cardId),
+        });
+
+        if (!card) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Không tìm thấy thẻ liên kết." });
+        }
+
+        const now = new Date();
+
+        // 4. Khôi phục card về đúng giá trị trong snapshot
+        await tx
+          .update(cards)
+          .set({
+            title:      snapshot.snappedCardTitle,
+            startDate:  snapshot.snappedStartDate,
+            dueDate:    snapshot.snappedDueDate,
+            targetUser: snapshot.snappedTargetUser,
+            updatedAt:  now,
+          })
+          .where(eq(cards.id, config.cardId));
+
+        // 5. Khôi phục config fields + tái-approve (DRAFT → APPROVED)
+        //    Giữ nguyên approvedBy/approvedAt từ lần approve trước.
+        await tx
+          .update(cardRewardConfigs)
+          .set({
+            approvalStatus: "approved",
+            rewardType:     snapshot.snappedRewardType,
+            bonusAmount:    snapshot.snappedBonusAmount,
+            currency:       snapshot.snappedCurrency,
+            rejectedReason: null,
+            updatedAt:      now,
+          })
+          .where(eq(cardRewardConfigs.id, input.configId));
+
+        // 6. Khôi phục deductions: xóa hiện tại → insert lại từ snappedDeductions
+        await tx
+          .delete(cardRewardDeductions)
+          .where(eq(cardRewardDeductions.configId, input.configId));
+
+        type SnappedDeductionItem = {
+          reason: string;
+          unitType: "percent" | "vnd";
+          value: string;
+          displayOrder: number;
+        };
+        const snappedItems =
+          (snapshot.snappedDeductions as SnappedDeductionItem[] | null) ?? [];
+
+        if (snappedItems.length > 0) {
+          await tx.insert(cardRewardDeductions).values(
+            snappedItems.map((item, i) => ({
+              configId:     input.configId,
+              reason:       item.reason,
+              unitType:     item.unitType,
+              value:        item.value,
+              displayOrder: item.displayOrder ?? i,
+              createdAt:    now,
+            })),
+          );
+        }
+
+        return { success: true, restoredCardTitle: snapshot.snappedCardTitle };
+
+      });
+    }),
+});

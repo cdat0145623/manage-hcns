@@ -16,6 +16,11 @@ export type RewardViolationType =
   | "start_date_changed"
   | "assignee_changed";
 
+export type RewardConfigViolationType =
+  | "reward_config_changed"
+  | "deduction_changed"
+  | "finalization_created";
+
 interface ViolationCandidate {
   violationType: RewardViolationType;
   beforeValue: unknown;
@@ -26,16 +31,12 @@ interface ViolationCandidate {
  * Detects reward violations by comparing new card values against the snapshot
  * taken at approval time, then atomically downgrades the config to DRAFT.
  *
- * Concurrency model (no SELECT FOR UPDATE, no dedup query needed):
- *
- *   1. Compare new values vs snapshot → collect violation candidates
+ * Concurrency model:
+ *   1. Compare new values vs snapshot → collect candidates
  *   2. Attempt atomic downgrade:
  *        UPDATE … WHERE approvalStatus = 'approved' RETURNING id
- *   3. If RETURNING returns a row → we won the race → insert all logs
- *      If RETURNING returns nothing → another request already downgraded → skip
- *
- * Only the first concurrent request can succeed the downgrade; all subsequent
- * requests find status ≠ 'approved' and exit cleanly at step 1 or step 2.
+ *   3. If RETURNING returns a row → won the race → bulk-insert all logs
+ *      If RETURNING returns nothing → already downgraded → skip
  */
 export async function trackCardRewardViolations({
   db,
@@ -46,11 +47,8 @@ export async function trackCardRewardViolations({
 }: {
   db: dbClient;
   cardId: number;
-  /** Pass when dueDate was changed in this request. */
   newDueDate?: Date | null;
-  /** Pass when startDate was changed in this request. */
   newStartDate?: Date | null;
-  /** Pass when a workspace member was added or removed. */
   memberAction?: {
     workspaceMemberId: number;
     action: "added" | "removed";
@@ -62,22 +60,19 @@ export async function trackCardRewardViolations({
 
   try {
     await db.transaction(async (tx) => {
-      // ── Step 1: Find the APPROVED config + snapshot ───────────────────────
+      // Step 1: Find the APPROVED config + snapshot
       const config = await tx.query.cardRewardConfigs.findFirst({
         where: (t, { and, eq }) =>
-          and(
-            eq(t.cardId, cardId),
-            eq(t.approvalStatus, "approved"),
-          ),
+          and(eq(t.cardId, cardId), eq(t.approvalStatus, "approved")),
       });
 
-      if (!config) return; // No APPROVED config → nothing to do
+      if (!config) return;
 
       const snapshot = await tx.query.cardRewardSnapshots.findFirst({
         where: eq(cardRewardSnapshots.configId, config.id),
       });
 
-      // ── Step 2: Compare new values vs snapshot ────────────────────────────
+      // Step 2: Compare new values vs snapshot
       const candidates: ViolationCandidate[] = [];
 
       if (newDueDate !== undefined && newDueDate !== null) {
@@ -96,7 +91,6 @@ export async function trackCardRewardViolations({
               afterValue: newDueDate.toISOString(),
             });
           }
-          // Equal to snapshot → user restored the approved date, no violation
         }
       }
 
@@ -125,11 +119,9 @@ export async function trackCardRewardViolations({
         });
       }
 
-      if (candidates.length === 0) return; // Changes match snapshot → no violation
+      if (candidates.length === 0) return;
 
-      // ── Step 3: Atomic downgrade ──────────────────────────────────────────
-      // This UPDATE is the concurrency gate.
-      // Exactly one concurrent request will get a row back; the rest get 0 rows.
+      // Step 3: Atomic downgrade — the concurrency gate
       const { rows: downgraded } = await tx.execute<{ id: number }>(
         sql`
           UPDATE "card_reward_configs"
@@ -142,7 +134,6 @@ export async function trackCardRewardViolations({
       );
 
       if (!downgraded.length) {
-        // Another concurrent request already won — skip silently
         log.debug(
           { configId: config.id, cardId },
           "Reward violation: concurrency skip — config already downgraded",
@@ -150,7 +141,7 @@ export async function trackCardRewardViolations({
         return;
       }
 
-      // ── Step 4: We won — bulk-insert all violation logs ───────────────────
+      // Step 4: Won the race — bulk-insert all violation logs
       await tx.insert(cardRewardLogs).values(
         candidates.map((c) => ({
           configId: config.id,
@@ -162,11 +153,7 @@ export async function trackCardRewardViolations({
       );
 
       log.info(
-        {
-          configId: config.id,
-          cardId,
-          violations: candidates.map((c) => c.violationType),
-        },
+        { configId: config.id, cardId, violations: candidates.map((c) => c.violationType) },
         "Reward violations recorded — config auto-downgraded to draft",
       );
     });
@@ -174,3 +161,88 @@ export async function trackCardRewardViolations({
     log.error({ err: error, cardId }, "trackCardRewardViolations failed");
   }
 }
+
+/**
+ * Audit log for reward config / deduction / finalization changes.
+ * Called after the corresponding card_activity is inserted.
+ *
+ * auto-downgrade behaviour:
+ *   "reward_config_changed" | "deduction_changed"
+ *     → Atomically downgrade config APPROVED or WAITING_APPROVAL → DRAFT,
+ *       then insert the violation log.
+ *       (Concurrency-safe: UPDATE … RETURNING acts as the exclusive gate.)
+ *       If status is already DRAFT/REJECTED → insert log only (still audit trail).
+ *   "finalization_created"
+ *     → Pure audit: insert log, no status change.
+ */
+export async function logConfigAudit({
+  db,
+  configId,
+  violationType,
+  beforeValue,
+  afterValue,
+}: {
+  db: dbClient;
+  configId: number;
+  violationType: RewardConfigViolationType;
+  beforeValue: unknown;
+  afterValue: unknown;
+}): Promise<void> {
+  try {
+    if (
+      violationType === "reward_config_changed" ||
+      violationType === "deduction_changed"
+    ) {
+      // ── Auto-downgrade path ─────────────────────────────────────────────
+      await db.transaction(async (tx) => {
+        // Atomic gate: downgrade if config is still in an approvable state.
+        // Targets both APPROVED (shouldn't be editable, but defensive) and
+        // WAITING_APPROVAL (user edited after submitting → pull back to draft).
+        const { rows: downgraded } = await tx.execute<{ id: number }>(
+          sql`
+            UPDATE "card_reward_configs"
+            SET    "approvalStatus" = 'draft',
+                   "updatedAt"      = now()
+            WHERE  id               = ${configId}
+              AND  "approvalStatus" IN ('approved', 'waiting_approval')
+            RETURNING id
+          `,
+        );
+
+        // Always insert the audit log regardless of whether downgrade occurred.
+        await tx.insert(cardRewardLogs).values({
+          configId,
+          violationType,
+          beforeValue: beforeValue as Record<string, unknown>,
+          afterValue: afterValue as Record<string, unknown>,
+          detectedAt: new Date(),
+        });
+
+        if (downgraded.length) {
+          log.info(
+            { configId, violationType },
+            "Config violation recorded — config auto-downgraded to draft",
+          );
+        } else {
+          log.debug(
+            { configId, violationType },
+            "Config audit log inserted (no downgrade needed)",
+          );
+        }
+      });
+    } else {
+      // ── Pure audit path (finalization_created) ──────────────────────────
+      await db.insert(cardRewardLogs).values({
+        configId,
+        violationType,
+        beforeValue: beforeValue as Record<string, unknown>,
+        afterValue: afterValue as Record<string, unknown>,
+        detectedAt: new Date(),
+      });
+      log.debug({ configId, violationType }, "Finalization audit log inserted");
+    }
+  } catch (error) {
+    log.error({ err: error, configId, violationType }, "logConfigAudit failed");
+  }
+}
+

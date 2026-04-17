@@ -24,6 +24,9 @@ export const rewardViolationTypeEnum = pgEnum("rewardViolationType", [
   "deadline_shortened",
   "start_date_changed",
   "assignee_changed",
+  "reward_config_changed",
+  "deduction_changed",
+  "finalization_created",
 ]);
 
 export const cardRewardConfigs = pgTable("card_reward_configs", {

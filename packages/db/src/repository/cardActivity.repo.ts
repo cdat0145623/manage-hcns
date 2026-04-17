@@ -97,6 +97,7 @@ export const bulkCreate = async (
     attachmentId?: string;
     oldValue?: string;
     newValue?: string;
+    metadata?: Record<string, unknown>;
   }[],
 ) => {
   const activitiesWithPublicIds = activityInputs.map((activity) => ({

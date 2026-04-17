@@ -203,7 +203,7 @@ interface MergedInstance {
   taskMasterId: string;
   taskMasterName: string | null;
   targetDate: Date | null;
-  status: "pending" | "done" | "missed";
+  status: "pending" | "done" | "missed" | "draft" | "waiting_approval" | "approved" | "rejected" | "waiting_evaluation" | "completed";
 }
 
 export const getCalendarMetrics = async (

@@ -27,6 +27,7 @@ import { AttachmentThumbnails } from "./AttachmentThumbnails";
 import { AttachmentUpload } from "./AttachmentUpload";
 import CardDetailsModals from "./CardDetailsModals";
 import CardMetadataGrid from "./CardMetadataGrid";
+import CardRewardConfigForm from "./CardRewardConfigForm";
 import Checklists from "./Checklists";
 import Dropdown from "./Dropdown";
 import NewCommentForm from "./NewCommentForm";
@@ -58,7 +59,7 @@ export default function CardDetailsModalContent({
   const [activeChecklistForm, setActiveChecklistForm] = useState<string | null>(
     null,
   );
-  const [activeTab, setActiveTab] = useState<"comments" | "history">(
+  const [activeTab, setActiveTab] = useState<"comments" | "history" | "rewards">(
     "comments",
   );
 
@@ -373,11 +374,26 @@ export default function CardDetailsModalContent({
                 >
                   {t`Hoạt động`}
                 </button>
+                <button
+                  onClick={() => setActiveTab("rewards")}
+                  className={`relative z-10 flex-1 rounded-xl py-2.5 text-[11px] font-bold uppercase tracking-widest transition-all ${
+                    activeTab === "rewards"
+                      ? "text-neutral-900 dark:text-dark-1000"
+                      : "text-light-500 hover:text-light-700 dark:text-dark-500"
+                  }`}
+                >
+                  {t`Cấu hình thưởng`}
+                </button>
                 <motion.div
                   className="absolute inset-y-1 rounded-xl bg-light-100 shadow-inner dark:bg-dark-200"
-                  style={{ width: "calc(50% - 4px)" }}
+                  style={{ width: "calc(33.33% - 4px)" }}
                   animate={{
-                    x: activeTab === "comments" ? 0 : "calc(100% + 4px)",
+                    x:
+                      activeTab === "comments"
+                        ? 0
+                        : activeTab === "history"
+                        ? "calc(100% + 4px)"
+                        : "calc(200% + 8px)",
                   }}
                   initial={false}
                   transition={{ type: "spring", stiffness: 450, damping: 38 }}
@@ -410,13 +426,22 @@ export default function CardDetailsModalContent({
                 </motion.div>
               ) : (
                 <motion.div
-                  key="comments"
+                  key={activeTab}
                   initial={{ opacity: 0, y: 5 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -5 }}
                   transition={{ duration: 0.15 }}
-                  className="flex flex-1 flex-col gap-2 px-6 pb-6"
+                  className="flex flex-1 flex-col gap-2 px-6 pb-6 pt-3"
                 >
+                  {activeTab === "rewards" && (
+                    <div className="mb-4">
+                      <CardRewardConfigForm
+                        cardPublicId={cardId}
+                        isReadOnly={!canEdit}
+                        card={card}
+                      />
+                    </div>
+                  )}
                   {card && !isTemplate && (
                     <div className="shrink-0 space-y-3">
                       <div className="flex items-center justify-between">

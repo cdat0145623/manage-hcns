@@ -23,6 +23,7 @@ import {
   createCardWebhookPayload,
   sendWebhooksForWorkspace,
 } from "../utils/webhook";
+import { markConfigWaitingEvaluation, revertConfigToApproved, trackCardRewardViolations } from "../utils/rewardViolation";
 
 const statusTypeEnumSchema = z.enum(statusTypeEnum.enumValues);
 
@@ -619,6 +620,13 @@ export const cardRouter = createTRPCRouter({
           createdBy: userId,
         });
 
+        // Track reward violation (non-blocking)
+        trackCardRewardViolations({
+          db: ctx.db,
+          cardId: card.id,
+          memberAction: { workspaceMemberId: member.id, action: "removed" },
+        }).catch(() => void 0);
+
         return { newMember: false };
       }
 
@@ -637,6 +645,13 @@ export const cardRouter = createTRPCRouter({
         workspaceMemberId: member.id,
         createdBy: userId,
       });
+
+      // Track reward violation (non-blocking)
+      trackCardRewardViolations({
+        db: ctx.db,
+        cardId: card.id,
+        memberAction: { workspaceMemberId: member.id, action: "added" },
+      }).catch(() => void 0);
 
       return { newMember: true };
     }),
@@ -918,6 +933,7 @@ export const cardRouter = createTRPCRouter({
       );
 
       let newListId: number | undefined;
+      let newListTitle: string | undefined;
 
       if (input.listPublicId) {
         const newList = await listRepo.getByPublicId(
@@ -932,6 +948,7 @@ export const cardRouter = createTRPCRouter({
           });
 
         newListId = newList.id;
+        newListTitle = newList.name;
       }
 
       if (!existingCard) {
@@ -1097,6 +1114,33 @@ export const cardRouter = createTRPCRouter({
       if (activities.length > 0) {
         await cardActivityRepo.bulkCreate(ctx.db, activities);
       }
+
+      // ── Reward violation tracking (non-blocking, fire-and-forget) ──────────
+      // Compares new values against the snapshot taken at approval time.
+      // Uses pessimistic locking + 5s dedup to handle concurrent saves safely.
+      if (input.dueDate !== undefined || input.startDate !== undefined) {
+        trackCardRewardViolations({
+          db: ctx.db,
+          cardId: result.id,
+          ...(input.dueDate !== undefined && { newDueDate: input.dueDate }),
+          ...(input.startDate !== undefined && { newStartDate: input.startDate }),
+        }).catch(() => void 0);
+      }
+
+      // Check if task is completed
+      const isStatusDone = input.status === "done" && existingCard.status !== "done";
+      const isStatusUndone = existingCard.status === "done" && input.status !== "done" && input.status !== undefined;
+
+      // const isMovedToDoneList = newListId && existingCard.listId !== newListId && 
+      //     (newListTitle?.toUpperCase() === "DONE" || newListTitle?.toUpperCase() === "HOÀN THÀNH");
+
+      // if (isStatusDone || isMovedToDoneList) {
+      if (isStatusDone) {
+        markConfigWaitingEvaluation({ db: ctx.db, cardId: result.id }).catch(() => void 0);
+      } else if (isStatusUndone) {
+        revertConfigToApproved({ db: ctx.db, cardId: result.id }).catch(() => void 0);
+      }
+      // ────────────────────────────────────────────────────────────────────────
 
       // Build changes object for webhook
       const webhookChanges: Record<string, { from: unknown; to: unknown }> = {};

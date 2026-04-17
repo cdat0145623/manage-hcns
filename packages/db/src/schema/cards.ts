@@ -60,7 +60,10 @@ export const activityTypes = [
   "updated_password",
   "updated_username",
   "updated_name",
-  "updated_email"
+  "updated_email",
+  "updated_reward_config",
+  "updated_deduction",
+  "created_finalization",
 ] as const;
 
 export type ActivityType = (typeof activityTypes)[number];

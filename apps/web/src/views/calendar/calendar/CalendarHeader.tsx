@@ -96,13 +96,13 @@ export function CalendarHeader({
       </div>
 
       <div className="flex items-center gap-1">
-        <div className="relative min-w-[200px]">
+        <div className="relative w-[200px]">
           <Listbox value={selectedUserId} onChange={setSelectedUserId}>
             <div className="relative">
               {/* <Listbox value={selectedUserId} onChange={setSelectedUserId}> */}
               <ListboxButton className="relative w-full cursor-pointer rounded-xl border border-neutral-200/70 bg-white/50 py-2.5 pl-4 pr-10 text-left text-sm font-semibold text-neutral-900 shadow-sm transition-all hover:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-dark-400/50 dark:bg-dark-300/50 dark:text-white dark:hover:bg-dark-200">
                 <span className="flex items-center gap-2.5 truncate">
-                  <HiOutlineUserCircle className="h-5 w-5 text-neutral-400 dark:text-neutral-500" />
+                  <HiOutlineUserCircle className="h-5 w-5 shrink-0 text-neutral-400 dark:text-neutral-500" />
                   <span className="block truncate">
                     {users?.find((u) => u.id === selectedUserId)?.name || "Chọn người dùng"}
                   </span>

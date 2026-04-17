@@ -174,6 +174,27 @@ export const getAll = async (db: dbClient) => {
   });
 };
 
+export const getAllForPublic = async (db: dbClient) => {
+  return await db.query.users.findMany({
+    columns: {
+      id: true,
+      name: true,
+      email: true,
+      username: true,
+      role: true,
+    },
+    with: {
+      position: {
+        columns: {
+          id: true,
+          name: true,
+        },
+      },
+    },
+    where: eq(users.isActive, true),
+  });
+};
+
 export const updatePosition = async (db: dbClient, userId: string, positionId: number) => {
   const [result] = await db
     .update(users)

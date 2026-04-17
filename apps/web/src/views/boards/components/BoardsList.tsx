@@ -1,8 +1,13 @@
 import Link from "next/link";
 import { t } from "@lingui/core/macro";
-import { HiOutlineRectangleStack, HiOutlineStar, HiStar } from "react-icons/hi2";
-import { ImCheckmark2, ImCheckmark } from "react-icons/im";
 import { motion } from "framer-motion";
+import {
+  HiOutlineRectangleStack,
+  HiOutlineStar,
+  HiStar,
+} from "react-icons/hi2";
+import { ImCheckmark, ImCheckmark2 } from "react-icons/im";
+
 import Button from "~/components/Button";
 import PatternedBackground from "~/components/PatternedBackground";
 import { Tooltip } from "~/components/Tooltip";
@@ -11,7 +16,15 @@ import { useModal } from "~/providers/modal";
 import { useWorkspace } from "~/providers/workspace";
 import { api } from "~/utils/api";
 
-export function BoardsList({ isTemplate, archived = false }: { isTemplate?: boolean; archived?: boolean }) {
+export function BoardsList({
+  isTemplate,
+  archived = false,
+  userId,
+}: {
+  isTemplate?: boolean;
+  archived?: boolean;
+  userId?: string;
+}) {
   const { workspace } = useWorkspace();
   const { openModal } = useModal();
   const { canCreateBoard } = usePermissions();
@@ -31,19 +44,34 @@ export function BoardsList({ isTemplate, archived = false }: { isTemplate?: bool
     },
   });
 
-  const { data, isLoading } = api.board.all.useQuery(
+  const isUserBoard = isAdmin && !archived;
+
+  const { data: allData, isLoading: allLoading } = api.board.all.useQuery(
     {
       workspacePublicId: workspace.publicId,
       type: isTemplate ? "template" : "regular",
       archived: archived,
     },
-    { enabled: workspace.publicId ? true : false },
+    { enabled: !isUserBoard && !!workspace.publicId },
   );
+
+  const { data: userData, isLoading: userLoading } =
+    api.board.allByUserId.useQuery(
+      {
+        workspacePublicId: workspace.publicId,
+        userId: userId ?? "",
+        archived: archived,
+      },
+      { enabled: isUserBoard && !!userId },
+    );
+
+  const data = isUserBoard ? userData : allData;
+  const isLoading = isUserBoard ? userLoading : allLoading;
 
   const handleToggleFavorite = (
     e: React.MouseEvent,
     boardPublicId: string,
-    currentFavorite: boolean | undefined
+    currentFavorite: boolean | undefined,
   ) => {
     e.preventDefault();
     e.stopPropagation();
@@ -56,7 +84,7 @@ export function BoardsList({ isTemplate, archived = false }: { isTemplate?: bool
   const handleSetDefault = (
     e: React.MouseEvent,
     boardPublicId: string,
-    currentDefault: boolean | undefined
+    currentDefault: boolean | undefined,
   ) => {
     e.preventDefault();
     e.stopPropagation();
@@ -84,13 +112,13 @@ export function BoardsList({ isTemplate, archived = false }: { isTemplate?: bool
             {archived ? t`Không có bảng lưu trữ` : t`Không có bảng`}
           </p>
           <p className="text-[14px] text-light-900 dark:text-dark-900">
-            {archived ? t`Các bảng bạn lưu trữ sẽ xuất hiện ở đây.` : t`Tạo bảng mới để bắt đầu`}
+            {archived
+              ? t`Các bảng bạn lưu trữ sẽ xuất hiện ở đây.`
+              : t`Tạo bảng mới để bắt đầu`}
           </p>
         </div>
         <Tooltip
-          content={
-            !canCreateBoard ? t`You don't have permission` : undefined
-          }
+          content={!canCreateBoard ? t`You don't have permission` : undefined}
         >
           <Button
             onClick={() => {
@@ -111,7 +139,7 @@ export function BoardsList({ isTemplate, archived = false }: { isTemplate?: bool
     >
       {data?.map((board) => (
         <motion.div
-          key={board.publicId}
+          key={board?.publicId}
           layout
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
@@ -120,26 +148,43 @@ export function BoardsList({ isTemplate, archived = false }: { isTemplate?: bool
               type: "spring",
               stiffness: 300,
               damping: 30,
-              mass: 1
+              mass: 1,
             },
             opacity: { duration: 0.2 },
-            scale: { duration: 0.2 }
+            scale: { duration: 0.2 },
           }}
         >
           <Link
-            href={`${isTemplate ? "templates" : "boards"}/${board.publicId}`}
+            href={`${isTemplate ? "templates" : "boards"}/${board?.publicId}`}
           >
             <div className="group relative mr-5 flex h-[150px] w-full items-center justify-center rounded-md border border-dashed border-light-400 bg-light-50 shadow-sm hover:bg-light-200 dark:border-dark-600 dark:bg-dark-50 dark:hover:bg-dark-100">
               <PatternedBackground />
               {isAdmin && isTemplate && (
                 <button
-                  onClick={(e) => handleSetDefault(e, board.publicId, board.isTemplateDefault)}
-                  className={`absolute right-10 top-3 z-10 rounded p-1 transition-all hover:bg-light-300 dark:hover:bg-dark-200 ${board.isTemplateDefault ? "" : "md:opacity-0 md:group-hover:opacity-100"
-                    }`}
-                  aria-label={board.isTemplateDefault ? "Remove as default" : "Set as default"}
-                  title={board.isTemplateDefault ? "Remove as default" : "Set as default"}
+                  onClick={(e) =>
+                    handleSetDefault(
+                      e,
+                      board?.publicId,
+                      board?.isTemplateDefault,
+                    )
+                  }
+                  className={`absolute right-10 top-3 z-10 rounded p-1 transition-all hover:bg-light-300 dark:hover:bg-dark-200 ${
+                    board?.isTemplateDefault
+                      ? ""
+                      : "md:opacity-0 md:group-hover:opacity-100"
+                  }`}
+                  aria-label={
+                    board?.isTemplateDefault
+                      ? "Remove as default"
+                      : "Set as default"
+                  }
+                  title={
+                    board?.isTemplateDefault
+                      ? "Remove as default"
+                      : "Set as default"
+                  }
                 >
-                  {board.isTemplateDefault ? (
+                  {board?.isTemplateDefault ? (
                     <ImCheckmark className="h-5 w-5 text-neutral-700 dark:text-dark-1000" />
                   ) : (
                     <ImCheckmark2 className="h-5 w-5 text-neutral-700 dark:text-dark-800" />
@@ -147,20 +192,36 @@ export function BoardsList({ isTemplate, archived = false }: { isTemplate?: bool
                 </button>
               )}
               <button
-                onClick={(e) => handleToggleFavorite(e, board.publicId, board.favorite)}
-                className={`absolute right-3 top-3 z-10 rounded p-1 transition-all hover:bg-light-300 dark:hover:bg-dark-200 ${board.favorite ? "" : "md:opacity-0 md:group-hover:opacity-100"
-                  }`}
-                aria-label={board.favorite ? "Remove from favorites" : "Add to favorites"}
+                onClick={(e) =>
+                  handleToggleFavorite(e, board?.publicId, board?.favorite)
+                }
+                className={`absolute right-3 top-3 z-10 rounded p-1 transition-all hover:bg-light-300 dark:hover:bg-dark-200 ${
+                  board?.favorite
+                    ? ""
+                    : "md:opacity-0 md:group-hover:opacity-100"
+                }`}
+                aria-label={
+                  board?.favorite ? "Remove from favorites" : "Add to favorites"
+                }
               >
-                {board.favorite ? (
+                {board?.favorite ? (
                   <HiStar className="h-5 w-5 text-neutral-700 dark:text-dark-1000" />
                 ) : (
                   <HiOutlineStar className="h-5 w-5 text-neutral-700 dark:text-dark-800" />
                 )}
               </button>
-              <p className="px-4 text-[14px] font-bold text-neutral-700 dark:text-dark-1000">
-                {board.user?.name} - {board.name}
-              </p>
+
+              <div
+                className="flex w-full flex-col px-8 text-center"
+                title={`${board.user?.name} - ${board.name}`}
+              >
+                <span className="mb-0.5 w-full truncate text-[11px] font-semibold uppercase tracking-wider text-neutral-500 dark:text-neutral-400">
+                  {board.user?.name}
+                </span>
+                <span className="w-full truncate text-[15px] font-bold text-neutral-800 dark:text-neutral-100">
+                  {board.name}
+                </span>
+              </div>
             </div>
           </Link>
         </motion.div>

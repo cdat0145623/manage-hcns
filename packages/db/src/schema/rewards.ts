@@ -15,8 +15,15 @@ import {
 
 import { cards } from "./cards";
 import { users } from "./users";
-import { statusTypeEnum } from "./tasks";
 
+export const rewardApprovalStatusEnum = pgEnum("rewardApprovalStatus", [
+  "draft",
+  "waiting_approval",
+  "approved",
+  "rejected",
+  "waiting_evaluation",
+  "completed"
+]);
 export const rewardTypeEnum = pgEnum("rewardType", ["project", "responsibility"]);
 export const deductionUnitEnum = pgEnum("deductionUnit", ["percent", "vnd"]);
 export const rewardViolationTypeEnum = pgEnum("rewardViolationType", [
@@ -36,7 +43,7 @@ export const cardRewardConfigs = pgTable("card_reward_configs", {
   bonusAmount: decimal("bonusAmount", { precision: 15, scale: 2 }),
   currency: varchar("currency", { length: 3 }).default("VND").notNull(),
 
-  approvalStatus: statusTypeEnum("approvalStatus").default("draft").notNull(),
+  approvalStatus: rewardApprovalStatusEnum("approvalStatus").default("draft").notNull(),
   approvedBy: uuid("approvedBy").references(() => users.id, { onUpdate: "no action" }),
   approvedAt: timestamp("approvedAt", { precision: 6 }),
   rejectedReason: text("rejectedReason"),

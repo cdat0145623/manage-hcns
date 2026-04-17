@@ -23,7 +23,7 @@ import {
   createCardWebhookPayload,
   sendWebhooksForWorkspace,
 } from "../utils/webhook";
-import { trackCardRewardViolations } from "../utils/rewardViolation";
+import { markConfigWaitingEvaluation, revertConfigToApproved, trackCardRewardViolations } from "../utils/rewardViolation";
 
 const statusTypeEnumSchema = z.enum(statusTypeEnum.enumValues);
 
@@ -933,6 +933,7 @@ export const cardRouter = createTRPCRouter({
       );
 
       let newListId: number | undefined;
+      let newListTitle: string | undefined;
 
       if (input.listPublicId) {
         const newList = await listRepo.getByPublicId(
@@ -947,6 +948,7 @@ export const cardRouter = createTRPCRouter({
           });
 
         newListId = newList.id;
+        newListTitle = newList.name;
       }
 
       if (!existingCard) {
@@ -1123,6 +1125,20 @@ export const cardRouter = createTRPCRouter({
           ...(input.dueDate !== undefined && { newDueDate: input.dueDate }),
           ...(input.startDate !== undefined && { newStartDate: input.startDate }),
         }).catch(() => void 0);
+      }
+
+      // Check if task is completed
+      const isStatusDone = input.status === "done" && existingCard.status !== "done";
+      const isStatusUndone = existingCard.status === "done" && input.status !== "done" && input.status !== undefined;
+
+      // const isMovedToDoneList = newListId && existingCard.listId !== newListId && 
+      //     (newListTitle?.toUpperCase() === "DONE" || newListTitle?.toUpperCase() === "HOÀN THÀNH");
+
+      // if (isStatusDone || isMovedToDoneList) {
+      if (isStatusDone) {
+        markConfigWaitingEvaluation({ db: ctx.db, cardId: result.id }).catch(() => void 0);
+      } else if (isStatusUndone) {
+        revertConfigToApproved({ db: ctx.db, cardId: result.id }).catch(() => void 0);
       }
       // ────────────────────────────────────────────────────────────────────────
 

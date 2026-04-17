@@ -246,3 +246,74 @@ export async function logConfigAudit({
   }
 }
 
+
+/**
+ * Transitions the card's reward config to waiting_evaluation when work is completed.
+ * Only targets configs that are either APPROVED or DRAFT (so we don't accidentally
+ * override a config already being evaluated or rejected/completed).
+ * This locks out the penalty API (since it only targets 'approved' configs).
+ */
+export async function markConfigWaitingEvaluation({
+  db,
+  cardId,
+}: {
+  db: dbClient;
+  cardId: number;
+}): Promise<void> {
+  try {
+    const { rows } = await db.execute<{ id: number }>(
+      sql`
+        UPDATE "card_reward_configs"
+        SET    "approvalStatus" = 'waiting_evaluation',
+               "updatedAt"      = now()
+        WHERE  "cardId"         = ${cardId}
+          AND  "approvalStatus" IN ('approved', 'draft', 'rejected', 'waiting_approval')
+        RETURNING id
+      `,
+    );
+
+    if (rows.length > 0) {
+      log.info(
+        { cardId, configId: rows[0]?.id },
+        "Card marked as done — reward config auto-transitioned to waiting_evaluation",
+      );
+    }
+  } catch (error) {
+    log.error({ err: error, cardId }, "markConfigWaitingEvaluation failed");
+  }
+}
+
+/**
+ * Reverts the config back to APPROVED if a card is marked as undone.
+ * Only targets configs that are currently WAITING_EVALUATION.
+ */
+export async function revertConfigToApproved({
+  db,
+  cardId,
+}: {
+  db: dbClient;
+  cardId: number;
+}): Promise<void> {
+  try {
+    const { rows } = await db.execute<{ id: number }>(
+      sql`
+        UPDATE "card_reward_configs"
+        SET    "approvalStatus" = 'approved',
+               "updatedAt"      = now()
+        WHERE  "cardId"         = ${cardId}
+          AND  "approvalStatus" = 'waiting_evaluation'
+        RETURNING id
+      `,
+    );
+
+    if (rows.length > 0) {
+      log.info(
+        { cardId, configId: rows[0]?.id },
+        "Card marked as undone — reward config auto-reverted to approved",
+      );
+    }
+  } catch (error) {
+    log.error({ err: error, cardId }, "revertConfigToApproved failed");
+  }
+}
+

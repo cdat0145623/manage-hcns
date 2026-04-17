@@ -435,7 +435,11 @@ export default function CardDetailsModalContent({
                 >
                   {activeTab === "rewards" && (
                     <div className="mb-4">
-                      <CardRewardConfigForm cardPublicId={cardId} isReadOnly={!canEdit} />
+                      <CardRewardConfigForm
+                        cardPublicId={cardId}
+                        isReadOnly={!canEdit}
+                        card={card}
+                      />
                     </div>
                   )}
                   {card && !isTemplate && (

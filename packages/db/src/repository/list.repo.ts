@@ -211,6 +211,7 @@ export const getByPublicId = async (db: dbClient, listPublicId: string) => {
       id: true,
       boardId: true,
       index: true,
+      name: true,
     },
     where: eq(lists.publicId, listPublicId),
   });

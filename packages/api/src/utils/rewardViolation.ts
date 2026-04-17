@@ -141,20 +141,9 @@ export async function trackCardRewardViolations({
         return;
       }
 
-      // Step 4: Won the race — bulk-insert all violation logs
-      await tx.insert(cardRewardLogs).values(
-        candidates.map((c) => ({
-          configId: config.id,
-          violationType: c.violationType,
-          beforeValue: c.beforeValue as Record<string, unknown>,
-          afterValue: c.afterValue as Record<string, unknown>,
-          detectedAt: new Date(),
-        })),
-      );
-
       log.info(
         { configId: config.id, cardId, violations: candidates.map((c) => c.violationType) },
-        "Reward violations recorded — config auto-downgraded to draft",
+        "Reward config auto-downgraded to draft due to violations (logs will be recorded on approval)",
       );
     });
   } catch (error) {
@@ -209,24 +198,15 @@ export async function logConfigAudit({
           `,
         );
 
-        // Always insert the audit log regardless of whether downgrade occurred.
-        await tx.insert(cardRewardLogs).values({
-          configId,
-          violationType,
-          beforeValue: beforeValue as Record<string, unknown>,
-          afterValue: afterValue as Record<string, unknown>,
-          detectedAt: new Date(),
-        });
-
         if (downgraded.length) {
           log.info(
             { configId, violationType },
-            "Config violation recorded — config auto-downgraded to draft",
+            "Config auto-downgraded to draft due to changes (logs will be recorded on approval)",
           );
         } else {
           log.debug(
             { configId, violationType },
-            "Config audit log inserted (no downgrade needed)",
+            "Config changed but no downgrade needed (already draft/rejected)",
           );
         }
       });
@@ -243,6 +223,77 @@ export async function logConfigAudit({
     }
   } catch (error) {
     log.error({ err: error, configId, violationType }, "logConfigAudit failed");
+  }
+}
+
+
+/**
+ * Transitions the card's reward config to waiting_evaluation when work is completed.
+ * Only targets configs that are either APPROVED or DRAFT (so we don't accidentally
+ * override a config already being evaluated or rejected/completed).
+ * This locks out the penalty API (since it only targets 'approved' configs).
+ */
+export async function markConfigWaitingEvaluation({
+  db,
+  cardId,
+}: {
+  db: dbClient;
+  cardId: number;
+}): Promise<void> {
+  try {
+    const { rows } = await db.execute<{ id: number }>(
+      sql`
+        UPDATE "card_reward_configs"
+        SET    "approvalStatus" = 'waiting_evaluation',
+               "updatedAt"      = now()
+        WHERE  "cardId"         = ${cardId}
+          AND  "approvalStatus" IN ('approved', 'draft', 'rejected', 'waiting_approval')
+        RETURNING id
+      `,
+    );
+
+    if (rows.length > 0) {
+      log.info(
+        { cardId, configId: rows[0]?.id },
+        "Card marked as done — reward config auto-transitioned to waiting_evaluation",
+      );
+    }
+  } catch (error) {
+    log.error({ err: error, cardId }, "markConfigWaitingEvaluation failed");
+  }
+}
+
+/**
+ * Reverts the config back to APPROVED if a card is marked as undone.
+ * Only targets configs that are currently WAITING_EVALUATION.
+ */
+export async function revertConfigToApproved({
+  db,
+  cardId,
+}: {
+  db: dbClient;
+  cardId: number;
+}): Promise<void> {
+  try {
+    const { rows } = await db.execute<{ id: number }>(
+      sql`
+        UPDATE "card_reward_configs"
+        SET    "approvalStatus" = 'approved',
+               "updatedAt"      = now()
+        WHERE  "cardId"         = ${cardId}
+          AND  "approvalStatus" = 'waiting_evaluation'
+        RETURNING id
+      `,
+    );
+
+    if (rows.length > 0) {
+      log.info(
+        { cardId, configId: rows[0]?.id },
+        "Card marked as undone — reward config auto-reverted to approved",
+      );
+    }
+  } catch (error) {
+    log.error({ err: error, cardId }, "revertConfigToApproved failed");
   }
 }
 

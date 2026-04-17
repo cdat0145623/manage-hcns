@@ -11,12 +11,20 @@ import {
   uuid,
   varchar,
   text,
+  boolean,
 } from "drizzle-orm/pg-core";
 
 import { cards } from "./cards";
 import { users } from "./users";
-import { statusTypeEnum } from "./tasks";
 
+export const rewardApprovalStatusEnum = pgEnum("rewardApprovalStatus", [
+  "draft",
+  "waiting_approval",
+  "approved",
+  "rejected",
+  "waiting_evaluation",
+  "completed"
+]);
 export const rewardTypeEnum = pgEnum("rewardType", ["project", "responsibility"]);
 export const deductionUnitEnum = pgEnum("deductionUnit", ["percent", "vnd"]);
 export const rewardViolationTypeEnum = pgEnum("rewardViolationType", [
@@ -36,7 +44,7 @@ export const cardRewardConfigs = pgTable("card_reward_configs", {
   bonusAmount: decimal("bonusAmount", { precision: 15, scale: 2 }),
   currency: varchar("currency", { length: 3 }).default("VND").notNull(),
 
-  approvalStatus: statusTypeEnum("approvalStatus").default("draft").notNull(),
+  approvalStatus: rewardApprovalStatusEnum("approvalStatus").default("draft").notNull(),
   approvedBy: uuid("approvedBy").references(() => users.id, { onUpdate: "no action" }),
   approvedAt: timestamp("approvedAt", { precision: 6 }),
   rejectedReason: text("rejectedReason"),
@@ -79,10 +87,12 @@ export const cardRewardSnapshots = pgTable("card_reward_snapshots", {
 export const cardRewardLogs = pgTable("card_reward_logs", {
   id: bigserial("id", { mode: "number" }).primaryKey(),
   configId: bigint("configId", { mode: "number" }).notNull().references(() => cardRewardConfigs.id, { onUpdate: "no action" }),
+  deductionId: bigint("deductionId", { mode: "number" }).references(() => cardRewardDeductions.id, { onDelete: "set null", onUpdate: "no action" }),
   violationType: rewardViolationTypeEnum("violationType").notNull(),
   beforeValue: jsonb("beforeValue").notNull(),
   afterValue: jsonb("afterValue").notNull(),
   detectedAt: timestamp("detectedAt", { precision: 6 }).defaultNow().notNull(),
+  isSkipped: boolean("isSkipped").default(false).notNull(),
 });
 
 export const cardRewardFinalizations = pgTable("card_reward_finalizations", {
@@ -152,6 +162,11 @@ export const cardRewardLogsRelations = relations(cardRewardLogs, ({ one }) => ({
     fields: [cardRewardLogs.configId],
     references: [cardRewardConfigs.id],
     relationName: "rewardLogsConfig"
+  }),
+  deduction: one(cardRewardDeductions, {
+    fields: [cardRewardLogs.deductionId],
+    references: [cardRewardDeductions.id],
+    relationName: "rewardLogsDeduction"
   })
 }));
 

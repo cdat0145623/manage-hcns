@@ -10,6 +10,7 @@ import {
   cardRewardDeductions,
   cardRewardSnapshots,
   cardRewardLogs,
+  cardRewardFinalizations,
 } from "@kan/db/schema";
 import * as userRepo from "@kan/db/repository/user.repo";
 import * as cardActivityRepo from "@kan/db/repository/cardActivity.repo";
@@ -764,5 +765,161 @@ export const rewardConfigRouter = createTRPCRouter({
         return { success: true, restoredCardTitle: snapshot.snappedCardTitle };
 
       });
+    }),
+
+  // ───────────────────────────────────────────────────────────────────────────
+  // [MUTATION] Finalize: Chốt Nghiệm thu & Freeze Data (WAITING_EVALUATION → COMPLETED)
+  // Quyền: ADMIN / AREA_MANAGER / BRANCH_MANAGER
+  // Lấy danh sách vi phạm không bị skip, chuyển ra deduction và tính final_amount
+  // ───────────────────────────────────────────────────────────────────────────
+  finalize: protectedProcedure
+    .input(
+      z.object({
+        configId: z.number().int().positive(),
+        final_percent: z.number().min(0).max(100),
+        final_note: z.string().optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const userId = ctx.user?.id;
+
+      if (!userId) {
+        throw new TRPCError({
+          message: "User not authenticated",
+          code: "UNAUTHORIZED",
+        });
+      }
+
+      const user = await userRepo.getById(ctx.db, userId);
+
+      if (!user) {
+        throw new TRPCError({
+          message: "User not found",
+          code: "NOT_FOUND",
+        });
+      }
+
+      if (!["ADMIN", "AREA_MANAGER", "BRANCH_MANAGER"].includes(user.role)) {
+        throw new TRPCError({
+          message: "Bạn không có quyền nghiệm thu (yêu cầu ADMIN hoặc MANAGER).",
+          code: "UNAUTHORIZED",
+        });
+      }
+
+      const config = await ctx.db.query.cardRewardConfigs.findFirst({
+        where: eq(cardRewardConfigs.id, input.configId),
+      });
+
+      if (!config) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Không tìm thấy cấu hình." });
+      }
+
+      if (config.approvalStatus !== "waiting_evaluation") {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: `Chỉ có thể nghiệm thu khi đang ở trạng thái waiting_evaluation (hiện tại: ${config.approvalStatus}).`,
+        });
+      }
+
+      const snapshot = await ctx.db.query.cardRewardSnapshots.findFirst({
+        where: eq(cardRewardSnapshots.configId, input.configId),
+      });
+
+      if (!snapshot) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Không tìm thấy snapshot cho cấu hình này." });
+      }
+
+      // Lấy danh sách logs phạt chưa bị skip (isSkipped = false) của config này có deductionId
+      const activeLogsAndDeductions = await ctx.db
+        .select({
+           log: cardRewardLogs,
+           deduction: cardRewardDeductions,
+        })
+        .from(cardRewardLogs)
+        .leftJoin(cardRewardDeductions, eq(cardRewardLogs.deductionId, cardRewardDeductions.id))
+        .where(
+          and(
+            eq(cardRewardLogs.configId, input.configId),
+            eq(cardRewardLogs.isSkipped, false)
+          )
+        );
+
+      let totalDeductionVND = 0;
+      const baseBonus = Number(snapshot.snappedBonusAmount || 0);
+
+      for (const row of activeLogsAndDeductions) {
+        if (row.deduction) { // Map sang card_reward_deductions để lấy giá trị cần khấu trừ
+           const dedValue = Number(row.deduction.value);
+           if (row.deduction.unitType === "vnd") {
+             totalDeductionVND += dedValue;
+           } else if (row.deduction.unitType === "percent") {
+             totalDeductionVND += baseBonus * (dedValue / 100);
+           }
+        }
+      }
+
+      const baseAmount = baseBonus * (input.final_percent / 100);
+      let finalAmount = baseAmount - totalDeductionVND;
+
+      // Không cho âm
+      if (finalAmount < 0) {
+         finalAmount = 0;
+      }
+
+      const now = new Date();
+
+      await ctx.db.transaction(async (tx) => {
+         // Insert or update card_reward_finalizations
+         await tx.insert(cardRewardFinalizations).values({
+           configId: input.configId,
+           completionPercent: input.final_percent.toString(),
+           suggestedAmount: baseAmount.toString(), 
+           finalAmount: finalAmount.toString(),
+           finalNote: input.final_note,
+           finalizedBy: userId,
+           finalizedAt: now,
+         }).onConflictDoUpdate({
+           target: cardRewardFinalizations.configId,
+           set: {
+             completionPercent: input.final_percent.toString(),
+             suggestedAmount: baseAmount.toString(),
+             finalAmount: finalAmount.toString(),
+             finalNote: input.final_note,
+             finalizedBy: userId,
+             finalizedAt: now, // cập nhật thời gian
+           }
+         });
+
+         // Update approvalStatus = completed
+         await tx.update(cardRewardConfigs)
+           .set({
+              approvalStatus: "completed",
+              updatedAt: now,
+           })
+           .where(eq(cardRewardConfigs.id, input.configId));
+           
+         // Gọi hàm audit log (pure audit logic) do trạng thái config sẽ là completed, trackCardRewardViolations skip 
+         // Ở đây chúng ta log ra type: finalization_created 
+         // Ta sẽ sử dụng logConfigAudit cũ để ghi vào event 
+         await tx.insert(cardRewardLogs).values({
+           configId: input.configId,
+           violationType: "finalization_created",
+           beforeValue: {},
+           afterValue: { 
+             finalAmount, 
+             completionPercent: input.final_percent 
+           },
+           detectedAt: now,
+           isSkipped: false,
+         });
+      });
+
+      return { 
+        success: true, 
+        baseBonus,
+        completionPercent: input.final_percent,
+        totalDeductionVND,
+        finalAmount,
+      };
     }),
 });

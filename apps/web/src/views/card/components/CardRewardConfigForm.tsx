@@ -212,6 +212,8 @@ export default function CardRewardConfigForm({
   const approvalStatus: RewardStatus =
     (remoteData?.approvalStatus as RewardStatus) || "draft";
 
+  const dbSnapshot: any = (remoteData as any)?.snapshot;
+
   const rewardType = watch("rewardType");
   const isProject = rewardType === "project";
 
@@ -320,16 +322,20 @@ export default function CardRewardConfigForm({
 
     const snapshot = rawSnapshot
       ? {
-          startDate: rawSnapshot.snappedStartDate ?? null,
-          dueDate: rawSnapshot.snappedDueDate ?? null,
+          snappedCardTitle:
+            (rawSnapshot as any).snappedCardTitle ?? card?.title ?? "",
+          snappedStartDate: rawSnapshot.snappedStartDate ?? null,
+          snappedDueDate: rawSnapshot.snappedDueDate ?? null,
+          snappedTargetUser: (rawSnapshot as any).snappedTargetUser ?? null,
+          snappedBonusAmount: rawSnapshot.snappedBonusAmount ?? null,
+          snappedCurrency: rawSnapshot.snappedCurrency ?? "VND",
+          snappedDeductions: (rawSnapshot as any).snappedDeductions ?? [],
           assigneeName:
             card?.members?.[0]?.name || card?.members?.[0]?.user?.name || "",
           assigneeImage:
             card?.members?.[0]?.image ||
             card?.members?.[0]?.user?.image ||
             null,
-          bonusAmount: rawSnapshot.snappedBonusAmount ?? null,
-          currency: rawSnapshot.snappedCurrency ?? "VND",
         }
       : null;
 
@@ -481,16 +487,16 @@ export default function CardRewardConfigForm({
               <p className="text-xs font-bold text-neutral-900 dark:text-dark-1000">
                 {t`Bạn đang chỉnh sửa bản thảo mới`}
               </p>
-              <div className="mt-0.5 flex items-center gap-2 text-[10px] font-bold text-neutral-500">
-                <span>{t`Bản cấu hình đã chốt`}: 10.000.000 VND</span>
-                {card?.dueDate &&
-                  new Date(card.dueDate).getTime() >
-                    new Date("2026-04-16").getTime() && (
-                    <span className="flex items-center gap-1 rounded bg-rose-100 px-1.5 py-0.5 font-black text-rose-600 dark:bg-rose-900/30 dark:text-rose-400">
-                      <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-rose-500" />
+              <div className="mt-0.5 flex flex-wrap items-center gap-2 text-[10px] font-bold text-neutral-500">
+                <span className="shrink-0">{t`Bản cấu hình đã chốt`}: {formatNumber(dbSnapshot?.snappedBonusAmount || 0)} {dbSnapshot?.snappedCurrency || "VND"}</span>
+                {card?.dueDate && dbSnapshot?.snappedDueDate &&
+                  new Date(card.dueDate as string | Date).getTime() >
+                    new Date(dbSnapshot.snappedDueDate as string | Date).getTime() && (
+                    <span className="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded bg-rose-100 px-1.5 py-0.5 font-black text-rose-600 dark:bg-rose-900/30 dark:text-rose-400">
+                      <span className="h-1.5 w-1.5 shrink-0 animate-pulse rounded-full bg-rose-500" />
                       {t`Lệch Snapshot (+${Math.round(
-                        (new Date(card.dueDate).getTime() -
-                          new Date("2026-04-16").getTime()) /
+                        (new Date(card.dueDate as string | Date).getTime() -
+                          new Date(dbSnapshot.snappedDueDate as string | Date).getTime()) /
                           (1000 * 3600 * 24),
                       )} ngày)`}
                     </span>
@@ -501,7 +507,7 @@ export default function CardRewardConfigForm({
           <button
             type="button"
             onClick={() => setViewMode("summary")}
-            className="rounded-lg border border-emerald-200 bg-white px-3 py-1.5 text-[10px] font-black uppercase text-emerald-600 shadow-sm transition-all hover:bg-emerald-50 dark:border-emerald-900/30 dark:bg-dark-100 dark:hover:bg-dark-200"
+            className="shrink-0 rounded-lg border border-emerald-200 bg-white px-3 py-1.5 text-[10px] font-black uppercase text-emerald-600 shadow-sm transition-all hover:bg-emerald-50 dark:border-emerald-900/30 dark:bg-dark-100 dark:hover:bg-dark-200"
           >
             {t`Xem bản APPROVED`}
           </button>

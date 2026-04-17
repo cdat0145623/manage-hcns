@@ -26,12 +26,19 @@ interface RewardViolationLog {
 }
 
 interface CardSnapshot {
-  startDate: string | Date | null;
-  dueDate: string | Date | null;
+  snappedCardTitle: string;
+  snappedStartDate: string | Date | null;
+  snappedDueDate: string | Date | null;
+  snappedTargetUser: string | null;
+  snappedBonusAmount: string | number | null;
+  snappedCurrency: string;
+  snappedDeductions: {
+    reason: string;
+    value: string | number;
+    unitType: string;
+  }[];
   assigneeName: string;
   assigneeImage?: string | null;
-  bonusAmount: string | number | null;
-  currency: string;
 }
 
 interface CardRewardSummaryCardProps {
@@ -56,6 +63,7 @@ interface CardRewardSummaryCardProps {
       image?: string | null;
       email?: string | null;
     } | null;
+    targetUser?: string | null;
   };
   onEdit: () => void;
   onWithdraw?: () => void;
@@ -92,6 +100,44 @@ export const CardRewardSummaryCard = ({
 
   const currentStatus = statusConfig[data.approvalStatus];
 
+  const mismatches = React.useMemo(() => {
+    if (data.approvalStatus !== "approved" || !data.snapshot) return { hasMismatch: false, title: false, deadline: false, assignee: false, amount: false, deductions: false };
+    
+    const snap = data.snapshot;
+    const title = card.cardTitle !== snap.snappedCardTitle;
+    
+    const d1 = card.startDate ? new Date(card.startDate).getTime() : null;
+    const d2 = snap.snappedStartDate ? new Date(snap.snappedStartDate).getTime() : null;
+    
+    const d3 = card.dueDate ? new Date(card.dueDate).getTime() : null;
+    const d4 = snap.snappedDueDate ? new Date(snap.snappedDueDate).getTime() : null;
+    const deadline = d1 !== d2 || d3 !== d4;
+
+    const assignee = (card.targetUser || "") !== (snap.snappedTargetUser || "");
+
+    const amt = Number(data.bonusAmount) !== Number(snap.snappedBonusAmount) || data.currency !== snap.snappedCurrency;
+
+    let deducs = false;
+    const sD = snap.snappedDeductions || [];
+    const cD = data.deductions || [];
+    if (sD.length !== cD.length) deducs = true;
+    else {
+      for(let i = 0; i < sD.length; i++) {
+        const sItem = sD[i]!;
+        const cItem = cD[i]!;
+        if (sItem.reason !== cItem.reason || Number(sItem.value) !== Number(cItem.value) || sItem.unitType !== cItem.unitType) {
+          deducs = true;
+          break;
+        }
+      }
+    }
+
+    return {
+      hasMismatch: title || deadline || assignee || amt || deducs,
+      title, deadline, assignee, amount: amt, deductions: deducs
+    };
+  }, [data, card]);
+
   const formatNumber = (val: string | number | null | undefined) => {
     if (val === null || val === undefined || val === "") return "0";
     const num = typeof val === "string" ? parseFloat(val) : val;
@@ -106,10 +152,9 @@ export const CardRewardSummaryCard = ({
       className="flex flex-col gap-5"
     >
       <div className="shrink-0 space-y-5">
-        {/* Header with Card Name and Integrated Badge */}
         <div className="flex items-center justify-between border-b border-light-200 pb-3 dark:border-dark-300">
           <div className="flex items-center gap-2">
-            <p className="text-sm font-black uppercase tracking-tight text-neutral-900 dark:text-dark-1000">
+            <p className={`text-sm font-black uppercase tracking-tight ${mismatches.title ? "text-rose-500" : "text-neutral-900 dark:text-dark-1000"}`}>
               {card.cardTitle}
             </p>
             <span
@@ -125,7 +170,7 @@ export const CardRewardSummaryCard = ({
               <HiCalendarDays className="h-3.5 w-3.5" />
               {t`Thời gian`}
             </p>
-            <div className="text-xs font-bold text-neutral-700 dark:text-dark-900">
+            <div className={`text-xs font-bold ${mismatches.deadline ? "text-rose-500 dark:text-rose-400" : "text-neutral-700 dark:text-dark-900"}`}>
               {card.startDate && card.dueDate ? (
                 <span>
                   {format(new Date(card.startDate), "dd/MM")} -{" "}
@@ -149,12 +194,24 @@ export const CardRewardSummaryCard = ({
                 email={card.assignee?.email || ""}
                 size="xs"
               />
-              <span className="text-xs font-black text-neutral-700 dark:text-dark-900">
+              <span className={`text-xs font-black ${mismatches.assignee ? "text-rose-500 dark:text-rose-400" : "text-neutral-700 dark:text-dark-900"}`}>
                 {card.assignee?.name || t`Chưa phân công`}
               </span>
             </div>
           </div>
         </div>
+
+        {/* Mismatch Warning Box */}
+        {data.approvalStatus === "approved" && data.snapshot && mismatches.hasMismatch && (
+          <div className="flex gap-3 rounded-xl border border-rose-200 bg-rose-50/50 p-4 dark:border-rose-900/30 dark:bg-rose-950/20">
+            <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-rose-100 text-rose-600 dark:bg-rose-900/30 dark:text-rose-400">
+              <HiExclamationCircle className="h-4 w-4" />
+            </div>
+            <p className="text-xs font-bold text-rose-700 dark:text-rose-300">
+              {t`Dữ liệu đã thay đổi so với bản gốc được duyệt`}
+            </p>
+          </div>
+        )}
 
         {/* Pending Info Box */}
         {data.approvalStatus === "waiting_approval" && (
@@ -163,12 +220,11 @@ export const CardRewardSummaryCard = ({
               <HiClock className="h-3.5 w-3.5" />
             </div>
             <p className="text-xs font-medium text-blue-700 dark:text-blue-300">
-              {t`ℹ️ Đang chờ Admin xét duyệt...`}
+              {t`Đang chờ Admin xét duyệt...`}
             </p>
           </div>
         )}
 
-        {/* Rejected Feedback Box (Structured Quote Style) */}
         {data.approvalStatus === "rejected" && (
           <motion.div
             initial={{ opacity: 0, scale: 0.98 }}
@@ -201,15 +257,23 @@ export const CardRewardSummaryCard = ({
           <div className="space-y-5">
             <div className="rounded-2xl border border-emerald-100 bg-white p-5 shadow-sm dark:border-emerald-900/20 dark:bg-dark-200/50">
               <p className="mb-3 text-[10px] font-bold uppercase tracking-widest text-emerald-600 dark:text-emerald-400">
-                ┌ {t`Snapshot (chốt lúc duyệt)`}
+                {t`Snapshot (chốt lúc duyệt)`}
               </p>
               <div className="ml-2 space-y-2 border-l-2 border-emerald-100 pl-4 transition-all dark:border-emerald-900/30">
                 <div className="flex items-center gap-2 text-xs font-semibold text-neutral-600 dark:text-dark-700">
                   <HiCalendarDays className="h-3.5 w-3.5 opacity-50" />
-                  {data.snapshot.startDate && data.snapshot.dueDate ? (
+                  {data.snapshot.snappedStartDate &&
+                  data.snapshot.snappedDueDate ? (
                     <span>
-                      {format(new Date(data.snapshot.startDate), "dd/MM")} -{" "}
-                      {format(new Date(data.snapshot.dueDate), "dd/MM/yyyy")}
+                      {format(
+                        new Date(data.snapshot.snappedStartDate),
+                        "dd/MM",
+                      )}{" "}
+                      -{" "}
+                      {format(
+                        new Date(data.snapshot.snappedDueDate),
+                        "dd/MM/yyyy",
+                      )}
                     </span>
                   ) : (
                     <span className="italic text-neutral-400">{t`Chưa đặt timeline`}</span>
@@ -226,8 +290,8 @@ export const CardRewardSummaryCard = ({
                 </div>
                 <div className="flex items-center gap-2 text-xs font-black text-neutral-800 dark:text-dark-1000">
                   <span className="text-sm">💰</span>
-                  {formatNumber(data.snapshot.bonusAmount)}{" "}
-                  {data.snapshot.currency}
+                  {formatNumber(data.snapshot.snappedBonusAmount)}{" "}
+                  {data.snapshot.snappedCurrency}
                 </div>
               </div>
             </div>
@@ -245,7 +309,7 @@ export const CardRewardSummaryCard = ({
                       {format(new Date(card.startDate), "dd/MM")} -{" "}
                       {format(new Date(card.dueDate), "dd/MM/yyyy")}
                       {(() => {
-                        const snapDue = data.snapshot.dueDate;
+                        const snapDue = data.snapshot.snappedDueDate;
                         if (!snapDue) return null;
                         const snapDueMs = new Date(snapDue).getTime();
                         const cardDueMs = new Date(card.dueDate).getTime();
@@ -315,9 +379,7 @@ export const CardRewardSummaryCard = ({
               </span>{" "}
               {(data.approvalStatus === "waiting_approval" ||
                 data.approvalStatus === "approved") && (
-                <span className="ml-1 text-[10px] italic text-neutral-400">
-                  (chỉ đọc)
-                </span>
+                <span className="ml-1 text-[10px] italic text-neutral-400"></span>
               )}
             </div>
             <div className="flex items-center gap-2 text-sm font-medium text-neutral-500">
@@ -327,16 +389,12 @@ export const CardRewardSummaryCard = ({
               </p>
             </div>
           </div>
-
-          {/* Table Style for Deductions */}
           <div className="space-y-3">
             <p className="text-[10px] font-black uppercase tracking-widest text-neutral-400">
               {t`Danh sách Khấu trừ`}{" "}
               {(data.approvalStatus === "waiting_approval" ||
                 data.approvalStatus === "approved") && (
-                <span className="ml-1 normal-case italic text-neutral-400">
-                  (chỉ đọc)
-                </span>
+                <span className="ml-1 normal-case italic text-neutral-400"></span>
               )}
             </p>
             <div className="overflow-hidden rounded-xl border border-light-200 dark:border-dark-300">
@@ -382,8 +440,6 @@ export const CardRewardSummaryCard = ({
               </table>
             </div>
           </div>
-
-          {/* Centered Actions - Always visible for Demo */}
           <div className="flex flex-row items-center justify-center gap-3 pt-2">
             {data.approvalStatus === "waiting_approval" && (
               <button

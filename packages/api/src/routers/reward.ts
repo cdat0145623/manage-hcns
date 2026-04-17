@@ -9,6 +9,7 @@ import {
   cardRewardConfigs,
   cardRewardDeductions,
   cardRewardSnapshots,
+  cardRewardLogs,
 } from "@kan/db/schema";
 import * as userRepo from "@kan/db/repository/user.repo";
 import * as cardActivityRepo from "@kan/db/repository/cardActivity.repo";
@@ -399,7 +400,16 @@ export const rewardConfigRouter = createTRPCRouter({
   // Side-effect: trigger snapshot (gọi service riêng)
   // ───────────────────────────────────────────────────────────────────────────
   approve: protectedProcedure
-    .input(z.object({ configId: z.number().int().positive() }))
+    .input(z.object({ 
+      configId: z.number().int().positive(),
+      violationDecisions: z.array(
+        z.object({
+          violationType: z.string(),
+          isSkipped: z.boolean().default(false),
+          deductionId: z.number().int().positive().optional(),
+        })
+      ).optional()
+    }))
     .mutation(async ({ ctx, input }) => {
       const userId = ctx.user?.id;
 
@@ -469,6 +479,69 @@ export const rewardConfigRouter = createTRPCRouter({
 
         if (!card) {
           throw new TRPCError({ code: "NOT_FOUND", message: "Không tìm thấy thẻ liên kết." });
+        }
+
+        // 2.5 Sinh logs (violations) trước khi snapshot mới ghi đè
+        const snapshot = await tx.query.cardRewardSnapshots.findFirst({
+          where: eq(cardRewardSnapshots.configId, input.configId),
+        });
+
+        if (snapshot) {
+          const candidates: { violationType: string; beforeValue: unknown; afterValue: unknown }[] = [];
+
+          // deadline_extended / shortened
+          if (card.dueDate !== null && card.dueDate !== undefined) {
+            const snappedDue = snapshot.snappedDueDate;
+            if (snappedDue) {
+              if (card.dueDate.getTime() > snappedDue.getTime()) {
+                candidates.push({ violationType: "deadline_extended", beforeValue: snappedDue.toISOString(), afterValue: card.dueDate.toISOString() });
+              } else if (card.dueDate.getTime() < snappedDue.getTime()) {
+                candidates.push({ violationType: "deadline_shortened", beforeValue: snappedDue.toISOString(), afterValue: card.dueDate.toISOString() });
+              }
+            }
+          }
+
+          // start_date_changed
+          if (card.startDate !== null && card.startDate !== undefined) {
+            const snappedStart = snapshot.snappedStartDate;
+            if (!snappedStart || card.startDate.getTime() !== snappedStart.getTime()) {
+              candidates.push({ violationType: "start_date_changed", beforeValue: snappedStart?.toISOString() ?? null, afterValue: card.startDate.toISOString() });
+            }
+          }
+
+          // assignee_changed
+          if (card.targetUser !== snapshot.snappedTargetUser) {
+            candidates.push({ violationType: "assignee_changed", beforeValue: { targetUser: snapshot.snappedTargetUser }, afterValue: { targetUser: card.targetUser } });
+          }
+
+          // reward_config_changed
+          if (config.rewardType !== snapshot.snappedRewardType || config.bonusAmount !== snapshot.snappedBonusAmount || config.currency !== snapshot.snappedCurrency) {
+            candidates.push({ violationType: "reward_config_changed", beforeValue: { rewardType: snapshot.snappedRewardType, bonusAmount: snapshot.snappedBonusAmount, currency: snapshot.snappedCurrency }, afterValue: { rewardType: config.rewardType, bonusAmount: config.bonusAmount, currency: config.currency } });
+          }
+
+          // deduction_changed
+          type SnappedDeductionItem = { reason: string; unitType: "percent" | "vnd"; value: string; displayOrder: number };
+          const snappedDeds = (snapshot.snappedDeductions as SnappedDeductionItem[] | null) ?? [];
+          const isDedsDifferent = snappedDeds.length !== deductions.length || snappedDeds.some((sd, i) => sd.reason !== deductions[i]?.reason || String(sd.value) !== String(deductions[i]?.value) || sd.unitType !== deductions[i]?.unitType);
+          
+          if (isDedsDifferent) {
+            candidates.push({ violationType: "deduction_changed", beforeValue: { count: snappedDeds.length, deductions: snappedDeds }, afterValue: { count: deductions.length, deductions } });
+          }
+
+          if (candidates.length > 0) {
+            await tx.insert(cardRewardLogs).values(candidates.map((c) => {
+              const decision = input.violationDecisions?.find((d) => d.violationType === c.violationType);
+              return {
+                configId: input.configId,
+                violationType: c.violationType as any,
+                beforeValue: c.beforeValue,
+                afterValue: c.afterValue,
+                detectedAt: now,
+                isSkipped: decision?.isSkipped ?? false,
+                deductionId: decision?.deductionId ?? null,
+              };
+            }));
+          }
         }
 
         await tx

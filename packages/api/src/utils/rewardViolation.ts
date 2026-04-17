@@ -141,20 +141,9 @@ export async function trackCardRewardViolations({
         return;
       }
 
-      // Step 4: Won the race — bulk-insert all violation logs
-      await tx.insert(cardRewardLogs).values(
-        candidates.map((c) => ({
-          configId: config.id,
-          violationType: c.violationType,
-          beforeValue: c.beforeValue as Record<string, unknown>,
-          afterValue: c.afterValue as Record<string, unknown>,
-          detectedAt: new Date(),
-        })),
-      );
-
       log.info(
         { configId: config.id, cardId, violations: candidates.map((c) => c.violationType) },
-        "Reward violations recorded — config auto-downgraded to draft",
+        "Reward config auto-downgraded to draft due to violations (logs will be recorded on approval)",
       );
     });
   } catch (error) {
@@ -209,24 +198,15 @@ export async function logConfigAudit({
           `,
         );
 
-        // Always insert the audit log regardless of whether downgrade occurred.
-        await tx.insert(cardRewardLogs).values({
-          configId,
-          violationType,
-          beforeValue: beforeValue as Record<string, unknown>,
-          afterValue: afterValue as Record<string, unknown>,
-          detectedAt: new Date(),
-        });
-
         if (downgraded.length) {
           log.info(
             { configId, violationType },
-            "Config violation recorded — config auto-downgraded to draft",
+            "Config auto-downgraded to draft due to changes (logs will be recorded on approval)",
           );
         } else {
           log.debug(
             { configId, violationType },
-            "Config audit log inserted (no downgrade needed)",
+            "Config changed but no downgrade needed (already draft/rejected)",
           );
         }
       });

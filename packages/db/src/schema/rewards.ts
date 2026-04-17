@@ -11,6 +11,7 @@ import {
   uuid,
   varchar,
   text,
+  boolean,
 } from "drizzle-orm/pg-core";
 
 import { cards } from "./cards";
@@ -86,10 +87,12 @@ export const cardRewardSnapshots = pgTable("card_reward_snapshots", {
 export const cardRewardLogs = pgTable("card_reward_logs", {
   id: bigserial("id", { mode: "number" }).primaryKey(),
   configId: bigint("configId", { mode: "number" }).notNull().references(() => cardRewardConfigs.id, { onUpdate: "no action" }),
+  deductionId: bigint("deductionId", { mode: "number" }).references(() => cardRewardDeductions.id, { onDelete: "set null", onUpdate: "no action" }),
   violationType: rewardViolationTypeEnum("violationType").notNull(),
   beforeValue: jsonb("beforeValue").notNull(),
   afterValue: jsonb("afterValue").notNull(),
   detectedAt: timestamp("detectedAt", { precision: 6 }).defaultNow().notNull(),
+  isSkipped: boolean("isSkipped").default(false).notNull(),
 });
 
 export const cardRewardFinalizations = pgTable("card_reward_finalizations", {
@@ -159,6 +162,11 @@ export const cardRewardLogsRelations = relations(cardRewardLogs, ({ one }) => ({
     fields: [cardRewardLogs.configId],
     references: [cardRewardConfigs.id],
     relationName: "rewardLogsConfig"
+  }),
+  deduction: one(cardRewardDeductions, {
+    fields: [cardRewardLogs.deductionId],
+    references: [cardRewardDeductions.id],
+    relationName: "rewardLogsDeduction"
   })
 }));
 

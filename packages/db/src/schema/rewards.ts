@@ -1,7 +1,8 @@
-import { relations } from "drizzle-orm";
+import { relations, sql } from "drizzle-orm";
 import {
   bigint,
   bigserial,
+  check,
   decimal,
   integer,
   jsonb,
@@ -16,6 +17,7 @@ import {
 
 import { cards } from "./cards";
 import { users } from "./users";
+import { taskInstances } from "./tasks";
 
 export const rewardApprovalStatusEnum = pgEnum("rewardApprovalStatus", [
   "draft",
@@ -37,22 +39,32 @@ export const rewardViolationTypeEnum = pgEnum("rewardViolationType", [
   "finalization_created",
 ]);
 
-export const cardRewardConfigs = pgTable("card_reward_configs", {
-  id: bigserial("id", { mode: "number" }).primaryKey(),
-  cardId: bigint("cardId", { mode: "number" }).notNull().unique().references(() => cards.id, { onDelete: "no action", onUpdate: "no action" }),
-  rewardType: rewardTypeEnum("rewardType").notNull(),
-  bonusAmount: decimal("bonusAmount", { precision: 15, scale: 2 }),
-  currency: varchar("currency", { length: 3 }).default("VND").notNull(),
+export const cardRewardConfigs = pgTable(
+  "card_reward_configs",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    cardId: bigint("cardId", { mode: "number" }).unique().references(() => cards.id, { onDelete: "no action", onUpdate: "no action" }),
+    taskInstanceId: uuid("taskInstanceId").unique().references(() => taskInstances.id, { onDelete: "no action", onUpdate: "no action" }),
+    rewardType: rewardTypeEnum("rewardType").notNull(),
+    bonusAmount: decimal("bonusAmount", { precision: 15, scale: 2 }),
+    currency: varchar("currency", { length: 3 }).default("VND").notNull(),
 
-  approvalStatus: rewardApprovalStatusEnum("approvalStatus").default("draft").notNull(),
-  approvedBy: uuid("approvedBy").references(() => users.id, { onUpdate: "no action" }),
-  approvedAt: timestamp("approvedAt", { precision: 6 }),
-  rejectedReason: text("rejectedReason"),
+    approvalStatus: rewardApprovalStatusEnum("approvalStatus").default("draft").notNull(),
+    approvedBy: uuid("approvedBy").references(() => users.id, { onUpdate: "no action" }),
+    approvedAt: timestamp("approvedAt", { precision: 6 }),
+    rejectedReason: text("rejectedReason"),
 
-  createdBy: uuid("createdBy").notNull().references(() => users.id, { onUpdate: "no action" }),
-  createdAt: timestamp("createdAt", { precision: 6 }).defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt", { precision: 6 }),
-});
+    createdBy: uuid("createdBy").notNull().references(() => users.id, { onUpdate: "no action" }),
+    createdAt: timestamp("createdAt", { precision: 6 }).defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt", { precision: 6 }),
+  },
+  (t) => [
+    check(
+      "card_reward_configs_xor_source",
+      sql`(("taskInstanceId" IS NOT NULL) AND ("cardId" IS NULL)) OR (("taskInstanceId" IS NULL) AND ("cardId" IS NOT NULL))`
+    ),
+  ]
+);
 
 export const cardRewardDeductions = pgTable("card_reward_deductions", {
   id: bigserial("id", { mode: "number" }).primaryKey(),
@@ -111,6 +123,11 @@ export const cardRewardConfigsRelations = relations(cardRewardConfigs, ({ one, m
     fields: [cardRewardConfigs.cardId],
     references: [cards.id],
     relationName: "rewardConfigsCard"
+  }),
+  taskInstance: one(taskInstances, {
+    fields: [cardRewardConfigs.taskInstanceId],
+    references: [taskInstances.id],
+    relationName: "rewardConfigsTaskInstance"
   }),
   userApprovedBy: one(users, {
     fields: [cardRewardConfigs.approvedBy],

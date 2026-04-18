@@ -20,6 +20,7 @@ export const create = async (
     description: string;
     targetDate: Date;
     actualDate: Date;
+    endDate: Date;
     status: TaskStatus;
   },
 ) => {
@@ -31,6 +32,7 @@ export const create = async (
         taskMasterId: taskInstanceInput.taskMasterId,
         targetDate: taskInstanceInput.targetDate,
         actualDate: taskInstanceInput.actualDate,
+        endDate: taskInstanceInput.endDate,
         status: taskInstanceInput.status,
       })
       .returning({
@@ -39,6 +41,7 @@ export const create = async (
         taskMasterId: taskInstances.taskMasterId,
         targetDate: taskInstances.targetDate,
         actualDate: taskInstances.actualDate,
+        endDate: taskInstances.endDate,
         status: taskInstances.status,
       });
 
@@ -62,6 +65,7 @@ export const generateVirtualTaskInstances = async (params: {
   taskMasterId: string;
   rruleString: string;
   startDate: Date;
+  masterEndDate: Date;
   from: Date;
   to: Date;
 }) => {
@@ -132,12 +136,20 @@ export const generateVirtualTaskInstances = async (params: {
     // Chuyển đổi ngược lại từ Floating Time về UTC thật sự
     const target = new Date(date.getTime() - offset);
 
+    // Tính endDate: lấy ngày từ target, giờ từ masterEndDate
+    const instanceEndDate = new Date(target);
+    instanceEndDate.setHours(params.masterEndDate.getHours());
+    instanceEndDate.setMinutes(params.masterEndDate.getMinutes());
+    instanceEndDate.setSeconds(params.masterEndDate.getSeconds());
+    instanceEndDate.setMilliseconds(params.masterEndDate.getMilliseconds());
+
     return {
       id: `virtual_${params.taskMasterId}_${target.getTime()}`,
       userId: params.userId,
       taskMasterId: params.taskMasterId,
       targetDate: target,
       actualDate: null,
+      endDate: instanceEndDate,
       status: "pending" as const,
     };
   });
@@ -153,6 +165,7 @@ export const update = async (
     description?: string;
     targetDate?: Date;
     actualDate?: Date;
+    endDate?: Date;
     status: TaskStatus;
   },
 ) => {
@@ -169,6 +182,7 @@ export const update = async (
       description: taskInstanceInput.description,
       targetDate: taskInstanceInput.targetDate,
       actualDate: taskInstanceInput.actualDate,
+      endDate: taskInstanceInput.endDate,
       status: taskInstanceInput.status,
       updatedAt: new Date(),
     })
@@ -179,6 +193,7 @@ export const update = async (
       taskMasterId: taskInstances.taskMasterId,
       targetDate: taskInstances.targetDate,
       actualDate: taskInstances.actualDate,
+      endDate: taskInstances.endDate,
       status: taskInstances.status,
     });
 

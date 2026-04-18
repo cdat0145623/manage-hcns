@@ -5,17 +5,23 @@ import React, { useEffect, useState } from "react";
 import { Controller, useFieldArray, useForm } from "react-hook-form";
 import {
   HiCheckCircle,
-  HiExclamationCircle,
   HiPlus,
   HiTrash,
+  HiArrowPath,
+  HiCheck,
+  HiClock,
+  HiPencilSquare,
 } from "react-icons/hi2";
 import { z } from "zod";
 
+import { CardRewardSummaryCard } from "./CardRewardSummaryCard";
 import type { RewardStatus } from "./CardRewardSummaryCard";
 import Select from "~/components/Select";
 import { usePopup } from "~/providers/popup";
 import { api } from "~/utils/api";
-import { CardRewardSummaryCard } from "./CardRewardSummaryCard";
+import { CardRewardAdminReview } from "./CardRewardAdminReview";
+import { CardRewardFinalize } from "./CardRewardFinalize";
+import { usePermissions } from "~/hooks/usePermissions";
 
 const DEFAULT_USD_TO_VND = 25400;
 
@@ -46,6 +52,8 @@ export default function CardRewardConfigForm({
   const [viewMode, setViewMode] = useState<"edit" | "summary">("edit");
   const { showPopup } = usePopup();
   const utils = api.useUtils();
+  const { role } = usePermissions();
+  const isAdmin = role === "ADMIN";
 
   // ───────────────────────────────────────────────────────────────────────────
   // Queries & Mutations
@@ -64,6 +72,8 @@ export default function CardRewardConfigForm({
   const withdrawMutation = api.reward.withdraw.useMutation();
   const approveMutation = api.reward.approve.useMutation();
   const rejectMutation = api.reward.reject.useMutation();
+  const revertMutation = api.reward.revert.useMutation();
+  const finalizeMutation = api.reward.finalize.useMutation();
 
   const isMutating =
     upsertMutation.isPending ||
@@ -212,6 +222,8 @@ export default function CardRewardConfigForm({
   const approvalStatus: RewardStatus =
     (remoteData?.approvalStatus as RewardStatus) || "draft";
 
+  const dbSnapshot: any = (remoteData as any)?.snapshot;
+
   const rewardType = watch("rewardType");
   const isProject = rewardType === "project";
 
@@ -252,13 +264,99 @@ export default function CardRewardConfigForm({
     }
   };
 
+  const handleRevert = async () => {
+    if (!remoteData?.id) return;
+    try {
+      await revertMutation.mutateAsync({ configId: remoteData.id });
+      showPopup({
+        header: t`Thành công`,
+        message: t`Đã khôi phục Card và Cấu hình về bản Approved`,
+        icon: "success",
+      });
+      await utils.reward.getByCardId.invalidate({ cardPublicId });
+    } catch (err: any) {
+      showPopup({
+        header: t`Lỗi`,
+        message: err.message || t`Lỗi khi khôi phục cấu hình`,
+        icon: "error",
+      });
+    }
+  };
+
+  const handleAdminApprove = async (decisions: any[], comment: string) => {
+    if (!remoteData?.id) return;
+    try {
+      await approveMutation.mutateAsync({
+        configId: remoteData.id,
+        logDecisions: decisions,
+      });
+      showPopup({
+        header: t`Thành công`,
+        message: t`Đã duyệt cấu hình thưởng.`,
+        icon: "success",
+      });
+      await utils.reward.getByCardId.invalidate({ cardPublicId });
+    } catch (err: any) {
+      showPopup({
+        header: t`Lỗi`,
+        message: err.message || t`Lỗi khi duyệt cấu hình`,
+        icon: "error",
+      });
+    }
+  };
+
+  const handleAdminFinalize = async (percent: number, note: string) => {
+    if (!remoteData?.id) return;
+    try {
+      await finalizeMutation.mutateAsync({
+        configId: remoteData.id,
+        final_percent: percent,
+        final_note: note,
+      });
+      showPopup({
+        header: t`Thành công`,
+        message: t`Đã nghiệm thu và tất toán tiền thưởng.`,
+        icon: "success",
+      });
+      await utils.reward.getByCardId.invalidate({ cardPublicId });
+    } catch (err: any) {
+      showPopup({
+        header: t`Lỗi`,
+        message: err.message || t`Lỗi khi nghiệm thu`,
+        icon: "error",
+      });
+    }
+  };
+
+  const handleAdminReject = async (reason: string) => {
+    if (!remoteData?.id) return;
+    try {
+      await rejectMutation.mutateAsync({
+        configId: remoteData.id,
+        rejectedReason: reason,
+      });
+      showPopup({
+        header: t`Đã từ chối`,
+        message: t`Đã từ chối cấu hình thưởng.`,
+        icon: "success",
+      });
+      await utils.reward.getByCardId.invalidate({ cardPublicId });
+    } catch (err: any) {
+      showPopup({
+        header: t`Lỗi`,
+        message: err.message || t`Lỗi khi từ chối cấu hình`,
+        icon: "error",
+      });
+    }
+  };
+
   const onSubmit = async (data: RewardConfigFormValues) => {
     try {
       const payload = {
         cardPublicId,
         rewardType: data.rewardType,
         bonusAmount:
-          data.rewardType === "project" ? data.bonusAmount?.toString() : null,
+          data.rewardType === "project" ? data.bonusAmount : 0,
         currency: data.currency,
         deductions: data.deductions.map((d) => ({
           ...d,
@@ -276,7 +374,7 @@ export default function CardRewardConfigForm({
 
       // Only call submit if it's currently draft or rejected
       // If it's already waiting_approval, just updating is enough
-      if (approvalStatus === "draft" || approvalStatus === "rejected") {
+      if (result.status === "draft" || result.status === "rejected") {
         await submitMutation.mutateAsync({ configId: result.configId });
         showPopup({
           header: t`Thành công`,
@@ -320,16 +418,21 @@ export default function CardRewardConfigForm({
 
     const snapshot = rawSnapshot
       ? {
-          startDate: rawSnapshot.snappedStartDate ?? null,
-          dueDate: rawSnapshot.snappedDueDate ?? null,
+          snappedCardTitle:
+            (rawSnapshot as any).snappedCardTitle ?? card?.title ?? "",
+          snappedStartDate: rawSnapshot.snappedStartDate ?? null,
+          snappedDueDate: rawSnapshot.snappedDueDate ?? null,
+          snappedTargetUser: (rawSnapshot as any).snappedTargetUser ?? null,
+          snappedRewardType: (rawSnapshot as any).snappedRewardType ?? "project",
+          snappedBonusAmount: rawSnapshot.snappedBonusAmount ?? null,
+          snappedCurrency: rawSnapshot.snappedCurrency ?? "VND",
+          snappedDeductions: (rawSnapshot as any).snappedDeductions ?? [],
           assigneeName:
             card?.members?.[0]?.name || card?.members?.[0]?.user?.name || "",
           assigneeImage:
             card?.members?.[0]?.image ||
             card?.members?.[0]?.user?.image ||
             null,
-          bonusAmount: rawSnapshot.snappedBonusAmount ?? null,
-          currency: rawSnapshot.snappedCurrency ?? "VND",
         }
       : null;
 
@@ -349,6 +452,8 @@ export default function CardRewardConfigForm({
       deductionValue: 0,
     }));
 
+    const finalization = (remoteData as any)?.finalization ?? null;
+
     return {
       ...values,
       approvalStatus,
@@ -359,8 +464,54 @@ export default function CardRewardConfigForm({
         : undefined,
       snapshot,
       violationLogs: violationLogs.length > 0 ? violationLogs : undefined,
+      finalization,
       deductions: values.deductions.map((d) => ({ ...d })),
     };
+  };
+
+  const checkHasMismatch = (summaryData: any) => {
+    if (!summaryData.snapshot) return false;
+    const snap = summaryData.snapshot;
+
+    const title = card?.title !== snap.snappedCardTitle;
+
+    const d1 = card?.startDate ? new Date(card.startDate).getTime() : null;
+    const d2 = snap.snappedStartDate
+      ? new Date(snap.snappedStartDate).getTime()
+      : null;
+
+    const d3 = card?.dueDate ? new Date(card.dueDate).getTime() : null;
+    const d4 = snap.snappedDueDate
+      ? new Date(snap.snappedDueDate).getTime()
+      : null;
+    const deadline = d1 !== d2 || d3 !== d4;
+
+    const assignee = (card?.members?.[0]?.publicId || "") !== (snap.snappedTargetUser || "");
+
+    const amt =
+      Number(summaryData.bonusAmount) !== Number(snap.snappedBonusAmount) ||
+      summaryData.currency !== snap.snappedCurrency;
+
+    let deducs = false;
+    const sD = snap.snappedDeductions || [];
+    const cD = summaryData.deductions || [];
+    if (sD.length !== cD.length) deducs = true;
+    else {
+      for (let i = 0; i < sD.length; i++) {
+        const sItem = sD[i]!;
+        const cItem = cD[i]!;
+        if (
+          sItem.reason !== cItem.reason ||
+          Number(sItem.value) !== Number(cItem.value) ||
+          sItem.unitType !== cItem.unitType
+        ) {
+          deducs = true;
+          break;
+        }
+      }
+    }
+
+    return title || deadline || assignee || amt || deducs;
   };
 
   if (isQueryLoading) {
@@ -372,9 +523,54 @@ export default function CardRewardConfigForm({
   }
 
   if (viewMode === "summary") {
+    const summaryData = getSummaryData();
+    const isWaitingApproval = summaryData.approvalStatus === "waiting_approval";
+    const isBreachedDraft =
+      summaryData.approvalStatus === "draft" && !!summaryData.snapshot;
+    const hasMismatch = checkHasMismatch(summaryData);
+    const isBreachedApproved = summaryData.approvalStatus === "approved" && hasMismatch;
+
+    // Admin chỉ được Review khi User đã Submit (waiting_approval) 
+    // HOẶC khi đã Duyệt rồi nhưng bị lệch dữ liệu (isBreachedApproved)
+    // Đối với Bản nháp (draft), Admin chỉ được xem (Summary View)
+    if (isAdmin && (isWaitingApproval || isBreachedApproved)) {
+      return (
+        <CardRewardAdminReview
+          data={{ ...summaryData, id: remoteData?.id! }}
+          card={{
+            cardTitle: card?.title || "Card Title",
+            startDate: card?.startDate,
+            dueDate: card?.dueDate,
+            targetUser: card?.members?.[0]
+              ? {
+                  name: card.members[0].name || card.members[0].user?.name,
+                  avatarUrl: card.members[0].image || card.members[0].user?.image,
+                  email: card.members[0].email || card.members[0].user?.email || "",
+                }
+              : null,
+          }}
+          onApprove={handleAdminApprove}
+          onReject={handleAdminReject}
+          onRevert={handleRevert}
+        />
+      );
+    }
+
+    if (isAdmin && summaryData.approvalStatus === "waiting_evaluation") {
+      return (
+        <CardRewardFinalize
+          data={{ ...summaryData, id: remoteData?.id! }}
+          onFinalize={handleAdminFinalize}
+          onBack={() => setViewMode("edit")}
+        />
+      );
+    }
+
+    const effectivelyReadOnly = isReadOnly || (isAdmin && approvalStatus === "draft");
+
     return (
       <CardRewardSummaryCard
-        data={getSummaryData()}
+        data={summaryData}
         card={{
           cardTitle: card?.title || "Card Title",
           startDate: card?.startDate,
@@ -387,11 +583,15 @@ export default function CardRewardConfigForm({
               }
             : null,
         }}
+        isAdmin={isAdmin}
         onEdit={() => setViewMode("edit")}
         onWithdraw={handleWithdraw}
+        onRevert={handleRevert}
       />
     );
   }
+
+  const effectivelyReadOnly = isReadOnly || (isAdmin && approvalStatus === "draft");
 
   return (
     <motion.div
@@ -405,66 +605,6 @@ export default function CardRewardConfigForm({
           {t`Cấu hình thưởng / Khấu trừ`}
         </p>
 
-        <div className="flex items-center gap-3">
-          {/* Helper for demo: simulate admin approve */}
-          <button
-            type="button"
-            disabled={isMutating}
-            onClick={async () => {
-              if (!remoteData?.id) return;
-              try {
-                await approveMutation.mutateAsync({ configId: remoteData.id });
-                showPopup({
-                  header: t`Thành công`,
-                  message: t`Đã duyệt cấu hình thưởng`,
-                  icon: "success",
-                });
-                await utils.reward.getByCardId.invalidate({ cardPublicId });
-                setViewMode("summary");
-              } catch (err: any) {
-                showPopup({
-                  header: t`Lỗi`,
-                  message: err.message,
-                  icon: "error",
-                });
-              }
-            }}
-            className="text-[9px] font-bold text-emerald-500 hover:underline disabled:opacity-50"
-          >
-            {t`Demo Approve`}
-          </button>
-
-          <span className="h-2 w-[1px] bg-neutral-200 dark:bg-dark-300" />
-          <button
-            type="button"
-            disabled={isMutating}
-            onClick={async () => {
-              if (!remoteData?.id) return;
-              try {
-                await rejectMutation.mutateAsync({
-                  configId: remoteData.id,
-                  rejectedReason: t`Số tiền thưởng vượt ngân sách Q2.`,
-                });
-                showPopup({
-                  header: t`Thành công`,
-                  message: t`Đã từ chối cấu hình thưởng`,
-                  icon: "success",
-                });
-                await utils.reward.getByCardId.invalidate({ cardPublicId });
-                setViewMode("summary");
-              } catch (err: any) {
-                showPopup({
-                  header: t`Lỗi`,
-                  message: err.message,
-                  icon: "error",
-                });
-              }
-            }}
-            className="text-[9px] font-bold text-rose-500 hover:underline disabled:opacity-50"
-          >
-            {t`Demo Reject`}
-          </button>
-        </div>
       </div>
 
       {approvalStatus === "approved" && (
@@ -481,16 +621,26 @@ export default function CardRewardConfigForm({
               <p className="text-xs font-bold text-neutral-900 dark:text-dark-1000">
                 {t`Bạn đang chỉnh sửa bản thảo mới`}
               </p>
-              <div className="mt-0.5 flex items-center gap-2 text-[10px] font-bold text-neutral-500">
-                <span>{t`Bản cấu hình đã chốt`}: 10.000.000 VND</span>
+              <div className="mt-0.5 flex flex-wrap items-center gap-2 text-[10px] font-bold text-neutral-500">
+                <span className="shrink-0">
+                  {t`Bản cấu hình đã chốt`}:{" "}
+                  {formatNumber(dbSnapshot?.snappedBonusAmount || 0)}{" "}
+                  {dbSnapshot?.snappedCurrency || "VND"}
+                </span>
+
                 {card?.dueDate &&
-                  new Date(card.dueDate).getTime() >
-                    new Date("2026-04-16").getTime() && (
-                    <span className="flex items-center gap-1 rounded bg-rose-100 px-1.5 py-0.5 font-black text-rose-600 dark:bg-rose-900/30 dark:text-rose-400">
-                      <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-rose-500" />
+                  dbSnapshot?.snappedDueDate &&
+                  new Date(card.dueDate as string | Date).getTime() >
+                    new Date(
+                      dbSnapshot.snappedDueDate as string | Date,
+                    ).getTime() && (
+                    <span className="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded bg-rose-100 px-1.5 py-0.5 font-black text-rose-600 dark:bg-rose-900/30 dark:text-rose-400">
+                      <span className="h-1.5 w-1.5 shrink-0 animate-pulse rounded-full bg-rose-500" />
                       {t`Lệch Snapshot (+${Math.round(
-                        (new Date(card.dueDate).getTime() -
-                          new Date("2026-04-16").getTime()) /
+                        (new Date(card.dueDate as string | Date).getTime() -
+                          new Date(
+                            dbSnapshot.snappedDueDate as string | Date,
+                          ).getTime()) /
                           (1000 * 3600 * 24),
                       )} ngày)`}
                     </span>
@@ -501,7 +651,7 @@ export default function CardRewardConfigForm({
           <button
             type="button"
             onClick={() => setViewMode("summary")}
-            className="rounded-lg border border-emerald-200 bg-white px-3 py-1.5 text-[10px] font-black uppercase text-emerald-600 shadow-sm transition-all hover:bg-emerald-50 dark:border-emerald-900/30 dark:bg-dark-100 dark:hover:bg-dark-200"
+            className="shrink-0 rounded-lg border border-emerald-200 bg-white px-3 py-1.5 text-[10px] font-black uppercase text-emerald-600 shadow-sm transition-all hover:bg-emerald-50 dark:border-emerald-900/30 dark:bg-dark-100 dark:hover:bg-dark-200"
           >
             {t`Xem bản APPROVED`}
           </button>
@@ -528,7 +678,7 @@ export default function CardRewardConfigForm({
                     setValue("bonusAmount", 0);
                   }
                 }}
-                disabled={isReadOnly}
+                disabled={effectivelyReadOnly}
                 options={[
                   { value: "project", label: t`Thưởng Dự án (Project)` },
                   {
@@ -563,7 +713,7 @@ export default function CardRewardConfigForm({
                 render={({ field }) => (
                   <input
                     type="text"
-                    disabled={isReadOnly || !isProject}
+                    disabled={effectivelyReadOnly || !isProject}
                     value={formatNumber(field.value)}
                     onChange={(e) =>
                       field.onChange(parseNumber(e.target.value))
@@ -590,7 +740,7 @@ export default function CardRewardConfigForm({
                   <Select
                     value={field.value}
                     onChange={field.onChange}
-                    disabled={isReadOnly}
+                    disabled={effectivelyReadOnly}
                     options={[
                       { value: "VND", label: "VND" },
                       { value: "USD", label: "USD" },
@@ -608,7 +758,7 @@ export default function CardRewardConfigForm({
             <label className="text-xs font-semibold uppercase tracking-wider text-neutral-500 dark:text-dark-600">
               {t`Danh sách Khấu trừ`}
             </label>
-            {!isReadOnly && (
+            {!effectivelyReadOnly && (
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
@@ -662,7 +812,7 @@ export default function CardRewardConfigForm({
                       >
                         <td className="p-1">
                           <input
-                            disabled={isReadOnly}
+                            disabled={effectivelyReadOnly}
                             {...register(`deductions.${index}.reason` as const)}
                             placeholder={t`Nhập lý do khấu trừ...`}
                             className="w-full rounded border border-transparent bg-transparent px-3 py-2 text-sm outline-none transition-all placeholder:text-light-400 focus:border-light-200 focus:bg-light-50 dark:text-dark-1000 dark:focus:border-dark-300 dark:focus:bg-dark-200"
@@ -676,7 +826,7 @@ export default function CardRewardConfigForm({
                               <Select
                                 value={field.value}
                                 onChange={field.onChange}
-                                disabled={isReadOnly}
+                                disabled={effectivelyReadOnly}
                                 options={[
                                   { value: "percent", label: "%" },
                                   { value: "vnd", label: "VND" },
@@ -702,7 +852,7 @@ export default function CardRewardConfigForm({
                               >
                                 <input
                                   type="text"
-                                  disabled={isReadOnly}
+                                  disabled={effectivelyReadOnly}
                                   value={formatNumber(field.value)}
                                   onChange={(e) =>
                                     field.onChange(parseNumber(e.target.value))
@@ -719,7 +869,7 @@ export default function CardRewardConfigForm({
                           />
                         </td>
                         <td className="border-l border-light-100 p-1 text-center dark:border-dark-300">
-                          {!isReadOnly && (
+                          {!effectivelyReadOnly && (
                             <motion.button
                               whileHover={{ scale: 1.1 }}
                               whileTap={{ scale: 0.9 }}
@@ -740,7 +890,7 @@ export default function CardRewardConfigForm({
           </div>
         </div>
 
-        {!isReadOnly && (
+        {!effectivelyReadOnly && (
           <div className="flex justify-end gap-3 border-t border-light-200 pt-4 dark:border-dark-300/50">
             {approvalStatus === "draft" && (
               <motion.button
@@ -756,8 +906,10 @@ export default function CardRewardConfigForm({
                       rewardType: data.rewardType,
                       // Draft được phép chưa điền bonusAmount → gửi null nếu chưa có giá trị > 0
                       bonusAmount:
-                        data.rewardType === "project" && data.bonusAmount && data.bonusAmount > 0
-                          ? data.bonusAmount.toString()
+                        data.rewardType === "project" &&
+                        data.bonusAmount &&
+                        data.bonusAmount > 0
+                          ? data.bonusAmount
                           : null,
                       currency: data.currency,
                       deductions: data.deductions.map((d) => ({

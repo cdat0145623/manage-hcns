@@ -3,9 +3,14 @@ import {protectedProcedure, createTRPCRouter} from "../trpc";
 import {generateUID} from "@kan/shared/utils";
 import {z} from "zod";
 import { RRule } from 'rrule';
+import { eq } from "drizzle-orm";
 
 import * as taskMasterRepo from "@kan/db/repository/taskMaster.repo";
 import * as taskInstanceRepo from "@kan/db/repository/taskInstance.repo";
+import { taskMasters, taskInstances } from "@kan/db/schema";
+import {
+  trackTaskInstanceRewardViolations,
+} from "../utils/rewardViolation";
 
 export const taskMasterRouter = createTRPCRouter({
   create: protectedProcedure
@@ -58,6 +63,7 @@ export const taskMasterRouter = createTRPCRouter({
       taskMasterId: taskMaster.id,
       rruleString,
       startDate,
+      masterEndDate: taskMaster.endDate,
       from,
       to,
     });
@@ -67,7 +73,6 @@ export const taskMasterRouter = createTRPCRouter({
         ...taskInstance,
         selectedUserId: taskMaster.targetUser,
         startDate: taskMaster.startDate,
-        endDate: taskMaster.endDate,
       };
     });
 
@@ -107,6 +112,11 @@ export const taskMasterRouter = createTRPCRouter({
 
     const {id, name, description, startDate, endDate, selectedUserId, rruleString} = input;
 
+    // Snapshot previous values before update (for violation comparison)
+    const previousMaster = await ctx.db.query.taskMasters.findFirst({
+      where: eq(taskMasters.id, id),
+    });
+
     const taskMaster = await taskMasterRepo.update(ctx.db, {
       id,
       name,
@@ -118,11 +128,17 @@ export const taskMasterRouter = createTRPCRouter({
       userId,
     });
 
-    const taskInstances = await ctx.db.query.taskInstances.findMany({
+    const taskInstancesList = await ctx.db.query.taskInstances.findMany({
       where: (t, { eq }) => eq(t.taskMasterId, id),
     });
 
-    const updatedTaskInstances = taskInstances.map(async (taskInstance) => {
+    const updatedTaskInstances = taskInstancesList.map(async (taskInstance) => {
+      const instanceEndDate = new Date(taskInstance.targetDate!);
+      instanceEndDate.setHours(taskMaster.endDate.getHours());
+      instanceEndDate.setMinutes(taskMaster.endDate.getMinutes());
+      instanceEndDate.setSeconds(taskMaster.endDate.getSeconds());
+      instanceEndDate.setMilliseconds(taskMaster.endDate.getMilliseconds());
+
       await taskInstanceRepo.update(ctx.db, {
         id: taskInstance.id,
         taskMasterId: id,
@@ -130,8 +146,35 @@ export const taskMasterRouter = createTRPCRouter({
         name: taskMaster.name!,
         description: taskMaster.description!,
         status: taskInstance.status,
+        endDate: instanceEndDate,
       });
     });
+
+    // ── Reward violation tracking (non-blocking, fire-and-forget) ──────────────
+    const endDateChanged = endDate !== undefined &&
+      previousMaster?.endDate?.getTime() !== endDate?.getTime();
+    const assigneeChanged = selectedUserId !== undefined &&
+      previousMaster?.targetUser !== selectedUserId;
+ 
+    if (endDateChanged || assigneeChanged) {
+      for (const inst of taskInstancesList) {
+        const instEndDate = new Date(inst.targetDate!);
+        const endTime = endDate ?? previousMaster!.endDate;
+        instEndDate.setHours(endTime.getHours());
+        instEndDate.setMinutes(endTime.getMinutes());
+        instEndDate.setSeconds(endTime.getSeconds());
+        instEndDate.setMilliseconds(endTime.getMilliseconds());
+
+        trackTaskInstanceRewardViolations({
+          db: ctx.db,
+          taskInstanceId: inst.id,
+          newDueDate: instEndDate,
+          newStartDate: inst.targetDate,
+          newTargetUser: selectedUserId ?? inst.userId,
+        }).catch(() => void 0);
+      }
+    }
+    // ───────────────────────────────────────────────────────────────────
 
     return taskMaster;
   })

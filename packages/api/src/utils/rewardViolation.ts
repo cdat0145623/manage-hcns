@@ -6,6 +6,8 @@ import {
   cardRewardConfigs,
   cardRewardLogs,
   cardRewardSnapshots,
+  taskInstances,
+  taskMasters,
 } from "@kan/db/schema";
 
 const log = createLogger("reward-violation");
@@ -227,6 +229,193 @@ export async function logConfigAudit({
 }
 
 
+/**
+ * Same logic as trackCardRewardViolations but looks up the config via taskInstanceId.
+ *
+ * Call this from taskInstance.update when endDate or userId changes.
+ *
+ * @param taskInstanceId - the taskInstance UUID
+ * @param newDueDate - the newly-derived dueDate (taskInstance.endDate)
+ * @param newStartDate - the new startDate (taskInstance.targetDate)
+ * @param newTargetUser - the new assignee UUID
+ */
+export async function trackTaskInstanceRewardViolations({
+  db,
+  taskInstanceId,
+  newDueDate,
+  newStartDate,
+  newTargetUser,
+}: {
+  db: dbClient;
+  taskInstanceId: string;
+  newDueDate?: Date | null;
+  newStartDate?: Date | null;
+  newTargetUser?: string | null;
+}): Promise<void> {
+  if (newDueDate === undefined && newStartDate === undefined && newTargetUser === undefined) {
+    return;
+  }
+
+  try {
+    await db.transaction(async (tx) => {
+      // Find the APPROVED config + snapshot for this taskInstance
+      const config = await tx.query.cardRewardConfigs.findFirst({
+        where: (t, { and, eq }) =>
+          and(eq(t.taskInstanceId, taskInstanceId), eq(t.approvalStatus, "approved")),
+      });
+
+      if (!config) return;
+
+      const snapshot = await tx.query.cardRewardSnapshots.findFirst({
+        where: eq(cardRewardSnapshots.configId, config.id),
+      });
+
+      const candidates: ViolationCandidate[] = [];
+
+      // 1. dueDate changed
+      if (newDueDate !== undefined && newDueDate !== null) {
+        const snappedDue = snapshot?.snappedDueDate ?? null;
+        if (snappedDue) {
+          if (newDueDate.getTime() > snappedDue.getTime()) {
+            candidates.push({
+              violationType: "deadline_extended",
+              beforeValue: snappedDue.toISOString(),
+              afterValue: newDueDate.toISOString(),
+            });
+          } else if (newDueDate.getTime() < snappedDue.getTime()) {
+            candidates.push({
+              violationType: "deadline_shortened",
+              beforeValue: snappedDue.toISOString(),
+              afterValue: newDueDate.toISOString(),
+            });
+          }
+        }
+      }
+
+      // 2. startDate changed
+      if (newStartDate !== undefined && newStartDate !== null) {
+        const snappedStart = snapshot?.snappedStartDate ?? null;
+        if (!snappedStart || newStartDate.getTime() !== snappedStart.getTime()) {
+          candidates.push({
+            violationType: "start_date_changed",
+            beforeValue: snappedStart?.toISOString() ?? null,
+            afterValue: newStartDate.toISOString(),
+          });
+        }
+      }
+
+      // 3. targetUser (assignee) changed
+      if (newTargetUser !== undefined) {
+        const snappedUser = snapshot?.snappedTargetUser ?? null;
+        if (newTargetUser !== snappedUser) {
+          candidates.push({
+            violationType: "assignee_changed",
+            beforeValue: { targetUser: snappedUser },
+            afterValue: { targetUser: newTargetUser },
+          });
+        }
+      }
+
+      if (candidates.length === 0) return;
+
+      // Atomic downgrade
+      const { rows: downgraded } = await tx.execute<{ id: number }>(
+        sql`
+          UPDATE "card_reward_configs"
+          SET    "approvalStatus" = 'draft',
+                 "updatedAt"      = now()
+          WHERE  id               = ${config.id}
+            AND  "approvalStatus" = 'approved'
+          RETURNING id
+        `,
+      );
+
+      if (!downgraded.length) {
+        log.debug(
+          { configId: config.id, taskInstanceId },
+          "TaskInstance reward violation: concurrency skip — config already downgraded",
+        );
+        return;
+      }
+ 
+      log.info(
+        { configId: config.id, taskInstanceId, violations: candidates.map((c) => c.violationType) },
+        "TaskInstance reward config auto-downgraded to draft due to violations",
+      );
+    });
+  } catch (error) {
+    log.error({ err: error, taskInstanceId }, "trackTaskInstanceRewardViolations failed");
+  }
+}
+
+/**
+ * Transitions the taskInstance's reward config to waiting_evaluation.
+ * Called when a taskInstance status is moved to 'done'.
+ */
+export async function markTaskInstanceConfigWaitingEvaluation({
+  db,
+  taskInstanceId,
+}: {
+  db: dbClient;
+  taskInstanceId: string;
+}): Promise<void> {
+  try {
+    const { rows } = await db.execute<{ id: number }>(
+      sql`
+        UPDATE "card_reward_configs"
+        SET    "approvalStatus" = 'waiting_evaluation',
+               "updatedAt"      = now()
+        WHERE  "taskInstanceId"   = ${taskInstanceId}
+          AND  "approvalStatus" IN ('approved', 'draft', 'rejected', 'waiting_approval')
+        RETURNING id
+      `,
+    );
+
+    if (rows.length > 0) {
+      log.info(
+        { taskInstanceId, configId: rows[0]?.id },
+        "TaskInstance marked as done — reward config auto-transitioned to waiting_evaluation",
+      );
+    }
+  } catch (error) {
+    log.error({ err: error, taskInstanceId }, "markTaskInstanceConfigWaitingEvaluation failed");
+  }
+}
+
+/**
+ * Reverts the taskInstance's reward config back to APPROVED if the instance is re-opened.
+ * Only targets configs that are currently WAITING_EVALUATION.
+ * NEVER reverts if status is COMPLETED.
+ */
+export async function revertTaskInstanceConfigToApproved({
+  db,
+  taskInstanceId,
+}: {
+  db: dbClient;
+  taskInstanceId: string;
+}): Promise<void> {
+  try {
+    const { rows } = await db.execute<{ id: number }>(
+      sql`
+        UPDATE "card_reward_configs"
+        SET    "approvalStatus" = 'approved',
+               "updatedAt"      = now()
+        WHERE  "taskInstanceId"   = ${taskInstanceId}
+          AND  "approvalStatus" = 'waiting_evaluation'
+        RETURNING id
+      `,
+    );
+
+    if (rows.length > 0) {
+      log.info(
+        { taskInstanceId, configId: rows[0]?.id },
+        "TaskInstance re-opened — reward config auto-reverted to approved",
+      );
+    }
+  } catch (error) {
+    log.error({ err: error, taskInstanceId }, "revertTaskInstanceConfigToApproved failed");
+  }
+}
 /**
  * Transitions the card's reward config to waiting_evaluation when work is completed.
  * Only targets configs that are either APPROVED or DRAFT (so we don't accidentally

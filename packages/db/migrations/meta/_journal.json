@@ -442,6 +442,27 @@
       "when": 1776409124259,
       "tag": "20260417065844_AddDeductionIdToRewardLogs",
       "breakpoints": true
+    },
+    {
+      "idx": 63,
+      "version": "7",
+      "when": 1776477248645,
+      "tag": "20260418015408_AddTaskMasterIdToCardRewardConfigs",
+      "breakpoints": true
+    },
+    {
+      "idx": 64,
+      "version": "7",
+      "when": 1776483138291,
+      "tag": "20260418033218_AddEndDateToTaskInstance",
+      "breakpoints": true
+    },
+    {
+      "idx": 65,
+      "version": "7",
+      "when": 1776483138300,
+      "tag": "20260418041300_RefactorRewardConfigToTaskInstance",
+      "breakpoints": true
     }
   ]
 }

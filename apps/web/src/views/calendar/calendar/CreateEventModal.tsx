@@ -29,7 +29,7 @@ export interface EditableEntry {
   masterId?: string;
   instanceId?: string | null;
   type?: "VIRTUAL" | "INSTANCE";
-  status?: "pending" | "done" | "missed" | "draft" | "waiting_approval" | "approved" | "rejected" | "waiting_evaluation" | "completed";
+  status?: "pending" | "done" | "missed";
   title: string;
   description?: string;
   date: Date | string;

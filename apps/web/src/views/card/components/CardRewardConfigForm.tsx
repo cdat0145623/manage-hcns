@@ -258,7 +258,7 @@ export default function CardRewardConfigForm({
         cardPublicId,
         rewardType: data.rewardType,
         bonusAmount:
-          data.rewardType === "project" ? data.bonusAmount?.toString() : null,
+          data.rewardType === "project" ? data.bonusAmount : 0,
         currency: data.currency,
         deductions: data.deductions.map((d) => ({
           ...d,
@@ -276,7 +276,7 @@ export default function CardRewardConfigForm({
 
       // Only call submit if it's currently draft or rejected
       // If it's already waiting_approval, just updating is enough
-      if (approvalStatus === "draft" || approvalStatus === "rejected") {
+      if (result.status === "draft" || result.status === "rejected") {
         await submitMutation.mutateAsync({ configId: result.configId });
         showPopup({
           header: t`Thành công`,
@@ -757,8 +757,8 @@ export default function CardRewardConfigForm({
                       // Draft được phép chưa điền bonusAmount → gửi null nếu chưa có giá trị > 0
                       bonusAmount:
                         data.rewardType === "project" && data.bonusAmount && data.bonusAmount > 0
-                          ? data.bonusAmount.toString()
-                          : null,
+                          ? data.bonusAmount
+                          : 0,
                       currency: data.currency,
                       deductions: data.deductions.map((d) => ({
                         ...d,

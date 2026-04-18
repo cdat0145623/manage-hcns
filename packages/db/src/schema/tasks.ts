@@ -80,6 +80,7 @@ export const taskInstances = pgTable(
     description: text("description"),
     targetDate: timestamp("targetDate"),
     actualDate: timestamp("actualDate"),
+    endDate: timestamp("endDate"),
     status: statusTypeEnum("status").notNull().default("pending"),
     isDeleted: boolean("isDeleted").notNull().default(false),
     createdAt: timestamp("createdAt").notNull().defaultNow(),

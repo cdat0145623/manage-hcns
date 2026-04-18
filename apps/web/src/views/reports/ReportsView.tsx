@@ -41,6 +41,8 @@ import PatternedBackground from "~/components/PatternedBackground";
 import { useModal } from "~/providers/modal";
 import { useWorkspace } from "~/providers/workspace";
 import { api } from "~/utils/api";
+import { detectRewardMismatch } from "~/utils/reward";
+import { RewardBreachListPopup } from "../card/components/RewardBreachListPopup";
 
 const CHART_COLORS = [
   "#6366f1", // Indigo
@@ -543,7 +545,7 @@ export default function ReportsView() {
   const [year, setYear] = useState<number>(now.getFullYear());
   const [activeIndex, setActiveIndex] = useState(-1);
 
-  const { modalContentType, openModal, isOpen } = useModal();
+  const { modalContentType, openModal, closeModal, isOpen } = useModal();
 
   // const { data: users } = api.user.getAll.useQuery();
   const { data: currentUser } = api.user.getUser.useQuery();
@@ -593,6 +595,48 @@ export default function ReportsView() {
     { selectedUserId, boardPublicId, viewMode, month, week, year },
     { enabled: !!selectedUserId && boardsData !== undefined },
   );
+
+  // --- REWARD BREACH DETECTION ---
+  const { data: pendingRewards } = api.reward.getPendingApprovals.useQuery(
+    { boardPublicId, selectedUserId },
+    {
+      enabled:
+        currentUser?.role === "ADMIN" && !!selectedUserId && !!boardPublicId,
+    },
+  );
+
+  const [hasShownBreachPopup, setHasShownBreachPopup] = useState<string | null>(
+    null,
+  );
+
+  useEffect(() => {
+    if (
+      pendingRewards &&
+      selectedUserId &&
+      hasShownBreachPopup !== selectedUserId
+    ) {
+      const breached = pendingRewards.filter((r: any) => {
+        const mismatch = detectRewardMismatch(
+          {
+            title: r.cardTitle || "Untitled",
+            startDate: r.startDate,
+            dueDate: r.dueDate,
+            assigneeId: r.targetUser,
+            bonusAmount: r.bonusAmount,
+            currency: r.currency,
+            deductions: r.deductions,
+          },
+          r.snapshot,
+        );
+        return mismatch.hasMismatch;
+      });
+
+      if (breached.length > 0) {
+        setHasShownBreachPopup(selectedUserId);
+        openModal("REWARD_BREACH_REVIEW");
+      }
+    }
+  }, [pendingRewards, selectedUserId, hasShownBreachPopup]);
 
   const memberOptions = users
     .filter((u) => u != null && !!u.id)
@@ -797,7 +841,7 @@ export default function ReportsView() {
                 Bảng điều khiển
               </h1>
               <div className="mt-2 flex items-center gap-2">
-                <div className="h-4 max-w-[250px] truncate rounded-full bg-indigo-500/10 px-2 leading-4 text-[10px] font-extrabold uppercase tracking-widest text-indigo-600 dark:bg-indigo-500/20 dark:text-indigo-400">
+                <div className="h-4 max-w-[250px] truncate rounded-full bg-indigo-500/10 px-2 text-[10px] font-extrabold uppercase leading-4 tracking-widest text-indigo-600 dark:bg-indigo-500/20 dark:text-indigo-400">
                   {users?.find((u) => u.id === selectedUserId)?.name ||
                     workspace.name}
                 </div>
@@ -1183,6 +1227,22 @@ export default function ReportsView() {
         isVisible={isOpen && modalContentType === "NEW_WORKSPACE"}
       >
         <NewWorkspaceForm />
+      </Modal>
+
+      <Modal
+        modalSize="md"
+        isVisible={isOpen && modalContentType === "REWARD_BREACH_REVIEW"}
+      >
+        <RewardBreachListPopup
+          userId={selectedUserId}
+          userName={users.find((u) => u.id === selectedUserId)?.name || ""}
+          cards={pendingRewards || []}
+          onReviewCard={(publicId) => {
+            closeModal();
+            openModal("CARD_DETAILS", publicId);
+          }}
+          onClose={() => closeModal()}
+        />
       </Modal>
 
       <style jsx global>{`

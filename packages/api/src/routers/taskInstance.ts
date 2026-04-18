@@ -8,6 +8,11 @@ import * as taskMasterRepo from "@kan/db/repository/taskMaster.repo";
 import { statusTypeEnum } from "@kan/db/schema";
 
 import { createTRPCRouter, protectedProcedure } from "../trpc";
+import {
+  trackTaskInstanceRewardViolations,
+  markTaskInstanceConfigWaitingEvaluation,
+  revertTaskInstanceConfigToApproved,
+} from "../utils/rewardViolation";
 
 import pkg from "rrule";
 const { RRule } = pkg;
@@ -210,6 +215,12 @@ export const taskInstanceRouter = createTRPCRouter({
         });
       }
 
+      const instanceEndDate = new Date(targetDate);
+      instanceEndDate.setHours(taskMaster.endDate.getHours());
+      instanceEndDate.setMinutes(taskMaster.endDate.getMinutes());
+      instanceEndDate.setSeconds(taskMaster.endDate.getSeconds());
+      instanceEndDate.setMilliseconds(taskMaster.endDate.getMilliseconds());
+
       const newTaskInstance = await taskInstanceRepo.create(ctx.db, {
         userId,
         taskMasterId,
@@ -217,6 +228,7 @@ export const taskInstanceRouter = createTRPCRouter({
         description: taskMaster.description!,
         targetDate,
         actualDate,
+        endDate: instanceEndDate,
         status,
       });
 
@@ -299,6 +311,7 @@ export const taskInstanceRouter = createTRPCRouter({
                 taskMasterId: taskMaster.id,
                 rruleString: taskMaster.frequence.rruleString,
                 startDate: taskMaster.startDate,
+                masterEndDate: taskMaster.endDate,
                 from,
                 to,
               });
@@ -439,6 +452,12 @@ export const taskInstanceRouter = createTRPCRouter({
         });
       }
 
+      const instanceEndDate = new Date(targetDate ?? oldTaskInstance.targetDate!);
+      instanceEndDate.setHours(taskMaster.endDate.getHours());
+      instanceEndDate.setMinutes(taskMaster.endDate.getMinutes());
+      instanceEndDate.setSeconds(taskMaster.endDate.getSeconds());
+      instanceEndDate.setMilliseconds(taskMaster.endDate.getMilliseconds());
+
       const newTaskInstance = await taskInstanceRepo.update(ctx.db, {
         id,
         userId,
@@ -447,6 +466,7 @@ export const taskInstanceRouter = createTRPCRouter({
         description,
         targetDate,
         actualDate,
+        endDate: instanceEndDate,
         status: status,
       });
 
@@ -472,6 +492,37 @@ export const taskInstanceRouter = createTRPCRouter({
           ctx.db,
           cardActivitesInsert,
         );
+      }
+
+      // ---- Reward Triggers ----
+      // 1. Violation Check (End Date, Target Date, or Assignee changed)
+      if (
+        oldTaskInstance.endDate?.getTime() !== newTaskInstance.endDate?.getTime() ||
+        oldTaskInstance.targetDate?.getTime() !== newTaskInstance.targetDate?.getTime() ||
+        oldTaskInstance.userId !== newTaskInstance.userId
+      ) {
+        await trackTaskInstanceRewardViolations({
+          db: ctx.db,
+          taskInstanceId: id,
+          newDueDate: newTaskInstance.endDate,
+          newStartDate: newTaskInstance.targetDate,
+          newTargetUser: newTaskInstance.userId,
+        });
+      }
+
+      // 2. Evaluation Status Transition
+      if (oldTaskInstance.status !== newTaskInstance.status) {
+        if (newTaskInstance.status === "done") {
+          await markTaskInstanceConfigWaitingEvaluation({
+            db: ctx.db,
+            taskInstanceId: id,
+          });
+        } else if (oldTaskInstance.status === "done") {
+          await revertTaskInstanceConfigToApproved({
+            db: ctx.db,
+            taskInstanceId: id,
+          });
+        }
       }
 
       if (oldTaskInstance.targetDate !== newTaskInstance.targetDate) {

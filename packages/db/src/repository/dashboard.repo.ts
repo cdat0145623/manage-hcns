@@ -281,6 +281,7 @@ export const getCalendarMetrics = async (
         taskMasterId: taskMaster.id,
         rruleString: freq.rruleString,
         startDate: taskMaster.startDate,
+        masterEndDate: taskMaster.endDate,
         from: effectiveFrom,
         to: effectiveTo,
       });

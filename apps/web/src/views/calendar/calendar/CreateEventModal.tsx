@@ -15,6 +15,7 @@ import Editor from "~/components/Editor";
 import { usePopup } from "~/providers/popup";
 import { api } from "~/utils/api";
 import Modal from "../../../components/modal";
+import CardRewardConfigForm from "../../card/components/CardRewardConfigForm";
 
 export interface Attendee {
   id: string;
@@ -682,6 +683,15 @@ export function CreateEventModal({
               </div>
             </div>
 
+            {isEditMode && editEntry?.masterId ? (
+              <div className="space-y-2 rounded-2xl border border-neutral-200/80 bg-neutral-50/40 p-4 dark:border-dark-300 dark:bg-dark-200/30">
+                <p className="text-[10px] font-black uppercase tracking-widest text-neutral-500 dark:text-neutral-400">
+                  Mẫu thưởng (áp dụng khi tạo phiên bản công việc)
+                </p>
+                <CardRewardConfigForm taskMasterId={editEntry.masterId} />
+              </div>
+            ) : null}
+
             <motion.div
               layout
               className="space-y-4 rounded-3xl border border-neutral-100 bg-white p-4 shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:border-dark-300 dark:bg-dark-200/50"
@@ -806,8 +816,8 @@ export function CreateEventModal({
                     }`}
                   >
                     <span>
-                      {isEditMode && 
-                      editEntry?.rruleStringToText && 
+                      {isEditMode &&
+                      editEntry?.rruleStringToText &&
                       recurrence === editEntry.recurrence
                         ? editEntry.rruleStringToText
                         : recurrence !== "UNSELECTED" && selectedOpt

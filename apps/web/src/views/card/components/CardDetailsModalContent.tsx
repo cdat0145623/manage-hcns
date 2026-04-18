@@ -2,7 +2,7 @@ import { t } from "@lingui/core/macro";
 import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
-import { HiXMark, HiMiniPlus } from "react-icons/hi2";
+import { HiMiniPlus, HiXMark } from "react-icons/hi2";
 
 import { authClient } from "@kan/auth/client";
 
@@ -50,8 +50,14 @@ export default function CardDetailsModalContent({
   onClose,
 }: CardDetailsModalContentProps) {
   const utils = api.useUtils();
-  const { modalContentType, entityId, clearModalState, isOpen, modalStates, openModal } =
-    useModal();
+  const {
+    modalContentType,
+    entityId,
+    clearModalState,
+    isOpen,
+    modalStates,
+    openModal,
+  } = useModal();
   const { showPopup } = usePopup();
   const { workspace } = useWorkspace();
   const { canEditCard, canAttach, canCreateComment } = usePermissions();
@@ -59,9 +65,9 @@ export default function CardDetailsModalContent({
   const [activeChecklistForm, setActiveChecklistForm] = useState<string | null>(
     null,
   );
-  const [activeTab, setActiveTab] = useState<"comments" | "history" | "rewards">(
-    "comments",
-  );
+  const [activeTab, setActiveTab] = useState<
+    "comments" | "history" | "rewards"
+  >("comments");
 
   const { data: card, isLoading } = api.card.byId.useQuery(
     { cardPublicId: cardId ?? "" },
@@ -291,7 +297,7 @@ export default function CardDetailsModalContent({
 
           {/* Checklists */}
           <div className="flex-1 overflow-y-auto px-10 pb-10 pt-4">
-            <div className="flex items-center gap-3 mb-3">
+            <div className="mb-3 flex items-center gap-3">
               <p className="text-[11px] font-semibold uppercase tracking-widest text-neutral-900 dark:text-dark-1000">
                 {t`Checklist`}
               </p>
@@ -392,8 +398,8 @@ export default function CardDetailsModalContent({
                       activeTab === "comments"
                         ? 0
                         : activeTab === "history"
-                        ? "calc(100% + 4px)"
-                        : "calc(200% + 8px)",
+                          ? "calc(100% + 4px)"
+                          : "calc(200% + 8px)",
                   }}
                   initial={false}
                   transition={{ type: "spring", stiffness: 450, damping: 38 }}
@@ -442,7 +448,7 @@ export default function CardDetailsModalContent({
                       />
                     </div>
                   )}
-                  {card && !isTemplate && (
+                  {card && !isTemplate && activeTab !== "rewards" && (
                     <div className="shrink-0 space-y-3">
                       <div className="flex items-center justify-between">
                         <p className="text-[10px] font-bold uppercase tracking-widest text-neutral-900 dark:text-dark-1000">
@@ -471,8 +477,10 @@ export default function CardDetailsModalContent({
                       </div>
                     </div>
                   )}
-                  <div className="h-px bg-light-200 dark:bg-dark-300" />
-                  {canComment && (
+                  {(activeTab !== "rewards" || hasComments) && (
+                    <div className="h-px bg-light-200 dark:bg-dark-300" />
+                  )}
+                  {canComment && activeTab !== "rewards" && (
                     <div className="shrink-0 space-y-1">
                       <p className="text-[10px] font-bold uppercase tracking-widest text-neutral-900 dark:text-dark-1000">
                         {t`Viết bình luận`}

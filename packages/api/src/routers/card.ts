@@ -20,10 +20,14 @@ import {
   assertPermission,
 } from "../utils/permissions";
 import {
+  markConfigWaitingEvaluation,
+  revertConfigToApproved,
+  trackCardRewardViolations,
+} from "../utils/rewardViolation";
+import {
   createCardWebhookPayload,
   sendWebhooksForWorkspace,
 } from "../utils/webhook";
-import { markConfigWaitingEvaluation, revertConfigToApproved, trackCardRewardViolations } from "../utils/rewardViolation";
 
 const statusTypeEnumSchema = z.enum(statusTypeEnum.enumValues);
 
@@ -1123,22 +1127,35 @@ export const cardRouter = createTRPCRouter({
           db: ctx.db,
           cardId: result.id,
           ...(input.dueDate !== undefined && { newDueDate: input.dueDate }),
-          ...(input.startDate !== undefined && { newStartDate: input.startDate }),
+          ...(input.startDate !== undefined && {
+            newStartDate: input.startDate,
+          }),
         }).catch(() => void 0);
       }
 
       // Check if task is completed
-      const isStatusDone = input.status === "done" && existingCard.status !== "done";
-      const isStatusUndone = existingCard.status === "done" && input.status !== "done" && input.status !== undefined;
+      const isStatusDone =
+        input.status === "done" && existingCard.status !== "done";
+      const isStatusUndone =
+        existingCard.status === "done" &&
+        input.status !== "done" &&
+        input.status !== undefined;
 
-      // const isMovedToDoneList = newListId && existingCard.listId !== newListId && 
+      // const isMovedToDoneList = newListId && existingCard.listId !== newListId &&
       //     (newListTitle?.toUpperCase() === "DONE" || newListTitle?.toUpperCase() === "HOÀN THÀNH");
 
       // if (isStatusDone || isMovedToDoneList) {
       if (isStatusDone) {
-        markConfigWaitingEvaluation({ db: ctx.db, cardId: result.id }).catch(() => void 0);
+        markConfigWaitingEvaluation({
+          db: ctx.db,
+          cardId: result.id,
+          dueDate: result.dueDate,
+          completedAt: new Date(),
+        }).catch(() => void 0);
       } else if (isStatusUndone) {
-        revertConfigToApproved({ db: ctx.db, cardId: result.id }).catch(() => void 0);
+        revertConfigToApproved({ db: ctx.db, cardId: result.id }).catch(
+          () => void 0,
+        );
       }
       // ────────────────────────────────────────────────────────────────────────
 

@@ -42,7 +42,12 @@ export function Tooltip({
 
     return () => {
       instance.destroy();
-      rootRef.current?.unmount();
+      const root = rootRef.current;
+      rootRef.current = null;
+      // Defer unmount so we never call createRoot.unmount() during React's render/commit.
+      queueMicrotask(() => {
+        root?.unmount();
+      });
     };
   }, [content, placement, delay]);
 

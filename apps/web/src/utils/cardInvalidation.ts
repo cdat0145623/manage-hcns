@@ -9,10 +9,12 @@ export async function invalidateCard(
   cardPublicId: string,
 ) {
   if (!cardPublicId || cardPublicId.length < 12) return;
-  
+
   await Promise.all([
     utils.card.byId.invalidate({ cardPublicId }),
     utils.card.getActivities.invalidate({ cardPublicId }),
+    // Card dates/members affect reward snapshot + approval status (trackCardRewardViolations).
+    utils.reward.getByCardId.invalidate({ cardPublicId }),
   ]);
 }
 
@@ -30,6 +32,6 @@ export async function invalidateTaskInstance(
     utils.attachment.getByTaskInstanceId.invalidate({ taskInstanceId }),
     utils.taskInstance.byId.invalidate({ id: taskInstanceId }),
     utils.taskInstance.getVirtual.invalidate(),
+    utils.reward.getByTaskInstanceId.invalidate({ taskInstanceId }),
   ]);
 }
-

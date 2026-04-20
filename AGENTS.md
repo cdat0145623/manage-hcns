@@ -331,3 +331,18 @@ Update all of the following:
 - Provide clear description of changes
 - Include screenshots for UI changes
 - Keep PRs focused on a single feature/fix
+
+## Learned User Preferences
+
+- Bug reports and feature discussions may be in Vietnamese; when validating reward UI behavior, align with the Vietnamese copy in `apps/web` card reward components.
+
+## Learned Workspace Facts
+
+- Better Auth rejects requests when the browser `Origin` is not listed: add non-default dev URLs (for example forwarded ports like `http://localhost:63443`) to `BETTER_AUTH_TRUSTED_ORIGINS` (comma-separated full origins) and keep `NEXT_PUBLIC_BASE_URL` consistent with the URL actually used in the browser.
+- Drizzle `packages/db/drizzle.config.ts` resolves `schema` and `out` from the config file path so `drizzle-kit migrate` finds `packages/db/migrations` regardless of the process working directory.
+- Running migrations or DB tools on the host: `POSTGRES_URL` must use `localhost` and the published port from `docker-compose` (for example `5632`); hostname `postgres` only resolves on the Docker network.
+- If `drizzle.__drizzle_migrations` is empty but the database already matches the latest schema (for example after `drizzle push`), use `pnpm db:migrate:stamp` then `pnpm db:migrate` so Drizzle does not replay every migration from the start; the stamp script is idempotent when a watermark already exists.
+- Card reward snapshots store assignee as a user id (`snappedTargetUser`); compare to `cards.targetUser` or the member user id, not workspace member `publicId`.
+- After reward mutations that change status (approve, reject, submit, etc.), prefer `refetch` for `reward.getByCardId` plus `invalidateCard` from `~/utils/cardInvalidation` so the card detail modal and board stay in sync; `invalidate` alone can lag behind `refetch`.
+- The “data changed vs approved snapshot” warning in the reward summary is intended only when `approvalStatus` is `draft` and a snapshot exists (post-approval monitoring uses other cues).
+- Merging branches that both add Drizzle migrations: merge `packages/db/migrations/meta/_journal.json` so every `tag` appears once, `idx` stays contiguous, each `tag` has a matching `.sql`, then run `pnpm db:migrate` on a throwaway or staging database.

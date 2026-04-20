@@ -466,6 +466,7 @@ export const getWithListAndMembersByPublicId = async (
       description: true,
       startDate: true,
       dueDate: true,
+      targetUser: true,
       createdBy: true,
       status: true,
     },

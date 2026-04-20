@@ -1,3 +1,4 @@
+import { t } from "@lingui/macro";
 import { format } from "date-fns";
 import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useMemo, useState } from "react";
@@ -6,7 +7,8 @@ import { HiMiniPlus, HiXMark } from "react-icons/hi2";
 import { authClient } from "@kan/auth/client";
 
 import type { EditableEntry } from "./CreateEventModal";
-import Editor, { type WorkspaceMember } from "~/components/Editor";
+import type { WorkspaceMember } from "~/components/Editor";
+import Editor from "~/components/Editor";
 import { useModal } from "~/providers/modal";
 import { usePopup } from "~/providers/popup";
 import { api } from "~/utils/api";
@@ -14,6 +16,7 @@ import Modal from "../../../components/modal";
 import ActivityList from "../../card/components/ActivityList";
 import { AttachmentThumbnails } from "../../card/components/AttachmentThumbnails";
 import { AttachmentUpload } from "../../card/components/AttachmentUpload";
+import CardRewardConfigForm from "../../card/components/CardRewardConfigForm";
 import Checklists from "../../card/components/Checklists";
 import { DeleteChecklistConfirmation } from "../../card/components/DeleteChecklistConfirmation";
 import { DeleteCommentConfirmation } from "../../card/components/DeleteCommentConfirmation";
@@ -31,6 +34,12 @@ interface EventDetailModalProps {
 }
 
 type TaskStatus = "pending" | "done" | "missed";
+
+function normalizeTaskStatus(s: string | undefined | null): TaskStatus {
+  const v = String(s ?? "pending").toLowerCase();
+  if (v === "done" || v === "missed" || v === "pending") return v;
+  return "pending";
+}
 
 const STATUS_CONFIG: Record<
   TaskStatus,
@@ -168,9 +177,9 @@ export function EventDetailModal({
   const [activeChecklistForm, setActiveChecklistForm] = useState<string | null>(
     null,
   );
-  const [activeTab, setActiveTab] = useState<"comments" | "history">(
-    "comments",
-  );
+  const [activeTab, setActiveTab] = useState<
+    "comments" | "history" | "rewards"
+  >("comments");
 
   const { data: attachments } = api.attachment.getByTaskInstanceId.useQuery(
     { taskInstanceId: entry?.instanceId! },
@@ -203,11 +212,25 @@ export function EventDetailModal({
     { enabled: !!entry?.instanceId && entry?.type === "INSTANCE" && isVisible },
   );
 
+  /** Ưu tiên dữ liệu từ API — entry từ lịch có thể stale sau khi đánh dấu hoàn thành */
+  const currentStatus: TaskStatus = useMemo(() => {
+    if (latestInstance?.status != null) {
+      return normalizeTaskStatus(latestInstance.status);
+    }
+    return normalizeTaskStatus(entry?.status);
+  }, [latestInstance?.status, entry?.status]);
+
   const [description, setDescription] = useState(entry?.description ?? "");
 
   useEffect(() => {
     setDescription(entry?.description ?? "");
   }, [entry?.description, isVisible]);
+
+  useEffect(() => {
+    if (entry?.type !== "INSTANCE" && activeTab === "rewards") {
+      setActiveTab("comments");
+    }
+  }, [entry?.type, entry?.id, activeTab]);
 
   const { data: currentUser } = api.user.getUser.useQuery();
 
@@ -222,8 +245,16 @@ export function EventDetailModal({
     currentUser?.role === "ADMIN";
 
   const updateInstance = api.taskInstance.update.useMutation({
-    onSuccess: () => {
+    onSuccess: async (_data, variables) => {
       void utils.taskInstance.getVirtual.invalidate();
+      if (variables.id) {
+        await Promise.all([
+          utils.taskInstance.byId.invalidate({ id: variables.id }),
+          utils.reward.getByTaskInstanceId.invalidate({
+            taskInstanceId: variables.id,
+          }),
+        ]);
+      }
     },
     onError: (error: any) => {
       console.error("Mutation failed:", error);
@@ -242,12 +273,10 @@ export function EventDetailModal({
     });
   };
 
-  if (!entry) return null;
-
-  const currentStatus: TaskStatus = entry.status! ?? "pending";
   const isBusy = updateInstance.isPending || isUpdating;
 
   const handleStatusChange = async (newStatus: TaskStatus) => {
+    if (!entry) return;
     if (newStatus === currentStatus || isBusy) return;
     if (!entry.masterId) return;
 
@@ -302,19 +331,56 @@ export function EventDetailModal({
   };
 
   const statusConfig = STATUS_CONFIG[currentStatus];
-  const displayChecklists = latestInstance?.checklists ?? entry.checklists;
+  const displayChecklists = latestInstance?.checklists ?? entry?.checklists;
 
-  const startDate = entry.date ? new Date(entry.date) : new Date();
-  if (entry.startTime) {
+  const startDate = entry?.date ? new Date(entry.date) : new Date();
+  if (entry?.startTime) {
     const [h, m] = entry.startTime.split(":");
     if (h && m) startDate.setHours(parseInt(h, 10), parseInt(m, 10), 0, 0);
   }
 
-  const endDate = entry.date ? new Date(entry.date) : new Date();
-  if (entry.endTime) {
+  const endDate = entry?.date ? new Date(entry.date) : new Date();
+  if (entry?.endTime) {
     const [h, m] = entry.endTime.split(":");
     if (h && m) endDate.setHours(parseInt(h, 10), parseInt(m, 10), 0, 0);
   }
+
+  const isInstanceEvent =
+    entry?.type === "INSTANCE" && Boolean(entry?.instanceId);
+
+  const rewardCalendarCard = useMemo(
+    () => ({
+      title: entry?.title ?? "",
+      startDate,
+      dueDate: endDate,
+      status: currentStatus,
+      members:
+        entry?.selectedUserId != null && entry.selectedUserId !== ""
+          ? [
+              {
+                name: entry.assigneeName,
+                email: "",
+                image: null,
+                user: {
+                  id: entry.selectedUserId,
+                  name: entry.assigneeName ?? "",
+                  image: null,
+                },
+              },
+            ]
+          : [],
+    }),
+    [
+      entry?.title,
+      currentStatus,
+      entry?.selectedUserId,
+      entry?.assigneeName,
+      startDate,
+      endDate,
+    ],
+  );
+
+  if (!entry) return null;
 
   return (
     <Modal
@@ -324,34 +390,34 @@ export function EventDetailModal({
       hideDefaultStyles
       onClose={onClose}
     >
-        <motion.div
-          initial={{ opacity: 0, scale: 0.97 }}
-          animate={{ opacity: 1, scale: 1 }}
-          exit={{ opacity: 0, scale: 0.97 }}
-          transition={{ duration: 0.18, ease: "easeOut" }}
-          className="flex h-[92vh] rounded-2xl border border-light-200 bg-white shadow-2xl dark:border-dark-300 dark:bg-dark-100"
-        >
+      <motion.div
+        initial={{ opacity: 0, scale: 0.97 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, scale: 0.97 }}
+        transition={{ duration: 0.18, ease: "easeOut" }}
+        className="flex h-[92vh] rounded-2xl border border-light-200 bg-white shadow-2xl dark:border-dark-300 dark:bg-dark-100"
+      >
         <div className="flex w-1/2 flex-col border-r border-light-100 text-left dark:border-dark-300">
           <div className="shrink-0 border-b border-light-100 px-10 py-7 dark:border-dark-300">
             <h3 className="block w-full resize-none overflow-hidden border-0 bg-transparent p-0 text-2xl font-bold leading-snug text-neutral-900 dark:text-dark-1000">
               {entry.title}
             </h3>
           </div>
-            <div className="shrink-0 border-b border-light-100 px-10 py-6 dark:border-dark-300">
-              <p className="mb-3 text-[10px] font-semibold uppercase tracking-widest text-neutral-900 dark:text-dark-1000">
-                Mô tả
-              </p>
-              <div className="group relative flex min-h-[120px] w-full flex-col rounded-xl border border-light-200 bg-white shadow-sm transition-all focus-within:border-light-400 focus-within:shadow-md dark:border-dark-300 dark:bg-dark-100 dark:focus-within:border-dark-500">
-                <Editor
-                  content={description}
-                  onChange={canEdit ? setDescription : undefined}
-                  onBlur={canEdit ? handleDescriptionBlur : undefined}
-                  readOnly={!canEdit}
-                  workspaceMembers={workspaceMembers}
-                  maxHeightClass="max-h-[300px]"
-                />
-              </div>
+          <div className="shrink-0 border-b border-light-100 px-10 py-6 dark:border-dark-300">
+            <p className="mb-3 text-[10px] font-semibold uppercase tracking-widest text-neutral-900 dark:text-dark-1000">
+              Mô tả
+            </p>
+            <div className="group relative flex min-h-[120px] w-full flex-col rounded-xl border border-light-200 bg-white shadow-sm transition-all focus-within:border-light-400 focus-within:shadow-md dark:border-dark-300 dark:bg-dark-100 dark:focus-within:border-dark-500">
+              <Editor
+                content={description}
+                onChange={canEdit ? setDescription : undefined}
+                onBlur={canEdit ? handleDescriptionBlur : undefined}
+                readOnly={!canEdit}
+                workspaceMembers={workspaceMembers}
+                maxHeightClass="max-h-[300px]"
+              />
             </div>
+          </div>
 
           {/* Checklists */}
           <div className="flex-1 space-y-4 overflow-y-auto px-10 py-4">
@@ -507,6 +573,7 @@ export function EventDetailModal({
             <div className="sticky top-0 z-10 shrink-0 bg-light-50/80 px-6 py-2 backdrop-blur-md dark:bg-dark-50/80">
               <div className="relative flex rounded-2xl border border-light-200 bg-white p-1 shadow-sm dark:border-dark-300 dark:bg-dark-100">
                 <button
+                  type="button"
                   onClick={() => setActiveTab("comments")}
                   className={`relative z-10 flex-1 rounded-xl py-2.5 text-[11px] font-bold uppercase tracking-widest transition-all ${
                     activeTab === "comments"
@@ -514,9 +581,10 @@ export function EventDetailModal({
                       : "text-light-500 hover:text-light-700 dark:text-dark-500"
                   }`}
                 >
-                  Tính năng
+                  {t`Tính năng`}
                 </button>
                 <button
+                  type="button"
                   onClick={() => setActiveTab("history")}
                   className={`relative z-10 flex-1 rounded-xl py-2.5 text-[11px] font-bold uppercase tracking-widest transition-all ${
                     activeTab === "history"
@@ -524,13 +592,38 @@ export function EventDetailModal({
                       : "text-light-500 hover:text-light-700 dark:text-dark-500"
                   }`}
                 >
-                  Hoạt động
+                  {t`Hoạt động`}
                 </button>
+                {isInstanceEvent ? (
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab("rewards")}
+                    className={`relative z-10 flex-1 rounded-xl py-2.5 text-[11px] font-bold uppercase tracking-widest transition-all ${
+                      activeTab === "rewards"
+                        ? "text-neutral-900 dark:text-dark-1000"
+                        : "text-light-500 hover:text-light-700 dark:text-dark-500"
+                    }`}
+                  >
+                    {t`Cấu hình thưởng`}
+                  </button>
+                ) : null}
                 <motion.div
                   className="absolute inset-y-1 rounded-xl bg-light-100 shadow-inner dark:bg-dark-200"
-                  style={{ width: "calc(50% - 4px)" }}
+                  style={{
+                    width: isInstanceEvent
+                      ? "calc(33.333% - 4px)"
+                      : "calc(50% - 4px)",
+                  }}
                   animate={{
-                    x: activeTab === "comments" ? 0 : "calc(100% + 4px)",
+                    x: isInstanceEvent
+                      ? activeTab === "comments"
+                        ? 0
+                        : activeTab === "history"
+                          ? "calc(100% + 4px)"
+                          : "calc(200% + 8px)"
+                      : activeTab === "comments"
+                        ? 0
+                        : "calc(100% + 4px)",
                   }}
                   initial={false}
                   transition={{ type: "spring", stiffness: 450, damping: 38 }}
@@ -558,6 +651,20 @@ export function EventDetailModal({
                       "updated_comment_updated",
                       "updated_comment_deleted",
                     ]}
+                  />
+                </motion.div>
+              ) : activeTab === "rewards" && isInstanceEvent ? (
+                <motion.div
+                  key="rewards"
+                  initial={{ opacity: 0, y: 5 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -5 }}
+                  transition={{ duration: 0.15 }}
+                  className="flex min-h-0 flex-1 flex-col overflow-y-auto px-6 pb-6"
+                >
+                  <CardRewardConfigForm
+                    taskInstanceId={entry.instanceId!}
+                    card={rewardCalendarCard}
                   />
                 </motion.div>
               ) : (

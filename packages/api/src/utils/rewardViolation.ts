@@ -1,16 +1,26 @@
-import { eq, sql } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 
-import { createLogger } from "@kan/logger";
 import type { dbClient } from "@kan/db/client";
 import {
   cardRewardConfigs,
+  cardRewardDeductions,
   cardRewardLogs,
   cardRewardSnapshots,
   taskInstances,
   taskMasters,
 } from "@kan/db/schema";
+import { createLogger } from "@kan/logger";
+import { REWARD_DEDUCTION_REASON } from "@kan/shared/constants";
 
 const log = createLogger("reward-violation");
+
+/** Trạng thái config được phép chuyển sang waiting_evaluation khi công việc hoàn thành */
+const APPROVAL_STATUSES_BEFORE_EVALUATION = [
+  "approved",
+  "draft",
+  "rejected",
+  "waiting_approval",
+] as const;
 
 export type RewardViolationType =
   | "deadline_extended"
@@ -98,7 +108,10 @@ export async function trackCardRewardViolations({
 
       if (newStartDate !== undefined && newStartDate !== null) {
         const snappedStart = snapshot?.snappedStartDate ?? null;
-        if (!snappedStart || newStartDate.getTime() !== snappedStart.getTime()) {
+        if (
+          !snappedStart ||
+          newStartDate.getTime() !== snappedStart.getTime()
+        ) {
           candidates.push({
             violationType: "start_date_changed",
             beforeValue: snappedStart?.toISOString() ?? null,
@@ -144,7 +157,11 @@ export async function trackCardRewardViolations({
       }
 
       log.info(
-        { configId: config.id, cardId, violations: candidates.map((c) => c.violationType) },
+        {
+          configId: config.id,
+          cardId,
+          violations: candidates.map((c) => c.violationType),
+        },
         "Reward config auto-downgraded to draft due to violations (logs will be recorded on approval)",
       );
     });
@@ -228,7 +245,6 @@ export async function logConfigAudit({
   }
 }
 
-
 /**
  * Same logic as trackCardRewardViolations but looks up the config via taskInstanceId.
  *
@@ -252,7 +268,11 @@ export async function trackTaskInstanceRewardViolations({
   newStartDate?: Date | null;
   newTargetUser?: string | null;
 }): Promise<void> {
-  if (newDueDate === undefined && newStartDate === undefined && newTargetUser === undefined) {
+  if (
+    newDueDate === undefined &&
+    newStartDate === undefined &&
+    newTargetUser === undefined
+  ) {
     return;
   }
 
@@ -261,7 +281,10 @@ export async function trackTaskInstanceRewardViolations({
       // Find the APPROVED config + snapshot for this taskInstance
       const config = await tx.query.cardRewardConfigs.findFirst({
         where: (t, { and, eq }) =>
-          and(eq(t.taskInstanceId, taskInstanceId), eq(t.approvalStatus, "approved")),
+          and(
+            eq(t.taskInstanceId, taskInstanceId),
+            eq(t.approvalStatus, "approved"),
+          ),
       });
 
       if (!config) return;
@@ -295,7 +318,10 @@ export async function trackTaskInstanceRewardViolations({
       // 2. startDate changed
       if (newStartDate !== undefined && newStartDate !== null) {
         const snappedStart = snapshot?.snappedStartDate ?? null;
-        if (!snappedStart || newStartDate.getTime() !== snappedStart.getTime()) {
+        if (
+          !snappedStart ||
+          newStartDate.getTime() !== snappedStart.getTime()
+        ) {
           candidates.push({
             violationType: "start_date_changed",
             beforeValue: snappedStart?.toISOString() ?? null,
@@ -337,14 +363,21 @@ export async function trackTaskInstanceRewardViolations({
         );
         return;
       }
- 
+
       log.info(
-        { configId: config.id, taskInstanceId, violations: candidates.map((c) => c.violationType) },
+        {
+          configId: config.id,
+          taskInstanceId,
+          violations: candidates.map((c) => c.violationType),
+        },
         "TaskInstance reward config auto-downgraded to draft due to violations",
       );
     });
   } catch (error) {
-    log.error({ err: error, taskInstanceId }, "trackTaskInstanceRewardViolations failed");
+    log.error(
+      { err: error, taskInstanceId },
+      "trackTaskInstanceRewardViolations failed",
+    );
   }
 }
 
@@ -355,30 +388,51 @@ export async function trackTaskInstanceRewardViolations({
 export async function markTaskInstanceConfigWaitingEvaluation({
   db,
   taskInstanceId,
+  dueDate,
+  completedAt,
 }: {
   db: dbClient;
   taskInstanceId: string;
+  dueDate?: Date | null;
+  completedAt?: Date;
 }): Promise<void> {
   try {
-    const { rows } = await db.execute<{ id: number }>(
-      sql`
-        UPDATE "card_reward_configs"
-        SET    "approvalStatus" = 'waiting_evaluation',
-               "updatedAt"      = now()
-        WHERE  "taskInstanceId"   = ${taskInstanceId}
-          AND  "approvalStatus" IN ('approved', 'draft', 'rejected', 'waiting_approval')
-        RETURNING id
-      `,
-    );
+    const rows = await db
+      .update(cardRewardConfigs)
+      .set({
+        approvalStatus: "waiting_evaluation",
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(cardRewardConfigs.taskInstanceId, taskInstanceId),
+          inArray(cardRewardConfigs.approvalStatus, [
+            ...APPROVAL_STATUSES_BEFORE_EVALUATION,
+          ]),
+        ),
+      )
+      .returning({ id: cardRewardConfigs.id });
 
     if (rows.length > 0) {
+      const configId = rows[0]?.id;
       log.info(
-        { taskInstanceId, configId: rows[0]?.id },
+        { taskInstanceId, configId },
         "TaskInstance marked as done — reward config auto-transitioned to waiting_evaluation",
       );
+      if (configId != null && completedAt) {
+        await recordLateCompletionRewardLog({
+          db,
+          configId,
+          dueDate: dueDate ?? null,
+          completedAt,
+        });
+      }
     }
   } catch (error) {
-    log.error({ err: error, taskInstanceId }, "markTaskInstanceConfigWaitingEvaluation failed");
+    log.error(
+      { err: error, taskInstanceId },
+      "markTaskInstanceConfigWaitingEvaluation failed",
+    );
   }
 }
 
@@ -395,27 +449,110 @@ export async function revertTaskInstanceConfigToApproved({
   taskInstanceId: string;
 }): Promise<void> {
   try {
-    const { rows } = await db.execute<{ id: number }>(
-      sql`
-        UPDATE "card_reward_configs"
-        SET    "approvalStatus" = 'approved',
-               "updatedAt"      = now()
-        WHERE  "taskInstanceId"   = ${taskInstanceId}
-          AND  "approvalStatus" = 'waiting_evaluation'
-        RETURNING id
-      `,
-    );
+    const rows = await db
+      .update(cardRewardConfigs)
+      .set({
+        approvalStatus: "approved",
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(cardRewardConfigs.taskInstanceId, taskInstanceId),
+          eq(cardRewardConfigs.approvalStatus, "waiting_evaluation"),
+        ),
+      )
+      .returning({ id: cardRewardConfigs.id });
 
     if (rows.length > 0) {
+      const configId = rows[0]?.id;
+      if (configId != null) {
+        await deleteLateCompletionRewardLogsForConfig(db, configId);
+      }
       log.info(
         { taskInstanceId, configId: rows[0]?.id },
         "TaskInstance re-opened — reward config auto-reverted to approved",
       );
     }
   } catch (error) {
-    log.error({ err: error, taskInstanceId }, "revertTaskInstanceConfigToApproved failed");
+    log.error(
+      { err: error, taskInstanceId },
+      "revertTaskInstanceConfigToApproved failed",
+    );
   }
 }
+
+async function deleteLateCompletionRewardLogsForConfig(
+  db: dbClient,
+  configId: number,
+): Promise<void> {
+  await db
+    .delete(cardRewardLogs)
+    .where(
+      and(
+        eq(cardRewardLogs.configId, configId),
+        eq(cardRewardLogs.violationType, "completed_after_deadline"),
+      ),
+    );
+}
+
+/**
+ * Khi hoàn thành sau deadline: gắn log + khấu trừ loại trễ hạn (late_deadline) để nghiệm thu tính đúng.
+ * Quy tắc đúng hạn: completedAt &lt; dueDate (cùng logic ưu tiên với dashboard on-time).
+ */
+export async function recordLateCompletionRewardLog({
+  db,
+  configId,
+  dueDate,
+  completedAt,
+}: {
+  db: dbClient;
+  configId: number;
+  dueDate: Date | null;
+  completedAt: Date;
+}): Promise<void> {
+  try {
+    if (!dueDate) return;
+    if (completedAt.getTime() < dueDate.getTime()) return;
+
+    const deductions = await db.query.cardRewardDeductions.findMany({
+      where: eq(cardRewardDeductions.configId, configId),
+    });
+    const lateRow = deductions.find(
+      (d) => d.reason === REWARD_DEDUCTION_REASON.LATE,
+    );
+    if (!lateRow) {
+      log.warn(
+        { configId },
+        "Late completion: no late_deadline deduction row on config",
+      );
+      return;
+    }
+
+    await deleteLateCompletionRewardLogsForConfig(db, configId);
+
+    await db.insert(cardRewardLogs).values({
+      configId,
+      violationType: "completed_after_deadline",
+      deductionId: lateRow.id,
+      beforeValue: { dueDate: dueDate.toISOString() },
+      afterValue: { completedAt: completedAt.toISOString() },
+      detectedAt: completedAt,
+      isSkipped: false,
+    });
+
+    log.info(
+      {
+        configId,
+        dueDate: dueDate.toISOString(),
+        completedAt: completedAt.toISOString(),
+      },
+      "Recorded late completion reward log (completed_after_deadline)",
+    );
+  } catch (error) {
+    log.error({ err: error, configId }, "recordLateCompletionRewardLog failed");
+  }
+}
+
 /**
  * Transitions the card's reward config to waiting_evaluation when work is completed.
  * Only targets configs that are either APPROVED or DRAFT (so we don't accidentally
@@ -425,27 +562,47 @@ export async function revertTaskInstanceConfigToApproved({
 export async function markConfigWaitingEvaluation({
   db,
   cardId,
+  dueDate,
+  completedAt,
 }: {
   db: dbClient;
   cardId: number;
+  /** Deadline hiện tại của thẻ (so sánh với thời điểm hoàn thành). */
+  dueDate?: Date | null;
+  /** Thời điểm chuyển sang hoàn thành (thường là now). */
+  completedAt?: Date;
 }): Promise<void> {
   try {
-    const { rows } = await db.execute<{ id: number }>(
-      sql`
-        UPDATE "card_reward_configs"
-        SET    "approvalStatus" = 'waiting_evaluation',
-               "updatedAt"      = now()
-        WHERE  "cardId"         = ${cardId}
-          AND  "approvalStatus" IN ('approved', 'draft', 'rejected', 'waiting_approval')
-        RETURNING id
-      `,
-    );
+    const rows = await db
+      .update(cardRewardConfigs)
+      .set({
+        approvalStatus: "waiting_evaluation",
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(cardRewardConfigs.cardId, cardId),
+          inArray(cardRewardConfigs.approvalStatus, [
+            ...APPROVAL_STATUSES_BEFORE_EVALUATION,
+          ]),
+        ),
+      )
+      .returning({ id: cardRewardConfigs.id });
 
     if (rows.length > 0) {
+      const configId = rows[0]?.id;
       log.info(
-        { cardId, configId: rows[0]?.id },
+        { cardId, configId },
         "Card marked as done — reward config auto-transitioned to waiting_evaluation",
       );
+      if (configId != null && completedAt) {
+        await recordLateCompletionRewardLog({
+          db,
+          configId,
+          dueDate: dueDate ?? null,
+          completedAt,
+        });
+      }
     }
   } catch (error) {
     log.error({ err: error, cardId }, "markConfigWaitingEvaluation failed");
@@ -464,18 +621,25 @@ export async function revertConfigToApproved({
   cardId: number;
 }): Promise<void> {
   try {
-    const { rows } = await db.execute<{ id: number }>(
-      sql`
-        UPDATE "card_reward_configs"
-        SET    "approvalStatus" = 'approved',
-               "updatedAt"      = now()
-        WHERE  "cardId"         = ${cardId}
-          AND  "approvalStatus" = 'waiting_evaluation'
-        RETURNING id
-      `,
-    );
+    const rows = await db
+      .update(cardRewardConfigs)
+      .set({
+        approvalStatus: "approved",
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(cardRewardConfigs.cardId, cardId),
+          eq(cardRewardConfigs.approvalStatus, "waiting_evaluation"),
+        ),
+      )
+      .returning({ id: cardRewardConfigs.id });
 
     if (rows.length > 0) {
+      const configId = rows[0]?.id;
+      if (configId != null) {
+        await deleteLateCompletionRewardLogsForConfig(db, configId);
+      }
       log.info(
         { cardId, configId: rows[0]?.id },
         "Card marked as undone — reward config auto-reverted to approved",
@@ -485,4 +649,3 @@ export async function revertConfigToApproved({
     log.error({ err: error, cardId }, "revertConfigToApproved failed");
   }
 }
-

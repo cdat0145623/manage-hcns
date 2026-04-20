@@ -1,51 +1,50 @@
+import type { Language } from "rrule/dist/esm/nlp/i18n";
 import { TRPCError } from "@trpc/server";
+import pkg, { Weekday } from "rrule";
 import { z } from "zod";
 
 import * as cardActivityRepo from "@kan/db/repository/cardActivity.repo";
 import * as cardCommentRepo from "@kan/db/repository/cardComment.repo";
+import * as rewardRepo from "@kan/db/repository/reward.repo";
 import * as taskInstanceRepo from "@kan/db/repository/taskInstance.repo";
 import * as taskMasterRepo from "@kan/db/repository/taskMaster.repo";
 import { statusTypeEnum } from "@kan/db/schema";
 
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import {
-  trackTaskInstanceRewardViolations,
   markTaskInstanceConfigWaitingEvaluation,
   revertTaskInstanceConfigToApproved,
+  trackTaskInstanceRewardViolations,
 } from "../utils/rewardViolation";
 
-import pkg from "rrule";
 const { RRule } = pkg;
 
 const statusTypeEnumSchema = z.enum(statusTypeEnum.enumValues);
 
-import type { Language } from 'rrule/dist/esm/nlp/i18n'
-import { Weekday } from 'rrule'
-
 // ---- 1. Định nghĩa ngôn ngữ tiếng Việt ----
 const VIETNAMESE: Language = {
   dayNames: [
-    'Chủ Nhật',
-    'Thứ Hai',
-    'Thứ Ba',
-    'Thứ Tư',
-    'Thứ Năm',
-    'Thứ Sáu',
-    'Thứ Bảy',
+    "Chủ Nhật",
+    "Thứ Hai",
+    "Thứ Ba",
+    "Thứ Tư",
+    "Thứ Năm",
+    "Thứ Sáu",
+    "Thứ Bảy",
   ],
   monthNames: [
-    'tháng 1',
-    'tháng 2',
-    'tháng 3',
-    'tháng 4',
-    'tháng 5',
-    'tháng 6',
-    'tháng 7',
-    'tháng 8',
-    'tháng 9',
-    'tháng 10',
-    'tháng 11',
-    'tháng 12',
+    "tháng 1",
+    "tháng 2",
+    "tháng 3",
+    "tháng 4",
+    "tháng 5",
+    "tháng 6",
+    "tháng 7",
+    "tháng 8",
+    "tháng 9",
+    "tháng 10",
+    "tháng 11",
+    "tháng 12",
   ],
   tokens: {
     SKIP: /^(thứ|ngày|vào|lúc)\b/i,
@@ -62,73 +61,73 @@ const VIETNAMESE: Language = {
     years: /^năm/i,
     on: /^vào/i,
     in: /^trong/i,
-    'on the': /^vào ngày/i,
+    "on the": /^vào ngày/i,
     for: /^trong/i,
     and: /^và/i,
     or: /^hoặc/i,
     at: /^lúc/i,
     last: /^cuối/i,
-    '(~ approximate)': /^(~)/,
+    "(~ approximate)": /^(~)/,
     until: /^đến/i,
     time: /^(lần)/i,
     times: /^(lần)/i,
   },
-}
+};
 
 // ---- 2. Hàm gettext dịch các token tiếng Anh sang tiếng Việt ----
 const vietnameseGettext = (id: string | number | Weekday): string => {
-  const key = id.toString()
-  
-  const translations: Record<string, string> = {
-    every: 'Hằng',
-    day: 'ngày',
-    days: 'ngày',
-    week: 'tuần',
-    weeks: 'tuần',
-    month: 'tháng',
-    months: 'tháng',
-    year: 'năm',
-    years: 'năm',
-    on: 'vào',
-    in: 'trong',
-    'on the': 'vào ngày',
-    for: 'trong',
-    and: 'và',
-    or: 'hoặc',
-    at: 'lúc',
-    last: 'cuối',
-    '(~ approximate)': '(~)',
-    until: 'đến',
-    time: 'lần',
-    times: 'lần',
-    Monday: 'Thứ Hai',
-    Tuesday: 'Thứ Ba',
-    Wednesday: 'Thứ Tư',
-    Thursday: 'Thứ Năm',
-    Friday: 'Thứ Sáu',
-    Saturday: 'Thứ Bảy',
-    Sunday: 'Chủ Nhật',
-    January: 'tháng 1',
-    February: 'tháng 2',
-    March: 'tháng 3',
-    April: 'tháng 4',
-    May: 'tháng 5',
-    June: 'tháng 6',
-    July: 'tháng 7',
-    August: 'tháng 8',
-    September: 'tháng 9',
-    October: 'tháng 10',
-    November: 'tháng 11',
-    December: 'tháng 12',
-    '1st': 'thứ 1',
-    '2nd': 'thứ 2',
-    '3rd': 'thứ 3',
-    '4th': 'thứ 4',
-    '5th': 'thứ 5',
-  }
+  const key = id.toString();
 
-  return translations[key] ?? key
-}
+  const translations: Record<string, string> = {
+    every: "Hằng",
+    day: "ngày",
+    days: "ngày",
+    week: "tuần",
+    weeks: "tuần",
+    month: "tháng",
+    months: "tháng",
+    year: "năm",
+    years: "năm",
+    on: "vào",
+    in: "trong",
+    "on the": "vào ngày",
+    for: "trong",
+    and: "và",
+    or: "hoặc",
+    at: "lúc",
+    last: "cuối",
+    "(~ approximate)": "(~)",
+    until: "đến",
+    time: "lần",
+    times: "lần",
+    Monday: "Thứ Hai",
+    Tuesday: "Thứ Ba",
+    Wednesday: "Thứ Tư",
+    Thursday: "Thứ Năm",
+    Friday: "Thứ Sáu",
+    Saturday: "Thứ Bảy",
+    Sunday: "Chủ Nhật",
+    January: "tháng 1",
+    February: "tháng 2",
+    March: "tháng 3",
+    April: "tháng 4",
+    May: "tháng 5",
+    June: "tháng 6",
+    July: "tháng 7",
+    August: "tháng 8",
+    September: "tháng 9",
+    October: "tháng 10",
+    November: "tháng 11",
+    December: "tháng 12",
+    "1st": "thứ 1",
+    "2nd": "thứ 2",
+    "3rd": "thứ 3",
+    "4th": "thứ 4",
+    "5th": "thứ 5",
+  };
+
+  return translations[key] ?? key;
+};
 
 export const taskInstanceRouter = createTRPCRouter({
   byId: protectedProcedure
@@ -155,11 +154,11 @@ export const taskInstanceRouter = createTRPCRouter({
         where: (t, { eq }) => eq(t.id, input.id),
         with: {
           checklists: {
-            with: { 
+            with: {
               items: {
                 where: (t, { isNull }) => isNull(t.deletedAt),
-              }
-             },
+              },
+            },
             where: (t, { isNull }) => isNull(t.deletedAt),
           },
         },
@@ -239,6 +238,16 @@ export const taskInstanceRouter = createTRPCRouter({
         });
       }
 
+      try {
+        await rewardRepo.cloneMasterRewardTemplateToInstance(ctx.db, {
+          taskMasterId,
+          taskInstanceId: newTaskInstance.id,
+          createdBy: userId,
+        });
+      } catch (e) {
+        console.error("cloneMasterRewardTemplateToInstance failed:", e);
+      }
+
       return newTaskInstance;
     }),
   getVirtual: protectedProcedure
@@ -298,9 +307,12 @@ export const taskInstanceRouter = createTRPCRouter({
               return [];
             }
 
-            const normalizedRrule = taskMaster.frequence.rruleString.replace(/\\n/g, "\n");
+            const normalizedRrule = taskMaster.frequence.rruleString.replace(
+              /\\n/g,
+              "\n",
+            );
             const rule = RRule.fromString(normalizedRrule);
-            const ruleText = rule.toText(vietnameseGettext, VIETNAMESE)
+            const ruleText = rule.toText(vietnameseGettext, VIETNAMESE);
 
             const from = input.from;
             const to = input.to;
@@ -325,9 +337,11 @@ export const taskInstanceRouter = createTRPCRouter({
                   ),
                 with: {
                   checklists: {
-                    with: { items: {
-                      where: (t, { isNull }) => isNull(t.deletedAt),
-                    } },
+                    with: {
+                      items: {
+                        where: (t, { isNull }) => isNull(t.deletedAt),
+                      },
+                    },
                     where: (t, { isNull }) => isNull(t.deletedAt),
                   },
                 },
@@ -353,7 +367,7 @@ export const taskInstanceRouter = createTRPCRouter({
                   startDate: taskMaster.startDate,
                   endDate: taskMaster.endDate,
                   createdBy: taskMaster.createdBy,
-                  rruleStringToText: ruleText
+                  rruleStringToText: ruleText,
                 };
 
                 if (existing) {
@@ -452,15 +466,19 @@ export const taskInstanceRouter = createTRPCRouter({
         });
       }
 
-      const instanceEndDate = new Date(targetDate ?? oldTaskInstance.targetDate!);
+      const instanceEndDate = new Date(
+        targetDate ?? oldTaskInstance.targetDate!,
+      );
       instanceEndDate.setHours(taskMaster.endDate.getHours());
       instanceEndDate.setMinutes(taskMaster.endDate.getMinutes());
       instanceEndDate.setSeconds(taskMaster.endDate.getSeconds());
       instanceEndDate.setMilliseconds(taskMaster.endDate.getMilliseconds());
 
+      // Giữ nguyên userId gắn với instance (slot / assignee theo unique index),
+      // không ghi đè bằng ctx.user — tránh false "assignee_changed" và sai reward.
       const newTaskInstance = await taskInstanceRepo.update(ctx.db, {
         id,
-        userId,
+        userId: oldTaskInstance.userId,
         taskMasterId,
         name,
         description,
@@ -497,8 +515,10 @@ export const taskInstanceRouter = createTRPCRouter({
       // ---- Reward Triggers ----
       // 1. Violation Check (End Date, Target Date, or Assignee changed)
       if (
-        oldTaskInstance.endDate?.getTime() !== newTaskInstance.endDate?.getTime() ||
-        oldTaskInstance.targetDate?.getTime() !== newTaskInstance.targetDate?.getTime() ||
+        oldTaskInstance.endDate?.getTime() !==
+          newTaskInstance.endDate?.getTime() ||
+        oldTaskInstance.targetDate?.getTime() !==
+          newTaskInstance.targetDate?.getTime() ||
         oldTaskInstance.userId !== newTaskInstance.userId
       ) {
         await trackTaskInstanceRewardViolations({
@@ -516,6 +536,8 @@ export const taskInstanceRouter = createTRPCRouter({
           await markTaskInstanceConfigWaitingEvaluation({
             db: ctx.db,
             taskInstanceId: id,
+            dueDate: newTaskInstance.endDate,
+            completedAt: newTaskInstance.actualDate ?? new Date(),
           });
         } else if (oldTaskInstance.status === "done") {
           await revertTaskInstanceConfigToApproved({

@@ -1,34 +1,111 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { t } from "@lingui/macro";
-import { AnimatePresence, motion } from "framer-motion";
-import React, { useEffect, useState } from "react";
-import { Controller, useFieldArray, useForm } from "react-hook-form";
+import { differenceInDays, format } from "date-fns";
+import { motion } from "framer-motion";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { Controller, useForm } from "react-hook-form";
 import {
-  HiCheckCircle,
-  HiPlus,
-  HiTrash,
   HiArrowPath,
+  HiCalendarDays,
   HiCheck,
+  HiCheckCircle,
   HiClock,
+  HiCurrencyDollar,
+  HiExclamationCircle,
   HiPencilSquare,
+  HiUser,
 } from "react-icons/hi2";
 import { z } from "zod";
 
-import { CardRewardSummaryCard } from "./CardRewardSummaryCard";
+import {
+  isRewardDeductionReasonKey,
+  REWARD_DEDUCTION_REASON,
+} from "@kan/shared/constants";
+
+import type { RewardLogRow } from "./CardRewardFinalize";
 import type { RewardStatus } from "./CardRewardSummaryCard";
 import Select from "~/components/Select";
+import { usePermissions } from "~/hooks/usePermissions";
 import { usePopup } from "~/providers/popup";
 import { api } from "~/utils/api";
+import {
+  invalidateCard,
+  invalidateTaskInstance,
+} from "~/utils/cardInvalidation";
 import { CardRewardAdminReview } from "./CardRewardAdminReview";
 import { CardRewardFinalize } from "./CardRewardFinalize";
-import { usePermissions } from "~/hooks/usePermissions";
+import { CardRewardSummaryCard } from "./CardRewardSummaryCard";
 
 const DEFAULT_USD_TO_VND = 25400;
 
 interface RewardDeduction {
-  reason: string;
+  id?: number;
+  reason:
+    | typeof REWARD_DEDUCTION_REASON.LATE
+    | typeof REWARD_DEDUCTION_REASON.MOVE;
   unitType: "percent" | "vnd";
   value: number;
+  displayOrder?: number;
+}
+
+const DEFAULT_DEDUCTION_PAIR: [RewardDeduction, RewardDeduction] = [
+  {
+    reason: REWARD_DEDUCTION_REASON.LATE,
+    unitType: "vnd",
+    value: 1,
+    displayOrder: 0,
+  },
+  {
+    reason: REWARD_DEDUCTION_REASON.MOVE,
+    unitType: "vnd",
+    value: 1,
+    displayOrder: 1,
+  },
+];
+
+function buildDeductionPairFromRemote(
+  rows: Array<{
+    id?: number;
+    reason: string;
+    value: string | number;
+    unitType: string;
+    displayOrder?: number;
+  }>,
+): RewardDeduction[] {
+  const byReason = new Map<string, (typeof rows)[0]>();
+  for (const d of rows) {
+    const r = isRewardDeductionReasonKey(d.reason)
+      ? d.reason
+      : REWARD_DEDUCTION_REASON.LATE;
+    if (
+      r === REWARD_DEDUCTION_REASON.LATE ||
+      r === REWARD_DEDUCTION_REASON.MOVE
+    ) {
+      byReason.set(r, d);
+    }
+  }
+  const late = byReason.get(REWARD_DEDUCTION_REASON.LATE);
+  const move = byReason.get(REWARD_DEDUCTION_REASON.MOVE);
+  return [
+    {
+      id: late?.id,
+      reason: REWARD_DEDUCTION_REASON.LATE,
+      unitType: (late?.unitType as RewardDeduction["unitType"]) ?? "vnd",
+      value: late
+        ? parseFloat(String(late.value))
+        : DEFAULT_DEDUCTION_PAIR[0].value,
+      displayOrder: 0,
+    },
+    {
+      id: move?.id,
+      reason: REWARD_DEDUCTION_REASON.MOVE,
+      unitType: (move?.unitType as RewardDeduction["unitType"]) ?? "vnd",
+      value: move
+        ? parseFloat(String(move.value))
+        : DEFAULT_DEDUCTION_PAIR[1].value,
+      displayOrder: 1,
+    },
+  ];
 }
 
 interface RewardConfigFormValues {
@@ -38,34 +115,118 @@ interface RewardConfigFormValues {
   deductions: RewardDeduction[];
 }
 
-interface CardRewardConfigFormProps {
-  cardPublicId: string;
+export type CardRewardConfigFormProps = {
   isReadOnly?: boolean;
-  card?: any; // Passing full card data from parent
-}
+  /** Kanban card — truyền đúng một trong: cardPublicId, taskInstanceId, hoặc taskMasterId (mẫu) */
+  card?: any;
+} & (
+  | {
+      cardPublicId: string;
+      taskInstanceId?: undefined;
+      taskMasterId?: undefined;
+    }
+  | {
+      taskInstanceId: string;
+      cardPublicId?: undefined;
+      taskMasterId?: undefined;
+    }
+  | {
+      taskMasterId: string;
+      cardPublicId?: undefined;
+      taskInstanceId?: undefined;
+    }
+);
 
 export default function CardRewardConfigForm({
   cardPublicId,
+  taskInstanceId,
+  taskMasterId,
   isReadOnly = false,
   card,
 }: CardRewardConfigFormProps) {
+  const isTaskMasterTemplate = Boolean(taskMasterId);
+  const isTaskInstanceReward = Boolean(taskInstanceId);
   const [viewMode, setViewMode] = useState<"edit" | "summary">("edit");
+  useEffect(() => {
+    if (isTaskMasterTemplate) setViewMode("edit");
+  }, [isTaskMasterTemplate]);
   const { showPopup } = usePopup();
   const utils = api.useUtils();
   const { role } = usePermissions();
   const isAdmin = role === "ADMIN";
+  const canFinalize = ["ADMIN", "AREA_MANAGER", "BRANCH_MANAGER"].includes(
+    role ?? "",
+  );
+  /** Duyệt/từ chối reward config — API reject chỉ cho ADMIN. */
+  const canReviewRewardApproval = role === "ADMIN";
 
   // ───────────────────────────────────────────────────────────────────────────
   // Queries & Mutations
   // ───────────────────────────────────────────────────────────────────────────
-  const { data: remoteData, isLoading: isQueryLoading } =
+  const { data: remoteByCard, isLoading: loadingCard } =
     api.reward.getByCardId.useQuery(
-      { cardPublicId },
+      { cardPublicId: cardPublicId ?? "" },
       {
-        enabled: !!cardPublicId,
+        enabled:
+          !!cardPublicId && !isTaskInstanceReward && !isTaskMasterTemplate,
         refetchOnWindowFocus: false,
       },
     );
+
+  const { data: remoteByTask, isLoading: loadingTask } =
+    api.reward.getByTaskInstanceId.useQuery(
+      { taskInstanceId: taskInstanceId ?? "" },
+      {
+        enabled:
+          isTaskInstanceReward && !!taskInstanceId && !isTaskMasterTemplate,
+        refetchOnWindowFocus: false,
+      },
+    );
+
+  const { data: remoteByMaster, isLoading: loadingMaster } =
+    api.reward.getByTaskMasterId.useQuery(
+      { taskMasterId: taskMasterId ?? "" },
+      {
+        enabled: isTaskMasterTemplate && !!taskMasterId,
+        refetchOnWindowFocus: false,
+      },
+    );
+
+  const remoteData = isTaskMasterTemplate
+    ? remoteByMaster
+    : isTaskInstanceReward
+      ? remoteByTask
+      : remoteByCard;
+  const isQueryLoading = isTaskMasterTemplate
+    ? loadingMaster
+    : isTaskInstanceReward
+      ? loadingTask
+      : loadingCard;
+
+  /** Refetch reward config + card/task so modal và board đồng bộ sau mutation. */
+  const refreshRewardState = async (opts?: { configId?: number }) => {
+    if (isTaskMasterTemplate && taskMasterId) {
+      await Promise.all([
+        utils.reward.getByTaskMasterId.refetch({ taskMasterId }),
+        utils.taskInstance.getVirtual.invalidate(),
+      ]);
+    } else if (isTaskInstanceReward && taskInstanceId) {
+      await Promise.all([
+        utils.reward.getByTaskInstanceId.refetch({ taskInstanceId }),
+        invalidateTaskInstance(utils, taskInstanceId),
+      ]);
+    } else if (cardPublicId) {
+      await Promise.all([
+        utils.reward.getByCardId.refetch({ cardPublicId }),
+        invalidateCard(utils, cardPublicId),
+      ]);
+    }
+    if (opts?.configId != null) {
+      await utils.reward.previewViolations.invalidate({
+        configId: opts.configId,
+      });
+    }
+  };
 
   const upsertMutation = api.reward.upsert.useMutation();
   const submitMutation = api.reward.submit.useMutation();
@@ -74,6 +235,47 @@ export default function CardRewardConfigForm({
   const rejectMutation = api.reward.reject.useMutation();
   const revertMutation = api.reward.revert.useMutation();
   const finalizeMutation = api.reward.finalize.useMutation();
+
+  const buildUpsertPayload = (
+    data: RewardConfigFormValues,
+    mode: "draft" | "submit",
+  ) => {
+    const deductions = data.deductions.map((d, i) => ({
+      ...d,
+      value: d.value.toString(),
+      displayOrder: i,
+    }));
+    const source = isTaskMasterTemplate
+      ? ({ taskMasterId: taskMasterId! } as const)
+      : isTaskInstanceReward && taskInstanceId
+        ? ({ taskInstanceId } as const)
+        : ({ cardPublicId: cardPublicId! } as const);
+
+    if (mode === "draft") {
+      const draftBonus = data.bonusAmount;
+      return {
+        ...source,
+        rewardType: data.rewardType,
+        currency: data.currency,
+        deductions,
+        bonusAmount:
+          data.rewardType === "project" &&
+          typeof draftBonus === "number" &&
+          draftBonus > 0
+            ? draftBonus
+            : undefined,
+      };
+    }
+
+    return {
+      ...source,
+      rewardType: data.rewardType,
+      bonusAmount:
+        data.rewardType === "project" ? Number(data.bonusAmount ?? 0) : 0,
+      currency: data.currency,
+      deductions,
+    };
+  };
 
   const isMutating =
     upsertMutation.isPending ||
@@ -111,10 +313,10 @@ export default function CardRewardConfigForm({
     const deductionItemSchema = z
       .object({
         id: z.number().optional().nullable(),
-        reason: z
-          .string()
-          .min(1, t`Lý do là bắt buộc`)
-          .max(500),
+        reason: z.enum([
+          REWARD_DEDUCTION_REASON.LATE,
+          REWARD_DEDUCTION_REASON.MOVE,
+        ]),
         unitType: z.enum(["percent", "vnd"]),
         value: z.number().min(0.01, t`Giá trị phải lớn hơn 0`),
         displayOrder: z.number().int().min(0).default(0),
@@ -122,12 +324,12 @@ export default function CardRewardConfigForm({
       .refine(
         (data) => {
           if (data.unitType === "percent") {
-            return data.value < 100;
+            return data.value <= 100;
           }
           return true;
         },
         {
-          message: t`Phần trăm phải nhỏ hơn 100`,
+          message: t`Phần trăm không được vượt quá 100`,
           path: ["value"],
         },
       );
@@ -137,7 +339,17 @@ export default function CardRewardConfigForm({
         rewardType: z.enum(["project", "responsibility"]),
         bonusAmount: z.number().optional().nullable(),
         currency: z.string().length(3).default("VND"),
-        deductions: z.array(deductionItemSchema).default([]),
+        deductions: z
+          .array(deductionItemSchema)
+          .length(2)
+          .refine(
+            (rows) =>
+              rows[0]?.reason === REWARD_DEDUCTION_REASON.LATE &&
+              rows[1]?.reason === REWARD_DEDUCTION_REASON.MOVE,
+            {
+              message: t`Danh sách khấu trừ phải gồm đúng 2 loại theo thứ tự.`,
+            },
+          ),
       })
       .refine(
         (d) =>
@@ -176,7 +388,6 @@ export default function CardRewardConfigForm({
   }, [exRate]);
 
   const {
-    register,
     control,
     handleSubmit,
     watch,
@@ -190,7 +401,7 @@ export default function CardRewardConfigForm({
       rewardType: "project",
       bonusAmount: 0,
       currency: "VND",
-      deductions: [],
+      deductions: [...DEFAULT_DEDUCTION_PAIR],
     },
   });
 
@@ -203,13 +414,7 @@ export default function CardRewardConfigForm({
           ? parseFloat(remoteData.bonusAmount)
           : 0,
         currency: (remoteData.currency as any) || "VND",
-        deductions: remoteData.deductions.map((d) => ({
-          id: d.id,
-          reason: d.reason,
-          unitType: d.unitType as any,
-          value: parseFloat(d.value),
-          displayOrder: d.displayOrder,
-        })),
+        deductions: buildDeductionPairFromRemote(remoteData.deductions),
       });
 
       // If already has status beyond draft, default to summary view
@@ -224,13 +429,42 @@ export default function CardRewardConfigForm({
 
   const dbSnapshot: any = (remoteData as any)?.snapshot;
 
+  const snapshotAssigneeName = useMemo(() => {
+    const uid = dbSnapshot?.snappedTargetUser as string | undefined;
+    if (!uid || !card?.members?.length) return undefined;
+    const m = card.members.find(
+      (x: { user?: { id?: string | null } | null }) => x.user?.id === uid,
+    );
+    return m?.name || m?.user?.name || undefined;
+  }, [dbSnapshot, card?.members]);
+
+  /** Sau khi dời lịch, backend hạ reward → draft: chuyển sang khung chỉnh sửa để thấy snapshot so sánh. */
+  const prevRewardStatusRef = useRef<string | undefined>();
+  useEffect(() => {
+    const s = remoteData?.approvalStatus;
+    if (
+      prevRewardStatusRef.current === "approved" &&
+      s === "draft" &&
+      dbSnapshot
+    ) {
+      setViewMode("edit");
+    }
+    prevRewardStatusRef.current = s;
+  }, [remoteData?.approvalStatus, dbSnapshot]);
+
+  const showResubmitSnapshotBanner =
+    !!dbSnapshot &&
+    (approvalStatus === "draft" || approvalStatus === "rejected");
+
+  /** Gộp so sánh + form một màn: không dùng màn summary riêng khi cần gửi duyệt lại. */
+  useEffect(() => {
+    if (viewMode === "summary" && showResubmitSnapshotBanner) {
+      setViewMode("edit");
+    }
+  }, [viewMode, showResubmitSnapshotBanner]);
+
   const rewardType = watch("rewardType");
   const isProject = rewardType === "project";
-
-  const { fields, append, remove } = useFieldArray({
-    control,
-    name: "deductions",
-  });
 
   const formatNumber = (val: number | string) => {
     if (!val && val !== 0) return "";
@@ -253,7 +487,7 @@ export default function CardRewardConfigForm({
         message: t`Đã rút lại yêu cầu phê duyệt`,
         icon: "success",
       });
-      await utils.reward.getByCardId.invalidate({ cardPublicId });
+      await refreshRewardState({ configId: remoteData.id });
       setViewMode("edit");
     } catch (err: any) {
       showPopup({
@@ -273,7 +507,7 @@ export default function CardRewardConfigForm({
         message: t`Đã khôi phục Card và Cấu hình về bản Approved`,
         icon: "success",
       });
-      await utils.reward.getByCardId.invalidate({ cardPublicId });
+      await refreshRewardState({ configId: remoteData.id });
     } catch (err: any) {
       showPopup({
         header: t`Lỗi`,
@@ -283,7 +517,7 @@ export default function CardRewardConfigForm({
     }
   };
 
-  const handleAdminApprove = async (decisions: any[], comment: string) => {
+  const handleAdminApprove = async (decisions: any[]) => {
     if (!remoteData?.id) return;
     try {
       await approveMutation.mutateAsync({
@@ -295,7 +529,7 @@ export default function CardRewardConfigForm({
         message: t`Đã duyệt cấu hình thưởng.`,
         icon: "success",
       });
-      await utils.reward.getByCardId.invalidate({ cardPublicId });
+      await refreshRewardState({ configId: remoteData.id });
     } catch (err: any) {
       showPopup({
         header: t`Lỗi`,
@@ -318,7 +552,7 @@ export default function CardRewardConfigForm({
         message: t`Đã nghiệm thu và tất toán tiền thưởng.`,
         icon: "success",
       });
-      await utils.reward.getByCardId.invalidate({ cardPublicId });
+      await refreshRewardState({ configId: remoteData.id });
     } catch (err: any) {
       showPopup({
         header: t`Lỗi`,
@@ -340,7 +574,7 @@ export default function CardRewardConfigForm({
         message: t`Đã từ chối cấu hình thưởng.`,
         icon: "success",
       });
-      await utils.reward.getByCardId.invalidate({ cardPublicId });
+      await refreshRewardState({ configId: remoteData.id });
     } catch (err: any) {
       showPopup({
         header: t`Lỗi`,
@@ -350,41 +584,46 @@ export default function CardRewardConfigForm({
     }
   };
 
-  const onSubmit = async (data: RewardConfigFormValues) => {
+  /** Lưu + gửi duyệt (validate form). Khác với chỉ lưu nháp. */
+  const submitForApproval = async (data: RewardConfigFormValues) => {
     try {
-      const payload = {
-        cardPublicId,
-        rewardType: data.rewardType,
-        bonusAmount:
-          data.rewardType === "project" ? data.bonusAmount : 0,
-        currency: data.currency,
-        deductions: data.deductions.map((d) => ({
-          ...d,
-          value: d.value.toString(),
-        })),
-      };
+      const result = await upsertMutation.mutateAsync(
+        buildUpsertPayload(data, "submit"),
+      );
+      await refreshRewardState({ configId: result.configId });
 
-      const result = await upsertMutation.mutateAsync(payload);
-      showPopup({
-        header: t`Thành công`,
-        message: t`Đã lưu cấu hình thưởng`,
-        icon: "success",
-      });
-      await utils.reward.getByCardId.invalidate({ cardPublicId });
-
-      // Only call submit if it's currently draft or rejected
-      // If it's already waiting_approval, just updating is enough
       if (result.status === "draft" || result.status === "rejected") {
         await submitMutation.mutateAsync({ configId: result.configId });
-        showPopup({
-          header: t`Thành công`,
-          message: t`Đã gửi yêu cầu phê duyệt`,
-          icon: "success",
-        });
-        await utils.reward.getByCardId.invalidate({ cardPublicId });
+        await refreshRewardState({ configId: result.configId });
       }
 
+      showPopup({
+        header: t`Thành công`,
+        message: t`Đã gửi yêu cầu phê duyệt`,
+        icon: "success",
+      });
       setViewMode("summary");
+    } catch (err: any) {
+      showPopup({
+        header: t`Lỗi`,
+        message: err.message || t`Lỗi khi lưu cấu hình`,
+        icon: "error",
+      });
+    }
+  };
+
+  /** Mẫu task master: chỉ lưu nháp, không gửi duyệt. */
+  const saveTemplateDraft = async (data: RewardConfigFormValues) => {
+    try {
+      const result = await upsertMutation.mutateAsync(
+        buildUpsertPayload(data, "draft"),
+      );
+      showPopup({
+        header: t`Thành công`,
+        message: t`Đã lưu mẫu thưởng`,
+        icon: "success",
+      });
+      await refreshRewardState({ configId: result.configId });
     } catch (err: any) {
       showPopup({
         header: t`Lỗi`,
@@ -397,6 +636,32 @@ export default function CardRewardConfigForm({
   // Prepare data for Summary View
   const getSummaryData = () => {
     const values = getValues();
+
+    // Khi đã có bản ghi trên server, dùng remoteData cho tiền/khấu trừ — không dùng form (getValues),
+    // tránh lệch oan với snapshot ngay sau duyệt (form chưa reset kịp hoặc decimal khác kiểu).
+    const useRemoteReward =
+      remoteData != null &&
+      [
+        "waiting_approval",
+        "approved",
+        "waiting_evaluation",
+        "completed",
+      ].includes(approvalStatus);
+
+    let summaryBonus = values.bonusAmount;
+    let summaryCurrency = values.currency;
+    let summaryRewardType = values.rewardType;
+    let summaryDeductions = values.deductions.map((d) => ({ ...d }));
+
+    if (useRemoteReward) {
+      summaryBonus = remoteData!.bonusAmount
+        ? parseFloat(String(remoteData.bonusAmount))
+        : 0;
+      summaryCurrency =
+        (remoteData!.currency as typeof values.currency) || "VND";
+      summaryRewardType = remoteData!.rewardType as typeof values.rewardType;
+      summaryDeductions = buildDeductionPairFromRemote(remoteData!.deductions);
+    }
 
     // approvedByUser sẽ có khi backend getByCardId join user (hiện bỏ trống)
     const approvedByUser =
@@ -423,7 +688,8 @@ export default function CardRewardConfigForm({
           snappedStartDate: rawSnapshot.snappedStartDate ?? null,
           snappedDueDate: rawSnapshot.snappedDueDate ?? null,
           snappedTargetUser: (rawSnapshot as any).snappedTargetUser ?? null,
-          snappedRewardType: (rawSnapshot as any).snappedRewardType ?? "project",
+          snappedRewardType:
+            (rawSnapshot as any).snappedRewardType ?? "project",
           snappedBonusAmount: rawSnapshot.snappedBonusAmount ?? null,
           snappedCurrency: rawSnapshot.snappedCurrency ?? "VND",
           snappedDeductions: (rawSnapshot as any).snappedDeductions ?? [],
@@ -436,26 +702,63 @@ export default function CardRewardConfigForm({
         }
       : null;
 
-    // logs sẽ có khi backend join cardRewardLogs
     const rawLogs =
       (
         remoteData as {
-          logs?: { detectedAt: Date | string; violationType: string }[];
+          logs?: Array<{
+            detectedAt: Date | string;
+            violationType: string;
+            isSkipped: boolean;
+            deduction?: {
+              unitType: "percent" | "vnd";
+              value: string;
+            } | null;
+          }>;
         } | null
       )?.logs ?? [];
-    const violationLogs = rawLogs.map((l) => ({
-      date:
-        typeof l.detectedAt === "string"
-          ? l.detectedAt
-          : l.detectedAt.toISOString(),
-      reason: l.violationType,
-      deductionValue: 0,
-    }));
+    const violationLogs = rawLogs
+      .filter((l) => l.violationType !== "finalization_created")
+      .map((l) => {
+        let deductionValue = 0;
+        let deductionUnit: "vnd" | "percent" | null = null;
+        if (!l.isSkipped && l.deduction) {
+          const v = Number(l.deduction.value);
+          if (l.deduction.unitType === "vnd") {
+            deductionValue = v;
+            deductionUnit = "vnd";
+          } else {
+            // Giữ nguyên % (đặc biệt thưởng trách nhiệm: thưởng gốc 0 — không quy đổi ra tiền).
+            deductionValue = v;
+            deductionUnit = "percent";
+          }
+        }
+        const reasonLabel =
+          l.violationType === "deadline_extended"
+            ? t`Dời deadline / timeline`
+            : l.violationType === "deduction_changed" ||
+                l.violationType === "completed_after_deadline"
+              ? t`Trễ hạn (hoàn thành sau deadline)`
+              : l.violationType;
+
+        return {
+          date:
+            typeof l.detectedAt === "string"
+              ? l.detectedAt
+              : l.detectedAt.toISOString(),
+          reason: reasonLabel,
+          deductionValue,
+          deductionUnit,
+          isSkipped: Boolean(l.isSkipped),
+        };
+      });
 
     const finalization = (remoteData as any)?.finalization ?? null;
 
     return {
       ...values,
+      rewardType: summaryRewardType,
+      bonusAmount: summaryBonus,
+      currency: summaryCurrency,
       approvalStatus,
       rejectedReason: remoteData?.rejectedReason ?? undefined,
       approvedBy: approvedByUser ? { name: approvedByUser.name } : undefined,
@@ -465,53 +768,8 @@ export default function CardRewardConfigForm({
       snapshot,
       violationLogs: violationLogs.length > 0 ? violationLogs : undefined,
       finalization,
-      deductions: values.deductions.map((d) => ({ ...d })),
+      deductions: summaryDeductions.map((d) => ({ ...d })),
     };
-  };
-
-  const checkHasMismatch = (summaryData: any) => {
-    if (!summaryData.snapshot) return false;
-    const snap = summaryData.snapshot;
-
-    const title = card?.title !== snap.snappedCardTitle;
-
-    const d1 = card?.startDate ? new Date(card.startDate).getTime() : null;
-    const d2 = snap.snappedStartDate
-      ? new Date(snap.snappedStartDate).getTime()
-      : null;
-
-    const d3 = card?.dueDate ? new Date(card.dueDate).getTime() : null;
-    const d4 = snap.snappedDueDate
-      ? new Date(snap.snappedDueDate).getTime()
-      : null;
-    const deadline = d1 !== d2 || d3 !== d4;
-
-    const assignee = (card?.members?.[0]?.publicId || "") !== (snap.snappedTargetUser || "");
-
-    const amt =
-      Number(summaryData.bonusAmount) !== Number(snap.snappedBonusAmount) ||
-      summaryData.currency !== snap.snappedCurrency;
-
-    let deducs = false;
-    const sD = snap.snappedDeductions || [];
-    const cD = summaryData.deductions || [];
-    if (sD.length !== cD.length) deducs = true;
-    else {
-      for (let i = 0; i < sD.length; i++) {
-        const sItem = sD[i]!;
-        const cItem = cD[i]!;
-        if (
-          sItem.reason !== cItem.reason ||
-          Number(sItem.value) !== Number(cItem.value) ||
-          sItem.unitType !== cItem.unitType
-        ) {
-          deducs = true;
-          break;
-        }
-      }
-    }
-
-    return title || deadline || assignee || amt || deducs;
   };
 
   if (isQueryLoading) {
@@ -525,18 +783,13 @@ export default function CardRewardConfigForm({
   if (viewMode === "summary") {
     const summaryData = getSummaryData();
     const isWaitingApproval = summaryData.approvalStatus === "waiting_approval";
-    const isBreachedDraft =
-      summaryData.approvalStatus === "draft" && !!summaryData.snapshot;
-    const hasMismatch = checkHasMismatch(summaryData);
-    const isBreachedApproved = summaryData.approvalStatus === "approved" && hasMismatch;
-
-    // Admin chỉ được Review khi User đã Submit (waiting_approval) 
-    // HOẶC khi đã Duyệt rồi nhưng bị lệch dữ liệu (isBreachedApproved)
-    // Đối với Bản nháp (draft), Admin chỉ được xem (Summary View)
-    if (isAdmin && (isWaitingApproval || isBreachedApproved)) {
+    // Chỉ hiển thị màn duyệt khi đang chờ admin; đã approved → CardRewardSummaryCard (có badge lệch nếu cần).
+    // Trước đây gộp isBreachedApproved + so sánh assignee sai (publicId vs user id) khiến admin kẹt màn chờ dù API đã approved.
+    if (canReviewRewardApproval && isWaitingApproval) {
       return (
         <CardRewardAdminReview
           data={{ ...summaryData, id: remoteData?.id! }}
+          snapshotAssigneeName={snapshotAssigneeName}
           card={{
             cardTitle: card?.title || "Card Title",
             startDate: card?.startDate,
@@ -544,8 +797,10 @@ export default function CardRewardConfigForm({
             targetUser: card?.members?.[0]
               ? {
                   name: card.members[0].name || card.members[0].user?.name,
-                  avatarUrl: card.members[0].image || card.members[0].user?.image,
-                  email: card.members[0].email || card.members[0].user?.email || "",
+                  avatarUrl:
+                    card.members[0].image || card.members[0].user?.image,
+                  email:
+                    card.members[0].email || card.members[0].user?.email || "",
                 }
               : null,
           }}
@@ -556,17 +811,21 @@ export default function CardRewardConfigForm({
       );
     }
 
-    if (isAdmin && summaryData.approvalStatus === "waiting_evaluation") {
+    if (canFinalize && summaryData.approvalStatus === "waiting_evaluation") {
       return (
         <CardRewardFinalize
-          data={{ ...summaryData, id: remoteData?.id! }}
+          data={{
+            ...summaryData,
+            id: remoteData?.id!,
+            logs: (remoteData?.logs ?? []) as RewardLogRow[],
+          }}
           onFinalize={handleAdminFinalize}
           onBack={() => setViewMode("edit")}
         />
       );
     }
 
-    const effectivelyReadOnly = isReadOnly || (isAdmin && approvalStatus === "draft");
+    const effectivelyReadOnly = isReadOnly;
 
     return (
       <CardRewardSummaryCard
@@ -575,6 +834,10 @@ export default function CardRewardConfigForm({
           cardTitle: card?.title || "Card Title",
           startDate: card?.startDate,
           dueDate: card?.dueDate,
+          targetUser:
+            (card as { targetUser?: string | null })?.targetUser ??
+            card?.members?.[0]?.user?.id ??
+            null,
           assignee: card?.members?.[0]
             ? {
                 name: card.members[0].name || card.members[0].user?.name,
@@ -591,7 +854,7 @@ export default function CardRewardConfigForm({
     );
   }
 
-  const effectivelyReadOnly = isReadOnly || (isAdmin && approvalStatus === "draft");
+  const effectivelyReadOnly = isReadOnly;
 
   return (
     <motion.div
@@ -600,11 +863,21 @@ export default function CardRewardConfigForm({
       exit={{ opacity: 0, y: -10 }}
       className="shrink-0 space-y-3"
     >
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-[10px] font-bold uppercase tracking-widest text-neutral-900 dark:text-dark-1000">
           {t`Cấu hình thưởng / Khấu trừ`}
         </p>
-
+        {showResubmitSnapshotBanner && (
+          <span
+            className={
+              approvalStatus === "rejected"
+                ? "rounded-full border border-rose-200 bg-rose-50 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-rose-700 dark:border-rose-900/50 dark:bg-rose-950/40 dark:text-rose-300"
+                : "rounded-full border border-neutral-200 bg-neutral-100 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-neutral-600 dark:border-dark-300 dark:bg-dark-200 dark:text-dark-600"
+            }
+          >
+            {approvalStatus === "rejected" ? t`Từ chối` : t`Bản nháp`}
+          </span>
+        )}
       </div>
 
       {approvalStatus === "approved" && (
@@ -658,8 +931,106 @@ export default function CardRewardConfigForm({
         </motion.div>
       )}
 
+      {showResubmitSnapshotBanner && (
+        <motion.div
+          initial={{ opacity: 0, y: -4 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="space-y-2"
+        >
+          {/* Snapshot — gọn một khối */}
+          <div className="rounded-xl border border-neutral-200/90 bg-[#f7f7f2] px-3 py-2.5 dark:border-dark-300 dark:bg-dark-200/40">
+            <p className="mb-1.5 text-[9px] font-bold uppercase tracking-widest text-neutral-400 dark:text-dark-600">
+              {t`Snapshot (chốt lúc duyệt)`}
+            </p>
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[12px] font-semibold text-neutral-800 dark:text-dark-800">
+              <span className="inline-flex items-center gap-1.5">
+                <HiCalendarDays className="h-4 w-4 shrink-0 text-neutral-400" />
+                <span>
+                  {dbSnapshot?.snappedStartDate
+                    ? format(new Date(dbSnapshot.snappedStartDate), "MMM d")
+                    : "—"}{" "}
+                  →{" "}
+                  {dbSnapshot?.snappedDueDate
+                    ? format(new Date(dbSnapshot.snappedDueDate), "MMM d, yyyy")
+                    : "—"}
+                </span>
+              </span>
+              <span className="inline-flex min-w-0 max-w-[40%] items-center gap-1.5">
+                <HiUser className="h-4 w-4 shrink-0 text-neutral-400" />
+                <span className="truncate">{snapshotAssigneeName ?? "—"}</span>
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <HiCurrencyDollar className="h-4 w-4 shrink-0 text-neutral-400" />
+                <span>
+                  {formatNumber(dbSnapshot?.snappedBonusAmount || 0)}{" "}
+                  {dbSnapshot?.snappedCurrency || "VND"}
+                </span>
+              </span>
+            </div>
+          </div>
+
+          {/* Thẻ hiện tại — một dòng */}
+          <div className="rounded-xl border border-light-200 bg-white px-3 py-2.5 dark:border-dark-300 dark:bg-dark-100">
+            <p className="mb-1 text-[9px] font-bold uppercase tracking-widest text-neutral-400 dark:text-dark-600">
+              {t`Hiện tại (card gốc)`}
+            </p>
+            <div className="flex flex-wrap items-center gap-2 text-[12px] font-semibold text-neutral-800 dark:text-dark-800">
+              <span>
+                {card?.startDate
+                  ? format(new Date(card.startDate), "MMM d")
+                  : "—"}{" "}
+                –{" "}
+                {card?.dueDate
+                  ? format(new Date(card.dueDate), "MMM d, yyyy")
+                  : "—"}
+              </span>
+              {dbSnapshot?.snappedDueDate &&
+                card?.dueDate &&
+                (() => {
+                  const d = differenceInDays(
+                    new Date(card.dueDate),
+                    new Date(dbSnapshot.snappedDueDate),
+                  );
+                  if (d === 0) return null;
+                  return (
+                    <span className="rounded-md bg-rose-100 px-1.5 py-0.5 text-[10px] font-bold text-rose-700 dark:bg-rose-950/50 dark:text-rose-300">
+                      {d > 0 ? t`dời +${d} ngày` : t`sớm ${-d} ngày`}
+                    </span>
+                  );
+                })()}
+              <span className="text-neutral-500 dark:text-dark-600">·</span>
+              <span className="inline-flex min-w-0 items-center gap-1">
+                <HiUser className="h-4 w-4 shrink-0 text-neutral-400" />
+                <span className="truncate">
+                  {card?.members?.[0]?.name ||
+                    card?.members?.[0]?.user?.name ||
+                    "—"}
+                </span>
+              </span>
+              {card?.status && (
+                <>
+                  <span className="text-neutral-400">·</span>
+                  <span className="text-[10px] font-bold uppercase tracking-wide text-neutral-500">
+                    {String(card.status)}
+                  </span>
+                </>
+              )}
+            </div>
+          </div>
+
+          <div className="flex items-start gap-2 rounded-lg border border-rose-200 bg-rose-50/90 px-2.5 py-2 dark:border-rose-900/40 dark:bg-rose-950/25">
+            <HiExclamationCircle className="mt-0.5 h-4 w-4 shrink-0 text-rose-600 dark:text-rose-400" />
+            <p className="text-[11px] font-medium leading-snug text-rose-900 dark:text-rose-100">
+              {t`Dữ liệu đã thay đổi so với bản đã duyệt. Lưu và gửi duyệt lại để admin xem xét.`}
+            </p>
+          </div>
+        </motion.div>
+      )}
+
       <form
-        onSubmit={handleSubmit(onSubmit)}
+        onSubmit={handleSubmit(
+          isTaskMasterTemplate ? saveTemplateDraft : submitForApproval,
+        )}
         className="space-y-7 rounded-2xl border border-light-200 bg-white/70 p-5 shadow-[0_8px_30px_rgb(0,0,0,0.04)] backdrop-blur-md transition-all dark:border-dark-300 dark:bg-dark-100/70"
       >
         <div className="space-y-3">
@@ -754,137 +1125,91 @@ export default function CardRewardConfigForm({
           </div>
         </div>
         <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <label className="text-xs font-semibold uppercase tracking-wider text-neutral-500 dark:text-dark-600">
-              {t`Danh sách Khấu trừ`}
-            </label>
-            {!effectivelyReadOnly && (
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                type="button"
-                onClick={() =>
-                  append({ reason: "", unitType: "vnd", value: 0 })
-                }
-                className="flex items-center gap-1.5 rounded-lg bg-emerald-50 px-2 py-1 text-xs font-bold text-emerald-600 transition-colors hover:bg-emerald-100 dark:bg-emerald-900/20 dark:text-emerald-400 dark:hover:bg-emerald-900/40"
-              >
-                <HiPlus className="h-3.5 w-3.5" />
-                {t`THÊM`}
-              </motion.button>
-            )}
-          </div>
+          <label className="text-xs font-semibold uppercase tracking-wider text-neutral-500 dark:text-dark-600">
+            {t`Danh sách Khấu trừ`}
+          </label>
 
           <div className="overflow-hidden rounded-xl border border-light-200 bg-white shadow-[0_2px_10px_rgba(0,0,0,0.02)] transition-all dark:border-dark-300 dark:bg-dark-100">
             <table className="w-full text-left text-sm text-neutral-600 dark:text-dark-700">
               <thead className="bg-light-100 text-xs font-semibold text-neutral-500 dark:bg-dark-200 dark:text-dark-600">
                 <tr>
-                  <th className="border-b border-light-200 px-3 py-2 dark:border-dark-300">{t`Lý do`}</th>
+                  <th className="border-b border-light-200 px-3 py-2 dark:border-dark-300">{t`Loại khấu trừ`}</th>
                   <th className="border-left border-b border-l border-light-200 px-3 py-2 dark:border-dark-300">{t`Loại`}</th>
                   <th className="border-left border-b border-l border-light-200 px-3 py-2 dark:border-dark-300">{t`Giá trị`}</th>
-                  <th className="border-left w-8 border-b border-l border-light-200 px-2 py-2 dark:border-dark-300"></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-light-100 bg-white font-medium dark:divide-dark-300 dark:bg-dark-100">
-                <AnimatePresence mode="popLayout">
-                  {fields.length === 0 ? (
-                    <motion.tr
-                      key="empty"
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      exit={{ opacity: 0 }}
-                    >
-                      <td
-                        colSpan={4}
-                        className="px-4 py-8 text-center text-xs italic text-neutral-400 dark:text-dark-600"
-                      >
-                        {t`(Chưa có mục)`}
-                      </td>
-                    </motion.tr>
-                  ) : (
-                    fields.map((field, index) => (
-                      <motion.tr
-                        key={field.id}
-                        initial={{ opacity: 0, y: -5 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, scale: 0.95 }}
-                        transition={{ duration: 0.2 }}
-                        className="group transition-colors hover:bg-light-50 dark:hover:bg-dark-200/40"
-                      >
-                        <td className="p-1">
-                          <input
+                {[0, 1].map((index) => (
+                  <tr
+                    key={index}
+                    className="group transition-colors hover:bg-light-50 dark:hover:bg-dark-200/40"
+                  >
+                    <td className="px-3 py-2">
+                      <Controller
+                        name={`deductions.${index}.reason`}
+                        control={control}
+                        render={({ field }) => (
+                          <input type="hidden" {...field} />
+                        )}
+                      />
+                      <span className="text-sm font-medium text-neutral-800 dark:text-dark-900">
+                        {index === 0
+                          ? t`Trễ hạn (hoàn thành sau deadline)`
+                          : t`Dời deadline`}
+                      </span>
+                    </td>
+                    <td className="w-[120px] border-l border-light-100 p-1 dark:border-dark-300">
+                      <Controller
+                        name={`deductions.${index}.unitType`}
+                        control={control}
+                        render={({ field }) => (
+                          <Select
+                            value={field.value}
+                            onChange={field.onChange}
                             disabled={effectivelyReadOnly}
-                            {...register(`deductions.${index}.reason` as const)}
-                            placeholder={t`Nhập lý do khấu trừ...`}
-                            className="w-full rounded border border-transparent bg-transparent px-3 py-2 text-sm outline-none transition-all placeholder:text-light-400 focus:border-light-200 focus:bg-light-50 dark:text-dark-1000 dark:focus:border-dark-300 dark:focus:bg-dark-200"
+                            options={[
+                              { value: "percent", label: "%" },
+                              { value: "vnd", label: "VND" },
+                            ]}
+                            className="w-full"
                           />
-                        </td>
-                        <td className="w-[120px] border-l border-light-100 p-1 dark:border-dark-300">
-                          <Controller
-                            name={`deductions.${index}.unitType`}
-                            control={control}
-                            render={({ field }) => (
-                              <Select
-                                value={field.value}
-                                onChange={field.onChange}
-                                disabled={effectivelyReadOnly}
-                                options={[
-                                  { value: "percent", label: "%" },
-                                  { value: "vnd", label: "VND" },
-                                ]}
-                                className="w-full"
-                              />
-                            )}
-                          />
-                        </td>
-                        <td className="w-[120px] border-l border-light-100 p-1 dark:border-dark-300">
-                          <Controller
-                            name={`deductions.${index}.value`}
-                            control={control}
-                            render={({ field }) => (
-                              <motion.div
-                                animate={
-                                  errors.deductions?.[index]?.value
-                                    ? { x: [-1, 1, -1, 1, 0] }
-                                    : {}
-                                }
-                                transition={{ duration: 0.4 }}
-                                className="relative flex h-full items-center p-1"
-                              >
-                                <input
-                                  type="text"
-                                  disabled={effectivelyReadOnly}
-                                  value={formatNumber(field.value)}
-                                  onChange={(e) =>
-                                    field.onChange(parseNumber(e.target.value))
-                                  }
-                                  placeholder="0"
-                                  className={`w-full rounded-lg border px-3 py-2 text-sm font-bold outline-none transition-all dark:text-dark-1000 ${
-                                    errors.deductions?.[index]?.value
-                                      ? "border-rose-500 bg-rose-100/30 text-rose-700 focus:ring-4 focus:ring-rose-500/10"
-                                      : "border-transparent bg-transparent focus:border-light-200 focus:bg-light-50 dark:focus:bg-dark-200"
-                                  }`}
-                                />
-                              </motion.div>
-                            )}
-                          />
-                        </td>
-                        <td className="border-l border-light-100 p-1 text-center dark:border-dark-300">
-                          {!effectivelyReadOnly && (
-                            <motion.button
-                              whileHover={{ scale: 1.1 }}
-                              whileTap={{ scale: 0.9 }}
-                              type="button"
-                              onClick={() => remove(index)}
-                              className="mx-auto flex h-7 w-7 items-center justify-center rounded-lg text-red-400 opacity-50 transition-all hover:bg-red-50 hover:text-red-500 hover:opacity-100 dark:hover:bg-red-500/10"
-                            >
-                              <HiTrash className="h-4 w-4" />
-                            </motion.button>
-                          )}
-                        </td>
-                      </motion.tr>
-                    ))
-                  )}
-                </AnimatePresence>
+                        )}
+                      />
+                    </td>
+                    <td className="w-[120px] border-l border-light-100 p-1 dark:border-dark-300">
+                      <Controller
+                        name={`deductions.${index}.value`}
+                        control={control}
+                        render={({ field }) => (
+                          <motion.div
+                            animate={
+                              errors.deductions?.[index]?.value
+                                ? { x: [-1, 1, -1, 1, 0] }
+                                : {}
+                            }
+                            transition={{ duration: 0.4 }}
+                            className="relative flex h-full items-center p-1"
+                          >
+                            <input
+                              type="text"
+                              disabled={effectivelyReadOnly}
+                              value={formatNumber(field.value)}
+                              onChange={(e) =>
+                                field.onChange(parseNumber(e.target.value))
+                              }
+                              placeholder="0"
+                              className={`w-full rounded-lg border px-3 py-2 text-sm font-bold outline-none transition-all dark:text-dark-1000 ${
+                                errors.deductions?.[index]?.value
+                                  ? "border-rose-500 bg-rose-100/30 text-rose-700 focus:ring-4 focus:ring-rose-500/10"
+                                  : "border-transparent bg-transparent focus:border-light-200 focus:bg-light-50 dark:focus:bg-dark-200"
+                              }`}
+                            />
+                          </motion.div>
+                        )}
+                      />
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>
@@ -892,7 +1217,7 @@ export default function CardRewardConfigForm({
 
         {!effectivelyReadOnly && (
           <div className="flex justify-end gap-3 border-t border-light-200 pt-4 dark:border-dark-300/50">
-            {approvalStatus === "draft" && (
+            {(approvalStatus === "draft" || approvalStatus === "rejected") && (
               <motion.button
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
@@ -901,29 +1226,15 @@ export default function CardRewardConfigForm({
                 onClick={async () => {
                   try {
                     const data = getValues();
-                    const payload = {
-                      cardPublicId,
-                      rewardType: data.rewardType,
-                      // Draft được phép chưa điền bonusAmount → gửi null nếu chưa có giá trị > 0
-                      bonusAmount:
-                        data.rewardType === "project" &&
-                        data.bonusAmount &&
-                        data.bonusAmount > 0
-                          ? data.bonusAmount
-                          : null,
-                      currency: data.currency,
-                      deductions: data.deductions.map((d) => ({
-                        ...d,
-                        value: d.value.toString(),
-                      })),
-                    };
-                    await upsertMutation.mutateAsync(payload);
+                    const result = await upsertMutation.mutateAsync(
+                      buildUpsertPayload(data, "draft"),
+                    );
                     showPopup({
                       header: t`Thành công`,
                       message: t`Đã lưu bản nháp`,
                       icon: "success",
                     });
-                    await utils.reward.getByCardId.invalidate({ cardPublicId });
+                    await refreshRewardState({ configId: result.configId });
                   } catch (err: any) {
                     showPopup({
                       header: t`Lỗi`,
@@ -934,25 +1245,27 @@ export default function CardRewardConfigForm({
                 }}
                 className="rounded-xl border border-light-200 bg-white px-6 py-2.5 text-xs font-bold uppercase tracking-wider text-neutral-600 transition-all hover:bg-light-50 disabled:opacity-50 dark:border-dark-300 dark:bg-dark-100 dark:text-dark-700"
               >
-                {t`Lưu nháp`}
+                {isTaskMasterTemplate ? t`Lưu mẫu thưởng` : t`Lưu nháp`}
               </motion.button>
             )}
 
-            <motion.button
-              whileHover={{ scale: 1.02, y: -1 }}
-              whileTap={{ scale: 0.98 }}
-              type="submit"
-              disabled={isMutating}
-              className="rounded-xl bg-emerald-500 px-6 py-2.5 text-xs font-bold uppercase tracking-wider text-white shadow-lg shadow-emerald-500/20 transition-all hover:bg-emerald-600 focus:outline-none focus:ring-[3px] focus:ring-emerald-500/30 disabled:opacity-50 dark:bg-emerald-600 dark:hover:bg-emerald-500"
-            >
-              {isMutating ? (
-                <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-              ) : approvalStatus === "rejected" ? (
-                t`Lưu & Gửi lại`
-              ) : (
-                t`Lưu & Gửi duyệt`
-              )}
-            </motion.button>
+            {!isTaskMasterTemplate && (
+              <motion.button
+                whileHover={{ scale: 1.02, y: -1 }}
+                whileTap={{ scale: 0.98 }}
+                type="submit"
+                disabled={isMutating}
+                className="rounded-xl bg-emerald-500 px-6 py-2.5 text-xs font-bold uppercase tracking-wider text-white shadow-lg shadow-emerald-500/20 transition-all hover:bg-emerald-600 focus:outline-none focus:ring-[3px] focus:ring-emerald-500/30 disabled:opacity-50 dark:bg-emerald-600 dark:hover:bg-emerald-500"
+              >
+                {isMutating ? (
+                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                ) : approvalStatus === "rejected" ? (
+                  t`Lưu & Gửi lại`
+                ) : (
+                  t`Lưu & Gửi duyệt`
+                )}
+              </motion.button>
+            )}
           </div>
         )}
       </form>

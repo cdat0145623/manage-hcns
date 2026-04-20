@@ -463,6 +463,20 @@
       "when": 1776483138300,
       "tag": "20260418041300_RefactorRewardConfigToTaskInstance",
       "breakpoints": true
+    },
+    {
+      "idx": 66,
+      "version": "7",
+      "when": 1776500000000,
+      "tag": "20260418120000_add_completed_after_deadline_violation",
+      "breakpoints": true
+    },
+    {
+      "idx": 67,
+      "version": "7",
+      "when": 1776507200000,
+      "tag": "20260418140000_add_task_master_reward_template",
+      "breakpoints": true
     }
   ]
 }

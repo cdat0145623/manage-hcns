@@ -647,7 +647,7 @@ export default function Editor({
   return (
     <div
       ref={containerRef}
-      className={twMerge("relative group flex flex-col transition-all")}
+      className={twMerge("group relative flex flex-col transition-all")}
     >
       <style jsx global>{`
         .tiptap p.is-empty::before {
@@ -697,16 +697,21 @@ export default function Editor({
       `}</style>
 
       {!readOnly && editor && (
-        <div className="sticky top-0 z-40 rounded-t-xl bg-white/80 backdrop-blur-md dark:bg-dark-100/80">
-          <EditorProToolbar 
-            editor={editor} 
-            disableHeadings={disableHeadings} 
+        <div className="sticky top-0 z-40 rounded-t-xl bg-light-300 dark:bg-dark-400">
+          <EditorProToolbar
+            editor={editor}
+            disableHeadings={disableHeadings}
             popoverPlacement={popoverPlacement}
           />
         </div>
       )}
 
-      <div className={twMerge("overflow-y-auto overflow-x-hidden scrollbar-thin scrollbar-thumb-light-300 dark:scrollbar-thumb-dark-700", maxHeightClass || "max-h-[250px]")}>
+      <div
+        className={twMerge(
+          "overflow-y-auto overflow-x-hidden scrollbar-thin scrollbar-thumb-light-300 dark:scrollbar-thumb-dark-700",
+          maxHeightClass || "max-h-[250px]",
+        )}
+      >
         <EditorContent
           editor={editor}
           className={twMerge(
@@ -763,7 +768,7 @@ function ColorPicker({
     <Popover className="relative">
       <Popover.Button
         type="button"
-        className="flex h-7 w-7 items-center justify-center rounded-lg text-light-500 transition-all hover:bg-light-100 hover:text-light-1000 dark:text-dark-600 dark:hover:bg-dark-300 dark:hover:text-dark-1000"
+        className="flex h-7 w-7 items-center justify-center rounded-lg text-light-800 transition-all hover:bg-light-400/90 hover:text-light-1000 dark:text-dark-200 dark:hover:bg-dark-500 dark:hover:text-dark-1000"
       >
         <div className="flex flex-col items-center">
           {icon}
@@ -788,7 +793,7 @@ function ColorPicker({
         leaveFrom="transform opacity-100 scale-100"
         leaveTo="transform opacity-0 scale-95"
       >
-        <Popover.Panel 
+        <Popover.Panel
           anchor={popoverPlacement === "top" ? "top start" : "bottom start"}
           className="z-[100] w-44 rounded-xl border border-light-200 bg-white p-2 shadow-xl focus:outline-none dark:border-dark-300 dark:bg-dark-100"
         >
@@ -848,8 +853,8 @@ function ToolbarButton({
       className={twMerge(
         "flex h-7 w-7 items-center justify-center rounded-lg transition-all active:scale-95",
         active
-          ? "bg-light-200 text-light-1000 shadow-sm dark:bg-dark-300 dark:text-dark-1000"
-          : "text-light-500 hover:bg-light-100 hover:text-light-1000 dark:text-dark-600 dark:hover:bg-dark-200 dark:hover:text-dark-1000",
+          ? "bg-light-400 text-light-1000 shadow-sm dark:bg-dark-500 dark:text-dark-1000"
+          : "text-light-800 hover:bg-light-400/90 hover:text-light-1000 dark:text-dark-200 dark:hover:bg-dark-500 dark:hover:text-dark-1000",
       )}
     >
       {icon}
@@ -871,7 +876,7 @@ function EditorProToolbar({
   const extraItems = getCommandItems(disableHeadings);
 
   return (
-    <div className="flex flex-nowrap items-center gap-1 rounded-t-[10px] border-b border-light-100/80 bg-light-50/50 p-1.5 px-2.5 backdrop-blur-sm dark:border-dark-300/80 dark:bg-dark-100/50">
+    <div className="flex flex-nowrap items-center gap-1 rounded-t-[10px] border-b border-light-400 bg-light-300 p-1.5 px-2.5 dark:border-dark-500 dark:bg-dark-400">
       <div className="mx-0.5 h-4 w-px shrink-0 bg-light-200 dark:bg-dark-300" />
 
       <div className="flex shrink-0 items-center gap-0.5 pr-1">
@@ -973,7 +978,7 @@ function EditorProToolbar({
       <Menu as="div" className="relative inline-block shrink-0 text-left">
         <Menu.Button
           type="button"
-          className="flex h-7 w-7 items-center justify-center rounded-lg text-light-500 transition-all hover:bg-light-100 hover:text-light-1000 dark:text-dark-600 dark:hover:bg-dark-300 dark:hover:text-dark-1000"
+          className="flex h-7 w-7 items-center justify-center rounded-lg text-light-800 transition-all hover:bg-light-400/90 hover:text-light-1000 dark:text-dark-200 dark:hover:bg-dark-500 dark:hover:text-dark-1000"
         >
           <HiEllipsisVertical className="h-4 w-4" />
         </Menu.Button>
@@ -987,7 +992,7 @@ function EditorProToolbar({
           leaveFrom="transform opacity-100 scale-100"
           leaveTo="transform opacity-0 scale-95"
         >
-          <Menu.Items 
+          <Menu.Items
             anchor={popoverPlacement === "top" ? "top end" : "bottom end"}
             className="z-[100] w-48 rounded-xl border border-light-200 bg-white p-1.5 shadow-xl ring-1 ring-light-100/50 focus:outline-none dark:border-dark-300 dark:bg-dark-100 dark:ring-white/5"
           >

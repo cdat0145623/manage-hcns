@@ -5,7 +5,7 @@ import pkg from "rrule";
 import type { dbClient } from "@kan/db/client";
 // eslint-disable-next-line @typescript-eslint/consistent-type-imports
 import { cardActivities, statusTypeEnum, taskInstances } from "@kan/db/schema";
-import { generateUID } from "@kan/shared/utils";
+import { applyMasterWallTimeToAnchorDay, generateUID } from "@kan/shared/utils";
 
 const { RRule } = pkg;
 
@@ -136,12 +136,10 @@ export const generateVirtualTaskInstances = async (params: {
     // Chuyển đổi ngược lại từ Floating Time về UTC thật sự
     const target = new Date(date.getTime() - offset);
 
-    // Tính endDate: lấy ngày từ target, giờ từ masterEndDate
-    const instanceEndDate = new Date(target);
-    instanceEndDate.setHours(params.masterEndDate.getHours());
-    instanceEndDate.setMinutes(params.masterEndDate.getMinutes());
-    instanceEndDate.setSeconds(params.masterEndDate.getSeconds());
-    instanceEndDate.setMilliseconds(params.masterEndDate.getMilliseconds());
+    const instanceEndDate = applyMasterWallTimeToAnchorDay(
+      target,
+      params.masterEndDate,
+    );
 
     return {
       id: `virtual_${params.taskMasterId}_${target.getTime()}`,
@@ -180,11 +178,17 @@ export const update = async (
       taskMasterId: taskInstanceInput.taskMasterId,
       name: taskInstanceInput.name,
       description: taskInstanceInput.description,
-      targetDate: taskInstanceInput.targetDate,
-      actualDate: taskInstanceInput.actualDate,
-      endDate: taskInstanceInput.endDate,
       status: taskInstanceInput.status,
       updatedAt: new Date(),
+      ...(taskInstanceInput.targetDate !== undefined
+        ? { targetDate: taskInstanceInput.targetDate }
+        : {}),
+      ...(taskInstanceInput.actualDate !== undefined
+        ? { actualDate: taskInstanceInput.actualDate }
+        : {}),
+      ...(taskInstanceInput.endDate !== undefined
+        ? { endDate: taskInstanceInput.endDate }
+        : {}),
     })
     .where(eq(taskInstances.id, taskInstanceInput.id))
     .returning({

@@ -1,7 +1,7 @@
-import { Listbox, Transition, Portal } from "@headlessui/react";
-import { Fragment } from "react";
-import { HiChevronUpDown, HiCheck } from "react-icons/hi2";
+import { Listbox, Portal, Transition } from "@headlessui/react";
 import { motion } from "framer-motion";
+import { Fragment } from "react";
+import { HiCheck, HiChevronUpDown } from "react-icons/hi2";
 
 interface Option {
   value: string;
@@ -30,7 +30,9 @@ export default function Select({
   return (
     <Listbox value={value} onChange={onChange} disabled={disabled}>
       <div className={`relative ${className}`}>
-        <Listbox.Button className={`relative w-full cursor-pointer rounded-xl border border-light-200 bg-white py-2.5 pl-4 pr-10 text-left text-sm font-medium outline-none transition-all hover:border-emerald-500/50 focus:border-emerald-500 focus:ring-[3px] focus:ring-emerald-500/10 dark:border-dark-300/50 dark:bg-dark-200 dark:text-white dark:focus:border-emerald-500/50 ${buttonClassName}`}>
+        <Listbox.Button
+          className={`relative w-full cursor-pointer rounded-xl border border-light-200 bg-white py-2.5 pl-4 pr-10 text-left text-sm font-medium outline-none transition-all hover:border-emerald-500/50 focus:border-emerald-500 focus:ring-[3px] focus:ring-emerald-500/10 dark:border-dark-300/50 dark:bg-dark-200 dark:text-white dark:focus:border-emerald-500/50 ${buttonClassName}`}
+        >
           <span className="block truncate">{selected?.label}</span>
           <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
             <HiChevronUpDown
@@ -50,7 +52,7 @@ export default function Select({
         >
           <Listbox.Options
             anchor="bottom start"
-            className="z-[9999] w-[var(--button-width)] min-w-[120px] overflow-hidden rounded-2xl border border-white/40 bg-white/80 p-1.5 shadow-[0_20px_50px_rgba(0,0,0,0.12)] backdrop-blur-xl focus:outline-none dark:border-dark-400/40 dark:bg-dark-100 [--anchor-gap:4px]"
+            className="z-[9999] w-[var(--button-width)] min-w-[120px] overflow-hidden rounded-2xl border border-neutral-200 bg-white p-1.5 shadow-[0_20px_50px_rgba(0,0,0,0.12)] [--anchor-gap:4px] focus:outline-none dark:border-dark-400 dark:bg-dark-100"
           >
             {options.map((option) => (
               <Listbox.Option

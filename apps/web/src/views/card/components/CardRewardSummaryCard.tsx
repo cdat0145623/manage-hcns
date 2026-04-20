@@ -1,5 +1,4 @@
 import { t } from "@lingui/macro";
-import { format } from "date-fns";
 import { motion } from "framer-motion";
 import React from "react";
 import {
@@ -16,6 +15,10 @@ import { REWARD_DEDUCTION_REASON } from "@kan/shared/constants";
 
 import Avatar from "~/components/Avatar";
 import { detectRewardMismatch } from "~/utils/reward";
+import {
+  formatRewardDayMonth,
+  formatRewardDayMonthYear,
+} from "~/utils/rewardDates";
 
 export type RewardStatus =
   | "draft"
@@ -206,14 +209,11 @@ export const CardRewardSummaryCard = ({
               <span className="text-sm">📅</span>
               <p className="font-semibold text-neutral-700 dark:text-dark-800">
                 {data.snapshot.snappedStartDate
-                  ? format(new Date(data.snapshot.snappedStartDate), "MMM d")
+                  ? formatRewardDayMonth(data.snapshot.snappedStartDate)
                   : "?"}{" "}
                 →{" "}
                 {data.snapshot.snappedDueDate
-                  ? format(
-                      new Date(data.snapshot.snappedDueDate),
-                      "MMM d, yyyy",
-                    )
+                  ? formatRewardDayMonthYear(data.snapshot.snappedDueDate)
                   : "?"}
               </p>
             </div>
@@ -339,8 +339,8 @@ export const CardRewardSummaryCard = ({
               {card.startDate && card.dueDate ? (
                 <div className="flex items-center gap-2">
                   <span>
-                    {format(new Date(card.startDate), "MMM d")} -{" "}
-                    {format(new Date(card.dueDate), "MMM d, yyyy")}
+                    {formatRewardDayMonth(card.startDate)} -{" "}
+                    {formatRewardDayMonthYear(card.dueDate)}
                   </span>
                   {mismatches.deadline && (mismatches.diffDays ?? 0) > 0 && (
                     <span className="flex items-center gap-1 rounded border border-rose-100 bg-rose-50 px-2 py-0.5 text-[10px] text-rose-600">
@@ -405,7 +405,7 @@ export const CardRewardSummaryCard = ({
                 >
                   <span className="h-2 w-2 rounded-full bg-rose-500 shadow-[0_0_5px_rgba(244,63,94,0.3)]" />
                   <span className="font-bold text-neutral-400">
-                    {format(new Date(log.date), "MMM d")}
+                    {formatRewardDayMonth(log.date)}
                   </span>
                   <span className="font-semibold text-neutral-600">
                     • {log.reason}
@@ -481,7 +481,7 @@ export const CardRewardSummaryCard = ({
             <span className="opacity-50">•</span>
             <span>
               {data.approvedAt && !isNaN(new Date(data.approvedAt).getTime())
-                ? format(new Date(data.approvedAt), "MMM dd, yyyy")
+                ? formatRewardDayMonthYear(data.approvedAt)
                 : ""}
             </span>
           </div>

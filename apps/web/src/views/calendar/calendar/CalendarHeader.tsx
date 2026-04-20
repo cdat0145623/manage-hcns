@@ -5,10 +5,26 @@ import {
   ListboxOptions,
   Transition,
 } from "@headlessui/react";
-import { addDays, addMonths, addWeeks, format, subDays, subMonths, subWeeks, startOfWeek, endOfWeek } from "date-fns";
-import { motion, AnimatePresence } from "framer-motion";
+import {
+  addDays,
+  addMonths,
+  addWeeks,
+  endOfWeek,
+  format,
+  startOfWeek,
+  subDays,
+  subMonths,
+  subWeeks,
+} from "date-fns";
+import { AnimatePresence, motion } from "framer-motion";
 import { Fragment, useMemo } from "react";
-import { HiOutlineChevronLeft, HiOutlineChevronRight, HiOutlineUserCircle, HiChevronUpDown, HiCheck } from "react-icons/hi2";
+import {
+  HiCheck,
+  HiChevronUpDown,
+  HiOutlineChevronLeft,
+  HiOutlineChevronRight,
+  HiOutlineUserCircle,
+} from "react-icons/hi2";
 
 export type ViewMode = "DAY" | "WEEK" | "MONTH";
 
@@ -60,14 +76,17 @@ export function CalendarHeader({
             `Tháng ${currentDate.getMonth() + 1} ${currentDate.getFullYear()}`
           ) : viewMode === "WEEK" ? (
             <>
-              {format(startOfWeek(currentDate, { weekStartsOn: 1 }), "d")} Tháng {startOfWeek(currentDate, { weekStartsOn: 1 }).getMonth() + 1} — 
-              {format(endOfWeek(currentDate, { weekStartsOn: 1 }), "d")} Tháng {endOfWeek(currentDate, { weekStartsOn: 1 }).getMonth() + 1}, {format(endOfWeek(currentDate, { weekStartsOn: 1 }), "yyyy")}
+              {format(startOfWeek(currentDate, { weekStartsOn: 1 }), "d")} Tháng{" "}
+              {startOfWeek(currentDate, { weekStartsOn: 1 }).getMonth() + 1} —
+              {format(endOfWeek(currentDate, { weekStartsOn: 1 }), "d")} Tháng{" "}
+              {endOfWeek(currentDate, { weekStartsOn: 1 }).getMonth() + 1},{" "}
+              {format(endOfWeek(currentDate, { weekStartsOn: 1 }), "yyyy")}
             </>
           ) : (
             `${currentDate.getDate()} Tháng ${currentDate.getMonth() + 1}, ${format(currentDate, "yyyy")}`
           )}
         </h2>
-        <div className="flex items-center gap-1.5 rounded-full bg-neutral-100/80 p-1 dark:bg-neutral-800/80 shadow-inner">
+        <div className="flex items-center gap-1.5 rounded-full bg-neutral-100/80 p-1 shadow-inner dark:bg-neutral-800/80">
           <motion.button
             whileHover={{ scale: 1.1 }}
             whileTap={{ scale: 0.9 }}
@@ -100,15 +119,19 @@ export function CalendarHeader({
           <Listbox value={selectedUserId} onChange={setSelectedUserId}>
             <div className="relative">
               {/* <Listbox value={selectedUserId} onChange={setSelectedUserId}> */}
-              <ListboxButton className="relative w-full cursor-pointer rounded-xl border border-neutral-200/70 bg-white/50 py-2.5 pl-4 pr-10 text-left text-sm font-semibold text-neutral-900 shadow-sm transition-all hover:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-dark-400/50 dark:bg-dark-300/50 dark:text-white dark:hover:bg-dark-200">
+              <ListboxButton className="relative w-full cursor-pointer rounded-xl border border-neutral-200 bg-white py-2.5 pl-4 pr-10 text-left text-sm font-semibold text-neutral-900 shadow-sm transition-all hover:bg-neutral-50 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-dark-400 dark:bg-dark-200 dark:text-white dark:hover:bg-dark-300">
                 <span className="flex items-center gap-2.5 truncate">
                   <HiOutlineUserCircle className="h-5 w-5 shrink-0 text-neutral-400 dark:text-neutral-500" />
                   <span className="block truncate">
-                    {users?.find((u) => u.id === selectedUserId)?.name || "Chọn người dùng"}
+                    {users?.find((u) => u.id === selectedUserId)?.name ||
+                      "Chọn người dùng"}
                   </span>
                 </span>
                 <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
-                  <HiChevronUpDown className="h-5 w-5 text-neutral-400" aria-hidden="true" />
+                  <HiChevronUpDown
+                    className="h-5 w-5 text-neutral-400"
+                    aria-hidden="true"
+                  />
                 </span>
               </ListboxButton>
 
@@ -118,20 +141,24 @@ export function CalendarHeader({
                 leaveFrom="opacity-100"
                 leaveTo="opacity-0"
               >
-                <ListboxOptions className="absolute z-50 mt-1.5 max-h-60 w-full overflow-auto rounded-xl bg-white/90 py-1.5 text-base shadow-xl ring-1 ring-black/5 backdrop-blur-md focus:outline-none dark:bg-dark-50/90 dark:ring-white/10 sm:text-sm">
+                <ListboxOptions className="absolute z-50 mt-1.5 max-h-60 w-full overflow-auto rounded-xl bg-white py-1.5 text-base shadow-xl ring-1 ring-black/5 focus:outline-none dark:bg-dark-50 dark:ring-white/10 sm:text-sm">
                   {users?.map((user) => (
                     <ListboxOption
                       key={user.id}
                       value={user.id}
                       className={({ focus, selected }) =>
                         `relative cursor-pointer select-none py-2.5 pl-10 pr-4 transition-colors ${
-                          focus ? "bg-blue-50 text-blue-900 dark:bg-blue-900/30 dark:text-blue-100" : "text-neutral-900 dark:text-neutral-200"
+                          focus
+                            ? "bg-blue-50 text-blue-900 dark:bg-blue-900/30 dark:text-blue-100"
+                            : "text-neutral-900 dark:text-neutral-200"
                         } ${selected ? "font-bold" : "font-medium"}`
                       }
                     >
                       {({ selected }) => (
                         <>
-                          <span className={`block truncate ${selected ? "text-blue-600 dark:text-blue-400" : ""}`}>
+                          <span
+                            className={`block truncate ${selected ? "text-blue-600 dark:text-blue-400" : ""}`}
+                          >
                             {user.name || user.username || user.email}
                           </span>
                           {selected ? (
@@ -148,23 +175,31 @@ export function CalendarHeader({
             </div>
           </Listbox>
         </div>
-        <div className="flex items-center gap-1 rounded-full bg-neutral-100/80 p-1 dark:bg-neutral-800/80 shadow-inner">
+        <div className="flex items-center gap-1 rounded-full bg-neutral-100/80 p-1 shadow-inner dark:bg-neutral-800/80">
           {(["DAY", "WEEK", "MONTH"] as ViewMode[]).map((mode) => {
-            const modeLabel: Record<ViewMode, string> = { DAY: "Ngày", WEEK: "Tuần", MONTH: "Tháng" };
+            const modeLabel: Record<ViewMode, string> = {
+              DAY: "Ngày",
+              WEEK: "Tuần",
+              MONTH: "Tháng",
+            };
             return (
-            <motion.button
-              key={mode}
-              whileHover={viewMode !== mode ? { scale: 1.05, backgroundColor: "rgba(255,255,255,0.8)" } : {}}
-              whileTap={{ scale: 0.95 }}
-              onClick={() => setViewMode(mode)}
-              className={`rounded-full px-5 py-1.5 text-[10px] font-black uppercase tracking-widest transition-all duration-300 ${
-                viewMode === mode
-                  ? "bg-white text-blue-600 shadow-md dark:bg-neutral-700 dark:text-white"
-                  : "text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-white"
-              }`}
-            >
-              {modeLabel[mode]}
-            </motion.button>
+              <motion.button
+                key={mode}
+                whileHover={
+                  viewMode !== mode
+                    ? { scale: 1.05, backgroundColor: "rgba(255,255,255,0.8)" }
+                    : {}
+                }
+                whileTap={{ scale: 0.95 }}
+                onClick={() => setViewMode(mode)}
+                className={`rounded-full px-5 py-1.5 text-[10px] font-black uppercase tracking-widest transition-all duration-300 ${
+                  viewMode === mode
+                    ? "bg-white text-blue-600 shadow-md dark:bg-neutral-700 dark:text-white"
+                    : "text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-white"
+                }`}
+              >
+                {modeLabel[mode]}
+              </motion.button>
             );
           })}
         </div>

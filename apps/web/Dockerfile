@@ -59,6 +59,9 @@ ARG NEXT_PUBLIC_STORAGE_URL
 
 WORKDIR /app
 
+# Olson DB on Alpine: Next SSR during `next build` uses process TZ for plain date-fns `format()`.
+RUN apk add --no-cache tzdata
+
 COPY --from=deps /app/ ./
 COPY --from=pruner /app/out/full/ .
 COPY --from=pruner /app/AUTO_VERSION /tmp/AUTO_VERSION
@@ -66,6 +69,7 @@ COPY --from=pruner /app/AUTO_VERSION /tmp/AUTO_VERSION
 # Force standalone output for production Docker image
 ENV NEXT_PUBLIC_USE_STANDALONE_OUTPUT=true
 ENV CI=true
+ENV TZ=Asia/Ho_Chi_Minh
 ENV NEXT_PUBLIC_AVATAR_BUCKET_NAME=$NEXT_PUBLIC_AVATAR_BUCKET_NAME
 ENV NEXT_PUBLIC_ATTACHMENTS_BUCKET_NAME=$NEXT_PUBLIC_ATTACHMENTS_BUCKET_NAME
 ENV NEXT_PUBLIC_STORAGE_URL=$NEXT_PUBLIC_STORAGE_URL
@@ -133,6 +137,14 @@ RUN npm init -y && \
 CMD ["npx", "drizzle-kit", "migrate"]
 
 # ============================================
+# Stage 5.5: IANA tzdata for distroless (no /usr/share/zoneinfo; Node falls back to UTC)
+# ============================================
+FROM debian:bookworm-slim AS tzdata
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends tzdata && \
+    rm -rf /var/lib/apt/lists/*
+
+# ============================================
 # Stage 6: Production web image (distroless)
 # ============================================
 FROM ${DISTROLESS_NODE_IMAGE} AS web
@@ -141,6 +153,9 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=3000
 ENV HOSTNAME=0.0.0.0
+# Without zoneinfo + TZ, SSR uses UTC for any code that relies on "local" time (date-fns format, etc.)
+COPY --from=tzdata /usr/share/zoneinfo /usr/share/zoneinfo
+ENV TZ=Asia/Ho_Chi_Minh
 
 # Copy the standalone Next.js server
 COPY --from=builder /app/apps/web/.next/standalone/ ./

@@ -43,6 +43,16 @@ export default function CardPage({ isTemplate }: { isTemplate?: boolean }) {
     }
   };
 
+  const handleAfterCardDeleted = () => {
+    if (boardId) {
+      void router.replace(
+        isTemplate ? `/templates/${boardId}` : `/boards/${boardId}`,
+      );
+    } else {
+      void router.replace(isTemplate ? "/templates" : "/boards");
+    }
+  };
+
   if (!cardId) return null;
 
   return (
@@ -56,6 +66,7 @@ export default function CardPage({ isTemplate }: { isTemplate?: boolean }) {
             cardId={cardId}
             isTemplate={isTemplate}
             onClose={handleClose}
+            onCardDeleted={handleAfterCardDeleted}
           />
         </div>
       </div>

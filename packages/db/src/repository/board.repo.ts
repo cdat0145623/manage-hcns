@@ -27,8 +27,8 @@ import {
   labels,
   lists,
   userBoardFavorites,
-  workspaceMembers,
   users,
+  workspaceMembers,
 } from "@kan/db/schema";
 import { generateUID } from "@kan/shared/utils";
 
@@ -56,7 +56,9 @@ export const getAllForPublic = async (
       eq(boards.workspaceId, workspaceId),
       isNull(boards.deletedAt),
       opts?.type ? eq(boards.type, opts.type) : undefined,
-      opts?.archived !== undefined ? eq(boards.isArchived, opts.archived) : undefined,
+      opts?.archived !== undefined
+        ? eq(boards.isArchived, opts.archived)
+        : undefined,
     ),
   });
 
@@ -101,13 +103,15 @@ export const getAllByUserId = async (
         columns: {
           name: true,
         },
-      }
+      },
     },
     where: and(
       eq(boards.workspaceId, workspaceId),
       isNull(boards.deletedAt),
       eq(boards.createdBy, userId),
-      opts?.archived !== undefined ? eq(boards.isArchived, opts.archived) : undefined,
+      opts?.archived !== undefined
+        ? eq(boards.isArchived, opts.archived)
+        : undefined,
     ),
   });
 
@@ -166,14 +170,20 @@ export const getAllByWorkspaceId = async (
         columns: {
           name: true,
         },
-      }
+      },
     },
     where: and(
       eq(boards.workspaceId, workspaceId),
       isNull(boards.deletedAt),
-      userRole === "ADMIN" ? undefined : eq(boards.createdBy, userId),
+      // Regular boards: non-admins only see boards they created. Template boards are shared
+      // workspace samples (list is gated by board:view on the API); do not filter by creator.
+      userRole === "ADMIN" || opts?.type === "template"
+        ? undefined
+        : eq(boards.createdBy, userId),
       opts?.type ? eq(boards.type, opts.type) : undefined,
-      opts?.archived !== undefined ? eq(boards.isArchived, opts.archived) : undefined,
+      opts?.archived !== undefined
+        ? eq(boards.isArchived, opts.archived)
+        : undefined,
     ),
   });
 
@@ -476,7 +486,7 @@ export const getByPublicId = async (
       ...list,
       cards: list.cards.map((card) => {
         // Filter for active attachments: group by publicId and take the latest activity.
-        const latestFiles = new Map<string, typeof card.fileActivities[0]>();
+        const latestFiles = new Map<string, (typeof card.fileActivities)[0]>();
         for (const activity of card.fileActivities) {
           latestFiles.set(activity.publicId, activity);
         }
@@ -676,7 +686,7 @@ export const getBySlug = async (
       ...list,
       cards: list.cards.map((card) => {
         // Filter for active attachments
-        const latestFiles = new Map<string, typeof card.fileActivities[0]>();
+        const latestFiles = new Map<string, (typeof card.fileActivities)[0]>();
         for (const activity of card.fileActivities) {
           latestFiles.set(activity.publicId, activity);
         }
@@ -799,7 +809,9 @@ export const update = async (
       slug: boardInput.slug,
       visibility: boardInput.visibility,
       updatedAt: new Date(),
-      ...(boardInput.isArchived !== undefined && { isArchived: boardInput.isArchived }) 
+      ...(boardInput.isArchived !== undefined && {
+        isArchived: boardInput.isArchived,
+      }),
     })
     .where(eq(boards.publicId, boardInput.boardPublicId))
     .returning({
@@ -819,10 +831,10 @@ export const unArchived = async (
 ) => {
   const [result] = await db
     .update(boards)
-    .set({ 
-      deletedAt: null, 
+    .set({
+      deletedAt: null,
       deletedBy: null,
-      ...(args.isArchived !== undefined && { isArchived: args.isArchived }) 
+      ...(args.isArchived !== undefined && { isArchived: args.isArchived }),
     })
     .where(and(eq(boards.id, args.boardId), isNull(boards.deletedAt)))
     .returning({
@@ -831,7 +843,7 @@ export const unArchived = async (
     });
 
   return result;
-}
+};
 
 export const softDelete = async (
   db: dbClient,
@@ -844,10 +856,10 @@ export const softDelete = async (
 ) => {
   const [result] = await db
     .update(boards)
-    .set({ 
-      deletedAt: args.deletedAt, 
+    .set({
+      deletedAt: args.deletedAt,
       deletedBy: args.deletedBy,
-      ...(args.isArchived !== undefined && { isArchived: args.isArchived }) 
+      ...(args.isArchived !== undefined && { isArchived: args.isArchived }),
     })
     .where(and(eq(boards.id, args.boardId), isNull(boards.deletedAt)))
     .returning({
@@ -1174,25 +1186,23 @@ export const removeUserFavorite = async (
     .where(
       and(
         eq(userBoardFavorites.userId, userId),
-        eq(userBoardFavorites.boardId, boardId)
-      )
+        eq(userBoardFavorites.boardId, boardId),
+      ),
     )
     .returning();
 };
 
-export const getByName = async (
-  db: dbClient, 
-  name: string,
-  userId: string,
-) => {
+export const getByName = async (db: dbClient, name: string, userId: string) => {
   const result = await db
     .select()
     .from(boards)
-    .where(and(
-      eq(boards.name, name),
-      eq(boards.type, "regular"),
-      eq(boards.createdBy, userId),
-    ))
+    .where(
+      and(
+        eq(boards.name, name),
+        eq(boards.type, "regular"),
+        eq(boards.createdBy, userId),
+      ),
+    )
     .limit(1);
 
   return result[0] ?? null;
@@ -1226,7 +1236,7 @@ export const getTemplateDefault = async (db: dbClient) => {
     where: and(
       eq(boards.type, "template"),
       eq(boards.isTemplateDefault, true),
-      isNull(boards.deletedAt)
+      isNull(boards.deletedAt),
     ),
   });
 

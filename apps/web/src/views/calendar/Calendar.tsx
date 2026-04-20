@@ -11,6 +11,8 @@ import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { DragDropContext } from "react-beautiful-dnd";
 
+import { parseCalendarDayInZone } from "@kan/shared/utils";
+
 import type { ViewMode } from "./calendar/CalendarHeader";
 import type {
   CreateEventInput,
@@ -18,7 +20,9 @@ import type {
 } from "./calendar/CreateEventModal";
 import type { CalendarEntry } from "~/hooks/useRecurrence";
 import Modal from "~/components/modal";
+import { NewWorkspaceForm } from "~/components/NewWorkspaceForm";
 import { useRecurrence } from "~/hooks/useRecurrence";
+import { useModal } from "~/providers/modal";
 import { usePopup } from "~/providers/popup";
 import { api } from "~/utils/api";
 import CardDetailsModalContent from "../card/components/CardDetailsModalContent";
@@ -29,8 +33,6 @@ import { EventDetailModal } from "./calendar/EventDetailModal";
 import { MonthView } from "./calendar/MonthView";
 import { SuccessModal } from "./calendar/SuccessModal";
 import { WeekView } from "./calendar/WeekView";
-import { NewWorkspaceForm } from "~/components/NewWorkspaceForm";
-import { useModal } from "~/providers/modal";
 
 function toEditableEntry(entry: CalendarEntry): EditableEntry {
   const startDate = new Date(entry.startDate);
@@ -257,8 +259,7 @@ export function Calendar() {
           showPopup({
             header: "Lỗi",
             message:
-              error.message ||
-              "Không thể tạo công việc. Vui lòng thử lại sau.",
+              error.message || "Không thể tạo công việc. Vui lòng thử lại sau.",
             icon: "error",
           });
         }
@@ -361,7 +362,7 @@ export function Calendar() {
 
     if (destination.droppableId.startsWith("droppable-")) {
       const dateStr = destination.droppableId.replace("droppable-", "");
-      const newDate = new Date(dateStr);
+      const newDate = parseCalendarDayInZone(dateStr);
 
       if (draggableId.startsWith("virtual_") || draggableId.startsWith("v_")) {
         showPopup({

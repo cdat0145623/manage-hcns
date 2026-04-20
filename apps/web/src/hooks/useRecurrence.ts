@@ -1,13 +1,24 @@
 import {
   addMonths,
+  differenceInMinutes,
   endOfMonth,
   startOfMonth,
-  differenceInMinutes,
 } from "date-fns";
 import { useMemo } from "react";
+
+import { applyMasterWallTimeToAnchorDay } from "@kan/shared/utils";
+
 import { api } from "~/utils/api";
 
-export type RecurrenceType = "DAILY" | "WEEKLY" | "MONTHLY" | "MONTHLY_DATE" | "MONTHLY_DAY" | "NONE" | "UNSELECTED" | "CUSTOM";
+export type RecurrenceType =
+  | "DAILY"
+  | "WEEKLY"
+  | "MONTHLY"
+  | "MONTHLY_DATE"
+  | "MONTHLY_DAY"
+  | "NONE"
+  | "UNSELECTED"
+  | "CUSTOM";
 
 export interface TaskMaster {
   id: string;
@@ -49,24 +60,30 @@ export interface CalendarEntry {
   createdBy?: string;
 }
 
-export function useRecurrence(currentDate: Date, selectedUserId: string | undefined) {
+export function useRecurrence(
+  currentDate: Date,
+  selectedUserId: string | undefined,
+) {
   const monthStart = startOfMonth(currentDate);
   const monthEnd = endOfMonth(currentDate); // Buffer
 
   // Lấy dữ liệu thực tế từ backend
-  const { data: virtualTasks } = api.taskInstance.getVirtual.useQuery({
-    from: monthStart,
-    to: monthEnd,
-    targetUser: selectedUserId === "all" ? undefined : selectedUserId,
-  }, {
-    staleTime: 1000 * 60 * 5, // 5 minutes
-  });
+  const { data: virtualTasks } = api.taskInstance.getVirtual.useQuery(
+    {
+      from: monthStart,
+      to: monthEnd,
+      targetUser: selectedUserId === "all" ? undefined : selectedUserId,
+    },
+    {
+      staleTime: 1000 * 60 * 5, // 5 minutes
+    },
+  );
 
   const utils = api.useUtils();
   const updateTask = api.taskInstance.update.useMutation({
     onSuccess: () => {
       void utils.taskInstance.getVirtual.invalidate();
-    }
+    },
   });
 
   const calendarEntries = useMemo(() => {
@@ -76,7 +93,8 @@ export function useRecurrence(currentDate: Date, selectedUserId: string | undefi
       const isVirtual = task.id?.startsWith("virtual_");
 
       // Chuyển status về chữ thường để tránh lỗi khi hiển thị màu giao diện (bắt buộc phải là "pending" | "done" | "missed")
-      let currentStatus = typeof task.status === "string" ? task.status.toLowerCase() : "pending";
+      let currentStatus =
+        typeof task.status === "string" ? task.status.toLowerCase() : "pending";
       if (!["pending", "done", "missed"].includes(currentStatus)) {
         currentStatus = "pending";
       }
@@ -87,7 +105,7 @@ export function useRecurrence(currentDate: Date, selectedUserId: string | undefi
       const duration =
         start && end && !isNaN(start.getTime()) && !isNaN(end.getTime())
           ? differenceInMinutes(end, start)
-          : task.duration ?? 60;
+          : (task.duration ?? 60);
 
       return {
         id: task.id,
@@ -104,7 +122,9 @@ export function useRecurrence(currentDate: Date, selectedUserId: string | undefi
         type: isVirtual ? "VIRTUAL" : "INSTANCE",
         color: task.color ?? "bg-blue-500",
         duration: duration,
-        recurrence: (task.taskMaster?.recurrence || task.recurrence || "NONE") as RecurrenceType,
+        recurrence: (task.taskMaster?.recurrence ||
+          task.recurrence ||
+          "NONE") as RecurrenceType,
         rruleString: task.taskMaster?.rruleString || task.rruleString || "",
         rruleStringToText: task.taskMaster?.rruleStringToText || "",
         checklists: task.checklists || [],
@@ -113,22 +133,36 @@ export function useRecurrence(currentDate: Date, selectedUserId: string | undefi
     });
   }, [virtualTasks]);
 
-  const moveTask = (instanceId: string, newDate: Date) => {
-    const entry = calendarEntries.find((e: CalendarEntry) => e.id === instanceId);
+  const moveTask = (instanceId: string, newDayStart: Date) => {
+    const entry = calendarEntries.find(
+      (e: CalendarEntry) => e.id === instanceId,
+    );
     if (!entry) return;
 
-    // Gửi yêu cầu đổi ngày (kéo thả) xuống DB
+    const targetDate = applyMasterWallTimeToAnchorDay(
+      newDayStart,
+      entry.startDate,
+    );
+
     updateTask.mutate({
       id: instanceId,
       taskMasterId: entry.masterId,
-      targetDate: newDate,
+      targetDate,
       status: "pending",
     });
   };
 
-  const data = api.card.getByUserId.useQuery({ userId: selectedUserId }, {
-    staleTime: 1000 * 60 * 5, // 5 minutes
-  });
+  const data = api.card.getByUserId.useQuery(
+    { userId: selectedUserId },
+    {
+      staleTime: 1000 * 60 * 5, // 5 minutes
+    },
+  );
 
-  return { calendarEntries, cards: data.data?.filterCards, formattedResult: data.data?.formattedResult , moveTask };
+  return {
+    calendarEntries,
+    cards: data.data?.filterCards,
+    formattedResult: data.data?.formattedResult,
+    moveTask,
+  };
 }

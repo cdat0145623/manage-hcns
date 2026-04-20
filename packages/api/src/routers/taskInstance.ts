@@ -9,6 +9,7 @@ import * as rewardRepo from "@kan/db/repository/reward.repo";
 import * as taskInstanceRepo from "@kan/db/repository/taskInstance.repo";
 import * as taskMasterRepo from "@kan/db/repository/taskMaster.repo";
 import { statusTypeEnum } from "@kan/db/schema";
+import { applyMasterWallTimeToAnchorDay } from "@kan/shared/utils";
 
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import {
@@ -214,11 +215,10 @@ export const taskInstanceRouter = createTRPCRouter({
         });
       }
 
-      const instanceEndDate = new Date(targetDate);
-      instanceEndDate.setHours(taskMaster.endDate.getHours());
-      instanceEndDate.setMinutes(taskMaster.endDate.getMinutes());
-      instanceEndDate.setSeconds(taskMaster.endDate.getSeconds());
-      instanceEndDate.setMilliseconds(taskMaster.endDate.getMilliseconds());
+      const instanceEndDate = applyMasterWallTimeToAnchorDay(
+        targetDate,
+        taskMaster.endDate,
+      );
 
       const newTaskInstance = await taskInstanceRepo.create(ctx.db, {
         userId,
@@ -466,13 +466,11 @@ export const taskInstanceRouter = createTRPCRouter({
         });
       }
 
-      const instanceEndDate = new Date(
-        targetDate ?? oldTaskInstance.targetDate!,
+      const anchor = targetDate ?? oldTaskInstance.targetDate!;
+      const instanceEndDate = applyMasterWallTimeToAnchorDay(
+        anchor,
+        taskMaster.endDate,
       );
-      instanceEndDate.setHours(taskMaster.endDate.getHours());
-      instanceEndDate.setMinutes(taskMaster.endDate.getMinutes());
-      instanceEndDate.setSeconds(taskMaster.endDate.getSeconds());
-      instanceEndDate.setMilliseconds(taskMaster.endDate.getMilliseconds());
 
       // Giữ nguyên userId gắn với instance (slot / assignee theo unique index),
       // không ghi đè bằng ctx.user — tránh false "assignee_changed" và sai reward.

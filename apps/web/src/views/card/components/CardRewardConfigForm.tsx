@@ -1,6 +1,6 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { t } from "@lingui/macro";
-import { differenceInDays, format } from "date-fns";
+import { differenceInDays } from "date-fns";
 import { motion } from "framer-motion";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
@@ -32,6 +32,10 @@ import {
   invalidateCard,
   invalidateTaskInstance,
 } from "~/utils/cardInvalidation";
+import {
+  formatRewardDayMonth,
+  formatRewardDayMonthYear,
+} from "~/utils/rewardDates";
 import { CardRewardAdminReview } from "./CardRewardAdminReview";
 import { CardRewardFinalize } from "./CardRewardFinalize";
 import { CardRewardSummaryCard } from "./CardRewardSummaryCard";
@@ -427,6 +431,32 @@ export default function CardRewardConfigForm({
   const approvalStatus: RewardStatus =
     (remoteData?.approvalStatus as RewardStatus) || "draft";
 
+  /** Chỉ áp dụng khi gửi duyệt (không chặn lưu nháp). Card: đủ ngày bắt đầu/kết thúc + ít nhất một thành viên (hoặc targetUser). */
+  const rewardSubmitPrereqError = useMemo(() => {
+    if (isTaskMasterTemplate) return null;
+    if (cardPublicId && card == null) {
+      return t`Đang tải dữ liệu card. Vui lòng thử lại sau.`;
+    }
+    const source = card;
+    if (source == null) return null;
+
+    const hasSchedule = source.startDate != null && source.dueDate != null;
+    const hasMember =
+      (Array.isArray(source.members) && source.members.length > 0) ||
+      Boolean(source.targetUser);
+
+    if (!hasSchedule && !hasMember) {
+      return t`Vui lòng chọn ngày bắt đầu, ngày kết thúc và gán thành viên trên card trước khi gửi duyệt.`;
+    }
+    if (!hasSchedule) {
+      return t`Vui lòng chọn ngày bắt đầu và ngày kết thúc trên card trước khi gửi duyệt.`;
+    }
+    if (!hasMember) {
+      return t`Vui lòng gán ít nhất một thành viên cho card trước khi gửi duyệt.`;
+    }
+    return null;
+  }, [isTaskMasterTemplate, cardPublicId, card]);
+
   const dbSnapshot: any = (remoteData as any)?.snapshot;
 
   const snapshotAssigneeName = useMemo(() => {
@@ -586,6 +616,14 @@ export default function CardRewardConfigForm({
 
   /** Lưu + gửi duyệt (validate form). Khác với chỉ lưu nháp. */
   const submitForApproval = async (data: RewardConfigFormValues) => {
+    if (rewardSubmitPrereqError) {
+      showPopup({
+        header: t`Thiếu thông tin`,
+        message: rewardSubmitPrereqError,
+        icon: "error",
+      });
+      return;
+    }
     try {
       const result = await upsertMutation.mutateAsync(
         buildUpsertPayload(data, "submit"),
@@ -947,11 +985,11 @@ export default function CardRewardConfigForm({
                 <HiCalendarDays className="h-4 w-4 shrink-0 text-neutral-400" />
                 <span>
                   {dbSnapshot?.snappedStartDate
-                    ? format(new Date(dbSnapshot.snappedStartDate), "MMM d")
+                    ? formatRewardDayMonth(dbSnapshot.snappedStartDate)
                     : "—"}{" "}
                   →{" "}
                   {dbSnapshot?.snappedDueDate
-                    ? format(new Date(dbSnapshot.snappedDueDate), "MMM d, yyyy")
+                    ? formatRewardDayMonthYear(dbSnapshot.snappedDueDate)
                     : "—"}
                 </span>
               </span>
@@ -976,13 +1014,8 @@ export default function CardRewardConfigForm({
             </p>
             <div className="flex flex-wrap items-center gap-2 text-[12px] font-semibold text-neutral-800 dark:text-dark-800">
               <span>
-                {card?.startDate
-                  ? format(new Date(card.startDate), "MMM d")
-                  : "—"}{" "}
-                –{" "}
-                {card?.dueDate
-                  ? format(new Date(card.dueDate), "MMM d, yyyy")
-                  : "—"}
+                {card?.startDate ? formatRewardDayMonth(card.startDate) : "—"} –{" "}
+                {card?.dueDate ? formatRewardDayMonthYear(card.dueDate) : "—"}
               </span>
               {dbSnapshot?.snappedDueDate &&
                 card?.dueDate &&
@@ -1216,56 +1249,65 @@ export default function CardRewardConfigForm({
         </div>
 
         {!effectivelyReadOnly && (
-          <div className="flex justify-end gap-3 border-t border-light-200 pt-4 dark:border-dark-300/50">
-            {(approvalStatus === "draft" || approvalStatus === "rejected") && (
-              <motion.button
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                type="button"
-                disabled={isMutating}
-                onClick={async () => {
-                  try {
-                    const data = getValues();
-                    const result = await upsertMutation.mutateAsync(
-                      buildUpsertPayload(data, "draft"),
-                    );
-                    showPopup({
-                      header: t`Thành công`,
-                      message: t`Đã lưu bản nháp`,
-                      icon: "success",
-                    });
-                    await refreshRewardState({ configId: result.configId });
-                  } catch (err: any) {
-                    showPopup({
-                      header: t`Lỗi`,
-                      message: err.message,
-                      icon: "error",
-                    });
-                  }
-                }}
-                className="rounded-xl border border-light-200 bg-white px-6 py-2.5 text-xs font-bold uppercase tracking-wider text-neutral-600 transition-all hover:bg-light-50 disabled:opacity-50 dark:border-dark-300 dark:bg-dark-100 dark:text-dark-700"
-              >
-                {isTaskMasterTemplate ? t`Lưu mẫu thưởng` : t`Lưu nháp`}
-              </motion.button>
+          <div className="flex flex-col gap-2 border-t border-light-200 pt-4 dark:border-dark-300/50">
+            {!isTaskMasterTemplate && rewardSubmitPrereqError && (
+              <p className="text-right text-[11px] font-medium text-amber-800 dark:text-amber-200/90">
+                {rewardSubmitPrereqError}
+              </p>
             )}
+            <div className="flex justify-end gap-3">
+              {(approvalStatus === "draft" ||
+                approvalStatus === "rejected") && (
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  type="button"
+                  disabled={isMutating}
+                  onClick={async () => {
+                    try {
+                      const data = getValues();
+                      const result = await upsertMutation.mutateAsync(
+                        buildUpsertPayload(data, "draft"),
+                      );
+                      showPopup({
+                        header: t`Thành công`,
+                        message: t`Đã lưu bản nháp`,
+                        icon: "success",
+                      });
+                      await refreshRewardState({ configId: result.configId });
+                    } catch (err: any) {
+                      showPopup({
+                        header: t`Lỗi`,
+                        message: err.message,
+                        icon: "error",
+                      });
+                    }
+                  }}
+                  className="rounded-xl border border-light-200 bg-white px-6 py-2.5 text-xs font-bold uppercase tracking-wider text-neutral-600 transition-all hover:bg-light-50 disabled:opacity-50 dark:border-dark-300 dark:bg-dark-100 dark:text-dark-700"
+                >
+                  {isTaskMasterTemplate ? t`Lưu mẫu thưởng` : t`Lưu nháp`}
+                </motion.button>
+              )}
 
-            {!isTaskMasterTemplate && (
-              <motion.button
-                whileHover={{ scale: 1.02, y: -1 }}
-                whileTap={{ scale: 0.98 }}
-                type="submit"
-                disabled={isMutating}
-                className="rounded-xl bg-emerald-500 px-6 py-2.5 text-xs font-bold uppercase tracking-wider text-white shadow-lg shadow-emerald-500/20 transition-all hover:bg-emerald-600 focus:outline-none focus:ring-[3px] focus:ring-emerald-500/30 disabled:opacity-50 dark:bg-emerald-600 dark:hover:bg-emerald-500"
-              >
-                {isMutating ? (
-                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                ) : approvalStatus === "rejected" ? (
-                  t`Lưu & Gửi lại`
-                ) : (
-                  t`Lưu & Gửi duyệt`
-                )}
-              </motion.button>
-            )}
+              {!isTaskMasterTemplate && (
+                <motion.button
+                  whileHover={{ scale: 1.02, y: -1 }}
+                  whileTap={{ scale: 0.98 }}
+                  type="submit"
+                  disabled={isMutating || Boolean(rewardSubmitPrereqError)}
+                  title={rewardSubmitPrereqError ?? undefined}
+                  className="rounded-xl bg-emerald-500 px-6 py-2.5 text-xs font-bold uppercase tracking-wider text-white shadow-lg shadow-emerald-500/20 transition-all hover:bg-emerald-600 focus:outline-none focus:ring-[3px] focus:ring-emerald-500/30 disabled:opacity-50 dark:bg-emerald-600 dark:hover:bg-emerald-500"
+                >
+                  {isMutating ? (
+                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                  ) : approvalStatus === "rejected" ? (
+                    t`Lưu & Gửi lại`
+                  ) : (
+                    t`Lưu & Gửi duyệt`
+                  )}
+                </motion.button>
+              )}
+            </div>
           </div>
         )}
       </form>

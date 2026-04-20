@@ -44,7 +44,10 @@ export function BoardsList({
     },
   });
 
-  const isUserBoard = isAdmin && !archived;
+  // Per-user listing is only for regular boards (admin "filter by member"). Templates are
+  // workspace-wide samples; filtering by creator would hide admins' templates for staff who
+  // cannot create templates, and would disable queries when userId is omitted on /templates.
+  const isUserBoard = isAdmin && !archived && !isTemplate;
 
   const { data: allData, isLoading: allLoading } = api.board.all.useQuery(
     {

@@ -1,6 +1,5 @@
 import { t } from "@lingui/core/macro";
 import { Trans } from "@lingui/react/macro";
-import { format } from "date-fns";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import {
@@ -11,7 +10,7 @@ import {
 
 import type { NewCardInput } from "@kan/api/types";
 import { authClient } from "@kan/auth/client";
-import { generateUID } from "@kan/shared/utils";
+import { formatInAppCalendarZone, generateUID } from "@kan/shared/utils";
 
 import type { WorkspaceMember } from "~/components/Editor";
 import Avatar from "~/components/Avatar";
@@ -22,6 +21,7 @@ import Editor from "~/components/Editor";
 import Input from "~/components/Input";
 import LabelIcon from "~/components/LabelIcon";
 import Toggle from "~/components/Toggle";
+import { useLocalisation } from "~/hooks/useLocalisation";
 import { useModalFormState } from "~/hooks/useModalFormState";
 import { useModal } from "~/providers/modal";
 import { usePopup } from "~/providers/popup";
@@ -54,6 +54,7 @@ export function NewCardForm({
   listPublicId,
   queryParams,
 }: NewCardFormProps) {
+  const { dateLocale } = useLocalisation();
   const { showPopup } = usePopup();
   const { workspace } = useWorkspace();
   const { closeModal, openModal, modalStates, clearModalState } = useModal();
@@ -201,9 +202,11 @@ export function NewCardForm({
     onSuccess: async (createdCard) => {
       if (!isAdmin && createdCard?.publicId && session?.user.id) {
         const currentUserMember = boardData?.workspace.members.find(
-          (m) => m.user?.id === session.user.id || (m as any).userId === session.user.id
+          (m) =>
+            m.user?.id === session.user.id ||
+            (m as any).userId === session.user.id,
         );
-        if (currentUserMember && !memberPublicIds.includes(currentUserMember.publicId)) {
+        if (currentUserMember && memberPublicIds.length === 0) {
           try {
             await addOrRemoveMember.mutateAsync({
               cardPublicId: createdCard.publicId,
@@ -300,14 +303,11 @@ export function NewCardForm({
   };
 
   const handleSelectMembers = (memberPublicId: string): void => {
-    const currentIndex = memberPublicIds.indexOf(memberPublicId);
-    if (currentIndex === -1) {
-      setValue("memberPublicIds", [...memberPublicIds, memberPublicId]);
-    } else {
-      const newMemberPublicIds = [...memberPublicIds];
-      newMemberPublicIds.splice(currentIndex, 1);
-      setValue("memberPublicIds", newMemberPublicIds);
+    if (memberPublicIds.length === 1 && memberPublicIds[0] === memberPublicId) {
+      setValue("memberPublicIds", []);
+      return;
     }
+    setValue("memberPublicIds", [memberPublicId]);
   };
 
   const handleSelectLabels = (labelPublicId: string): void => {
@@ -494,7 +494,11 @@ export function NewCardForm({
               className="flex h-full w-full items-center rounded-[5px] border-[1px] border-light-600 bg-light-200 px-2 py-1 text-left text-xs text-light-800 hover:bg-light-300 dark:border-dark-600 dark:bg-dark-400 dark:text-dark-1000 dark:hover:bg-dark-500"
             >
               {dueDate ? (
-                <span>{format(dueDate, "MMM d, yyyy")}</span>
+                <span>
+                  {formatInAppCalendarZone(dueDate, "MMM d, yyyy", {
+                    locale: dateLocale,
+                  })}
+                </span>
               ) : (
                 <>{t`Ngày hết hạn`}</>
               )}

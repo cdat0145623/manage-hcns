@@ -975,6 +975,21 @@ export const hardDeleteCardMemberRelationship = async (
   return { success: !!result };
 };
 
+/** Removes every workspace-member link for the card. Returns removed internal workspace member ids. */
+export const deleteAllCardMemberRelationshipsForCard = async (
+  db: dbClient,
+  cardId: number,
+) => {
+  const deleted = await db
+    .delete(cardToWorkspaceMembers)
+    .where(eq(cardToWorkspaceMembers.cardId, cardId))
+    .returning({
+      workspaceMemberId: cardToWorkspaceMembers.workspaceMemberId,
+    });
+
+  return deleted.map((row) => row.workspaceMemberId);
+};
+
 export const hardDeleteCardLabelRelationship = async (
   db: dbClient,
   args: { cardId: number; labelId: number },

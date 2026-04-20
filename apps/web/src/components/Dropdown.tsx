@@ -1,4 +1,4 @@
-import { Menu, Transition, Portal } from "@headlessui/react";
+import { Menu, Portal, Transition } from "@headlessui/react";
 import { Fragment } from "react";
 
 export default function Dropdown({
@@ -6,7 +6,12 @@ export default function Dropdown({
   children,
   disabled,
 }: {
-  items: { label: string; action?: () => void; icon?: React.ReactNode; disabled?: boolean }[];
+  items: {
+    label: string;
+    action?: () => void;
+    icon?: React.ReactNode;
+    disabled?: boolean;
+  }[];
   children: React.ReactNode;
   disabled?: boolean;
 }) {
@@ -31,7 +36,7 @@ export default function Dropdown({
         leaveTo="transform opacity-0 scale-95"
       >
         <div className="relative z-[999]">
-          <Menu.Items className="absolute right-0 mt-2 w-64 origin-top-right rounded-[24px] border border-white/40 bg-white/80 p-2.5 backdrop-blur-xl shadow-[0_20px_50px_rgba(0,0,0,0.12),0_0_0_1px_rgba(255,255,255,0.1)] focus:outline-none dark:border-dark-400/40 dark:bg-dark-100">
+          <Menu.Items className="absolute right-0 mt-2 w-64 origin-top-right rounded-[24px] border border-neutral-200 bg-white p-2.5 shadow-[0_20px_50px_rgba(0,0,0,0.12),0_0_0_1px_rgba(0,0,0,0.06)] focus:outline-none dark:border-dark-400 dark:bg-dark-100">
             <div className="flex flex-col gap-1">
               {items.map((item) => (
                 <Menu.Item key={item.label} disabled={item.disabled}>
@@ -40,7 +45,11 @@ export default function Dropdown({
                     disabled={item.disabled ?? !item.action}
                     className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-[12.5px] font-semibold text-neutral-900 transition-all hover:bg-light-200/50 disabled:cursor-not-allowed disabled:opacity-40 dark:text-dark-1000 dark:hover:bg-dark-300/50"
                   >
-                    {item.icon && <span className="flex shrink-0 items-center justify-center text-light-600 dark:text-dark-600">{item.icon}</span>}
+                    {item.icon && (
+                      <span className="flex shrink-0 items-center justify-center text-light-600 dark:text-dark-600">
+                        {item.icon}
+                      </span>
+                    )}
                     <span>{item.label}</span>
                   </button>
                 </Menu.Item>

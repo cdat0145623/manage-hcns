@@ -5,7 +5,6 @@ import {
   eachDayOfInterval,
   endOfMonth,
   endOfWeek,
-  format,
   isSameDay,
   isToday,
   startOfMonth,
@@ -22,6 +21,13 @@ import {
   HiXMark,
 } from "react-icons/hi2";
 import { twMerge } from "tailwind-merge";
+
+import {
+  buildInstantFromAppCalendarDayAndTime,
+  formatInAppCalendarZone,
+} from "@kan/shared/utils";
+
+import { useLocalisation } from "~/hooks/useLocalisation";
 
 const parseTime = (t: string) => {
   const [h, m] = t.split(":").map((n) => parseInt(n ?? "0", 10));
@@ -56,6 +62,7 @@ export function DueDateSelector({
   weekStartsOn = 1,
   label,
 }: DueDateSelectorProps) {
+  const { dateLocale } = useLocalisation();
   const [isOpen, setIsOpen] = useState(false);
   const [dropdownPos, setDropdownPos] = useState({ top: 0, left: 0 });
   const buttonRef = useRef<HTMLButtonElement>(null);
@@ -95,7 +102,7 @@ export function DueDateSelector({
 
       if (pendingDate && !currentTime) {
         const now = new Date();
-        const timeStr = format(now, "HH:mm");
+        const timeStr = formatInAppCalendarZone(now, "HH:mm");
         const fullDate = buildDate(pendingDate, timeStr);
         if (
           fullDate &&
@@ -111,7 +118,6 @@ export function DueDateSelector({
     }
   };
 
-
   // Calculate dropdown position when opening
   const openDropdown = () => {
     if (!buttonRef.current) return;
@@ -122,7 +128,7 @@ export function DueDateSelector({
     });
     // Set current time to existing due date's time if present
     if (dueDate) {
-      setCurrentTime(format(dueDate, "HH:mm"));
+      setCurrentTime(formatInAppCalendarZone(dueDate, "HH:mm"));
     } else {
       setCurrentTime(null);
     }
@@ -164,7 +170,7 @@ export function DueDateSelector({
 
       if (pendingDate && !currentTime) {
         const now = new Date();
-        const timeStr = format(now, "HH:mm");
+        const timeStr = formatInAppCalendarZone(now, "HH:mm");
         const fullDate = buildDate(pendingDate, timeStr);
         if (
           fullDate &&
@@ -180,14 +186,16 @@ export function DueDateSelector({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [isOpen, pendingDate, currentTime, dueDate, onDateSelect]);
 
-  const monthName = format(currentMonth, "MMM yyyy");
+  const monthName = formatInAppCalendarZone(currentMonth, "MMM yyyy", {
+    locale: dateLocale,
+  });
 
   const dayHeaders = useMemo(() => {
     const weekStart = startOfWeek(new Date(), { weekStartsOn });
     return eachDayOfInterval({
       start: weekStart,
       end: new Date(weekStart.getTime() + 6 * 24 * 60 * 60 * 1000),
-    }).map((d) => format(d, "EEEEEE"));
+    }).map((d) => formatInAppCalendarZone(d, "EEEEEE", { locale: dateLocale }));
   }, [weekStartsOn]);
 
   const days = useMemo(() => {
@@ -197,7 +205,7 @@ export function DueDateSelector({
     const calendarEnd = endOfWeek(monthEnd, { weekStartsOn });
     return eachDayOfInterval({ start: calendarStart, end: calendarEnd }).map(
       (date) => ({
-        date: format(date, "yyyy-MM-dd"),
+        date: formatInAppCalendarZone(date, "yyyy-MM-dd"),
         isToday: isToday(date),
         isSelected: pendingDate ? isSameDay(date, pendingDate) : false,
         isCurrentMonth: date >= monthStart && date <= monthEnd,
@@ -216,11 +224,8 @@ export function DueDateSelector({
   }, []);
 
   const buildDate = (dateObj: Date, timeStr: string) => {
-    const { hours, minutes } = parseTime(timeStr);
-    const result = new Date(dateObj);
-    if (isNaN(result.getTime())) return null;
-    result.setHours(hours, minutes, 0, 0);
-    return result;
+    if (isNaN(dateObj.getTime())) return null;
+    return buildInstantFromAppCalendarDayAndTime(dateObj, timeStr);
   };
 
   const handleDayClick = (dateObj: Date, e: React.MouseEvent) => {
@@ -396,9 +401,7 @@ export function DueDateSelector({
         ref={buttonRef}
         type="button"
         onClick={() =>
-          !disabled &&
-          !isLoading &&
-          (isOpen ? handleClose() : openDropdown())
+          !disabled && !isLoading && (isOpen ? handleClose() : openDropdown())
         }
         disabled={isLoading || disabled}
         className={`flex min-h-[34px] w-full items-center rounded-xl bg-white px-3 text-left text-[13px] font-medium text-neutral-900 shadow-sm ring-1 ring-light-300 transition-all hover:bg-light-50 hover:ring-light-400 dark:bg-dark-300/30 dark:text-dark-1000 dark:ring-dark-300/50 dark:hover:bg-dark-300/50 ${
@@ -407,7 +410,9 @@ export function DueDateSelector({
       >
         {pendingDate ? (
           <span className="truncate">
-            {format(pendingDate, "MMM d, yyyy HH:mm")}
+            {formatInAppCalendarZone(pendingDate, "MMM d, yyyy HH:mm", {
+              locale: dateLocale,
+            })}
           </span>
         ) : (
           <>
@@ -420,4 +425,3 @@ export function DueDateSelector({
     </div>
   );
 }
-

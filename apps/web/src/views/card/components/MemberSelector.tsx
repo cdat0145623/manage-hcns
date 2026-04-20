@@ -46,26 +46,29 @@ export default function MemberSelector({
           (member) => member.publicId === update.workspaceMemberPublicId,
         );
 
-        const memberToAdd = oldCard.members.find(
-          (member) => member.publicId === update.workspaceMemberPublicId,
-        );
+        const workspaceMembers = oldCard.list?.board?.workspace?.members ?? [];
+        const resolvedMember =
+          oldCard.members.find(
+            (member) => member.publicId === update.workspaceMemberPublicId,
+          ) ??
+          workspaceMembers.find(
+            (m) => m.publicId === update.workspaceMemberPublicId,
+          );
 
         const updatedMembers = hasMember
           ? oldCard.members.filter(
               (member) => member.publicId !== update.workspaceMemberPublicId,
             )
-          : [
-              ...oldCard.members,
-              {
-                publicId: update.workspaceMemberPublicId,
-                email: memberToAdd?.email ?? "",
-                deletedAt: null,
-                user: {
-                  id: memberToAdd?.user?.id ?? "",
-                  name: memberToAdd?.user?.name ?? "",
+          : resolvedMember
+            ? [resolvedMember]
+            : [
+                {
+                  publicId: update.workspaceMemberPublicId,
+                  email: null,
+                  deletedAt: null,
+                  user: null,
                 },
-              },
-            ];
+              ];
 
         return {
           ...oldCard,

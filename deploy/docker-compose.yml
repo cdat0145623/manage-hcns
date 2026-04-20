@@ -1,13 +1,9 @@
 services:
   migrate:
-    image: kanbn-migrate:latest
+    image: ${MIGRATE_IMAGE:-ghcr.io/zomzem-audepartment/kanbn-migrate}:${TAG:-latest}
     container_name: ${MIGRATE_CONTAINER_NAME:-kan-migrate}
     networks:
       - kan-network
-    build:
-      context: .
-      dockerfile: ./apps/web/Dockerfile
-      target: migrate
     env_file:
       - .env
     environment:
@@ -18,21 +14,13 @@ services:
     restart: "no"
 
   web:
-    image: kanbn-web:latest
+    image: ${WEB_IMAGE:-ghcr.io/zomzem-audepartment/kanbn-web}:${TAG:-latest}
     container_name: ${WEB_CONTAINER_NAME:-kan-web}
     ports:
       - "${WEB_PORT:-3001}:3000"
     networks:
       - kan-network
       - minio_net
-    build:
-      context: .
-      dockerfile: ./apps/web/Dockerfile
-      target: web
-      args:
-        NEXT_PUBLIC_AVATAR_BUCKET_NAME: ${NEXT_PUBLIC_AVATAR_BUCKET_NAME:-kanbn}
-        NEXT_PUBLIC_ATTACHMENTS_BUCKET_NAME: ${NEXT_PUBLIC_ATTACHMENTS_BUCKET_NAME:-kanbn}
-        NEXT_PUBLIC_STORAGE_URL: ${NEXT_PUBLIC_STORAGE_URL:-http://minio-server:9000}
     env_file:
       - .env
     environment:
@@ -41,7 +29,6 @@ services:
       - BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET}
       - POSTGRES_URL=${POSTGRES_URL}
       - ALLOWED_FRAME_ANCESTORS=${ALLOWED_FRAME_ANCESTORS}
-      # Match app calendar zone (SSR / Node "local" time); image also ships zoneinfo + TZ
       - TZ=Asia/Ho_Chi_Minh
     depends_on:
       migrate:
@@ -62,7 +49,7 @@ services:
     volumes:
       - kan_postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d progress"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -77,6 +64,6 @@ networks:
     name: minio_minio-net
 
 volumes:
-  # Fixed name so `docker compose` from repo root and from ./deploy share the same Postgres data.
+  # Same named volume as root docker-compose.yml (reuse DB when switching to deploy).
   kan_postgres_data:
     name: kanbn_kan_postgres_data

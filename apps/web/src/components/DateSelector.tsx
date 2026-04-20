@@ -4,8 +4,6 @@ import {
   endOfMonth,
   endOfWeek,
   format,
-  isSameDay,
-  isToday,
   startOfMonth,
   startOfWeek,
   subMonths,
@@ -13,6 +11,11 @@ import {
 import { useMemo, useState } from "react";
 import { HiChevronLeft, HiChevronRight } from "react-icons/hi2";
 import { twMerge } from "tailwind-merge";
+
+import {
+  buildInstantFromAppCalendarDayAndTime,
+  calendarDateKeyInAppZone,
+} from "@kan/shared/utils";
 
 interface DateSelectorProps {
   selectedDate?: Date | null;
@@ -51,8 +54,13 @@ const DateSelector = ({
         const dateString = format(date, "yyyy-MM-dd");
         return {
           date: dateString,
-          isToday: isToday(date),
-          isSelected: selectedDate ? isSameDay(date, selectedDate) : false,
+          isToday:
+            calendarDateKeyInAppZone(date) ===
+            calendarDateKeyInAppZone(new Date()),
+          isSelected: selectedDate
+            ? calendarDateKeyInAppZone(date) ===
+              calendarDateKeyInAppZone(selectedDate)
+            : false,
           isCurrentMonth: date >= monthStart && date <= monthEnd,
           dateObj: date,
         };
@@ -71,10 +79,13 @@ const DateSelector = ({
   const handleDateClick = (date: Date, e: React.MouseEvent) => {
     e.stopPropagation();
     // If clicking the same date that's already selected, unselect it
-    if (selectedDate && isSameDay(date, selectedDate)) {
+    if (
+      selectedDate &&
+      calendarDateKeyInAppZone(date) === calendarDateKeyInAppZone(selectedDate)
+    ) {
       onDateSelect?.(undefined);
     } else {
-      onDateSelect?.(date);
+      onDateSelect?.(buildInstantFromAppCalendarDayAndTime(date, "00:00"));
     }
   };
 

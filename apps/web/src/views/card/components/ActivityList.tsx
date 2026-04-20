@@ -1,7 +1,7 @@
 import type { Locale as DateFnsLocale } from "date-fns";
 import { t } from "@lingui/core/macro";
 import { Trans } from "@lingui/react/macro";
-import { format, formatDistanceToNow, isSameYear } from "date-fns";
+import { format, formatDistanceToNow } from "date-fns";
 import { useEffect, useRef, useState } from "react";
 import {
   HiChevronDoubleDown,
@@ -21,6 +21,10 @@ import {
 
 import type { ActivityType, GetCardActivitiesOutput } from "@kan/api/types";
 import { authClient } from "@kan/auth/client";
+import {
+  formatInAppCalendarZone,
+  isSameCalendarYearInAppZone,
+} from "@kan/shared/utils";
 
 import Avatar from "~/components/Avatar";
 import { useLocalisation } from "~/hooks/useLocalisation";
@@ -318,8 +322,8 @@ export const getActivityText = ({
       type === "deadline_removed") &&
     toDueDate
   ) {
-    const showYear = !isSameYear(toDueDate, new Date());
-    const formattedDate = format(
+    const showYear = !isSameCalendarYearInAppZone(toDueDate, new Date());
+    const formattedDate = formatInAppCalendarZone(
       toDueDate,
       showYear ? "HH:mm do MMM yyyy" : "HH:mm do MMM",
       { locale: dateLocale },
@@ -337,8 +341,8 @@ export const getActivityText = ({
       type === "start_date_removed") &&
     newValue
   ) {
-    const showYear = !isSameYear(newValue, new Date());
-    const formattedDate = format(
+    const showYear = !isSameCalendarYearInAppZone(newValue, new Date());
+    const formattedDate = formatInAppCalendarZone(
       newValue,
       showYear ? "HH:mm do MMM yyyy" : "HH:mm do MMM",
       { locale: dateLocale },

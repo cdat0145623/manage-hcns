@@ -560,7 +560,7 @@ export default function ReportsView() {
   );
 
   const { data: boardsData } = api.board.all.useQuery(
-    { workspacePublicId: workspace.publicId },
+    { workspacePublicId: workspace.publicId, type: "regular" },
     { enabled: hasLoaded && !!workspace.publicId },
   );
 
@@ -584,7 +584,21 @@ export default function ReportsView() {
     if (boardsData) {
       const isValid = boardsData.some((b) => b.publicId === boardPublicId);
       if (!isValid && boardsData.length > 0) {
-        setBoardPublicId(boardsData[0]?.publicId || "");
+        const now = new Date();
+        const m = now.getMonth() + 1;
+        const y = now.getFullYear();
+        const monthLabel = `Tháng ${m}`;
+        const yearLabel = `${y}`;
+
+        // Try to find a board that matches both month and year, or just month
+        const bestMatch =
+          boardsData.find(
+            (b) => b.name.includes(monthLabel) && b.name.includes(yearLabel),
+          ) ||
+          boardsData.find((b) => b.name.includes(monthLabel)) ||
+          boardsData[0];
+
+        setBoardPublicId(bestMatch?.publicId || "");
       } else if (!isValid && boardsData.length === 0) {
         setBoardPublicId("");
       }

@@ -54,7 +54,7 @@ interface CardRewardAdminReviewProps {
     deductions?: {
       id?: number;
       reason: string;
-      value: string | number;
+      value: string | number | null;
       unitType: string;
     }[];
     snapshot?: CardSnapshot | null;
@@ -162,7 +162,7 @@ export const CardRewardAdminReview = ({
   };
 
   const formatCurrency = (val: string | number | null) => {
-    if (val === null || val === undefined) return "0";
+    if (val === null || val === undefined || val === "") return "";
     return Number(val).toLocaleString("vi-VN");
   };
 

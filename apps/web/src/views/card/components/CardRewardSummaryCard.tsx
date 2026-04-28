@@ -46,7 +46,7 @@ interface CardSnapshot {
   snappedCurrency: string;
   snappedDeductions: {
     reason: string;
-    value: string | number;
+    value: string | number | null;
     unitType: string;
   }[];
   assigneeName: string;
@@ -72,7 +72,7 @@ interface CardRewardSummaryCardProps {
     rejectedReason?: string | null;
     approvedBy?: { name: string | null };
     approvedAt?: Date | string | null;
-    deductions?: { reason: string; value: string | number; unitType: string }[];
+    deductions?: { reason: string; value: string | number | null; unitType: string }[];
     snapshot?: CardSnapshot | null;
     violationLogs?: RewardViolationLog[];
     finalization?: {
@@ -157,9 +157,9 @@ export const CardRewardSummaryCard = ({
   }, [data, card]);
 
   const formatNumber = (val: string | number | null | undefined) => {
-    if (val === null || val === undefined || val === "") return "0";
+    if (val === null || val === undefined || val === "") return "";
     const num = typeof val === "string" ? parseFloat(val) : val;
-    if (isNaN(num)) return "0";
+    if (isNaN(num)) return "";
     return num.toLocaleString("vi-VN");
   };
 

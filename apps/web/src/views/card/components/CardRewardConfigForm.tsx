@@ -40,7 +40,7 @@ import { CardRewardAdminReview } from "./CardRewardAdminReview";
 import { CardRewardFinalize } from "./CardRewardFinalize";
 import { CardRewardSummaryCard } from "./CardRewardSummaryCard";
 
-const DEFAULT_USD_TO_VND = 25400;
+
 
 interface RewardDeduction {
   id?: number;
@@ -48,7 +48,7 @@ interface RewardDeduction {
     | typeof REWARD_DEDUCTION_REASON.LATE
     | typeof REWARD_DEDUCTION_REASON.MOVE;
   unitType: "percent" | "vnd";
-  value: number;
+  value: number | null;
   displayOrder?: number;
 }
 
@@ -114,8 +114,8 @@ function buildDeductionPairFromRemote(
 
 interface RewardConfigFormValues {
   rewardType: "project" | "responsibility";
-  bonusAmount: number;
-  currency: "VND" | "USD";
+  bonusAmount: number | null;
+  currency: "VND";
   deductions: RewardDeduction[];
 }
 
@@ -246,7 +246,7 @@ export default function CardRewardConfigForm({
   ) => {
     const deductions = data.deductions.map((d, i) => ({
       ...d,
-      value: d.value.toString(),
+      value: (d.value ?? 0).toString(),
       displayOrder: i,
     }));
     const source = isTaskMasterTemplate
@@ -288,29 +288,7 @@ export default function CardRewardConfigForm({
     approveMutation.isPending ||
     rejectMutation.isPending;
 
-  const [exRate, setExRate] = React.useState(DEFAULT_USD_TO_VND);
-  const [isRateLoading, setIsRateLoading] = React.useState(false);
 
-  // Fetch real-time exchange rate
-  useEffect(() => {
-    const fetchRate = async () => {
-      setIsRateLoading(true);
-      try {
-        const res = await fetch(
-          "https://api.frankfurter.dev/latest?from=USD&to=VND",
-        );
-        const data = await res.json();
-        if (data?.rates?.VND) {
-          setExRate(data.rates.VND);
-        }
-      } catch (err) {
-        console.error("Failed to fetch exchange rate:", err);
-      } finally {
-        setIsRateLoading(false);
-      }
-    };
-    fetchRate();
-  }, []);
 
   // Define dynamic validation schema based on live rate
   const dynamicSchema = React.useMemo(() => {
@@ -322,13 +300,16 @@ export default function CardRewardConfigForm({
           REWARD_DEDUCTION_REASON.MOVE,
         ]),
         unitType: z.enum(["percent", "vnd"]),
-        value: z.number().min(0.01, t`Giá trị phải lớn hơn 0`),
+        value: z
+          .number()
+          .nullable()
+          .refine((v) => v !== null && v >= 0.01, t`Giá trị phải lớn hơn 0`),
         displayOrder: z.number().int().min(0).default(0),
       })
       .refine(
         (data) => {
           if (data.unitType === "percent") {
-            return data.value <= 100;
+            return (data.value ?? 0) <= 100;
           }
           return true;
         },
@@ -342,7 +323,7 @@ export default function CardRewardConfigForm({
       .object({
         rewardType: z.enum(["project", "responsibility"]),
         bonusAmount: z.number().optional().nullable(),
-        currency: z.string().length(3).default("VND"),
+        currency: z.literal("VND").default("VND"),
         deductions: z
           .array(deductionItemSchema)
           .length(2)
@@ -366,22 +347,14 @@ export default function CardRewardConfigForm({
       )
       .superRefine((data, ctx) => {
         if (data.rewardType === "project" && data.bonusAmount) {
-          const bonusInVnd =
-            data.currency === "USD"
-              ? data.bonusAmount * exRate
-              : data.bonusAmount;
+          const bonusInVnd = data.bonusAmount;
 
           data.deductions.forEach((item, index) => {
-            if (item.unitType === "vnd") {
+            if (item.unitType === "vnd" && item.value !== null) {
               if (item.value > bonusInVnd) {
-                const displayBonus = data.bonusAmount ?? 0;
-                const displayVnd = Math.round(bonusInVnd).toLocaleString();
                 ctx.addIssue({
                   code: z.ZodIssueCode.custom,
-                  message:
-                    data.currency === "USD"
-                      ? t`Khấu trừ vượt quá ${displayBonus}$ (~${displayVnd}đ)`
-                      : t`Khấu trừ không được lớn hơn tiền thưởng`,
+                  message: t`Khấu trừ không được lớn hơn tiền thưởng`,
                   path: ["deductions", index, "value"],
                 });
               }
@@ -389,7 +362,7 @@ export default function CardRewardConfigForm({
           });
         }
       });
-  }, [exRate]);
+  }, []);
 
   const {
     control,
@@ -403,9 +376,12 @@ export default function CardRewardConfigForm({
     resolver: zodResolver(dynamicSchema),
     defaultValues: {
       rewardType: "project",
-      bonusAmount: 0,
+      bonusAmount: null,
       currency: "VND",
-      deductions: [...DEFAULT_DEDUCTION_PAIR],
+      deductions: [...DEFAULT_DEDUCTION_PAIR].map((d) => ({
+        ...d,
+        value: null,
+      })),
     },
   });
 
@@ -496,8 +472,8 @@ export default function CardRewardConfigForm({
   const rewardType = watch("rewardType");
   const isProject = rewardType === "project";
 
-  const formatNumber = (val: number | string) => {
-    if (!val && val !== 0) return "";
+  const formatNumber = (val: number | string | null | undefined) => {
+    if (val === null || val === undefined || val === "") return "";
     const num =
       typeof val === "string" ? val.replace(/\D/g, "") : val.toString();
     if (!num) return "";
@@ -505,7 +481,9 @@ export default function CardRewardConfigForm({
   };
 
   const parseNumber = (val: string) => {
-    return Number(val.replace(/\D/g, "")) || 0;
+    const digits = val.replace(/\D/g, "");
+    if (digits === "") return null;
+    return Number(digits);
   };
 
   const handleWithdraw = async () => {
@@ -1145,10 +1123,7 @@ export default function CardRewardConfigForm({
                     value={field.value}
                     onChange={field.onChange}
                     disabled={effectivelyReadOnly}
-                    options={[
-                      { value: "VND", label: "VND" },
-                      { value: "USD", label: "USD" },
-                    ]}
+                    options={[{ value: "VND", label: "VND" }]}
                     className="w-full"
                     buttonClassName="font-bold"
                   />

@@ -67,3 +67,4 @@ volumes:
   # Same named volume as root docker-compose.yml (reuse DB when switching to deploy).
   kan_postgres_data:
     name: kanbn_kan_postgres_data
+    external: true

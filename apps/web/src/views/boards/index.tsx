@@ -3,24 +3,17 @@ import {
   ListboxButton,
   ListboxOption,
   ListboxOptions,
-  Transition,
 } from "@headlessui/react";
 import { t } from "@lingui/core/macro";
-import { useState, Fragment, useEffect } from "react";
-import {
-  HiArrowDownTray,
-  HiChevronDown,
-  HiOutlinePlusSmall,
-  HiChevronUpDown,
-  HiCheck,
-  HiOutlineUserCircle,
-} from "react-icons/hi2";
+import { useEffect, useState } from "react";
+import { HiChevronDown, HiOutlinePlusSmall } from "react-icons/hi2";
 
 import Button from "~/components/Button";
 import FeedbackModal from "~/components/FeedbackModal";
 import Modal from "~/components/modal";
 import { NewWorkspaceForm } from "~/components/NewWorkspaceForm";
 import { PageHead } from "~/components/PageHead";
+import SearchableSelect from "~/components/SearchableSelect";
 import { Tooltip } from "~/components/Tooltip";
 import { usePermissions } from "~/hooks/usePermissions";
 import { useKeyboardShortcut } from "~/providers/keyboard-shortcuts";
@@ -45,13 +38,15 @@ export default function BoardsPage({ isTemplate }: { isTemplate?: boolean }) {
   const isAdmin = workspace.role === "ADMIN";
 
   const { data: users } = api.user.getAll.useQuery();
-  const [selectedUserId, setSelectedUserId] = useState<string | null>(users?.[0]?.id ?? null);
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(
+    users?.[0]?.id ?? null,
+  );
 
   useEffect(() => {
     if (users?.[0]?.id && selectedUserId === null) {
       setSelectedUserId(users[0].id);
     }
-  }, [users]);
+  }, [selectedUserId, users]);
 
   const { tooltipContent: createModalShortcutTooltipContent } =
     useKeyboardShortcut({
@@ -94,61 +89,21 @@ export default function BoardsPage({ isTemplate }: { isTemplate?: boolean }) {
                 </Button>
               </Tooltip>
             )} */}
-            {isAdmin && activeTab === "boards" && (
+            {isAdmin && activeTab === "boards" && !isTemplate && (
               <div className="relative min-w-[200px]">
-                <Listbox value={selectedUserId} onChange={setSelectedUserId}>
-                  <div className="relative">
-                    {/* <Listbox value={selectedUserId} onChange={setSelectedUserId}> */}
-                    <ListboxButton className="relative w-full cursor-pointer rounded-xl border border-neutral-200/70 bg-white/50 py-2.5 pl-4 pr-10 text-left text-sm font-semibold text-neutral-900 shadow-sm transition-all hover:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-dark-400/50 dark:bg-dark-300/50 dark:text-white dark:hover:bg-dark-200">
-                      <span className="flex items-center gap-2.5 truncate">
-                        <HiOutlineUserCircle className="h-5 w-5 text-neutral-400 dark:text-neutral-500" />
-                        <span className="block truncate">
-                          {users?.find((u) => u.id === selectedUserId)?.name || "Chọn người dùng"}
-                        </span>
-                      </span>
-                      <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
-                        <HiChevronUpDown className="h-5 w-5 text-neutral-400" aria-hidden="true" />
-                      </span>
-                    </ListboxButton>
-      
-                    <Transition
-                      as={Fragment}
-                      leave="transition ease-in duration-100"
-                      leaveFrom="opacity-100"
-                      leaveTo="opacity-0"
-                    >
-                      <ListboxOptions
-                        anchor="bottom"
-                        className="z-50 mt-1.5 max-h-60 min-w-[200px] overflow-auto rounded-xl bg-white py-1.5 text-base shadow-xl ring-1 ring-black/5 focus:outline-none dark:bg-dark-50 sm:text-sm [--anchor-max-height:200px]"
-                      >
-                        {users?.map((user) => (
-                          <ListboxOption
-                            key={user.id}
-                            value={user.id}
-                            className={({ focus, selected }) =>
-                              `relative cursor-pointer select-none py-2.5 pl-10 pr-4 transition-colors ${
-                                focus ? "bg-blue-50 text-blue-900 dark:bg-blue-900/30 dark:text-blue-100" : "text-neutral-900 dark:text-neutral-200"
-                              } ${selected ? "font-bold" : "font-medium"}`
-                            }
-                          >
-                            {({ selected }) => (
-                              <>
-                                <span className={`block truncate ${selected ? "text-blue-600 dark:text-blue-400" : ""}`}>
-                                  {user.name || user.username || user.email}
-                                </span>
-                                {selected ? (
-                                  <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-blue-600 dark:text-blue-400">
-                                    <HiCheck className="h-5 w-5" aria-hidden="true" />
-                                  </span>
-                                ) : null}
-                              </>
-                            )}
-                          </ListboxOption>
-                        ))}
-                      </ListboxOptions>
-                    </Transition>
-                  </div>
-                </Listbox>
+                <SearchableSelect
+                  value={selectedUserId ?? ""}
+                  onChange={setSelectedUserId}
+                  options={
+                    users?.map((user) => ({
+                      value: user.id,
+                      label: user.name ?? user.username ?? user.email ?? "",
+                    })) ?? []
+                  }
+                  placeholder={t`Chọn người dùng`}
+                  searchPlaceholder={t`Tìm người dùng...`}
+                  noOptionsMessage={t`Không tìm thấy người dùng`}
+                />
               </div>
             )}
             <Tooltip
@@ -187,7 +142,10 @@ export default function BoardsPage({ isTemplate }: { isTemplate?: boolean }) {
             modalSize="sm"
             isVisible={isOpen && modalContentType === "NEW_BOARD"}
           >
-            <NewBoardForm isTemplate={!!isTemplate} />
+            <NewBoardForm
+              isTemplate={!!isTemplate}
+              ownerUserId={isAdmin ? (selectedUserId ?? undefined) : undefined}
+            />
           </Modal>
 
           <Modal
@@ -268,7 +226,11 @@ export default function BoardsPage({ isTemplate }: { isTemplate?: boolean }) {
             </div>
             <div className="flex h-full flex-row focus:outline-none">
               {activeTab === "boards" && (
-                <BoardsList isTemplate={false} archived={false} userId={selectedUserId ?? undefined} />
+                <BoardsList
+                  isTemplate={false}
+                  archived={false}
+                  userId={selectedUserId ?? undefined}
+                />
               )}
               {activeTab === "archived" && (
                 <BoardsList isTemplate={false} archived={true} />
@@ -277,7 +239,7 @@ export default function BoardsPage({ isTemplate }: { isTemplate?: boolean }) {
           </div>
         ) : (
           <div className="flex h-full flex-row">
-            <BoardsList isTemplate={!!isTemplate} userId={undefined}/>
+            <BoardsList isTemplate={!!isTemplate} userId={undefined} />
           </div>
         )}
       </div>

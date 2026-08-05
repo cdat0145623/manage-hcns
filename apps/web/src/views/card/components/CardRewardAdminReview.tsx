@@ -1,5 +1,5 @@
 import { t } from "@lingui/macro";
-import { differenceInDays, format } from "date-fns";
+import { differenceInDays } from "date-fns";
 import { motion } from "framer-motion";
 import React from "react";
 import {
@@ -14,6 +14,10 @@ import { REWARD_DEDUCTION_REASON } from "@kan/shared/constants";
 
 import { usePopup } from "~/providers/popup";
 import { api } from "~/utils/api";
+import {
+  formatRewardDayMonth,
+  formatRewardDayMonthYear,
+} from "~/utils/rewardDates";
 import { RewardStatus } from "./CardRewardSummaryCard";
 
 /** Màn duyệt chỉ xử lý khấu trừ loại dời deadline (mức đề xuất do NV cấu hình). */
@@ -50,7 +54,7 @@ interface CardRewardAdminReviewProps {
     deductions?: {
       id?: number;
       reason: string;
-      value: string | number;
+      value: string | number | null;
       unitType: string;
     }[];
     snapshot?: CardSnapshot | null;
@@ -158,7 +162,7 @@ export const CardRewardAdminReview = ({
   };
 
   const formatCurrency = (val: string | number | null) => {
-    if (val === null || val === undefined) return "0";
+    if (val === null || val === undefined || val === "") return "";
     return Number(val).toLocaleString("vi-VN");
   };
 
@@ -271,14 +275,11 @@ export const CardRewardAdminReview = ({
                 <span className="inline-block w-24 text-neutral-400">{t`Thời gian`}</span>
                 <span className="font-bold text-neutral-700">
                   {data.snapshot.snappedStartDate
-                    ? format(new Date(data.snapshot.snappedStartDate), "MMM d")
+                    ? formatRewardDayMonth(data.snapshot.snappedStartDate)
                     : "?"}{" "}
                   →{" "}
                   {data.snapshot.snappedDueDate
-                    ? format(
-                        new Date(data.snapshot.snappedDueDate),
-                        "MMM d, yyyy",
-                      )
+                    ? formatRewardDayMonthYear(data.snapshot.snappedDueDate)
                     : "?"}
                 </span>
               </div>
@@ -398,13 +399,9 @@ export const CardRewardAdminReview = ({
               <div className="flex justify-between border-b border-dashed border-neutral-200 pb-2">
                 <span className="text-neutral-400">{t`Thời gian`}</span>
                 <span className="font-bold text-neutral-700">
-                  {card.startDate
-                    ? format(new Date(card.startDate), "MMM d")
-                    : "?"}{" "}
+                  {card.startDate ? formatRewardDayMonth(card.startDate) : "?"}{" "}
                   →{" "}
-                  {card.dueDate
-                    ? format(new Date(card.dueDate), "MMM d, yyyy")
-                    : "?"}
+                  {card.dueDate ? formatRewardDayMonthYear(card.dueDate) : "?"}
                 </span>
               </div>
               <div className="flex justify-between">
@@ -423,9 +420,7 @@ export const CardRewardAdminReview = ({
                 <span className="w-24 text-neutral-400">{t`Hiện tại`}</span>
                 <div className="flex items-center gap-2 font-bold text-neutral-700 text-rose-600">
                   <span>
-                    {card.dueDate
-                      ? format(new Date(card.dueDate), "MMM d")
-                      : "?"}
+                    {card.dueDate ? formatRewardDayMonth(card.dueDate) : "?"}
                   </span>
                   {preview?.violations.some(
                     (v) => v.violationType === "deadline_extended",

@@ -1,5 +1,4 @@
 import { t } from "@lingui/macro";
-import { format } from "date-fns";
 import { motion } from "framer-motion";
 import React from "react";
 import {
@@ -7,6 +6,8 @@ import {
   HiExclamationTriangle,
   HiMagnifyingGlassCircle,
 } from "react-icons/hi2";
+
+import { formatInAppCalendarZone } from "@kan/shared/utils";
 
 import { detectRewardMismatch } from "~/utils/reward";
 
@@ -99,7 +100,10 @@ export const RewardBreachModalContent = ({
                   <div className="flex items-center gap-2">
                     <span className="h-1.5 w-1.5 rounded-full bg-neutral-300 dark:bg-dark-400" />
                     {card.snapshot?.snappedDueDate
-                      ? format(new Date(card.snapshot.snappedDueDate), "MMM d")
+                      ? formatInAppCalendarZone(
+                          card.snapshot.snappedDueDate,
+                          "MMM d",
+                        )
                       : "?"}
                   </div>
                   <span className="font-black uppercase tracking-widest text-rose-500/80">

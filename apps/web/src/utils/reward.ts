@@ -1,6 +1,8 @@
-import { isSameDay } from "date-fns";
-
 import { REWARD_DEDUCTION_REASON } from "@kan/shared/constants";
+import {
+  calendarDateKeyInAppZone,
+  diffCalendarDaysInAppZone,
+} from "@kan/shared/utils";
 
 const DEDUCTION_REASON_SORT: Record<string, number> = {
   [REWARD_DEDUCTION_REASON.LATE]: 0,
@@ -75,7 +77,10 @@ export const detectRewardMismatch = (
   ) => {
     if (a == null && b == null) return true;
     if (a == null || b == null) return false;
-    return isSameDay(new Date(a), new Date(b));
+    return (
+      calendarDateKeyInAppZone(new Date(a)) ===
+      calendarDateKeyInAppZone(new Date(b))
+    );
   };
 
   // 1. Title
@@ -101,7 +106,7 @@ export const detectRewardMismatch = (
 
   let diffDays = 0;
   if (d3 && d4) {
-    diffDays = Math.ceil((d3 - d4) / (1000 * 60 * 60 * 24));
+    diffDays = diffCalendarDaysInAppZone(new Date(d3), new Date(d4));
   }
 
   const deadlineMismatch =

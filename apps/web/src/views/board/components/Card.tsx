@@ -1,4 +1,3 @@
-import { format, isBefore, isSameYear, startOfDay } from "date-fns";
 import { HiOutlinePaperClip } from "react-icons/hi";
 import {
   HiBars3BottomLeft,
@@ -6,6 +5,12 @@ import {
   HiOutlineClock,
 } from "react-icons/hi2";
 import { twMerge } from "tailwind-merge";
+
+import {
+  formatInAppCalendarZone,
+  isCalendarDueDateOverdueInAppZone,
+  isSameCalendarYearInAppZone,
+} from "@kan/shared/utils";
 
 import Avatar from "~/components/Avatar";
 import Badge from "~/components/Badge";
@@ -55,8 +60,12 @@ const Card = ({
   status: "pending" | "missed" | "done";
 }) => {
   const { dateLocale } = useLocalisation();
-  const showYear = dueDate ? !isSameYear(dueDate, new Date()) : false;
-  const isOverdue = dueDate ? isBefore(dueDate, startOfDay(new Date())) : false;
+  const showYear = dueDate
+    ? !isSameCalendarYearInAppZone(dueDate, new Date())
+    : false;
+  const isOverdue = dueDate
+    ? isCalendarDueDateOverdueInAppZone(dueDate)
+    : false;
   const completedItems = checklists.reduce((acc, checklist) => {
     return acc + checklist.items.filter((item) => item.completed).length;
   }, 0);
@@ -106,21 +115,24 @@ const Card = ({
                     isOverdue && status !== "done"
                       ? "text-red-600 dark:text-red-400"
                       : status === "done"
-                      ? "text-emerald-600 dark:text-emerald-400"
-                      : "text-light-800 dark:text-dark-800",
+                        ? "text-emerald-600 dark:text-emerald-400"
+                        : "text-light-800 dark:text-dark-800",
                   )}
                 >
                   <HiOutlineClock className="h-4 w-4" />
                   <span className="text-[11px]">
                     {startDate &&
-                      format(startDate, showYear ? "MMM dd, yyyy" : "MMM dd", {
-                        locale: dateLocale,
-                      })
-                    }
+                      formatInAppCalendarZone(
+                        startDate,
+                        showYear ? "MMM dd, yyyy" : "MMM dd",
+                        { locale: dateLocale },
+                      )}
                     {startDate && " - "}
-                    {format(dueDate, showYear ? "MMM dd, yyyy" : "MMM dd", {
-                      locale: dateLocale,
-                    })}
+                    {formatInAppCalendarZone(
+                      dueDate,
+                      showYear ? "MMM dd, yyyy" : "MMM dd",
+                      { locale: dateLocale },
+                    )}
                   </span>
                 </div>
               )}

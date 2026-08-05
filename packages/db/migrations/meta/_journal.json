@@ -477,6 +477,20 @@
       "when": 1776507200000,
       "tag": "20260418140000_add_task_master_reward_template",
       "breakpoints": true
+    },
+    {
+      "idx": 68,
+      "version": "7",
+      "when": 1776600000000,
+      "tag": "20260420100000_task_schedule_timestamptz",
+      "breakpoints": true
+    },
+    {
+      "idx": 69,
+      "version": "7",
+      "when": 1785832992831,
+      "tag": "20260804084312_AddBoardOwner",
+      "breakpoints": true
     }
   ]
 }

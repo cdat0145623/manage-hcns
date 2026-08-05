@@ -13,6 +13,7 @@ import {
   cardRewardLogs,
   cardRewardSnapshots,
   cards,
+  cardToWorkspaceMembers,
   lists,
   rewardTypeEnum,
   taskInstances,
@@ -169,6 +170,74 @@ async function assertUserCanActOnCardRewardConfig(
       code: "INTERNAL_SERVER_ERROR",
       message: "Cấu hình reward không gắn card, task instance hay task master.",
     });
+  }
+}
+
+/** Trước khi gửi duyệt: card / task instance phải có timeline và người thực hiện. */
+async function assertRewardSubmitSourceReady(
+  db: dbClient,
+  config: { cardId: number | null; taskInstanceId: string | null },
+): Promise<void> {
+  if (config.cardId != null) {
+    const card = await db.query.cards.findFirst({
+      where: eq(cards.id, config.cardId),
+      columns: {
+        startDate: true,
+        dueDate: true,
+        targetUser: true,
+      },
+    });
+    if (!card) {
+      throw new TRPCError({
+        code: "NOT_FOUND",
+        message: "Không tìm thấy card.",
+      });
+    }
+    if (!card.startDate || !card.dueDate) {
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message:
+          "Vui lòng chọn ngày bắt đầu và ngày kết thúc trên card trước khi gửi duyệt cấu hình thưởng.",
+      });
+    }
+    const hasMember =
+      card.targetUser != null ||
+      (await db.query.cardToWorkspaceMembers.findFirst({
+        where: eq(cardToWorkspaceMembers.cardId, config.cardId),
+        columns: { cardId: true },
+      })) != null;
+    if (!hasMember) {
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message:
+          "Vui lòng gán ít nhất một thành viên cho card trước khi gửi duyệt cấu hình thưởng.",
+      });
+    }
+    return;
+  }
+
+  if (config.taskInstanceId != null) {
+    const inst = await db.query.taskInstances.findFirst({
+      where: eq(taskInstances.id, config.taskInstanceId),
+      columns: {
+        targetDate: true,
+        endDate: true,
+        userId: true,
+      },
+    });
+    if (!inst) {
+      throw new TRPCError({
+        code: "NOT_FOUND",
+        message: "Không tìm thấy phiên bản tác vụ.",
+      });
+    }
+    if (!inst.targetDate || !inst.endDate) {
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message:
+          "Vui lòng chọn ngày bắt đầu và ngày kết thúc cho tác vụ trước khi gửi duyệt cấu hình thưởng.",
+      });
+    }
   }
 }
 
@@ -1030,6 +1099,11 @@ export const rewardConfigRouter = createTRPCRouter({
           message: `Chỉ có thể submit khi đang ở trạng thái draft (hiện tại: ${config.approvalStatus}).`,
         });
       }
+
+      await assertRewardSubmitSourceReady(ctx.db, {
+        cardId: config.cardId,
+        taskInstanceId: config.taskInstanceId,
+      });
 
       await ctx.db
         .update(cardRewardConfigs)

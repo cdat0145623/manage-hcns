@@ -14,6 +14,8 @@ interface CalendarTaskProps {
   totalOverlap?: number;
   overlapIndex?: number;
   isDraggable?: boolean;
+  /** When true, skip layout projection / shared layoutId (e.g. list inside a modal). */
+  disableSharedLayout?: boolean;
   startHour?: number;
 }
 
@@ -98,6 +100,7 @@ export function CalendarTask({
   totalOverlap = 1,
   overlapIndex = 0,
   isDraggable = true,
+  disableSharedLayout = false,
   startHour = 0,
 }: CalendarTaskProps) {
   const isVirtual = entry.type === "VIRTUAL";
@@ -150,9 +153,9 @@ export function CalendarTask({
 
     return (
       <motion.button
-        layout
-        layoutId={entry.id}
-        initial={{ opacity: 0, y: 5 }}
+        layout={!disableSharedLayout}
+        layoutId={disableSharedLayout ? undefined : entry.id}
+        initial={disableSharedLayout ? false : { opacity: 0, y: 5 }}
         animate={{ opacity: 1, y: 0 }}
         whileHover={{
           scale: 1.02,
@@ -199,7 +202,7 @@ export function CalendarTask({
           <div
             className={`pointer-events-none ml-1 flex h-full w-full flex-row items-center justify-start gap-2 overflow-hidden ${colors.text}`}
           >
-            <span className="truncate text-[10px] font-black leading-none text-left">
+            <span className="truncate text-left text-[10px] font-black leading-none">
               {entry.title || "(No title)"}
             </span>
             <span className="shrink-0 text-[10px] font-black opacity-50">
@@ -210,7 +213,7 @@ export function CalendarTask({
           <div
             className={`pointer-events-none ml-1 flex h-full flex-col items-start justify-center gap-0.5 overflow-hidden ${colors.text}`}
           >
-            <span className="w-full truncate text-xs font-black leading-tight text-left">
+            <span className="w-full truncate text-left text-xs font-black leading-tight">
               {entry.title || "(No title)"}
             </span>
             <div className="flex w-full items-center gap-1.5 overflow-hidden opacity-60">

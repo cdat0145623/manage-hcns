@@ -49,7 +49,7 @@ export const cardRouter = createTRPCRouter({
         description: z.string().max(10000),
         listPublicId: z.string().min(12),
         labelPublicIds: z.array(z.string().min(12)),
-        memberPublicIds: z.array(z.string().min(12)),
+        memberPublicIds: z.array(z.string().min(12)).max(1),
         position: z.enum(["start", "end"]),
         dueDate: z.date().nullable().optional(),
       }),
@@ -634,6 +634,23 @@ export const cardRouter = createTRPCRouter({
         return { newMember: false };
       }
 
+      const removedWorkspaceMemberIds =
+        await cardRepo.deleteAllCardMemberRelationshipsForCard(ctx.db, card.id);
+
+      for (const workspaceMemberId of removedWorkspaceMemberIds) {
+        await cardActivityRepo.create(ctx.db, {
+          type: "member_unassigned" as const,
+          cardId: card.id,
+          workspaceMemberId,
+          createdBy: userId,
+        });
+        trackCardRewardViolations({
+          db: ctx.db,
+          cardId: card.id,
+          memberAction: { workspaceMemberId, action: "removed" },
+        }).catch(() => void 0);
+      }
+
       const newCardMemberRelationship =
         await cardRepo.createCardMemberRelationship(ctx.db, cardMemberIds);
 
@@ -650,7 +667,6 @@ export const cardRouter = createTRPCRouter({
         createdBy: userId,
       });
 
-      // Track reward violation (non-blocking)
       trackCardRewardViolations({
         db: ctx.db,
         cardId: card.id,
@@ -1100,8 +1116,8 @@ export const cardRouter = createTRPCRouter({
           type: activityType,
           cardId: result.id,
           createdBy: userId,
-          oldValue: previousStartDate?.toLocaleString(),
-          newValue: input.startDate?.toLocaleString(),
+          oldValue: previousStartDate?.toISOString(),
+          newValue: input.startDate?.toISOString(),
         });
       }
 

@@ -4,8 +4,6 @@ import {
   endOfMonth,
   endOfWeek,
   format,
-  isSameDay,
-  isToday,
   startOfMonth,
   startOfWeek,
   subMonths,
@@ -13,6 +11,11 @@ import {
 import { useMemo, useState } from "react";
 import { HiChevronLeft, HiChevronRight } from "react-icons/hi2";
 import { twMerge } from "tailwind-merge";
+
+import {
+  buildInstantFromAppCalendarDayAndTime,
+  calendarDateKeyInAppZone,
+} from "@kan/shared/utils";
 
 interface DateSelectorProps {
   selectedDate?: Date | null;
@@ -51,8 +54,13 @@ const DateSelector = ({
         const dateString = format(date, "yyyy-MM-dd");
         return {
           date: dateString,
-          isToday: isToday(date),
-          isSelected: selectedDate ? isSameDay(date, selectedDate) : false,
+          isToday:
+            calendarDateKeyInAppZone(date) ===
+            calendarDateKeyInAppZone(new Date()),
+          isSelected: selectedDate
+            ? calendarDateKeyInAppZone(date) ===
+              calendarDateKeyInAppZone(selectedDate)
+            : false,
           isCurrentMonth: date >= monthStart && date <= monthEnd,
           dateObj: date,
         };
@@ -71,10 +79,13 @@ const DateSelector = ({
   const handleDateClick = (date: Date, e: React.MouseEvent) => {
     e.stopPropagation();
     // If clicking the same date that's already selected, unselect it
-    if (selectedDate && isSameDay(date, selectedDate)) {
+    if (
+      selectedDate &&
+      calendarDateKeyInAppZone(date) === calendarDateKeyInAppZone(selectedDate)
+    ) {
       onDateSelect?.(undefined);
     } else {
-      onDateSelect?.(date);
+      onDateSelect?.(buildInstantFromAppCalendarDayAndTime(date, "00:00"));
     }
   };
 
@@ -116,7 +127,9 @@ const DateSelector = ({
               "flex aspect-square items-center justify-center rounded-lg focus:z-10",
               day.isSelected
                 ? "bg-light-1000 hover:bg-light-1000 dark:bg-dark-1000 dark:hover:bg-dark-1000"
-                : "bg-transparent hover:bg-light-200 dark:bg-transparent dark:hover:bg-dark-200",
+                : day.isToday
+                  ? "bg-light-200/70 hover:bg-light-300/70 dark:bg-dark-200/70 dark:hover:bg-dark-300/70"
+                  : "bg-transparent hover:bg-light-200 dark:bg-transparent dark:hover:bg-dark-200",
             )}
           >
             <time

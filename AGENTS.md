@@ -4,7 +4,7 @@
 
 Kan is an open-source project management tool (Trello alternative) built with:
 
-- **Frontend**: Next.js, React, TypeScript, Tailwind CSS
+- **Frontend**: Next.js, React, TypeScript, Tailwind CSS.
 - **Backend**: tRPC, Node.js
 - **Database**: PostgreSQL with Drizzle ORM
 - **Monorepo**: pnpm workspaces with Turbo

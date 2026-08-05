@@ -33,6 +33,7 @@ import { usePopup } from "~/providers/popup";
 import { useWorkspace } from "~/providers/workspace";
 import { api } from "~/utils/api";
 import { formatToArray } from "~/utils/helpers";
+import { listNames } from "../boards/components/NewBoardForm";
 import CardDetailsModalContent from "../card/components/CardDetailsModalContent";
 import { cardChildModalTypes } from "../card/constants";
 import BoardActivitySidebar from "./components/BoardActivitySidebar";
@@ -48,7 +49,6 @@ import { NewTemplateForm } from "./components/NewTemplateForm";
 import UpdateBoardSlugButton from "./components/UpdateBoardSlugButton";
 import { UpdateBoardSlugForm } from "./components/UpdateBoardSlugForm";
 import VisibilityButton from "./components/VisibilityButton";
-import { listNames } from "../boards/components/NewBoardForm";
 
 type PublicListId = string;
 
@@ -87,6 +87,12 @@ export default function BoardPage({ isTemplate }: { isTemplate?: boolean }) {
     const { cardId: _removed, ...newQuery } = router.query;
     void router.push({ query: newQuery }, undefined, { shallow: true });
     void utils.board.byId.invalidate();
+  };
+
+  /** After delete: URL + React Query cache already updated (optimistic); no refetch / full navigation. */
+  const handleAfterCardDeleted = () => {
+    const { cardId: _removed, ...newQuery } = router.query;
+    void router.push({ query: newQuery }, undefined, { shallow: true });
   };
 
   const { tooltipContent: createListShortcutTooltipContent } =
@@ -147,7 +153,7 @@ export default function BoardPage({ isTemplate }: { isTemplate?: boolean }) {
             icon: "error",
           });
         },
-      }
+      },
     );
   };
 
@@ -162,13 +168,17 @@ export default function BoardPage({ isTemplate }: { isTemplate?: boolean }) {
 
   const boardType: "regular" | "template" = isTemplate ? "template" : "regular";
 
-  const [restrictedMemberId, setRestrictedMemberId] = useState<string | null>(null);
+  const [restrictedMemberId, setRestrictedMemberId] = useState<string | null>(
+    null,
+  );
 
   const queryParams = {
     boardPublicId: boardId ?? "",
     members: isAdmin
       ? formatToArray(router.query.members)
-      : (restrictedMemberId ? [restrictedMemberId] : []),
+      : restrictedMemberId
+        ? [restrictedMemberId]
+        : [],
     labels: formatToArray(router.query.labels),
     lists: formatToArray(router.query.lists),
     ...(semanticFilters.length > 0 && {
@@ -504,6 +514,8 @@ export default function BoardPage({ isTemplate }: { isTemplate?: boolean }) {
             cardId={(router.query.cardId as string) || entityId || undefined}
             isTemplate={!!isTemplate}
             onClose={handleCloseCardModal}
+            onCardDeleted={handleAfterCardDeleted}
+            boardByIdQueryInput={queryParams}
           />
         </Modal>
       </>
@@ -528,7 +540,7 @@ export default function BoardPage({ isTemplate }: { isTemplate?: boolean }) {
               onSubmit={handleSubmit(onSubmit)}
               className="order-2 focus-visible:outline-none md:order-1"
             >
-              {boardData.user?.name}
+              {boardData.owner?.name ?? boardData.user?.name}
               <input
                 id="name"
                 type="text"

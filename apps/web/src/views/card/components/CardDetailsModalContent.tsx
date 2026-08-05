@@ -6,6 +6,7 @@ import { HiMiniPlus, HiXMark } from "react-icons/hi2";
 
 import { authClient } from "@kan/auth/client";
 
+import type { RouterInputs } from "~/utils/api";
 import Avatar from "~/components/Avatar";
 import Editor from "~/components/Editor";
 import FeedbackModal from "~/components/FeedbackModal";
@@ -42,12 +43,18 @@ interface CardDetailsModalContentProps {
   cardId: string | undefined;
   isTemplate?: boolean;
   onClose: () => void;
+  /** After successful delete; keep board cache (optimistic update) and avoid refetch. Defaults to onClose. */
+  onCardDeleted?: () => void;
+  /** Same object as `api.board.byId.useQuery` on the board page (includes filters + type). */
+  boardByIdQueryInput?: RouterInputs["board"]["byId"];
 }
 
 export default function CardDetailsModalContent({
   cardId,
   isTemplate,
   onClose,
+  onCardDeleted,
+  boardByIdQueryInput,
 }: CardDetailsModalContentProps) {
   const utils = api.useUtils();
   const {
@@ -529,6 +536,8 @@ export default function CardDetailsModalContent({
         cardId={cardId}
         refetchCard={refetchCard}
         clearModalState={clearModalState}
+        onCardDeleted={onCardDeleted ?? onClose}
+        boardByIdQueryInput={boardByIdQueryInput}
       />
     </div>
   );

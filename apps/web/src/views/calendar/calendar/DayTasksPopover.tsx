@@ -1,7 +1,7 @@
 import { format } from "date-fns";
 import { motion } from "framer-motion";
-import { MdClose } from "react-icons/md";
 import { useEffect } from "react";
+import { MdClose } from "react-icons/md";
 
 import type { CalendarEntry } from "~/hooks/useRecurrence";
 import { CalendarTask } from "./CalendarTask";
@@ -35,23 +35,34 @@ export function DayTasksPopover({
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
+        transition={{ duration: 0.2 }}
         onClick={onClose}
-        className="absolute inset-0 bg-black/20 backdrop-blur-[2px] transition-all dark:bg-black/40"
+        className="absolute inset-0 bg-black/20 backdrop-blur-[2px] dark:bg-black/40"
       />
 
       {/* Popover Card */}
       <motion.div
-        initial={{ opacity: 0, scale: 0.9, y: 10, rotateX: 10 }}
-        animate={{ opacity: 1, scale: 1, y: 0, rotateX: 0 }}
-        exit={{ opacity: 0, scale: 0.9, y: 10, rotateX: 10 }}
-        transition={{ type: "spring", stiffness: 400, damping: 28 }}
-        className="relative w-[30vw] h-[50vh] flex flex-col justify-between overflow-hidden rounded-3xl border border-white/40 bg-white/95 shadow-2xl shadow-blue-500/10 backdrop-blur-xl dark:border-white/5 dark:bg-neutral-900/95"
+        initial={{ opacity: 0, scale: 0.96, y: 8 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.96, y: 8 }}
+        transition={{ type: "spring", stiffness: 420, damping: 32 }}
+        className="relative flex h-[50vh] w-[30vw] flex-col justify-between overflow-hidden rounded-3xl border border-white/40 bg-white/95 shadow-2xl shadow-blue-500/10 backdrop-blur-xl dark:border-white/5 dark:bg-neutral-900/95"
       >
         {/* Header */}
         <div className="flex w-full items-center justify-between border-b border-neutral-100 p-5 dark:border-white/5">
           <div className="flex flex-col">
             <span className="text-[10px] font-black uppercase tracking-[0.2em] text-neutral-900 dark:text-white">
-              {["Chủ Nhật", "Thứ Hai", "Thứ Ba", "Thứ Tư", "Thứ Năm", "Thứ Sáu", "Thứ Bảy"][day.getDay()]}
+              {
+                [
+                  "Chủ Nhật",
+                  "Thứ Hai",
+                  "Thứ Ba",
+                  "Thứ Tư",
+                  "Thứ Năm",
+                  "Thứ Sáu",
+                  "Thứ Bảy",
+                ][day.getDay()]
+              }
             </span>
             <span className="text-xl font-black text-neutral-900 dark:text-white">
               {format(day, "d")} Tháng {day.getMonth() + 1}
@@ -66,20 +77,21 @@ export function DayTasksPopover({
         </div>
 
         {/* Task List */}
-        <div className="max-h-[420px] w-full overflow-y-auto p-4 custom-scrollbar">
+        <div className="custom-scrollbar max-h-[420px] w-full overflow-y-auto p-4">
           <div className="flex flex-col gap-1">
             {entries.length > 0 ? (
               entries.map((entry, idx) => (
                 <div key={entry.id} className="min-h-[40px]">
-                   <CalendarTask
-                      entry={entry}
-                      onClick={(clickedEntry) => {
-                        onTaskClick(clickedEntry);
-                        onClose();
-                      }}
-                      index={idx}
-                      isDraggable={false}
-                    />
+                  <CalendarTask
+                    entry={entry}
+                    onClick={(clickedEntry) => {
+                      onTaskClick(clickedEntry);
+                      onClose();
+                    }}
+                    index={idx}
+                    isDraggable={false}
+                    disableSharedLayout
+                  />
                 </div>
               ))
             ) : (

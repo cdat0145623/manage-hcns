@@ -44,7 +44,10 @@ export function BoardsList({
     },
   });
 
-  const isUserBoard = isAdmin && !archived;
+  // Per-user listing is only for regular boards (admin "filter by member"). Templates are
+  // workspace-wide samples; filtering by creator would hide admins' templates for staff who
+  // cannot create templates, and would disable queries when userId is omitted on /templates.
+  const isUserBoard = isAdmin && !archived && !isTemplate;
 
   const { data: allData, isLoading: allLoading } = api.board.all.useQuery(
     {
@@ -213,10 +216,10 @@ export function BoardsList({
 
               <div
                 className="flex w-full flex-col px-8 text-center"
-                title={`${board.user?.name} - ${board.name}`}
+                title={`${board.owner?.name ?? board.user?.name} - ${board.name}`}
               >
                 <span className="mb-0.5 w-full truncate text-[11px] font-semibold uppercase tracking-wider text-neutral-500 dark:text-neutral-400">
-                  {board.user?.name}
+                  {board.owner?.name ?? board.user?.name}
                 </span>
                 <span className="w-full truncate text-[15px] font-bold text-neutral-800 dark:text-neutral-100">
                   {board.name}

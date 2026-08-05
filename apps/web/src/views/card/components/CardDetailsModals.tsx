@@ -1,15 +1,17 @@
 import { t } from "@lingui/core/macro";
-import Modal from "~/components/modal";
+
+import type { RouterInputs } from "~/utils/api";
 import FeedbackModal from "~/components/FeedbackModal";
 import { LabelForm } from "~/components/LabelForm";
+import Modal from "~/components/modal";
 import { NewWorkspaceForm } from "~/components/NewWorkspaceForm";
 import { EditYouTubeModal } from "~/components/YouTubeEmbed/EditYouTubeModal";
 import { DeleteLabelConfirmation } from "../../../components/DeleteLabelConfirmation";
+import { AttachmentUpload } from "./AttachmentUpload";
 import { DeleteCardConfirmation } from "./DeleteCardConfirmation";
+import { DeleteChecklistConfirmation } from "./DeleteChecklistConfirmation";
 import { DeleteCommentConfirmation } from "./DeleteCommentConfirmation";
 import { NewChecklistForm } from "./NewChecklistForm";
-import { DeleteChecklistConfirmation } from "./DeleteChecklistConfirmation";
-import { AttachmentUpload } from "./AttachmentUpload";
 
 interface CardDetailsModalsProps {
   isOpen: boolean;
@@ -19,6 +21,8 @@ interface CardDetailsModalsProps {
   cardId: string;
   refetchCard: () => Promise<void>;
   clearModalState: (key: string) => void;
+  onCardDeleted?: () => void;
+  boardByIdQueryInput?: RouterInputs["board"]["byId"];
 }
 
 export default function CardDetailsModals({
@@ -29,6 +33,8 @@ export default function CardDetailsModals({
   cardId,
   refetchCard,
   clearModalState,
+  onCardDeleted,
+  boardByIdQueryInput,
 }: CardDetailsModalsProps) {
   return (
     <>
@@ -46,6 +52,8 @@ export default function CardDetailsModals({
         <DeleteCardConfirmation
           boardPublicId={boardId ?? ""}
           cardPublicId={cardId}
+          boardByIdQueryInput={boardByIdQueryInput}
+          onDeleted={onCardDeleted}
         />
       </Modal>
 

@@ -28,7 +28,6 @@ import {
   lists,
   userBoardFavorites,
   workspaceMembers,
-  users,
 } from "@kan/db/schema";
 import { generateUID } from "@kan/shared/utils";
 
@@ -56,7 +55,9 @@ export const getAllForPublic = async (
       eq(boards.workspaceId, workspaceId),
       isNull(boards.deletedAt),
       opts?.type ? eq(boards.type, opts.type) : undefined,
-      opts?.archived !== undefined ? eq(boards.isArchived, opts.archived) : undefined,
+      opts?.archived !== undefined
+        ? eq(boards.isArchived, opts.archived)
+        : undefined,
     ),
   });
 
@@ -101,13 +102,20 @@ export const getAllByUserId = async (
         columns: {
           name: true,
         },
-      }
+      },
+      owner: {
+        columns: {
+          name: true,
+        },
+      },
     },
     where: and(
       eq(boards.workspaceId, workspaceId),
       isNull(boards.deletedAt),
-      eq(boards.createdBy, userId),
-      opts?.archived !== undefined ? eq(boards.isArchived, opts.archived) : undefined,
+      eq(boards.ownerUserId, userId),
+      opts?.archived !== undefined
+        ? eq(boards.isArchived, opts.archived)
+        : undefined,
     ),
   });
 
@@ -166,14 +174,25 @@ export const getAllByWorkspaceId = async (
         columns: {
           name: true,
         },
-      }
+      },
+      owner: {
+        columns: {
+          name: true,
+        },
+      },
     },
     where: and(
       eq(boards.workspaceId, workspaceId),
       isNull(boards.deletedAt),
-      userRole === "ADMIN" ? undefined : eq(boards.createdBy, userId),
+      // Regular boards: non-admins only see boards they own. Template boards are shared
+      // workspace samples (list is gated by board:view on the API); do not filter by creator.
+      userRole === "ADMIN" || opts?.type === "template"
+        ? undefined
+        : eq(boards.ownerUserId, userId),
       opts?.type ? eq(boards.type, opts.type) : undefined,
-      opts?.archived !== undefined ? eq(boards.isArchived, opts.archived) : undefined,
+      opts?.archived !== undefined
+        ? eq(boards.isArchived, opts.archived)
+        : undefined,
     ),
   });
 
@@ -299,6 +318,12 @@ export const getByPublicId = async (
     with: {
       user: {
         columns: {
+          name: true,
+        },
+      },
+      owner: {
+        columns: {
+          id: true,
           name: true,
         },
       },
@@ -467,8 +492,18 @@ export const getByPublicId = async (
 
   if (!board) return null;
 
+  const ownerMemberPublicId = board.owner?.id
+    ? board.workspace?.members.find(
+        (member) => member.user?.id === board.owner?.id,
+      )?.publicId
+    : undefined;
+
+  const owner = board.owner ? { name: board.owner.name } : board.owner;
+
   const formattedResult = {
     ...board,
+    owner,
+    ownerMemberPublicId,
     favorite: board.userFavorites.length > 0,
     userFavorites: undefined,
     isTemplateDefault: board.isTemplateDefault,
@@ -476,7 +511,7 @@ export const getByPublicId = async (
       ...list,
       cards: list.cards.map((card) => {
         // Filter for active attachments: group by publicId and take the latest activity.
-        const latestFiles = new Map<string, typeof card.fileActivities[0]>();
+        const latestFiles = new Map<string, (typeof card.fileActivities)[0]>();
         for (const activity of card.fileActivities) {
           latestFiles.set(activity.publicId, activity);
         }
@@ -676,7 +711,7 @@ export const getBySlug = async (
       ...list,
       cards: list.cards.map((card) => {
         // Filter for active attachments
-        const latestFiles = new Map<string, typeof card.fileActivities[0]>();
+        const latestFiles = new Map<string, (typeof card.fileActivities)[0]>();
         for (const activity of card.fileActivities) {
           latestFiles.set(activity.publicId, activity);
         }
@@ -713,6 +748,7 @@ export const getWithListIdsByPublicId = (
       id: true,
       workspaceId: true,
       createdBy: true,
+      ownerUserId: true,
     },
     with: {
       lists: {
@@ -754,6 +790,7 @@ export const create = async (
     publicId?: string;
     name: string;
     createdBy: string;
+    ownerUserId?: string | null;
     workspaceId: number;
     importId?: number;
     slug: string;
@@ -767,6 +804,7 @@ export const create = async (
       publicId: boardInput.publicId ?? generateUID(),
       name: boardInput.name,
       createdBy: boardInput.createdBy,
+      ownerUserId: boardInput.ownerUserId ?? boardInput.createdBy,
       workspaceId: boardInput.workspaceId,
       importId: boardInput.importId,
       slug: boardInput.slug,
@@ -799,7 +837,9 @@ export const update = async (
       slug: boardInput.slug,
       visibility: boardInput.visibility,
       updatedAt: new Date(),
-      ...(boardInput.isArchived !== undefined && { isArchived: boardInput.isArchived }) 
+      ...(boardInput.isArchived !== undefined && {
+        isArchived: boardInput.isArchived,
+      }),
     })
     .where(eq(boards.publicId, boardInput.boardPublicId))
     .returning({
@@ -819,10 +859,10 @@ export const unArchived = async (
 ) => {
   const [result] = await db
     .update(boards)
-    .set({ 
-      deletedAt: null, 
+    .set({
+      deletedAt: null,
       deletedBy: null,
-      ...(args.isArchived !== undefined && { isArchived: args.isArchived }) 
+      ...(args.isArchived !== undefined && { isArchived: args.isArchived }),
     })
     .where(and(eq(boards.id, args.boardId), isNull(boards.deletedAt)))
     .returning({
@@ -831,7 +871,7 @@ export const unArchived = async (
     });
 
   return result;
-}
+};
 
 export const softDelete = async (
   db: dbClient,
@@ -844,10 +884,10 @@ export const softDelete = async (
 ) => {
   const [result] = await db
     .update(boards)
-    .set({ 
-      deletedAt: args.deletedAt, 
+    .set({
+      deletedAt: args.deletedAt,
       deletedBy: args.deletedBy,
-      ...(args.isArchived !== undefined && { isArchived: args.isArchived }) 
+      ...(args.isArchived !== undefined && { isArchived: args.isArchived }),
     })
     .where(and(eq(boards.id, args.boardId), isNull(boards.deletedAt)))
     .returning({
@@ -897,6 +937,7 @@ export const getWorkspaceAndBoardIdByBoardPublicId = async (
       id: true,
       workspaceId: true,
       createdBy: true,
+      ownerUserId: true,
     },
     where: eq(boards.publicId, boardPublicId),
   });
@@ -958,6 +999,7 @@ export const createFromSnapshot = async (
     };
     workspaceId: number;
     createdBy: string;
+    ownerUserId?: string | null;
     slug: string;
     name?: string;
     type: "regular" | "template";
@@ -972,6 +1014,7 @@ export const createFromSnapshot = async (
         name: args.name ?? args.source.name,
         slug: args.slug,
         createdBy: args.createdBy,
+        ownerUserId: args.ownerUserId ?? args.createdBy,
         workspaceId: args.workspaceId,
         type: args.type,
         sourceBoardId: args.sourceBoardId,
@@ -1174,25 +1217,31 @@ export const removeUserFavorite = async (
     .where(
       and(
         eq(userBoardFavorites.userId, userId),
-        eq(userBoardFavorites.boardId, boardId)
-      )
+        eq(userBoardFavorites.boardId, boardId),
+      ),
     )
     .returning();
 };
 
 export const getByName = async (
-  db: dbClient, 
+  db: dbClient,
   name: string,
-  userId: string,
+  workspaceId: number,
+  ownerUserId: string,
 ) => {
   const result = await db
     .select()
     .from(boards)
-    .where(and(
-      eq(boards.name, name),
-      eq(boards.type, "regular"),
-      eq(boards.createdBy, userId),
-    ))
+    .where(
+      and(
+        eq(boards.name, name),
+        eq(boards.type, "regular"),
+        eq(boards.workspaceId, workspaceId),
+        eq(boards.ownerUserId, ownerUserId),
+        isNull(boards.deletedAt),
+        eq(boards.isArchived, false),
+      ),
+    )
     .limit(1);
 
   return result[0] ?? null;
@@ -1226,7 +1275,7 @@ export const getTemplateDefault = async (db: dbClient) => {
     where: and(
       eq(boards.type, "template"),
       eq(boards.isTemplateDefault, true),
-      isNull(boards.deletedAt)
+      isNull(boards.deletedAt),
     ),
   });
 

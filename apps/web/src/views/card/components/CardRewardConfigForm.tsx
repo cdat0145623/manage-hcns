@@ -1,6 +1,6 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { t } from "@lingui/macro";
-import { differenceInDays, format } from "date-fns";
+import { differenceInDays } from "date-fns";
 import { motion } from "framer-motion";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
@@ -32,11 +32,15 @@ import {
   invalidateCard,
   invalidateTaskInstance,
 } from "~/utils/cardInvalidation";
+import {
+  formatRewardDayMonth,
+  formatRewardDayMonthYear,
+} from "~/utils/rewardDates";
 import { CardRewardAdminReview } from "./CardRewardAdminReview";
 import { CardRewardFinalize } from "./CardRewardFinalize";
 import { CardRewardSummaryCard } from "./CardRewardSummaryCard";
 
-const DEFAULT_USD_TO_VND = 25400;
+
 
 interface RewardDeduction {
   id?: number;
@@ -44,7 +48,7 @@ interface RewardDeduction {
     | typeof REWARD_DEDUCTION_REASON.LATE
     | typeof REWARD_DEDUCTION_REASON.MOVE;
   unitType: "percent" | "vnd";
-  value: number;
+  value: number | null;
   displayOrder?: number;
 }
 
@@ -110,8 +114,8 @@ function buildDeductionPairFromRemote(
 
 interface RewardConfigFormValues {
   rewardType: "project" | "responsibility";
-  bonusAmount: number;
-  currency: "VND" | "USD";
+  bonusAmount: number | null;
+  currency: "VND";
   deductions: RewardDeduction[];
 }
 
@@ -242,7 +246,7 @@ export default function CardRewardConfigForm({
   ) => {
     const deductions = data.deductions.map((d, i) => ({
       ...d,
-      value: d.value.toString(),
+      value: (d.value ?? 0).toString(),
       displayOrder: i,
     }));
     const source = isTaskMasterTemplate
@@ -284,29 +288,7 @@ export default function CardRewardConfigForm({
     approveMutation.isPending ||
     rejectMutation.isPending;
 
-  const [exRate, setExRate] = React.useState(DEFAULT_USD_TO_VND);
-  const [isRateLoading, setIsRateLoading] = React.useState(false);
 
-  // Fetch real-time exchange rate
-  useEffect(() => {
-    const fetchRate = async () => {
-      setIsRateLoading(true);
-      try {
-        const res = await fetch(
-          "https://api.frankfurter.dev/latest?from=USD&to=VND",
-        );
-        const data = await res.json();
-        if (data?.rates?.VND) {
-          setExRate(data.rates.VND);
-        }
-      } catch (err) {
-        console.error("Failed to fetch exchange rate:", err);
-      } finally {
-        setIsRateLoading(false);
-      }
-    };
-    fetchRate();
-  }, []);
 
   // Define dynamic validation schema based on live rate
   const dynamicSchema = React.useMemo(() => {
@@ -318,13 +300,16 @@ export default function CardRewardConfigForm({
           REWARD_DEDUCTION_REASON.MOVE,
         ]),
         unitType: z.enum(["percent", "vnd"]),
-        value: z.number().min(0.01, t`Giá trị phải lớn hơn 0`),
+        value: z
+          .number()
+          .nullable()
+          .refine((v) => v !== null && v >= 0.01, t`Giá trị phải lớn hơn 0`),
         displayOrder: z.number().int().min(0).default(0),
       })
       .refine(
         (data) => {
           if (data.unitType === "percent") {
-            return data.value <= 100;
+            return (data.value ?? 0) <= 100;
           }
           return true;
         },
@@ -338,7 +323,7 @@ export default function CardRewardConfigForm({
       .object({
         rewardType: z.enum(["project", "responsibility"]),
         bonusAmount: z.number().optional().nullable(),
-        currency: z.string().length(3).default("VND"),
+        currency: z.literal("VND").default("VND"),
         deductions: z
           .array(deductionItemSchema)
           .length(2)
@@ -362,22 +347,14 @@ export default function CardRewardConfigForm({
       )
       .superRefine((data, ctx) => {
         if (data.rewardType === "project" && data.bonusAmount) {
-          const bonusInVnd =
-            data.currency === "USD"
-              ? data.bonusAmount * exRate
-              : data.bonusAmount;
+          const bonusInVnd = data.bonusAmount;
 
           data.deductions.forEach((item, index) => {
-            if (item.unitType === "vnd") {
+            if (item.unitType === "vnd" && item.value !== null) {
               if (item.value > bonusInVnd) {
-                const displayBonus = data.bonusAmount ?? 0;
-                const displayVnd = Math.round(bonusInVnd).toLocaleString();
                 ctx.addIssue({
                   code: z.ZodIssueCode.custom,
-                  message:
-                    data.currency === "USD"
-                      ? t`Khấu trừ vượt quá ${displayBonus}$ (~${displayVnd}đ)`
-                      : t`Khấu trừ không được lớn hơn tiền thưởng`,
+                  message: t`Khấu trừ không được lớn hơn tiền thưởng`,
                   path: ["deductions", index, "value"],
                 });
               }
@@ -385,7 +362,7 @@ export default function CardRewardConfigForm({
           });
         }
       });
-  }, [exRate]);
+  }, []);
 
   const {
     control,
@@ -399,9 +376,12 @@ export default function CardRewardConfigForm({
     resolver: zodResolver(dynamicSchema),
     defaultValues: {
       rewardType: "project",
-      bonusAmount: 0,
+      bonusAmount: null,
       currency: "VND",
-      deductions: [...DEFAULT_DEDUCTION_PAIR],
+      deductions: [...DEFAULT_DEDUCTION_PAIR].map((d) => ({
+        ...d,
+        value: null,
+      })),
     },
   });
 
@@ -426,6 +406,32 @@ export default function CardRewardConfigForm({
 
   const approvalStatus: RewardStatus =
     (remoteData?.approvalStatus as RewardStatus) || "draft";
+
+  /** Chỉ áp dụng khi gửi duyệt (không chặn lưu nháp). Card: đủ ngày bắt đầu/kết thúc + ít nhất một thành viên (hoặc targetUser). */
+  const rewardSubmitPrereqError = useMemo(() => {
+    if (isTaskMasterTemplate) return null;
+    if (cardPublicId && card == null) {
+      return t`Đang tải dữ liệu card. Vui lòng thử lại sau.`;
+    }
+    const source = card;
+    if (source == null) return null;
+
+    const hasSchedule = source.startDate != null && source.dueDate != null;
+    const hasMember =
+      (Array.isArray(source.members) && source.members.length > 0) ||
+      Boolean(source.targetUser);
+
+    if (!hasSchedule && !hasMember) {
+      return t`Vui lòng chọn ngày bắt đầu, ngày kết thúc và gán thành viên trên card trước khi gửi duyệt.`;
+    }
+    if (!hasSchedule) {
+      return t`Vui lòng chọn ngày bắt đầu và ngày kết thúc trên card trước khi gửi duyệt.`;
+    }
+    if (!hasMember) {
+      return t`Vui lòng gán ít nhất một thành viên cho card trước khi gửi duyệt.`;
+    }
+    return null;
+  }, [isTaskMasterTemplate, cardPublicId, card]);
 
   const dbSnapshot: any = (remoteData as any)?.snapshot;
 
@@ -466,8 +472,8 @@ export default function CardRewardConfigForm({
   const rewardType = watch("rewardType");
   const isProject = rewardType === "project";
 
-  const formatNumber = (val: number | string) => {
-    if (!val && val !== 0) return "";
+  const formatNumber = (val: number | string | null | undefined) => {
+    if (val === null || val === undefined || val === "") return "";
     const num =
       typeof val === "string" ? val.replace(/\D/g, "") : val.toString();
     if (!num) return "";
@@ -475,7 +481,9 @@ export default function CardRewardConfigForm({
   };
 
   const parseNumber = (val: string) => {
-    return Number(val.replace(/\D/g, "")) || 0;
+    const digits = val.replace(/\D/g, "");
+    if (digits === "") return null;
+    return Number(digits);
   };
 
   const handleWithdraw = async () => {
@@ -586,6 +594,14 @@ export default function CardRewardConfigForm({
 
   /** Lưu + gửi duyệt (validate form). Khác với chỉ lưu nháp. */
   const submitForApproval = async (data: RewardConfigFormValues) => {
+    if (rewardSubmitPrereqError) {
+      showPopup({
+        header: t`Thiếu thông tin`,
+        message: rewardSubmitPrereqError,
+        icon: "error",
+      });
+      return;
+    }
     try {
       const result = await upsertMutation.mutateAsync(
         buildUpsertPayload(data, "submit"),
@@ -947,11 +963,11 @@ export default function CardRewardConfigForm({
                 <HiCalendarDays className="h-4 w-4 shrink-0 text-neutral-400" />
                 <span>
                   {dbSnapshot?.snappedStartDate
-                    ? format(new Date(dbSnapshot.snappedStartDate), "MMM d")
+                    ? formatRewardDayMonth(dbSnapshot.snappedStartDate)
                     : "—"}{" "}
                   →{" "}
                   {dbSnapshot?.snappedDueDate
-                    ? format(new Date(dbSnapshot.snappedDueDate), "MMM d, yyyy")
+                    ? formatRewardDayMonthYear(dbSnapshot.snappedDueDate)
                     : "—"}
                 </span>
               </span>
@@ -976,13 +992,8 @@ export default function CardRewardConfigForm({
             </p>
             <div className="flex flex-wrap items-center gap-2 text-[12px] font-semibold text-neutral-800 dark:text-dark-800">
               <span>
-                {card?.startDate
-                  ? format(new Date(card.startDate), "MMM d")
-                  : "—"}{" "}
-                –{" "}
-                {card?.dueDate
-                  ? format(new Date(card.dueDate), "MMM d, yyyy")
-                  : "—"}
+                {card?.startDate ? formatRewardDayMonth(card.startDate) : "—"} –{" "}
+                {card?.dueDate ? formatRewardDayMonthYear(card.dueDate) : "—"}
               </span>
               {dbSnapshot?.snappedDueDate &&
                 card?.dueDate &&
@@ -1112,10 +1123,7 @@ export default function CardRewardConfigForm({
                     value={field.value}
                     onChange={field.onChange}
                     disabled={effectivelyReadOnly}
-                    options={[
-                      { value: "VND", label: "VND" },
-                      { value: "USD", label: "USD" },
-                    ]}
+                    options={[{ value: "VND", label: "VND" }]}
                     className="w-full"
                     buttonClassName="font-bold"
                   />
@@ -1216,56 +1224,65 @@ export default function CardRewardConfigForm({
         </div>
 
         {!effectivelyReadOnly && (
-          <div className="flex justify-end gap-3 border-t border-light-200 pt-4 dark:border-dark-300/50">
-            {(approvalStatus === "draft" || approvalStatus === "rejected") && (
-              <motion.button
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                type="button"
-                disabled={isMutating}
-                onClick={async () => {
-                  try {
-                    const data = getValues();
-                    const result = await upsertMutation.mutateAsync(
-                      buildUpsertPayload(data, "draft"),
-                    );
-                    showPopup({
-                      header: t`Thành công`,
-                      message: t`Đã lưu bản nháp`,
-                      icon: "success",
-                    });
-                    await refreshRewardState({ configId: result.configId });
-                  } catch (err: any) {
-                    showPopup({
-                      header: t`Lỗi`,
-                      message: err.message,
-                      icon: "error",
-                    });
-                  }
-                }}
-                className="rounded-xl border border-light-200 bg-white px-6 py-2.5 text-xs font-bold uppercase tracking-wider text-neutral-600 transition-all hover:bg-light-50 disabled:opacity-50 dark:border-dark-300 dark:bg-dark-100 dark:text-dark-700"
-              >
-                {isTaskMasterTemplate ? t`Lưu mẫu thưởng` : t`Lưu nháp`}
-              </motion.button>
+          <div className="flex flex-col gap-2 border-t border-light-200 pt-4 dark:border-dark-300/50">
+            {!isTaskMasterTemplate && rewardSubmitPrereqError && (
+              <p className="text-right text-[11px] font-medium text-amber-800 dark:text-amber-200/90">
+                {rewardSubmitPrereqError}
+              </p>
             )}
+            <div className="flex justify-end gap-3">
+              {(approvalStatus === "draft" ||
+                approvalStatus === "rejected") && (
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  type="button"
+                  disabled={isMutating}
+                  onClick={async () => {
+                    try {
+                      const data = getValues();
+                      const result = await upsertMutation.mutateAsync(
+                        buildUpsertPayload(data, "draft"),
+                      );
+                      showPopup({
+                        header: t`Thành công`,
+                        message: t`Đã lưu bản nháp`,
+                        icon: "success",
+                      });
+                      await refreshRewardState({ configId: result.configId });
+                    } catch (err: any) {
+                      showPopup({
+                        header: t`Lỗi`,
+                        message: err.message,
+                        icon: "error",
+                      });
+                    }
+                  }}
+                  className="rounded-xl border border-light-200 bg-white px-6 py-2.5 text-xs font-bold uppercase tracking-wider text-neutral-600 transition-all hover:bg-light-50 disabled:opacity-50 dark:border-dark-300 dark:bg-dark-100 dark:text-dark-700"
+                >
+                  {isTaskMasterTemplate ? t`Lưu mẫu thưởng` : t`Lưu nháp`}
+                </motion.button>
+              )}
 
-            {!isTaskMasterTemplate && (
-              <motion.button
-                whileHover={{ scale: 1.02, y: -1 }}
-                whileTap={{ scale: 0.98 }}
-                type="submit"
-                disabled={isMutating}
-                className="rounded-xl bg-emerald-500 px-6 py-2.5 text-xs font-bold uppercase tracking-wider text-white shadow-lg shadow-emerald-500/20 transition-all hover:bg-emerald-600 focus:outline-none focus:ring-[3px] focus:ring-emerald-500/30 disabled:opacity-50 dark:bg-emerald-600 dark:hover:bg-emerald-500"
-              >
-                {isMutating ? (
-                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                ) : approvalStatus === "rejected" ? (
-                  t`Lưu & Gửi lại`
-                ) : (
-                  t`Lưu & Gửi duyệt`
-                )}
-              </motion.button>
-            )}
+              {!isTaskMasterTemplate && (
+                <motion.button
+                  whileHover={{ scale: 1.02, y: -1 }}
+                  whileTap={{ scale: 0.98 }}
+                  type="submit"
+                  disabled={isMutating || Boolean(rewardSubmitPrereqError)}
+                  title={rewardSubmitPrereqError ?? undefined}
+                  className="rounded-xl bg-emerald-500 px-6 py-2.5 text-xs font-bold uppercase tracking-wider text-white shadow-lg shadow-emerald-500/20 transition-all hover:bg-emerald-600 focus:outline-none focus:ring-[3px] focus:ring-emerald-500/30 disabled:opacity-50 dark:bg-emerald-600 dark:hover:bg-emerald-500"
+                >
+                  {isMutating ? (
+                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                  ) : approvalStatus === "rejected" ? (
+                    t`Lưu & Gửi lại`
+                  ) : (
+                    t`Lưu & Gửi duyệt`
+                  )}
+                </motion.button>
+              )}
+            </div>
           </div>
         )}
       </form>

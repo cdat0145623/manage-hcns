@@ -1,20 +1,21 @@
 import { relations, sql } from "drizzle-orm";
 import {
   bigint,
+  boolean,
+  index,
   pgEnum,
   pgTable,
   text,
   timestamp,
+  unique,
+  uniqueIndex,
   uuid,
   varchar,
-  uniqueIndex,
-  unique,
-  index,
-  boolean,
 } from "drizzle-orm/pg-core";
-import { users } from "./users";
+
 import { cards } from "./cards";
 import { checklists } from "./checklists";
+import { users } from "./users";
 
 export const statusTypeEnum = pgEnum("statusType", [
   "pending",
@@ -33,7 +34,7 @@ export const frequence = pgTable("frequence", {
     .default(sql`uuid_generate_v4()`),
   name: varchar("name", { length: 255 }).notNull(),
   rruleString: text("rruleString"), // Ví dụ: 'FREQ=WEEKLY;BYDAY=MO'
-  dtStart: timestamp("dtStart"), // Ngày bắt đầu tính nhịp
+  dtStart: timestamp("dtStart", { withTimezone: true }), // Ngày bắt đầu tính nhịp
   createdAt: timestamp("createAt").notNull().defaultNow(),
   updatedAt: timestamp("updateAt").notNull().defaultNow(),
 });
@@ -47,8 +48,8 @@ export const taskMasters = pgTable("taskMasters", {
     .references(() => frequence.id),
   name: varchar("name", { length: 255 }),
   description: text("description"),
-  startDate: timestamp("startDate").notNull(),
-  endDate: timestamp("endDate").notNull(),
+  startDate: timestamp("startDate", { withTimezone: true }).notNull(),
+  endDate: timestamp("endDate", { withTimezone: true }).notNull(),
   targetUser: uuid("targetUser")
     .notNull()
     .references(() => users.id),
@@ -68,8 +69,8 @@ export const taskInstances = pgTable(
   "taskInstances",
   {
     id: uuid("id")
-    .primaryKey()
-    .default(sql`uuid_generate_v4()`),
+      .primaryKey()
+      .default(sql`uuid_generate_v4()`),
     userId: uuid("userId")
       .notNull()
       .references(() => users.id),
@@ -78,9 +79,9 @@ export const taskInstances = pgTable(
       .references(() => taskMasters.id),
     name: varchar("name", { length: 255 }),
     description: text("description"),
-    targetDate: timestamp("targetDate"),
-    actualDate: timestamp("actualDate"),
-    endDate: timestamp("endDate"),
+    targetDate: timestamp("targetDate", { withTimezone: true }),
+    actualDate: timestamp("actualDate", { withTimezone: true }),
+    endDate: timestamp("endDate", { withTimezone: true }),
     status: statusTypeEnum("status").notNull().default("pending"),
     isDeleted: boolean("isDeleted").notNull().default(false),
     createdAt: timestamp("createdAt").notNull().defaultNow(),
@@ -155,30 +156,36 @@ export const taskMasterRelations = relations(taskMasters, ({ one, many }) => ({
   instances: many(taskInstances),
 }));
 
-export const taskInstanceRelations = relations(taskInstances, ({ one, many }) => ({
-  user: one(users, {
-    fields: [taskInstances.userId],
-    references: [users.id],
+export const taskInstanceRelations = relations(
+  taskInstances,
+  ({ one, many }) => ({
+    user: one(users, {
+      fields: [taskInstances.userId],
+      references: [users.id],
+    }),
+    taskMaster: one(taskMasters, {
+      fields: [taskInstances.taskMasterId],
+      references: [taskMasters.id],
+    }),
+    fileActivities: many(fileActivityLog),
+    checklists: many(checklists),
   }),
-  taskMaster: one(taskMasters, {
-    fields: [taskInstances.taskMasterId],
-    references: [taskMasters.id],
-  }),
-  fileActivities: many(fileActivityLog),
-  checklists: many(checklists),
-}));
+);
 
-export const fileActivityLogRelations = relations(fileActivityLog, ({ one }) => ({
-  taskInstance: one(taskInstances, {
-    fields: [fileActivityLog.taskInstanceId],
-    references: [taskInstances.id],
+export const fileActivityLogRelations = relations(
+  fileActivityLog,
+  ({ one }) => ({
+    taskInstance: one(taskInstances, {
+      fields: [fileActivityLog.taskInstanceId],
+      references: [taskInstances.id],
+    }),
+    card: one(cards, {
+      fields: [fileActivityLog.cardId],
+      references: [cards.id],
+    }),
+    createdBy: one(users, {
+      fields: [fileActivityLog.createdBy],
+      references: [users.id],
+    }),
   }),
-  card: one(cards, {
-    fields: [fileActivityLog.cardId],
-    references: [cards.id],
-  }),
-  createdBy: one(users, {
-    fields: [fileActivityLog.createdBy],
-    references: [users.id],
-  }),
-}));
+);

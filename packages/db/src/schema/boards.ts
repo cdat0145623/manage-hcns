@@ -41,6 +41,9 @@ export const boards = pgTable(
     createdBy: uuid("createdBy").references(() => users.id, {
       onDelete: "set null",
     }),
+    ownerUserId: uuid("ownerUserId").references(() => users.id, {
+      onDelete: "set null",
+    }),
     createdAt: timestamp("createdAt").defaultNow().notNull(),
     updatedAt: timestamp("updatedAt"),
     deletedAt: timestamp("deletedAt"),
@@ -63,6 +66,7 @@ export const boards = pgTable(
     index("board_is_archived_idx").on(table.isArchived),
     index("board_visibility_idx").on(table.visibility),
     index("board_type_idx").on(table.type),
+    index("board_owner_user_idx").on(table.ownerUserId),
     index("board_source_idx").on(table.sourceBoardId),
     uniqueIndex("unique_slug_per_workspace")
       .on(table.workspaceId, table.slug)
@@ -76,6 +80,11 @@ export const boardsRelations = relations(boards, ({ one, many }) => ({
     fields: [boards.createdBy],
     references: [users.id],
     relationName: "boardCreatedByUser",
+  }),
+  owner: one(users, {
+    fields: [boards.ownerUserId],
+    references: [users.id],
+    relationName: "boardOwnerUser",
   }),
   lists: many(lists),
   allLists: many(lists),

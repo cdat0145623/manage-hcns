@@ -1116,8 +1116,8 @@ export const cardRouter = createTRPCRouter({
           type: activityType,
           cardId: result.id,
           createdBy: userId,
-          oldValue: previousStartDate?.toLocaleString(),
-          newValue: input.startDate?.toLocaleString(),
+          oldValue: previousStartDate?.toISOString(),
+          newValue: input.startDate?.toISOString(),
         });
       }
 

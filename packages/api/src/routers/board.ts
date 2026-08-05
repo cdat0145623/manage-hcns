@@ -7,6 +7,7 @@ import * as cardRepo from "@kan/db/repository/card.repo";
 import * as activityRepo from "@kan/db/repository/cardActivity.repo";
 import * as labelRepo from "@kan/db/repository/label.repo";
 import * as listRepo from "@kan/db/repository/list.repo";
+import * as permissionRepo from "@kan/db/repository/permission.repo";
 import * as userRepo from "@kan/db/repository/user.repo";
 import * as workspaceRepo from "@kan/db/repository/workspace.repo";
 import { colours } from "@kan/shared/constants";
@@ -82,7 +83,7 @@ export const boardRouter = createTRPCRouter({
         userId,
         user.role,
         {
-          type: input.type, 
+          type: input.type,
           archived: input.archived ?? false,
         },
       );
@@ -107,9 +108,7 @@ export const boardRouter = createTRPCRouter({
         archived: z.boolean().optional(),
       }),
     )
-    .output(
-      z.custom<Awaited<ReturnType<typeof boardRepo.getAllByUserId>>>(),
-    )
+    .output(z.custom<Awaited<ReturnType<typeof boardRepo.getAllByUserId>>>())
     .query(async ({ ctx, input }) => {
       const userId = ctx.user?.id;
 
@@ -372,6 +371,7 @@ export const boardRouter = createTRPCRouter({
         labels: z.array(z.string().min(1)),
         type: z.enum(["regular", "template"]).optional(),
         sourceBoardPublicId: z.string().min(12).optional(),
+        ownerUserId: z.string().uuid().optional(),
       }),
     )
     .output(z.custom<Awaited<ReturnType<typeof boardRepo.create>>>())
@@ -383,21 +383,6 @@ export const boardRouter = createTRPCRouter({
           message: `User not authenticated`,
           code: "UNAUTHORIZED",
         });
-
-      if (input.type === "regular") {
-        const existingBoard = await boardRepo.getByName(
-          ctx.db,
-          input.name,
-          userId,
-        );
-
-        if (existingBoard) {
-          throw new TRPCError({
-            message: `Board with name ${input.name} already exists`,
-            code: "BAD_REQUEST",
-          });
-        }
-      }
 
       const workspace = await workspaceRepo.getByPublicId(
         ctx.db,
@@ -411,6 +396,53 @@ export const boardRouter = createTRPCRouter({
         });
 
       await assertPermission(ctx.db, userId, workspace.id, "board:create");
+
+      const ownerUserId = input.ownerUserId ?? userId;
+
+      if (ownerUserId !== userId) {
+        const currentMember = await permissionRepo.getMemberWithRole(
+          ctx.db,
+          userId,
+          workspace.id,
+        );
+
+        if (!currentMember || currentMember.role !== "ADMIN") {
+          throw new TRPCError({
+            message:
+              "Only workspace admins can create a board for another user",
+            code: "FORBIDDEN",
+          });
+        }
+
+        const ownerMember = await permissionRepo.getMemberWithRole(
+          ctx.db,
+          ownerUserId,
+          workspace.id,
+        );
+
+        if (!ownerMember) {
+          throw new TRPCError({
+            message: "Board owner is not a member of this workspace",
+            code: "BAD_REQUEST",
+          });
+        }
+      }
+
+      if (input.type === "regular") {
+        const existingBoard = await boardRepo.getByName(
+          ctx.db,
+          input.name,
+          workspace.id,
+          ownerUserId,
+        );
+
+        if (existingBoard) {
+          throw new TRPCError({
+            message: `Board with name ${input.name} already exists for this user`,
+            code: "BAD_REQUEST",
+          });
+        }
+      }
 
       // If sourceBoardPublicId is provided, clone the source board
       if (input.sourceBoardPublicId) {
@@ -472,6 +504,7 @@ export const boardRouter = createTRPCRouter({
           source: sourceBoard,
           workspaceId: workspace.id,
           createdBy: userId,
+          ownerUserId,
           slug,
           name: input.name,
           type: input.type ?? "regular",
@@ -497,6 +530,7 @@ export const boardRouter = createTRPCRouter({
         slug,
         name: input.name,
         createdBy: userId,
+        ownerUserId,
         workspaceId: workspace.id,
         type: input.type,
       });
@@ -589,7 +623,7 @@ export const boardRouter = createTRPCRouter({
         userId,
         board.workspaceId,
         "board:edit",
-        board.createdBy ?? null,
+        board.ownerUserId ?? board.createdBy ?? null,
       );
 
       // Handle favorite toggle separately
@@ -629,9 +663,17 @@ export const boardRouter = createTRPCRouter({
       }
 
       if (input.name) {
-        const existingBoard = await boardRepo.getByName(ctx.db, input.name, board.createdBy!);
+        const ownerUserId = board.ownerUserId ?? board.createdBy;
+        const existingBoard = ownerUserId
+          ? await boardRepo.getByName(
+              ctx.db,
+              input.name,
+              board.workspaceId,
+              ownerUserId,
+            )
+          : null;
 
-        if (existingBoard)
+        if (existingBoard && existingBoard.publicId !== input.boardPublicId)
           throw new TRPCError({
             message: `Board with name ${input.name} already exists`,
             code: "BAD_REQUEST",
@@ -696,7 +738,7 @@ export const boardRouter = createTRPCRouter({
         userId,
         board.workspaceId,
         "board:delete",
-        board.createdBy ?? null,
+        board.ownerUserId ?? board.createdBy ?? null,
       );
 
       const listIds = board.lists.map((list) => list.id);
@@ -900,7 +942,9 @@ export const boardRouter = createTRPCRouter({
         protect: false,
       },
     })
-    .output(z.custom<Awaited<ReturnType<typeof boardRepo.getTemplateDefault>>>())
+    .output(
+      z.custom<Awaited<ReturnType<typeof boardRepo.getTemplateDefault>>>(),
+    )
     .query(async ({ ctx }) => {
       const result = await boardRepo.getTemplateDefault(ctx.db);
       return result;
@@ -922,7 +966,9 @@ export const boardRouter = createTRPCRouter({
         isTemplateDefault: z.boolean(),
       }),
     )
-    .output(z.custom<Awaited<ReturnType<typeof boardRepo.setTemplateDefault>>>())
+    .output(
+      z.custom<Awaited<ReturnType<typeof boardRepo.setTemplateDefault>>>(),
+    )
     .mutation(async ({ ctx, input }) => {
       const userId = ctx.user?.id;
 

@@ -3,17 +3,16 @@ import Link from "next/link";
 import { useRouter } from "next/router";
 import { Button } from "@headlessui/react";
 import { t } from "@lingui/core/macro";
+import { endOfMonth, startOfMonth } from "date-fns";
 import { env } from "next-runtime-env";
 import { useTheme } from "next-themes";
-import { useEffect, useState } from "react";
-import { HiBolt } from "react-icons/hi2";
+import { memo, useEffect, useState } from "react";
+import { HiBolt, HiOutlineInformationCircle } from "react-icons/hi2";
 import {
   TbLayoutSidebarLeftCollapse,
   TbLayoutSidebarLeftExpand,
 } from "react-icons/tb";
-import { startOfMonth, endOfMonth } from "date-fns";
 import { twMerge } from "tailwind-merge";
-import { memo } from "react";
 
 import type { Subscription } from "@kan/shared/utils";
 import { hasActiveSubscription } from "@kan/shared/utils";
@@ -33,6 +32,7 @@ import ButtonComponent from "~/components/Button";
 import ReactiveButton from "~/components/ReactiveButton";
 import UserMenu from "~/components/UserMenu";
 import WorkspaceMenu from "~/components/WorkspaceMenu";
+import { APP_VERSION } from "~/data/changelog";
 import { useModal } from "~/providers/modal";
 import { useWorkspace } from "~/providers/workspace";
 import { api } from "~/utils/api";
@@ -63,7 +63,10 @@ function SideNavigation({
 
   const { data: workspaceData } = api.workspace.byId.useQuery(
     { workspacePublicId: workspace.publicId },
-    { enabled: hasLoaded && !!workspace.publicId && workspace.publicId.length >= 12 },
+    {
+      enabled:
+        hasLoaded && !!workspace.publicId && workspace.publicId.length >= 12,
+    },
   );
 
   const utils = api.useUtils();
@@ -126,7 +129,6 @@ function SideNavigation({
         group: "NAVIGATION",
         description: t`Go to boards`,
       },
-
     },
     {
       name: "Lịch",
@@ -204,7 +206,7 @@ function SideNavigation({
           description: t`Go to settings`,
         },
       },
-    )
+    );
   }
 
   const toggleCollapse = () => {
@@ -261,14 +263,21 @@ function SideNavigation({
                       void utils.taskInstance.getVirtual.prefetch({
                         from: startOfMonth(now),
                         to: endOfMonth(now),
-                        targetUser: currentUser?.role === "ADMIN" ? undefined : currentUser?.id,
+                        targetUser:
+                          currentUser?.role === "ADMIN"
+                            ? undefined
+                            : currentUser?.id,
                       });
                     } else if (item.href === "/boards") {
                       void utils.workspace.all.prefetch();
                     } else if (item.href === "/reports") {
-                      if (hasLoaded && workspace.publicId && workspace.publicId.length >= 12) {
-                        void utils.workspace.byId.prefetch({ 
-                          workspacePublicId: workspace.publicId 
+                      if (
+                        hasLoaded &&
+                        workspace.publicId &&
+                        workspace.publicId.length >= 12
+                      ) {
+                        void utils.workspace.byId.prefetch({
+                          workspacePublicId: workspace.publicId,
                         });
                       }
                     }
@@ -315,6 +324,25 @@ function SideNavigation({
                 )}
               </div>
             )}
+          <Link
+            href="/changelog"
+            onClick={onCloseSideNav}
+            title={t`Xem lịch sử cập nhật`}
+            className={twMerge(
+              "flex w-full items-center rounded-md px-3 py-2 text-xs text-light-900 transition-colors hover:bg-light-200 dark:text-dark-900 dark:hover:bg-dark-200",
+              isCollapsed && "justify-center px-2",
+            )}
+          >
+            <HiOutlineInformationCircle
+              className="h-4 w-4 shrink-0"
+              aria-hidden="true"
+            />
+            {!isCollapsed && (
+              <span className="ml-2 truncate">
+                {t`Phiên bản`} v{APP_VERSION}
+              </span>
+            )}
+          </Link>
         </div>
       </nav>
     </>

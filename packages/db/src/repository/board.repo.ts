@@ -27,7 +27,6 @@ import {
   labels,
   lists,
   userBoardFavorites,
-  users,
   workspaceMembers,
 } from "@kan/db/schema";
 import { generateUID } from "@kan/shared/utils";
@@ -104,11 +103,16 @@ export const getAllByUserId = async (
           name: true,
         },
       },
+      owner: {
+        columns: {
+          name: true,
+        },
+      },
     },
     where: and(
       eq(boards.workspaceId, workspaceId),
       isNull(boards.deletedAt),
-      eq(boards.createdBy, userId),
+      eq(boards.ownerUserId, userId),
       opts?.archived !== undefined
         ? eq(boards.isArchived, opts.archived)
         : undefined,
@@ -171,15 +175,20 @@ export const getAllByWorkspaceId = async (
           name: true,
         },
       },
+      owner: {
+        columns: {
+          name: true,
+        },
+      },
     },
     where: and(
       eq(boards.workspaceId, workspaceId),
       isNull(boards.deletedAt),
-      // Regular boards: non-admins only see boards they created. Template boards are shared
+      // Regular boards: non-admins only see boards they own. Template boards are shared
       // workspace samples (list is gated by board:view on the API); do not filter by creator.
       userRole === "ADMIN" || opts?.type === "template"
         ? undefined
-        : eq(boards.createdBy, userId),
+        : eq(boards.ownerUserId, userId),
       opts?.type ? eq(boards.type, opts.type) : undefined,
       opts?.archived !== undefined
         ? eq(boards.isArchived, opts.archived)
@@ -309,6 +318,12 @@ export const getByPublicId = async (
     with: {
       user: {
         columns: {
+          name: true,
+        },
+      },
+      owner: {
+        columns: {
+          id: true,
           name: true,
         },
       },
@@ -477,8 +492,18 @@ export const getByPublicId = async (
 
   if (!board) return null;
 
+  const ownerMemberPublicId = board.owner?.id
+    ? board.workspace?.members.find(
+        (member) => member.user?.id === board.owner?.id,
+      )?.publicId
+    : undefined;
+
+  const owner = board.owner ? { name: board.owner.name } : board.owner;
+
   const formattedResult = {
     ...board,
+    owner,
+    ownerMemberPublicId,
     favorite: board.userFavorites.length > 0,
     userFavorites: undefined,
     isTemplateDefault: board.isTemplateDefault,
@@ -723,6 +748,7 @@ export const getWithListIdsByPublicId = (
       id: true,
       workspaceId: true,
       createdBy: true,
+      ownerUserId: true,
     },
     with: {
       lists: {
@@ -764,6 +790,7 @@ export const create = async (
     publicId?: string;
     name: string;
     createdBy: string;
+    ownerUserId?: string | null;
     workspaceId: number;
     importId?: number;
     slug: string;
@@ -777,6 +804,7 @@ export const create = async (
       publicId: boardInput.publicId ?? generateUID(),
       name: boardInput.name,
       createdBy: boardInput.createdBy,
+      ownerUserId: boardInput.ownerUserId ?? boardInput.createdBy,
       workspaceId: boardInput.workspaceId,
       importId: boardInput.importId,
       slug: boardInput.slug,
@@ -909,6 +937,7 @@ export const getWorkspaceAndBoardIdByBoardPublicId = async (
       id: true,
       workspaceId: true,
       createdBy: true,
+      ownerUserId: true,
     },
     where: eq(boards.publicId, boardPublicId),
   });
@@ -970,6 +999,7 @@ export const createFromSnapshot = async (
     };
     workspaceId: number;
     createdBy: string;
+    ownerUserId?: string | null;
     slug: string;
     name?: string;
     type: "regular" | "template";
@@ -984,6 +1014,7 @@ export const createFromSnapshot = async (
         name: args.name ?? args.source.name,
         slug: args.slug,
         createdBy: args.createdBy,
+        ownerUserId: args.ownerUserId ?? args.createdBy,
         workspaceId: args.workspaceId,
         type: args.type,
         sourceBoardId: args.sourceBoardId,
@@ -1192,7 +1223,12 @@ export const removeUserFavorite = async (
     .returning();
 };
 
-export const getByName = async (db: dbClient, name: string, userId: string) => {
+export const getByName = async (
+  db: dbClient,
+  name: string,
+  workspaceId: number,
+  ownerUserId: string,
+) => {
   const result = await db
     .select()
     .from(boards)
@@ -1200,7 +1236,10 @@ export const getByName = async (db: dbClient, name: string, userId: string) => {
       and(
         eq(boards.name, name),
         eq(boards.type, "regular"),
-        eq(boards.createdBy, userId),
+        eq(boards.workspaceId, workspaceId),
+        eq(boards.ownerUserId, ownerUserId),
+        isNull(boards.deletedAt),
+        eq(boards.isArchived, false),
       ),
     )
     .limit(1);

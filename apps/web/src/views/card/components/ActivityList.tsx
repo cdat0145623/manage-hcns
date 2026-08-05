@@ -1,7 +1,7 @@
 import type { Locale as DateFnsLocale } from "date-fns";
 import { t } from "@lingui/core/macro";
 import { Trans } from "@lingui/react/macro";
-import { format, formatDistanceToNow } from "date-fns";
+import { formatDistanceToNow, isValid } from "date-fns";
 import { useEffect, useRef, useState } from "react";
 import {
   HiChevronDoubleDown,
@@ -45,6 +45,12 @@ type ActivityWithMergedLabels =
 const truncate = (value: string | null, maxLength = 50) => {
   if (!value) return value;
   return value.length > maxLength ? `${value.slice(0, maxLength - 1)}…` : value;
+};
+
+const toValidDate = (value: Date | string | number | null | undefined) => {
+  if (value == null) return null;
+  const date = value instanceof Date ? value : new Date(value);
+  return isValid(date) ? date : null;
 };
 
 export const getUserDisplayName = (
@@ -320,11 +326,14 @@ export const getActivityText = ({
     (type === "deadline_added" ||
       type === "deadline_changed" ||
       type === "deadline_removed") &&
-    toDueDate
+    toValidDate(toDueDate)
   ) {
-    const showYear = !isSameCalendarYearInAppZone(toDueDate, new Date());
+    const validDueDate = toValidDate(toDueDate);
+    if (!validDueDate) return baseText;
+
+    const showYear = !isSameCalendarYearInAppZone(validDueDate, new Date());
     const formattedDate = formatInAppCalendarZone(
-      toDueDate,
+      validDueDate,
       showYear ? "HH:mm do MMM yyyy" : "HH:mm do MMM",
       { locale: dateLocale },
     );
@@ -339,11 +348,14 @@ export const getActivityText = ({
     (type === "start_date_added" ||
       type === "start_date_changed" ||
       type === "start_date_removed") &&
-    newValue
+    toValidDate(newValue)
   ) {
-    const showYear = !isSameCalendarYearInAppZone(newValue, new Date());
+    const validStartDate = toValidDate(newValue);
+    if (!validStartDate) return baseText;
+
+    const showYear = !isSameCalendarYearInAppZone(validStartDate, new Date());
     const formattedDate = formatInAppCalendarZone(
-      newValue,
+      validStartDate,
       showYear ? "HH:mm do MMM yyyy" : "HH:mm do MMM",
       { locale: dateLocale },
     );
@@ -677,9 +689,11 @@ const ActivityList = ({
           })
           .sort(
             (a, b) =>
-              new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+              (toValidDate(a.createdAt)?.getTime() ?? 0) -
+              (toValidDate(b.createdAt)?.getTime() ?? 0),
           )
           .map((activity, index) => {
+            const createdAt = toValidDate(activity.createdAt);
             const activityText = getActivityText({
               type: activity.type,
               toTitle: activity.toTitle,
@@ -704,7 +718,8 @@ const ActivityList = ({
             if (
               activity.type === "comment" ||
               activity.type === "updated_comment_added"
-            )
+            ) {
+              if (!createdAt) return null;
               return (
                 <Comment
                   key={activity.publicId}
@@ -715,7 +730,7 @@ const ActivityList = ({
                   email={activity.user?.email ?? ""}
                   image={activity.user?.image ?? null}
                   isLoading={isLoading}
-                  createdAt={fixServerDate(activity.createdAt).toISOString()}
+                  createdAt={fixServerDate(createdAt).toISOString()}
                   comment={activity.comment?.comment}
                   isEdited={!!activity.comment?.updatedAt}
                   isAuthor={
@@ -724,8 +739,10 @@ const ActivityList = ({
                   isViewOnly={!!isViewOnly}
                 />
               );
+            }
 
             if (!activityText) return null;
+            if (!createdAt) return null;
 
             return (
               <div
@@ -760,7 +777,7 @@ const ActivityList = ({
                     ·
                   </span>
                   <span className="space-x-1 text-light-900 dark:text-dark-800">
-                    {formatDistanceToNow(fixServerDate(activity.createdAt), {
+                    {formatDistanceToNow(fixServerDate(createdAt), {
                       addSuffix: true,
                       locale: dateLocale,
                     })}

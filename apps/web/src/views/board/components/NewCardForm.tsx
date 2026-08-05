@@ -1,6 +1,6 @@
 import { t } from "@lingui/core/macro";
 import { Trans } from "@lingui/react/macro";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import {
   HiOutlineBarsArrowDown,
@@ -94,6 +94,7 @@ export function NewCardForm({
   const description = watch("description");
   const dueDate = watch("dueDate");
   const [isDateSelectorOpen, setIsDateSelectorOpen] = useState(false);
+  const hasInitializedOwner = useRef(false);
 
   // saving form state whenever form values change
   useEffect(() => {
@@ -106,6 +107,19 @@ export function NewCardForm({
   const { data: boardData } = api.board.byId.useQuery(queryParams, {
     enabled: !!boardPublicId,
   });
+
+  useEffect(() => {
+    const ownerMemberPublicId = boardData?.ownerMemberPublicId;
+
+    if (
+      !hasInitializedOwner.current &&
+      ownerMemberPublicId &&
+      memberPublicIds.length === 0
+    ) {
+      setValue("memberPublicIds", [ownerMemberPublicId]);
+      hasInitializedOwner.current = true;
+    }
+  }, [boardData?.ownerMemberPublicId, memberPublicIds.length, setValue]);
 
   // this adds the new created label to selected labels
   useEffect(() => {
@@ -510,7 +524,7 @@ export function NewCardForm({
                   onClick={() => setIsDateSelectorOpen(false)}
                 />
                 <div
-                  className="absolute left-0 top-full z-20 mt-2 rounded-md border border-light-200 bg-light-50 shadow-lg dark:border-dark-200 dark:bg-dark-100"
+                  className="absolute left-0 top-full z-20 mt-2 w-64 rounded-md border border-light-200 bg-light-50 p-3 shadow-lg dark:border-dark-200 dark:bg-dark-100"
                   onClick={(e) => {
                     e.stopPropagation();
                   }}

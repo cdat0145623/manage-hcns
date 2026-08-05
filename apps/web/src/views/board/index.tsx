@@ -540,7 +540,7 @@ export default function BoardPage({ isTemplate }: { isTemplate?: boolean }) {
               onSubmit={handleSubmit(onSubmit)}
               className="order-2 focus-visible:outline-none md:order-1"
             >
-              {boardData.user?.name}
+              {boardData.owner?.name ?? boardData.user?.name}
               <input
                 id="name"
                 type="text"

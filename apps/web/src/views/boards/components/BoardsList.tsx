@@ -216,10 +216,10 @@ export function BoardsList({
 
               <div
                 className="flex w-full flex-col px-8 text-center"
-                title={`${board.user?.name} - ${board.name}`}
+                title={`${board.owner?.name ?? board.user?.name} - ${board.name}`}
               >
                 <span className="mb-0.5 w-full truncate text-[11px] font-semibold uppercase tracking-wider text-neutral-500 dark:text-neutral-400">
-                  {board.user?.name}
+                  {board.owner?.name ?? board.user?.name}
                 </span>
                 <span className="w-full truncate text-[15px] font-bold text-neutral-800 dark:text-neutral-100">
                   {board.name}

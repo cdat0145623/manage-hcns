@@ -1,9 +1,11 @@
 import { useRouter } from "next/navigation";
+import { Listbox, Transition } from "@headlessui/react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { t } from "@lingui/core/macro";
-import { useEffect, useState, Fragment } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
-import { HiXMark, HiChevronDown } from "react-icons/hi2";
+import { HiChevronDown, HiXMark } from "react-icons/hi2";
+import { twMerge } from "tailwind-merge";
 import { z } from "zod";
 
 import type { Template } from "./TemplateBoards";
@@ -15,8 +17,6 @@ import { usePopup } from "~/providers/popup";
 import { useWorkspace } from "~/providers/workspace";
 import { api } from "~/utils/api";
 import TemplateBoards from "./TemplateBoards";
-import { Listbox, Transition } from "@headlessui/react";
-import { twMerge } from "tailwind-merge";
 
 const schema = z.object({
   name: z
@@ -39,61 +39,67 @@ export const getTemplates = (): Template[] => [
     name: t`Basic template`,
     lists: [t`To Do`, t`In Progress`, t`Done`],
     labels: [t`High Priority`, t`Medium Priority`, t`Low Priority`],
-  }
+  },
 ];
 
 export const listNames = [
   {
-    name:"Tháng 1",
-    id:1
+    name: "Tháng 1",
+    id: 1,
   },
   {
-    name:"Tháng 2",
-    id:2
+    name: "Tháng 2",
+    id: 2,
   },
   {
-    name:"Tháng 3",
-    id:3
+    name: "Tháng 3",
+    id: 3,
   },
   {
-    name:"Tháng 4",
-    id:4
+    name: "Tháng 4",
+    id: 4,
   },
   {
-    name:"Tháng 5",
-    id:5
+    name: "Tháng 5",
+    id: 5,
   },
   {
-    name:"Tháng 6",
-    id:6
+    name: "Tháng 6",
+    id: 6,
   },
   {
-    name:"Tháng 7",
-    id:7
+    name: "Tháng 7",
+    id: 7,
   },
   {
-    name:"Tháng 8",
-    id:8
+    name: "Tháng 8",
+    id: 8,
   },
   {
-    name:"Tháng 9",
-    id:9
+    name: "Tháng 9",
+    id: 9,
   },
   {
-    name:"Tháng 10",
-    id:10
+    name: "Tháng 10",
+    id: 10,
   },
   {
-    name:"Tháng 11",
-    id:11
+    name: "Tháng 11",
+    id: 11,
   },
   {
-    name:"Tháng 12",
-    id:12
+    name: "Tháng 12",
+    id: 12,
   },
-]
+];
 
-export function NewBoardForm({ isTemplate }: { isTemplate?: boolean }) {
+export function NewBoardForm({
+  isTemplate,
+  ownerUserId,
+}: {
+  isTemplate?: boolean;
+  ownerUserId?: string;
+}) {
   const utils = api.useUtils();
   const { closeModal } = useModal();
   const router = useRouter();
@@ -137,14 +143,19 @@ export function NewBoardForm({ isTemplate }: { isTemplate?: boolean }) {
 
   const currentMonth = new Date().getMonth() + 1; // getMonth() trả về 0-11
   const [selectedMonth, setSelectedMonth] = useState(
-    listNames.find((m) => m.id === currentMonth) ?? listNames[0]!
+    listNames.find((m) => m.id === currentMonth) ?? listNames[0]!,
   );
 
   useEffect(() => {
     setValue("name", `${selectedMonth.name}`);
   }, [selectedMonth]);
 
-  const refetchBoards = () => utils.board.all.refetch();
+  const refetchBoards = async () => {
+    await Promise.all([
+      utils.board.all.invalidate(),
+      utils.board.allByUserId.invalidate(),
+    ]);
+  };
 
   const createBoard = api.board.create.useMutation({
     onSuccess: async (board) => {
@@ -196,6 +207,7 @@ export function NewBoardForm({ isTemplate }: { isTemplate?: boolean }) {
       lists: data.template?.lists ?? [],
       labels: data.template?.labels ?? [],
       type: isTemplate ? "template" : "regular",
+      ownerUserId: !isTemplate ? ownerUserId : undefined,
     });
   };
 
@@ -230,7 +242,8 @@ export function NewBoardForm({ isTemplate }: { isTemplate?: boolean }) {
         >
           <div className="relative">
             <Listbox.Button className="relative flex w-full items-center gap-2.5 rounded-xl border border-neutral-200 bg-white py-2.5 pl-3.5 pr-9 text-left text-[13px] text-neutral-900 shadow-sm transition-all hover:border-indigo-300 hover:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/10 dark:border-neutral-700 dark:bg-neutral-800 dark:text-white dark:hover:border-neutral-600 dark:hover:bg-neutral-800/80">
-              <span>{selectedMonth.name}</span>  {/* Hiển thị tên tháng hiện tại */}
+              <span>{selectedMonth.name}</span>{" "}
+              {/* Hiển thị tên tháng hiện tại */}
               <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2.5">
                 <HiChevronDown className="h-3.5 w-3.5 text-neutral-400" />
               </span>

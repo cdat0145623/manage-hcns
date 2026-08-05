@@ -127,7 +127,9 @@ const DateSelector = ({
               "flex aspect-square items-center justify-center rounded-lg focus:z-10",
               day.isSelected
                 ? "bg-light-1000 hover:bg-light-1000 dark:bg-dark-1000 dark:hover:bg-dark-1000"
-                : "bg-transparent hover:bg-light-200 dark:bg-transparent dark:hover:bg-dark-200",
+                : day.isToday
+                  ? "bg-light-200/70 hover:bg-light-300/70 dark:bg-dark-200/70 dark:hover:bg-dark-300/70"
+                  : "bg-transparent hover:bg-light-200 dark:bg-transparent dark:hover:bg-dark-200",
             )}
           >
             <time

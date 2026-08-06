@@ -65,6 +65,7 @@ export default function SearchableSelect({
           <ComboboxInput
             className={`relative w-full cursor-pointer rounded-xl border border-light-200 bg-white py-2.5 pl-4 pr-10 text-left text-sm font-medium outline-none transition-all placeholder:text-neutral-400 hover:border-emerald-500/50 focus:border-emerald-500 focus:ring-[3px] focus:ring-emerald-500/10 disabled:cursor-not-allowed disabled:opacity-50 dark:border-dark-300/50 dark:bg-dark-200 dark:text-white dark:placeholder:text-dark-600 dark:focus:border-emerald-500/50 ${buttonClassName}`}
             displayValue={(option: Option | null) => option?.label ?? ""}
+            onFocus={() => setQuery("")}
             onChange={(event) => setQuery(event.target.value)}
             placeholder={selected ? searchPlaceholder : placeholder}
             aria-label={placeholder}

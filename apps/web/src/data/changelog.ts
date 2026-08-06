@@ -24,6 +24,7 @@ export const CHANGELOG_ENTRIES: ChangelogEntry[] = [
         items: [
           "Hỗ trợ phân quyền owner riêng cho board trong workspace.",
           "Admin có thể tạo board cho thành viên khác và tìm kiếm người dùng khi chọn owner.",
+          "Xem trước file PDF và Markdown trực tiếp trong card.",
         ],
       },
       {

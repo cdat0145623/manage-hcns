@@ -11,12 +11,14 @@ import {
   HiCodeBracket,
   HiDocument,
   HiDocumentText,
+  HiEye,
   HiFilm,
   HiOutlineTrash,
   HiPencil,
   HiPhoto,
   HiXMark,
 } from "react-icons/hi2";
+import ReactMarkdown from "react-markdown";
 
 import { usePopup } from "~/providers/popup";
 import { api } from "~/utils/api";
@@ -82,6 +84,9 @@ export function AttachmentThumbnails({
     ) ?? [];
 
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
+  const [previewAttachment, setPreviewAttachment] = useState<Attachment | null>(
+    null,
+  );
 
   const deleteAttachment = api.attachment.delete.useMutation({
     onMutate: async (args) => {
@@ -193,6 +198,11 @@ export function AttachmentThumbnails({
     link.click();
   };
 
+  const isPreviewable = (attachment: Attachment) =>
+    attachment.mimeType === "application/pdf" ||
+    attachment.mimeType === "text/markdown" ||
+    attachment.fileName.toLowerCase().endsWith(".md");
+
   const selectedAttachment =
     selectedIndex !== null ? imageAttachments[selectedIndex] : null;
 
@@ -232,6 +242,11 @@ export function AttachmentThumbnails({
                 taskInstanceId={taskInstanceId}
                 isReadOnly={isReadOnly}
                 onDownload={() => handleDownload(attachment)}
+                onPreview={
+                  isPreviewable(attachment)
+                    ? () => setPreviewAttachment(attachment)
+                    : undefined
+                }
                 onDelete={
                   isReadOnly
                     ? undefined
@@ -403,7 +418,106 @@ export function AttachmentThumbnails({
           </div>
         </Dialog>
       </Transition.Root>
+
+      <AttachmentPreviewModal
+        attachment={previewAttachment}
+        onClose={() => setPreviewAttachment(null)}
+      />
     </>
+  );
+}
+
+function AttachmentPreviewModal({
+  attachment,
+  onClose,
+}: {
+  attachment: Attachment | null;
+  onClose: () => void;
+}) {
+  const [markdown, setMarkdown] = useState<string | null>(null);
+  const [error, setError] = useState(false);
+  const isMarkdown =
+    attachment?.mimeType === "text/markdown" ||
+    attachment?.fileName.toLowerCase().endsWith(".md");
+
+  useEffect(() => {
+    if (!attachment || !isMarkdown) {
+      setMarkdown(null);
+      setError(false);
+      return;
+    }
+
+    const controller = new AbortController();
+    const url = getAttachmentUrl(attachment.newFileUrl);
+
+    void fetch(url, { signal: controller.signal })
+      .then((response) => {
+        if (!response.ok) throw new Error("Failed to load markdown");
+        return response.text();
+      })
+      .then(setMarkdown)
+      .catch((fetchError: unknown) => {
+        if (
+          fetchError instanceof DOMException &&
+          fetchError.name === "AbortError"
+        )
+          return;
+        setError(true);
+      });
+
+    return () => controller.abort();
+  }, [attachment, isMarkdown]);
+
+  if (!attachment) return null;
+
+  const previewBaseUrl = getAttachmentUrl(attachment.newFileUrl);
+  const previewUrl = `${previewBaseUrl}${previewBaseUrl.includes("?") ? "&" : "?"}inline=true`;
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+      onClick={onClose}
+    >
+      <div
+        className="flex h-[90vh] w-full max-w-5xl flex-col overflow-hidden rounded-xl bg-white dark:bg-dark-100"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="flex items-center justify-between border-b border-light-200 px-4 py-3 dark:border-dark-300">
+          <span className="truncate text-sm font-semibold">
+            {attachment.fileName}
+          </span>
+          <button
+            onClick={onClose}
+            className="rounded px-2 py-1 text-lg hover:bg-light-100 dark:hover:bg-dark-200"
+            aria-label="Close preview"
+          >
+            <HiXMark className="h-5 w-5" />
+          </button>
+        </div>
+
+        <div className="min-h-0 flex-1 overflow-auto">
+          {isMarkdown ? (
+            error ? (
+              <p className="p-6 text-sm text-red-500">
+                Unable to load this Markdown file.
+              </p>
+            ) : markdown === null ? (
+              <p className="p-6 text-sm text-light-600">Loading…</p>
+            ) : (
+              <article className="prose prose-sm dark:prose-invert max-w-none p-6">
+                <ReactMarkdown>{markdown}</ReactMarkdown>
+              </article>
+            )
+          ) : (
+            <iframe
+              title={attachment.fileName}
+              src={previewUrl}
+              className="h-full min-h-[70vh] w-full"
+            />
+          )}
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -456,6 +570,7 @@ function FileListItem({
   taskInstanceId,
   isReadOnly,
   onDownload,
+  onPreview,
   onDelete,
 }: {
   attachment: Attachment;
@@ -463,6 +578,7 @@ function FileListItem({
   taskInstanceId?: string;
   isReadOnly?: boolean;
   onDownload: () => void;
+  onPreview?: () => void;
   onDelete?: () => void;
 }) {
   const Icon = getFileIcon(attachment.mimeType);
@@ -577,6 +693,18 @@ function FileListItem({
           <span className="text-[10px]">{formattedDate}</span>
         </div>
         <div className="flex items-center gap-1">
+          {onPreview && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onPreview();
+              }}
+              className="flex-shrink-0 rounded-full bg-light-100 p-1.5 text-light-1000 transition-colors hover:bg-light-200 focus:outline-none dark:bg-dark-100 dark:text-dark-950 dark:hover:bg-dark-300"
+              aria-label={`Preview ${attachment.fileName}`}
+            >
+              <HiEye className="h-4 w-4" />
+            </button>
+          )}
           <button
             onClick={(e) => {
               e.stopPropagation();

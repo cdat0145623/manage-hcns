@@ -29,10 +29,7 @@ make build
 echo "Pushing release tag: $RELEASE_TAG"
 make push "TAG=$RELEASE_TAG"
 
-echo "Updating latest tag..."
-make push TAG=latest
-
-echo "Deploying latest..."
-make deploy TAG=latest
+echo "Deploying release tag: $RELEASE_TAG"
+make deploy "TAG=$RELEASE_TAG"
 
 echo "Deployment completed successfully."

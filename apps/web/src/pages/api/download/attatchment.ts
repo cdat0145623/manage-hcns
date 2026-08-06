@@ -33,7 +33,8 @@ export default withRateLimit(
       return res.status(405).json({ message: "Method not allowed" });
     }
 
-    const { url, filename, bucket: bucketParam } = req.query;
+    const { url, filename, bucket: bucketParam, inline } = req.query;
+    const disposition = inline === "true" ? "inline" : "attachment";
 
     if (!url || typeof url !== "string") {
       return res.status(400).json({ message: "url parameter is required" });
@@ -72,7 +73,7 @@ export default withRateLimit(
 
         res.setHeader(
           "Content-Disposition",
-          `attachment; filename="${downloadFilename}"; filename*=UTF-8''${downloadFilename}`,
+          `${disposition}; filename="${downloadFilename}"; filename*=UTF-8''${downloadFilename}`,
         );
         res.setHeader("Content-Length", stat.size);
 
@@ -135,7 +136,7 @@ export default withRateLimit(
         res.setHeader("Content-Type", contentType);
         res.setHeader(
           "Content-Disposition",
-          `attachment; filename="${downloadFilename}"; filename*=UTF-8''${downloadFilename}`,
+          `${disposition}; filename="${downloadFilename}"; filename*=UTF-8''${downloadFilename}`,
         );
 
         // Convert web stream to buffer and send (Next.js standalone doesn't support pipe)
@@ -190,7 +191,7 @@ export default withRateLimit(
       res.setHeader("Content-Type", contentType);
       res.setHeader(
         "Content-Disposition",
-        `attachment; filename="${downloadFilename}"; filename*=UTF-8''${downloadFilename}`,
+        `${disposition}; filename="${downloadFilename}"; filename*=UTF-8''${downloadFilename}`,
       );
 
       const buffer = await upstream.arrayBuffer();

@@ -1,242 +1,223 @@
-![github-background](https://github.com/user-attachments/assets/f728f52e-bf67-4357-9ba2-c24c437488e3)
+# Kan
 
-<div align="center">
-  <h3 align="center">Kan</h3>
-  <p>The open-source project management alternative to Trello.</p>
-</div>
+Kan is an open-source project management application inspired by Trello. This repository contains the web application, tRPC API, authentication, database, email, billing, and documentation packages used to run the product.
 
 <p align="center">
   <a href="https://kan.bn/kan/roadmap">Roadmap</a>
   ·
   <a href="https://kan.bn">Website</a>
   ·
-  <a href="https://docs.kan.bn">Docs</a>
+  <a href="https://docs.kan.bn">Documentation</a>
   ·
   <a href="https://discord.gg/e6ejRb6CmT">Discord</a>
 </p>
 
-<div align="center">
-  <a href="https://github.com/kanbn/kan/blob/main/LICENSE"><img alt="License" src="https://img.shields.io/badge/license-AGPLv3-purple"></a>
-</div>
+<p align="center">
+  <a href="https://github.com/Zomzem-Audepartment/kanbn"><img alt="Repository" src="https://img.shields.io/badge/repository-Zomzem--Audepartment%2Fkanbn-blue"></a>
+  <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/license-AGPLv3-purple"></a>
+</p>
 
-## Features 💫
+## Features
 
-- 👁️ **Board Visibility**: Control who can view and edit your boards
-- 🤝 **Workspace Members**: Invite members and collaborate with your team
-- 🚀 **Trello Imports**: Easily import your Trello boards
-- 🔍 **Labels & Filters**: Organise and find cards quickly
-- 💬 **Comments**: Discuss and collaborate with your team
-- 📝 **Activity Log**: Track all card changes with detailed activity history
-- 🎨 **Templates** : Save time with reusable custom board templates
-- ⚡️ **Integrations (coming soon)** : Connect your favourite tools
+- Workspaces, workspace members, roles, permissions, and invitations
+- Public and private boards with lists, drag-and-drop cards, labels, filters, templates, and activity history
+- Rich card content with descriptions, comments, checklists, attachments, mentions, due dates, members, and positions
+- Calendar views for scheduled cards and events
+- Recurring tasks, task masters, task instances, and task positions
+- Reward configuration, approval workflows, snapshots, and reward-breach reports
+- Dashboards, reports, feedback, and public board views
+- Trello board import
+- Webhooks, API keys, integrations, and billing through Stripe
+- Email notifications, optional Redis-backed rate limiting, and S3-compatible object storage
+- Social/OIDC authentication through Better Auth
+- Internationalized Next.js frontend using Lingui
 
-See our [roadmap](https://kan.bn/kan/roadmap) for upcoming features.
+The repository also contains a reverse-engineered functional reference in [`docs/cfd/`](docs/cfd/README.md).
 
-## Screenshot 👁️
+## Tech stack
 
-<img width="1507" alt="hero-dark" src="https://github.com/user-attachments/assets/8490104a-cd5d-49de-afc2-152fd8a93119" />
+- Next.js 15, React 18, TypeScript, Tailwind CSS, and Turborepo
+- tRPC with Zod validation
+- PostgreSQL with Drizzle ORM and Drizzle Kit
+- Better Auth
+- Lingui for internationalization
+- Vitest for package tests
+- Docker Compose for local and self-hosted deployments
 
-## Made With 🛠️
+## Repository structure
 
-- [Next.js](https://nextjs.org/?ref=kan.bn)
-- [tRPC](https://trpc.io/?ref=kan.bn)
-- [Better Auth](https://better-auth.com/?ref=kan.bn)
-- [Tailwind CSS](https://tailwindcss.com/?ref=kan.bn)
-- [Drizzle ORM](https://orm.drizzle.team/?ref=kan.bn)
-- [React Email](https://react.email/?ref=kan.bn)
+| Path              | Purpose                                                              |
+| ----------------- | -------------------------------------------------------------------- |
+| `apps/web`        | Next.js web application                                              |
+| `apps/docs`       | Mintlify documentation site                                          |
+| `packages/api`    | tRPC routers, permissions, webhooks, integrations, and API utilities |
+| `packages/db`     | Drizzle schema, migrations, repositories, and Redis client           |
+| `packages/auth`   | Better Auth server/client configuration and providers                |
+| `packages/email`  | Email templates and delivery helpers                                 |
+| `packages/stripe` | Stripe billing integration                                           |
+| `packages/shared` | Shared constants, permissions, and utilities                         |
+| `packages/logger` | Application logging                                                  |
+| `tooling`         | Shared TypeScript, ESLint, Prettier, and Tailwind configuration      |
 
-## Self Hosting 🐳
+## Requirements
 
-### One-click Deployments
+- Node.js `>=20.18.1`
+- pnpm `9.14.2` (Corepack is recommended)
+- PostgreSQL 15 or Docker
+- MinIO or another S3-compatible storage service when testing uploads locally
 
-The easiest way to deploy Kan is through Railway. We've partnered with Railway to maintain an official template that supports the development of the project.
-
-<a href="https://railway.com/deploy/kan?referralCode=bZPsr2&utm_medium=integration&utm_source=template&utm_campaign=generic">
-  <img src="https://railway.app/button.svg" alt="Deploy on Railway" height="40" />
-</a>
-
-### Docker Compose
-
-Alternatively, you can self-host Kan with Docker Compose. This will set up everything for you including your postgres database and automatically run migrations.
-
-1. Create a `.env` file with your environment variables (see [Environment Variables](#environment-variables-) section below)
-
-2. Use the provided `docker-compose.yml` file or create your own with the following configuration:
-
-```yaml
-services:
-  migrate:
-    image: ghcr.io/kanbn/kan-migrate:latest
-    container_name: kan-migrate
-    networks:
-      - kan-network
-    environment:
-      - POSTGRES_URL=${POSTGRES_URL}
-    depends_on:
-      postgres:
-        condition: service_healthy
-    restart: "no"
-
-  web:
-    image: ghcr.io/kanbn/kan:latest
-    container_name: kan-web
-    ports:
-      - "${WEB_PORT:-3000}:3000"
-    networks:
-      - kan-network
-    env_file:
-      - .env
-    environment:
-      - NEXT_PUBLIC_BASE_URL=${NEXT_PUBLIC_BASE_URL}
-      - BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET}
-      - POSTGRES_URL=${POSTGRES_URL}
-      - NEXT_PUBLIC_ALLOW_CREDENTIALS=true
-    depends_on:
-      migrate:
-        condition: service_completed_successfully
-    restart: unless-stopped
-
-  postgres:
-    image: postgres:15
-    container_name: kan-db
-    environment:
-      - POSTGRES_DB=kan_db
-      - POSTGRES_USER=kan
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-    ports:
-      - 5432:5432
-    volumes:
-      - kan_postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U kan -d kan_db"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
-    restart: unless-stopped
-    networks:
-      - kan-network
-
-networks:
-  kan-network:
-
-volumes:
-  kan_postgres_data:
-```
-
-3. Start the containers in detached mode:
+Enable the repository's package manager before installing dependencies:
 
 ```bash
-docker compose up -d
+corepack enable
+corepack prepare pnpm@9.14.2 --activate
 ```
 
-The `migrate` service will automatically run database migrations before the web service starts. The application will be available at http://localhost:3000 (or the port specified in `WEB_PORT`).
+## Local development
 
-**Managing containers:**
-
-- To stop the containers: `docker compose down`
-- To view logs: `docker compose logs -f`
-- To view logs for a specific service: `docker compose logs -f web` or `docker compose logs -f migrate`
-- To restart the containers: `docker compose restart`
-- To rebuild after code changes: `docker compose up -d --build`
-
-For the complete Docker Compose configuration with all optional features, see [docker-compose.yml](./docker-compose.yml) in the repository.
-
-## Local Development 🧑‍💻
-
-1. Clone the repository (or fork)
+### 1. Clone and install
 
 ```bash
-git clone https://github.com/kanbn/kan.git
-```
-
-2. Install dependencies
-
-```bash
+git clone https://github.com/Zomzem-Audepartment/kanbn.git
+cd kanbn
 pnpm install
 ```
 
-3. Copy `.env.example` to `.env` and configure your environment variables
-4. Migrate database
+### 2. Configure environment variables
+
+```bash
+cp .env.example .env
+```
+
+At minimum, configure `NEXT_PUBLIC_BASE_URL`, `BETTER_AUTH_SECRET`, and `POSTGRES_URL`. For the included Docker Compose stack, also set `POSTGRES_USER`, `POSTGRES_DB`, and `POSTGRES_PASSWORD`.
+
+Generate a local auth secret with:
+
+```bash
+openssl rand -base64 26 | tr -dc 'a-zA-Z0-9' | head -c 32
+```
+
+`BETTER_AUTH_TRUSTED_ORIGINS` must include the exact origin used in the browser, including forwarded development ports when applicable. Keep `NEXT_PUBLIC_BASE_URL` consistent with that origin.
+
+The complete variable list and comments are maintained in [`.env.example`](.env.example). Optional variables enable email, OAuth/OIDC providers, Trello import, Redis, S3 storage, Stripe, notifications, and iframe embedding.
+
+### 3. Start PostgreSQL and storage
+
+You can use the repository's Docker Compose stack:
+
+```bash
+docker compose up -d postgres
+```
+
+The root Compose file publishes PostgreSQL on `localhost:5632` and expects the local `POSTGRES_URL` to use that published port, for example:
+
+```dotenv
+POSTGRES_URL=postgresql://kan:password@localhost:5632/kan_db
+```
+
+For file uploads, start MinIO separately or provide an S3-compatible service. When using the root Compose file, the web container expects the external Docker network `minio_minio-net`; create/configure that network and the buckets named by `NEXT_PUBLIC_AVATAR_BUCKET_NAME` and `NEXT_PUBLIC_ATTACHMENTS_BUCKET_NAME`.
+
+### 4. Run migrations and start the app
 
 ```bash
 pnpm db:migrate
-```
-
-5. Start the development server
-
-```bash
 pnpm dev
 ```
 
-- Install minio before run
-6. Start minio server
+The development server is available at [http://localhost:3000](http://localhost:3000) unless the web app configuration overrides the port.
+
+Useful commands:
+
 ```bash
-.\minio.exe server C:\minio-data --console-address ":9001"
+pnpm build          # Build all packages and applications
+pnpm lint           # Lint the workspace
+pnpm typecheck      # Type-check the workspace
+pnpm format:fix     # Format files
+pnpm db:generate    # Generate a Drizzle migration
+pnpm db:push        # Push the schema directly to the database
+pnpm db:studio      # Open Drizzle Studio
 ```
 
-## Environment Variables 🔐
+Package tests can be run with the package scripts, for example:
 
-| Variable                                  | Description                                               | Required                              | Example                                                     |
-| ----------------------------------------- | --------------------------------------------------------- | ------------------------------------- | ----------------------------------------------------------- |
-| `POSTGRES_URL`                            | PostgreSQL connection URL                                 | To use external database              | `postgres://user:pass@localhost:5432/db`                    |
-| `REDIS_URL`                               | Redis connection URL                                      | For rate limiting (optional)          | `redis://localhost:6379` or `redis://redis:6379` (Docker)   |
-| `EMAIL_FROM`                              | Sender email address                                      | For Email                             | `"Kan <hello@mail.kan.bn>"`                                 |
-| `SMTP_HOST`                               | SMTP server hostname                                      | For Email                             | `smtp.resend.com`                                           |
-| `SMTP_PORT`                               | SMTP server port                                          | For Email                             | `465`                                                       |
-| `SMTP_USER`                               | SMTP username/email                                       | No                                    | `resend`                                                    |
-| `SMTP_PASSWORD`                           | SMTP password/token                                       | No                                    | `re_xxxx`                                                   |
-| `SMTP_SECURE`                             | Use secure SMTP connection (defaults to true if not set)  | For Email                             | `true`                                                      |
-| `SMTP_REJECT_UNAUTHORIZED`                | Reject invalid certificates (defaults to true if not set) | For Email                             | `false`                                                     |
-| `NEXT_PUBLIC_DISABLE_EMAIL`               | To disable all email features                             | For Email                             | `true`                                                      |
-| `NEXT_PUBLIC_BASE_URL`                    | Base URL of your installation                             | Yes                                   | `http://localhost:3000`                                     |
-| `NEXT_API_BODY_SIZE_LIMIT`                | Maximum API request body size (defaults to 1mb)           | No                                    | `50mb`                                                      |
-| `BETTER_AUTH_ALLOWED_DOMAINS`             | Comma-separated list of allowed domains for OIDC logins   | For OIDC/Social login                 | `example.com,subsidiary.com`                                |
-| `BETTER_AUTH_SECRET`                      | Auth encryption secret                                    | Yes                                   | Random 32+ char string                                      |
-| `BETTER_AUTH_TRUSTED_ORIGINS`             | Allowed callback origins                                  | No                                    | `http://localhost:3000,http://localhost:3001`               |
-| `GOOGLE_CLIENT_ID`                        | Google OAuth client ID                                    | For Google login                      | `xxx.apps.googleusercontent.com`                            |
-| `GOOGLE_CLIENT_SECRET`                    | Google OAuth client secret                                | For Google login                      | `xxx`                                                       |
-| `DISCORD_CLIENT_ID`                       | Discord OAuth client ID                                   | For Discord login                     | `xxx`                                                       |
-| `DISCORD_CLIENT_SECRET`                   | Discord OAuth client secret                               | For Discord login                     | `xxx`                                                       |
-| `GITHUB_CLIENT_ID`                        | GitHub OAuth client ID                                    | For GitHub login                      | `xxx`                                                       |
-| `GITHUB_CLIENT_SECRET`                    | GitHub OAuth client secret                                | For GitHub login                      | `xxx`                                                       |
-| `OIDC_CLIENT_ID`                          | Generic OIDC client ID                                    | For OIDC login                        | `xxx`                                                       |
-| `OIDC_CLIENT_SECRET`                      | Generic OIDC client secret                                | For OIDC login                        | `xxx`                                                       |
-| `OIDC_DISCOVERY_URL`                      | OIDC discovery URL                                        | For OIDC login                        | `https://auth.example.com/.well-known/openid-configuration` |
-| `TRELLO_APP_API_KEY`                      | Trello app API key                                        | For Trello import                     | `xxx`                                                       |
-| `TRELLO_APP_API_SECRET`                   | Trello app API secret                                     | For Trello import                     | `xxx`                                                       |
-| `S3_REGION`                               | S3 storage region                                         | For file uploads                      | `WEUR`                                                      |
-| `S3_ENDPOINT`                             | S3 endpoint URL                                           | For file uploads                      | `https://xxx.r2.cloudflarestorage.com`                      |
-| `S3_ACCESS_KEY_ID`                        | S3 access key                                             | For file uploads (optional with IRSA) | `xxx`                                                       |
-| `S3_SECRET_ACCESS_KEY`                    | S3 secret key                                             | For file uploads (optional with IRSA) | `xxx`                                                       |
-| `S3_FORCE_PATH_STYLE`                     | Use path-style URLs for S3                                | For file uploads                      | `true`                                                      |
-| `S3_AVATAR_UPLOAD_LIMIT`                  | Maximum avatar file size in bytes                         | For file uploads                      | `2097152` (2MB)                                             |
-| `NEXT_PUBLIC_STORAGE_URL`                 | Storage service URL                                       | For file uploads                      | `https://storage.kanbn.com`                                 |
-| `NEXT_PUBLIC_STORAGE_DOMAIN`              | Storage domain name                                       | For file uploads                      | `kanbn.com`                                                 |
-| `NEXT_PUBLIC_USE_VIRTUAL_HOSTED_URLS`     | Use virtual-hosted style URLs (bucket.domain.com)         | For file uploads (optional)           | `true`                                                      |
-| `NEXT_PUBLIC_AVATAR_BUCKET_NAME`          | S3 bucket name for avatars                                | For file uploads                      | `avatars`                                                   |
-| `NEXT_PUBLIC_ATTACHMENTS_BUCKET_NAME`     | S3 bucket name for attachments                            | For file uploads                      | `attachments`                                               |
-| `NEXT_PUBLIC_ALLOW_CREDENTIALS`           | Allow email & password login                              | For authentication                    | `true`                                                      |
-| `NEXT_PUBLIC_DISABLE_SIGN_UP`             | Disable sign up                                           | For authentication                    | `false`                                                     |
-| `NEXT_PUBLIC_WHITE_LABEL_HIDE_POWERED_BY` | Hide “Powered by kan.bn” on public boards (self-host)     | For white labelling                   | `true`                                                      |
-| `KAN_ADMIN_API_KEY`                       | Admin API key for stats and admin endpoints               | For admin/monitoring                  | `your-secret-admin-key`                                     |
-| `LOG_LEVEL`                               | Log verbosity level (debug, info, warn, error)            | No (defaults to debug in dev, info in prod) | `info`                                                 |
+```bash
+pnpm --filter @kan/web test
+pnpm --filter @kan/api test
+pnpm --filter @kan/auth test
+```
 
-See `.env.example` for a complete list of supported environment variables.
+## Docker deployment
 
-## Contributing 🤝
+The root [`docker-compose.yml`](docker-compose.yml) builds and runs three services:
 
-We welcome contributions! Please read our [contribution guidelines](CONTRIBUTING.md) before submitting a pull request.
+- `migrate`: applies Drizzle migrations and exits
+- `web`: builds and runs the Next.js application
+- `postgres`: runs PostgreSQL 15
 
-## Contributors 👥
+Build and start the stack:
 
-<a href="https://github.com/kanbn/kan/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=kanbn/kan" />
-</a>
+```bash
+docker compose up -d --build
+```
 
-## License 📝
+The web service is exposed on `${WEB_PORT:-3001}`. View logs or stop the stack with:
+
+```bash
+docker compose logs -f web
+docker compose down
+```
+
+For deployment using pre-built images, see [`deploy/docker-compose.yml`](deploy/docker-compose.yml) and the helper targets in [`Makefile`](Makefile):
+
+```bash
+make build
+make push TAG=v1.0.0
+make deploy TAG=v1.0.0
+```
+
+The deployment Compose file reads its environment from `deploy/.env` and supports overriding `REGISTRY`, `WEB_IMAGE`, `MIGRATE_IMAGE`, and `TAG`.
+
+## Database workflow
+
+Database schema and migrations live in [`packages/db`](packages/db):
+
+```bash
+cd packages/db
+pnpm generate       # Generate a migration after schema changes
+pnpm migrate        # Apply pending migrations
+pnpm studio         # Open Drizzle Studio
+```
+
+Use migrations for committed schema changes. Do not edit existing migration files after they have been applied.
+
+## Environment variables
+
+The supported variables are grouped in [`.env.example`](.env.example):
+
+- Core app and database: `NEXT_PUBLIC_BASE_URL`, `BETTER_AUTH_SECRET`, `POSTGRES_*`
+- Email: `SMTP_*`, `EMAIL_FROM`, `NEXT_PUBLIC_DISABLE_EMAIL`
+- Storage: `S3_*`, `NEXT_PUBLIC_STORAGE_*`, and bucket names
+- Authentication: `NEXT_PUBLIC_ALLOW_CREDENTIALS`, `NEXT_PUBLIC_DISABLE_SIGN_UP`, `BETTER_AUTH_TRUSTED_ORIGINS`, and provider credentials
+- Integrations: Trello, Redis, Stripe, Novu, and webhook settings
+- Operations: `LOG_LEVEL`, `CORS_ORIGINS`, `ALLOWED_FRAME_ANCESTORS`, and `NEXT_API_BODY_SIZE_LIMIT`
+
+Never commit secrets. Use separate `.env` files for local development and deployment environments.
+
+## Contributing
+
+Please read [`CONTRIBUTING.md`](CONTRIBUTING.md) before opening a pull request. Use focused conventional commits such as `feat:`, `fix:`, `refactor:`, or `docs:`. For UI changes, include screenshots in the pull request.
+
+Before submitting changes, run:
+
+```bash
+pnpm lint
+pnpm typecheck
+```
+
+## License
 
 Kan is licensed under the [AGPLv3 license](LICENSE).
 
-## Contact 📧
+## Contact
 
-For support or to get in touch, please email [henry@kan.bn](mailto:henry@kan.bn) or join our [Discord server](https://discord.gg/e6ejRb6CmT).
+For support, join the [Discord server](https://discord.gg/e6ejRb6CmT) or email [henry@kan.bn](mailto:henry@kan.bn).

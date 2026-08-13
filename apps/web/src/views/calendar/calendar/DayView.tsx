@@ -16,6 +16,7 @@ import { StrictModeDroppable as Droppable } from "~/components/StrictModeDroppab
 import {
   calculateDayHourLayout,
   compareCalendarEntriesByTime,
+  getCurrentTimeTop,
 } from "~/utils/calendar";
 import { CalendarCard } from "./CalendarCard";
 import { CalendarTask } from "./CalendarTask";
@@ -86,12 +87,7 @@ export function DayView({
     0,
   );
 
-  const currentHourLayout = hourLayout.find(
-    ({ hour }) => hour === now.getHours(),
-  );
-  const nowTop = currentHourLayout
-    ? currentHourLayout.top + (now.getMinutes() * currentHourLayout.height) / 60
-    : 0;
+  const nowTop = getCurrentTimeTop(hourLayout, now);
 
   const handleTimeSlotClick = (hour: number) => {
     const clickedDate = new Date(currentDate);
@@ -235,7 +231,7 @@ export function DayView({
               ))}
             </div>
 
-            {isDayToday && (
+            {isDayToday && nowTop !== null && (
               <div
                 className="pointer-events-none absolute left-0 right-0 z-30 flex items-center"
                 style={{ top: `${nowTop}px` }}

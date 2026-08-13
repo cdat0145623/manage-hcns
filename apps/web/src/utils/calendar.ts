@@ -14,8 +14,8 @@ export function compareCalendarEntriesByTime(
 
   if (aStart !== bStart) return aStart - bStart;
 
-  const aEnd = aStart + (a.duration || 60) * 60_000;
-  const bEnd = bStart + (b.duration || 60) * 60_000;
+  const aEnd = new Date(a.endDate).getTime();
+  const bEnd = new Date(b.endDate).getTime();
 
   return aEnd - bEnd;
 }
@@ -30,6 +30,22 @@ export interface DayHourLayout {
   top: number;
   height: number;
   entries: CalendarEntry[];
+}
+
+export function getCurrentTimeTop(
+  hourLayout: DayHourLayout[],
+  currentTime: Date,
+): number | null {
+  const currentHourLayout = hourLayout.find(
+    ({ hour }) => hour === currentTime.getHours(),
+  );
+
+  if (!currentHourLayout) return null;
+
+  return (
+    currentHourLayout.top +
+    (currentTime.getMinutes() * currentHourLayout.height) / 60
+  );
 }
 
 export function calculateDayHourLayout(

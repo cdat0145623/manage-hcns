@@ -221,13 +221,7 @@ export function CalendarTask({
             <div className="flex w-full items-center gap-1.5 overflow-hidden opacity-60">
               <span className="block whitespace-nowrap text-[10px] font-bold">
                 {format(new Date(entry.date), "H:mm")} -{" "}
-                {format(
-                  new Date(
-                    new Date(entry.date).getTime() +
-                      (entry.duration || 60) * 60000,
-                  ),
-                  "H:mm",
-                )}
+                {format(new Date(entry.endDate), "H:mm")}
               </span>
             </div>
           </div>

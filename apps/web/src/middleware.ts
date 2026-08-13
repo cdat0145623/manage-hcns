@@ -1,6 +1,7 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { env } from "next-runtime-env";
+
 import { env as env_config } from "~/env";
 
 export async function middleware(request: NextRequest) {
@@ -12,7 +13,8 @@ export async function middleware(request: NextRequest) {
     return proxyToMinio(request, path);
   }
 
-  const attachmentsBucket = env("NEXT_PUBLIC_ATTACHMENTS_BUCKET_NAME") ?? "attachments";
+  const attachmentsBucket =
+    env("NEXT_PUBLIC_ATTACHMENTS_BUCKET_NAME") ?? "attachments";
   const avatarBucket = env("NEXT_PUBLIC_AVATAR_BUCKET_NAME") ?? "images";
 
   if (
@@ -24,12 +26,21 @@ export async function middleware(request: NextRequest) {
   }
 
   const response = NextResponse.next();
-  const ancestors = (env_config.ALLOWED_FRAME_ANCESTORS ?? "'self'")
+  const configuredAncestors = (env_config.ALLOWED_FRAME_ANCESTORS ?? "")
     .replace(/,/g, " ") // Chuyen dau phay thanh dau cach
     .replace(/\s+/g, " ") // Don dep dau cach du thua
-    .trim();
-  response.headers.set("Content-Security-Policy", `frame-ancestors ${ancestors}`);
-  
+    .trim()
+    .split(" ")
+    .filter(Boolean);
+  const ancestors = [
+    "'self'",
+    ...configuredAncestors.filter((ancestor) => ancestor !== "'self'"),
+  ].join(" ");
+  response.headers.set(
+    "Content-Security-Policy",
+    `frame-ancestors ${ancestors}`,
+  );
+
   return response;
 }
 
@@ -49,9 +60,10 @@ async function proxyToMinio(request: NextRequest, path: string[]) {
   const response = await fetch(targetUrl, {
     method: request.method,
     headers,
-    body: request.method !== "GET" && request.method !== "HEAD"
-      ? request.body
-      : undefined,
+    body:
+      request.method !== "GET" && request.method !== "HEAD"
+        ? request.body
+        : undefined,
     // @ts-ignore - cần cho streaming body
     duplex: "half",
   });
@@ -63,11 +75,6 @@ async function proxyToMinio(request: NextRequest, path: string[]) {
   });
 }
 
-
 export const config = {
-  matcher: [
-    "/",
-    "/api/minio/:path*",
-    "/:path*",
-  ],
+  matcher: ["/", "/api/minio/:path*", "/:path*"],
 };

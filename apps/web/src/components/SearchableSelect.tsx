@@ -58,6 +58,7 @@ export default function SearchableSelect({
         if (option) onChange(option.value);
       }}
       onClose={() => setQuery("")}
+      immediate
       disabled={disabled}
     >
       <div className={`relative ${className}`}>

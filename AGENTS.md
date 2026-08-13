@@ -11,6 +11,16 @@ Kan is an open-source project management tool (Trello alternative) built with:
 - **Auth**: Better Auth
 - **Internationalization**: Lingui
 
+## Agent Skill Guidance
+
+- Before making changes, read this `AGENTS.md` completely and follow its project-specific instructions before applying general skill guidance.
+- For React and Next.js tasks, use the `vercel-react-best-practices` skill. For reusable component APIs, component composition, or component architecture refactors, also use the `vercel-composition-patterns` skill.
+- Read and apply only the skill rules relevant to the current task.
+- This project uses React 18 and the Next.js Pages Router.
+- Do not apply React 19-only, App Router-only, React Server Components, or Server Actions recommendations.
+- Prefer the project's existing tRPC React Query and Pages Router patterns. Preserve the established Lingui, Tailwind CSS, `useModal`, and `usePopup` conventions.
+- If skill guidance conflicts with this file or established project architecture, this `AGENTS.md` and the existing project conventions take precedence.
+
 ## Setup Commands
 
 - Install deps: `pnpm install`

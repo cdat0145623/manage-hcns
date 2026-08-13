@@ -5,6 +5,57 @@ export interface OverlapInfo {
   overlapIndex: number;
 }
 
+export function compareCalendarEntriesByTime(
+  a: CalendarEntry,
+  b: CalendarEntry,
+): number {
+  const aStart = new Date(a.date).getTime();
+  const bStart = new Date(b.date).getTime();
+
+  if (aStart !== bStart) return aStart - bStart;
+
+  const aEnd = aStart + (a.duration || 60) * 60_000;
+  const bEnd = bStart + (b.duration || 60) * 60_000;
+
+  return aEnd - bEnd;
+}
+
+const DAY_HOUR_MIN_HEIGHT = 128;
+const DAY_TASK_HEIGHT = 56;
+const DAY_TASK_GAP = 4;
+const DAY_HOUR_PADDING = 8;
+
+export interface DayHourLayout {
+  hour: number;
+  top: number;
+  height: number;
+  entries: CalendarEntry[];
+}
+
+export function calculateDayHourLayout(
+  entries: CalendarEntry[],
+  startHour: number,
+): DayHourLayout[] {
+  const sortedEntries = [...entries].sort(compareCalendarEntriesByTime);
+  let top = 0;
+
+  return Array.from({ length: 24 - startHour }, (_, index) => {
+    const hour = startHour + index;
+    const hourEntries = sortedEntries.filter(
+      (entry) => new Date(entry.date).getHours() === hour,
+    );
+    const contentHeight =
+      hourEntries.length * DAY_TASK_HEIGHT +
+      Math.max(hourEntries.length - 1, 0) * DAY_TASK_GAP +
+      DAY_HOUR_PADDING;
+    const height = Math.max(DAY_HOUR_MIN_HEIGHT, contentHeight);
+    const layout = { hour, top, height, entries: hourEntries };
+
+    top += height;
+    return layout;
+  });
+}
+
 export function calculateOverlap(
   entries: CalendarEntry[],
 ): Map<string, OverlapInfo> {

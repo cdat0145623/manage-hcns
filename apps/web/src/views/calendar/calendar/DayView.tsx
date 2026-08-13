@@ -13,7 +13,10 @@ import { useEffect, useMemo, useState } from "react";
 
 import type { CalendarEntry } from "~/hooks/useRecurrence";
 import { StrictModeDroppable as Droppable } from "~/components/StrictModeDroppable";
-import { calculateOverlap } from "~/utils/calendar";
+import {
+  calculateDayHourLayout,
+  compareCalendarEntriesByTime,
+} from "~/utils/calendar";
 import { CalendarCard } from "./CalendarCard";
 import { CalendarTask } from "./CalendarTask";
 import { DayCardPopover } from "./DayCardPopover";
@@ -54,14 +57,8 @@ export function DayView({
     () =>
       entries
         .filter((entry) => isSameDay(new Date(entry.date), currentDate))
-        .sort(
-          (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime(),
-        ),
+        .sort(compareCalendarEntriesByTime),
     [entries, currentDate],
-  );
-  const overlapInfoMap = useMemo(
-    () => calculateOverlap(dayEntries),
-    [dayEntries],
   );
   const droppableId = `droppable-${format(currentDate, "yyyy-MM-dd")}`;
 
@@ -79,12 +76,22 @@ export function DayView({
     return Math.min(DEFAULT_START_HOUR, earliestTaskHour);
   }, [dayEntries]);
 
-  const hoursToRender = useMemo(() => {
-    return Array.from({ length: 24 - startHour }, (_, i) => i + startHour);
-  }, [startHour]);
+  const hourLayout = useMemo(
+    () => calculateDayHourLayout(dayEntries, startHour),
+    [dayEntries, startHour],
+  );
 
-  const nowTop =
-    (now.getHours() - startHour) * 128 + (now.getMinutes() * 128) / 60;
+  const calendarHeight = hourLayout.reduce(
+    (total, { height }) => total + height,
+    0,
+  );
+
+  const currentHourLayout = hourLayout.find(
+    ({ hour }) => hour === now.getHours(),
+  );
+  const nowTop = currentHourLayout
+    ? currentHourLayout.top + (now.getMinutes() * currentHourLayout.height) / 60
+    : 0;
 
   const handleTimeSlotClick = (hour: number) => {
     const clickedDate = new Date(currentDate);
@@ -201,10 +208,11 @@ export function DayView({
       <div className="flex-1 overflow-y-auto">
         <div className="flex min-h-full pt-8">
           <div className="w-20 flex-shrink-0 border-r border-light-300 bg-neutral-50/30 dark:border-dark-300 dark:bg-neutral-900/10">
-            {hoursToRender.map((hour) => (
+            {hourLayout.map(({ hour, height }) => (
               <div
                 key={hour}
-                className="relative h-32 border-b border-neutral-100/30 dark:border-white/5"
+                className="relative border-b border-neutral-100/30 dark:border-white/5"
+                style={{ height: `${height}px` }}
               >
                 <span className="absolute -top-3 left-0 w-full pr-4 text-right text-[10px] font-black uppercase tracking-tighter text-neutral-600 dark:text-neutral-600">
                   {format(addHours(startOfDay(currentDate), hour), "H:mm")}
@@ -215,13 +223,14 @@ export function DayView({
 
           <div
             className="relative flex-1 bg-white dark:bg-dark-100"
-            style={{ height: `${(24 - startHour) * 128}px` }}
+            style={{ height: `${calendarHeight}px` }}
           >
             <div className="pointer-events-none absolute inset-0">
-              {hoursToRender.map((hour) => (
+              {hourLayout.map(({ hour, height }) => (
                 <div
                   key={hour}
-                  className="h-32 border-b border-dark-400 dark:border-white/5"
+                  className="border-b border-dark-400 dark:border-white/5"
+                  style={{ height: `${height}px` }}
                 />
               ))}
             </div>
@@ -255,84 +264,39 @@ export function DayView({
                   }`}
                 >
                   <div className="absolute inset-0 z-0 flex flex-col">
-                    {hoursToRender.map((hour) => (
+                    {hourLayout.map(({ hour, height }) => (
                       <div
                         key={`slot-${hour}`}
                         onClick={() => handleTimeSlotClick(hour)}
-                        className="h-32 w-full cursor-pointer transition-colors hover:bg-blue-100/30 dark:hover:bg-blue-900/20"
+                        className="w-full cursor-pointer transition-colors hover:bg-blue-100/30 dark:hover:bg-blue-900/20"
+                        style={{ height: `${height}px` }}
                       />
                     ))}
                   </div>
 
-                  {(() => {
-                    const renderedEntries = dayEntries.filter(
-                      (e) => (overlapInfoMap.get(e.id)?.overlapIndex ?? 0) < 2,
-                    );
-                    const hiddenEntries = dayEntries.filter(
-                      (e) => (overlapInfoMap.get(e.id)?.overlapIndex ?? 0) >= 2,
-                    );
-                    const hiddenCount = hiddenEntries.length;
-
-                    // Calculate Y position for badge: position at the top of the first hidden task
-                    const firstHidden = hiddenEntries[0];
-                    const hourHeight = 128;
-                    const badgeTop = firstHidden
-                      ? (() => {
-                          const d = new Date(firstHidden.date);
-                          return (
-                            (d.getHours() - startHour) * hourHeight +
-                            (d.getMinutes() * hourHeight) / 60
-                          );
-                        })()
-                      : 8;
-
-                    return (
-                      <>
-                        {renderedEntries.map((entry, index) => {
-                          const overlapInfo = overlapInfoMap.get(entry.id);
-                          return (
+                  <div className="pointer-events-none absolute inset-0 z-10 flex flex-col">
+                    {hourLayout.map(
+                      ({ hour, height, entries: hourEntries }) => (
+                        <div
+                          key={`tasks-${hour}`}
+                          className="flex flex-col gap-1 p-1"
+                          style={{ height: `${height}px` }}
+                        >
+                          {hourEntries.map((entry, index) => (
                             <CalendarTask
                               key={entry.id}
                               entry={entry}
                               onClick={onTaskClick}
                               variant="DETAILED"
-                              isPositioned={true}
-                              totalOverlap={Math.min(
-                                overlapInfo?.totalOverlap ?? 1,
-                                2,
-                              )}
-                              overlapIndex={overlapInfo?.overlapIndex}
                               index={index}
                               isDraggable={false}
-                              startHour={startHour}
+                              isDayStacked
                             />
-                          );
-                        })}
-                        {hiddenCount > 0 && (
-                          <motion.button
-                            initial={{ opacity: 0, scale: 0.9 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                            whileHover={{ scale: 1.05 }}
-                            whileTap={{ scale: 0.95 }}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setPopoverDay(currentDate);
-                            }}
-                            style={{ top: `${badgeTop + 4}px`, right: "12px" }}
-                            className="absolute z-[250] flex h-8 w-fit items-center gap-2 rounded-full border border-blue-200 bg-white/95 px-3 py-1.5 shadow-xl backdrop-blur-md transition-all hover:bg-blue-50 dark:border-white/10 dark:bg-neutral-800/95"
-                          >
-                            <span className="relative flex h-2 w-2">
-                              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-blue-400 opacity-75"></span>
-                              <span className="relative inline-flex h-2 w-2 rounded-full bg-blue-500"></span>
-                            </span>
-                            <span className="text-[10px] font-bold text-blue-600 dark:text-blue-400">
-                              +{hiddenCount} khác
-                            </span>
-                          </motion.button>
-                        )}
-                      </>
-                    );
-                  })()}
+                          ))}
+                        </div>
+                      ),
+                    )}
+                  </div>
                   {provided.placeholder}
                 </div>
               )}

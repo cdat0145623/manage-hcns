@@ -20,20 +20,32 @@ export function compareCalendarEntriesByTime(
   return aEnd - bEnd;
 }
 
-const DAY_HOUR_MIN_HEIGHT = 128;
-const DAY_TASK_HEIGHT = 56;
-const DAY_TASK_GAP = 4;
-const DAY_HOUR_PADDING = 8;
+const HOUR_MIN_HEIGHT = 128;
+const STACKED_TASK_HEIGHT = 56;
+const STACKED_TASK_GAP = 4;
+const HOUR_PADDING = 8;
 
-export interface DayHourLayout {
+export interface CalendarHourLayout {
   hour: number;
   top: number;
   height: number;
+}
+
+export interface DayHourLayout extends CalendarHourLayout {
   entries: CalendarEntry[];
 }
 
+function calculateHourHeight(entryCount: number): number {
+  const contentHeight =
+    entryCount * STACKED_TASK_HEIGHT +
+    Math.max(entryCount - 1, 0) * STACKED_TASK_GAP +
+    HOUR_PADDING;
+
+  return Math.max(HOUR_MIN_HEIGHT, contentHeight);
+}
+
 export function getCurrentTimeTop(
-  hourLayout: DayHourLayout[],
+  hourLayout: CalendarHourLayout[],
   currentTime: Date,
 ): number | null {
   const currentHourLayout = hourLayout.find(
@@ -60,12 +72,33 @@ export function calculateDayHourLayout(
     const hourEntries = sortedEntries.filter(
       (entry) => new Date(entry.date).getHours() === hour,
     );
-    const contentHeight =
-      hourEntries.length * DAY_TASK_HEIGHT +
-      Math.max(hourEntries.length - 1, 0) * DAY_TASK_GAP +
-      DAY_HOUR_PADDING;
-    const height = Math.max(DAY_HOUR_MIN_HEIGHT, contentHeight);
+    const height = calculateHourHeight(hourEntries.length);
     const layout = { hour, top, height, entries: hourEntries };
+
+    top += height;
+    return layout;
+  });
+}
+
+export function calculateWeekHourLayout(
+  entriesByDay: CalendarEntry[][],
+  startHour: number,
+): CalendarHourLayout[] {
+  let top = 0;
+
+  return Array.from({ length: 24 - startHour }, (_, index) => {
+    const hour = startHour + index;
+    const busiestDayEntryCount = entriesByDay.reduce((maxCount, dayEntries) => {
+      const entryCount = dayEntries.reduce(
+        (count, entry) =>
+          new Date(entry.date).getHours() === hour ? count + 1 : count,
+        0,
+      );
+
+      return Math.max(maxCount, entryCount);
+    }, 0);
+    const height = calculateHourHeight(busiestDayEntryCount);
+    const layout = { hour, top, height };
 
     top += height;
     return layout;

@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { CalendarEntry } from "~/hooks/useRecurrence";
 import {
   calculateDayHourLayout,
+  calculateWeekHourLayout,
   compareCalendarEntriesByTime,
   getCurrentTimeTop,
 } from "./calendar";
@@ -112,6 +113,102 @@ describe("calculateDayHourLayout", () => {
     ]);
     expect(eightOClock?.height).toBeGreaterThan(128);
     expect(nineOClock?.top).toBe(eightOClock?.height);
+  });
+});
+
+describe("calculateWeekHourLayout", () => {
+  it("uses the busiest day to size the shared hour row", () => {
+    const mondayEntries = [
+      createEntry({
+        id: "monday-task",
+        start: "2026-08-10T08:00:00+07:00",
+        duration: 30,
+      }),
+    ];
+    const tuesdayEntries = [
+      createEntry({
+        id: "tuesday-task-1",
+        start: "2026-08-11T08:00:00+07:00",
+        duration: 20,
+      }),
+      createEntry({
+        id: "tuesday-task-2",
+        start: "2026-08-11T08:20:00+07:00",
+        duration: 20,
+      }),
+      createEntry({
+        id: "tuesday-task-3",
+        start: "2026-08-11T08:40:00+07:00",
+        duration: 20,
+      }),
+    ];
+    const wednesdayEntries = [
+      createEntry({
+        id: "wednesday-task-1",
+        start: "2026-08-12T08:00:00+07:00",
+        duration: 30,
+      }),
+      createEntry({
+        id: "wednesday-task-2",
+        start: "2026-08-12T08:30:00+07:00",
+        duration: 30,
+      }),
+    ];
+
+    const layout = calculateWeekHourLayout(
+      [mondayEntries, tuesdayEntries, wednesdayEntries],
+      8,
+    );
+    const eightOClock = layout.find(({ hour }) => hour === 8);
+    const nineOClock = layout.find(({ hour }) => hour === 9);
+
+    expect(eightOClock?.height).toBe(184);
+    expect(nineOClock?.top).toBe(184);
+  });
+
+  it("keeps the minimum height when no day has more than two tasks", () => {
+    const entries = [
+      createEntry({
+        id: "task-1",
+        start: "2026-08-10T08:00:00+07:00",
+        duration: 30,
+      }),
+      createEntry({
+        id: "task-2",
+        start: "2026-08-10T08:30:00+07:00",
+        duration: 30,
+      }),
+    ];
+
+    const layout = calculateWeekHourLayout([entries, []], 8);
+
+    expect(layout[0]?.height).toBe(128);
+    expect(layout[1]?.top).toBe(128);
+  });
+
+  it("positions the current time inside an expanded shared hour", () => {
+    const entries = [
+      createEntry({
+        id: "task-1",
+        start: "2026-08-10T08:00:00+07:00",
+        duration: 20,
+      }),
+      createEntry({
+        id: "task-2",
+        start: "2026-08-10T08:20:00+07:00",
+        duration: 20,
+      }),
+      createEntry({
+        id: "task-3",
+        start: "2026-08-10T08:40:00+07:00",
+        duration: 20,
+      }),
+    ];
+    const layout = calculateWeekHourLayout([entries], 8);
+
+    expect(
+      getCurrentTimeTop(layout, new Date("2026-08-10T08:30:00+07:00")),
+    ).toBe(92);
   });
 });
 

@@ -17,7 +17,7 @@ interface CalendarTaskProps {
   /** When true, skip layout projection / shared layoutId (e.g. list inside a modal). */
   disableSharedLayout?: boolean;
   startHour?: number;
-  isDayStacked?: boolean;
+  isStacked?: boolean;
 }
 
 const STATUS_COLORS: Record<
@@ -103,7 +103,7 @@ export function CalendarTask({
   isDraggable = true,
   disableSharedLayout = false,
   startHour = 0,
-  isDayStacked = false,
+  isStacked = false,
 }: CalendarTaskProps) {
   const isVirtual = entry.type === "VIRTUAL";
   const status = entry.status ?? "pending";
@@ -182,7 +182,7 @@ export function CalendarTask({
         className={`${
           variant === "SUMMARY"
             ? `relative ${overlapIndex > 0 ? "ml-0.5" : ""} mb-1 flex h-[10vh] max-h-[50px] min-h-[40px] w-[calc(100%-4px)] items-center overflow-hidden rounded-xl border border-l-[3px] px-2.5 py-1.5 text-[10px] font-black transition-all ${colors.bg} ${colors.border} ${colors.text}`
-            : `relative flex w-full flex-col overflow-hidden rounded-2xl border border-l-[6px] px-3 py-2.5 shadow-sm backdrop-blur-md transition-all ${isDayStacked ? "pointer-events-auto h-14 shrink-0" : ""} ${colors.bg} ${colors.border} ${colors.text}`
+            : `relative flex w-full flex-col overflow-hidden rounded-2xl border border-l-[6px] px-3 py-2.5 shadow-sm backdrop-blur-md transition-all ${isStacked ? "pointer-events-auto h-14 shrink-0" : ""} ${colors.bg} ${colors.border} ${colors.text}`
         }`}
         style={{
           ...draggableProps?.style,

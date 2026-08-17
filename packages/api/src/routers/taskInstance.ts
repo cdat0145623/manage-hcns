@@ -506,13 +506,6 @@ export const taskInstanceRouter = createTRPCRouter({
         actorUserId: userId,
       });
 
-      if (!newTaskInstance) {
-        throw new TRPCError({
-          message: `Failed to update task instance`,
-          code: "INTERNAL_SERVER_ERROR",
-        });
-      }
-
       // ---- Reward Triggers ----
       // 1. Violation Check (End Date, Target Date, or Assignee changed)
       if (

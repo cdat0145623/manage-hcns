@@ -20,9 +20,6 @@ import {
   HiUser,
 } from "react-icons/hi2";
 import {
-  Bar,
-  BarChart,
-  CartesianGrid,
   Cell,
   Legend,
   Pie,
@@ -30,8 +27,6 @@ import {
   ResponsiveContainer,
   Sector,
   Tooltip,
-  XAxis,
-  YAxis,
 } from "recharts";
 import { twMerge } from "tailwind-merge";
 
@@ -43,6 +38,7 @@ import { useWorkspace } from "~/providers/workspace";
 import { api } from "~/utils/api";
 import { detectRewardMismatch } from "~/utils/reward";
 import { RewardBreachListPopup } from "../card/components/RewardBreachListPopup";
+import { TaskProgressChart } from "./components/task-progress-chart";
 
 const CHART_COLORS = [
   "#6366f1", // Indigo
@@ -473,27 +469,6 @@ const getPath = (
           Z`;
 };
 
-const CustomXAxisTick = (props: any) => {
-  const { x, y, payload } = props;
-  const name = payload.value;
-  const truncatedName = name.length > 15 ? name.substring(0, 13) + "..." : name;
-
-  return (
-    <g transform={`translate(${x},${y})`}>
-      <text
-        x={0}
-        y={0}
-        dy={16}
-        textAnchor="middle"
-        fill="#94a3b8"
-        className="text-[11px] font-bold"
-      >
-        {truncatedName}
-      </text>
-    </g>
-  );
-};
-
 const renderActiveShape = (props: any) => {
   const { cx, cy, innerRadius, outerRadius, startAngle, endAngle, fill } =
     props;
@@ -826,18 +801,6 @@ export default function ReportsView() {
             <stop offset="0%" stopColor="#34d399" />
             <stop offset="100%" stopColor="#059669" />
           </linearGradient>
-          <linearGradient id="doneGradient" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#10b981" />
-            <stop offset="100%" stopColor="#059669" />
-          </linearGradient>
-          <linearGradient id="missedGradient" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#f43f5e" />
-            <stop offset="100%" stopColor="#e11d48" />
-          </linearGradient>
-          <linearGradient id="pendingGradient" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#94a3b8" />
-            <stop offset="100%" stopColor="#64748b" />
-          </linearGradient>
         </defs>
       </svg>
 
@@ -1095,134 +1058,7 @@ export default function ReportsView() {
               {isCalendarDataLoading ? (
                 <SkeletonPulse className="h-80 w-full" />
               ) : taskProgressData.length > 0 ? (
-                <div className="relative h-[400px] w-full">
-                  <div className="absolute right-0 top-0 z-10 flex items-center gap-6 pr-2 pt-2">
-                    <div className="flex items-center gap-2">
-                      <div className="h-2 w-2 rounded-full bg-[#10b981]" />
-                      <span className="text-[10px] font-black uppercase tracking-[0.2em] text-neutral-900 dark:text-neutral-100">
-                        {t`HOÀN THÀNH`}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <div className="h-2 w-2 rounded-full bg-[#f43f5e]" />
-                      <span className="text-[10px] font-black uppercase tracking-[0.2em] text-neutral-900 dark:text-neutral-100">
-                        {t`BỎ LỠ`}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <div className="h-2 w-2 rounded-full bg-[#94a3b8]" />
-                      <span className="text-[10px] font-black uppercase tracking-[0.2em] text-neutral-900 dark:text-neutral-100">
-                        {t`CHỜ`}
-                      </span>
-                    </div>
-                  </div>
-                  <ResponsiveContainer
-                    width={
-                      taskProgressData.length < 4
-                        ? `${taskProgressData.length * 25}%`
-                        : "100%"
-                    }
-                    height="100%"
-                  >
-                    <BarChart
-                      data={taskProgressData}
-                      margin={{ top: 40, right: 0, left: -20, bottom: 80 }}
-                    >
-                      <CartesianGrid
-                        strokeDasharray="3 3"
-                        vertical={false}
-                        strokeOpacity={0.05}
-                      />
-                      <XAxis
-                        dataKey="taskName"
-                        interval={0}
-                        tick={<CustomXAxisTick />}
-                        axisLine={false}
-                        tickLine={false}
-                      />
-                      <YAxis
-                        tick={{
-                          fontSize: 10,
-                          fontWeight: 800,
-                          fill: "#94a3b8",
-                        }}
-                        axisLine={false}
-                        tickLine={false}
-                        unit="%"
-                        domain={[0, 100]}
-                      />
-                      <Tooltip
-                        cursor={false}
-                        content={({ active, payload }: any) => {
-                          if (!active || !payload?.length) return null;
-                          const d = payload[0].payload;
-                          return (
-                            <div className="w-[220px] overflow-hidden rounded-2xl border border-light-200/60 bg-white/95 p-4 shadow-xl backdrop-blur-xl dark:border-dark-400/40 dark:bg-dark-300/95">
-                              <div className="absolute left-0 top-0 h-1.5 w-full bg-gradient-to-r from-indigo-500 via-emerald-500 to-sky-500" />
-                              <p className="mb-4 text-xs font-black tracking-tight text-neutral-900 dark:text-dark-1000">
-                                {d.taskName}
-                              </p>
-                              <div className="flex flex-col gap-2.5">
-                                <div className="flex items-center justify-between">
-                                  <div className="flex items-center gap-2">
-                                    <div className="h-2 w-2 rounded-full bg-[#10b981]" />
-                                    <span className="text-[10px] font-extrabold uppercase tracking-wider text-light-500">{t`Done`}</span>
-                                  </div>
-                                  <span className="text-xs font-black text-emerald-600">
-                                    {d.doneCount} ({d.completionRate}%)
-                                  </span>
-                                </div>
-                                <div className="flex items-center justify-between">
-                                  <div className="flex items-center gap-2">
-                                    <div className="h-2 w-2 rounded-full bg-[#f43f5e]" />
-                                    <span className="text-[10px] font-extrabold uppercase tracking-wider text-light-500">{t`Missed`}</span>
-                                  </div>
-                                  <span className="text-xs font-black text-rose-600">
-                                    {d.missedCount} ({d.missedRate}%)
-                                  </span>
-                                </div>
-                                <div className="flex items-center justify-between">
-                                  <div className="flex items-center gap-2">
-                                    <div className="h-2 w-2 rounded-full bg-[#94a3b8]" />
-                                    <span className="text-[10px] font-extrabold uppercase tracking-wider text-light-500">{t`Pending`}</span>
-                                  </div>
-                                  <span className="text-xs font-black text-slate-600">
-                                    {d.pendingCount} ({d.pendingRate}%)
-                                  </span>
-                                </div>
-                              </div>
-                            </div>
-                          );
-                        }}
-                      />
-                      <Bar
-                        name="Pending"
-                        dataKey="pendingRate"
-                        stackId="stack"
-                        fill="url(#pendingGradient)"
-                        barSize={45}
-                        isAnimationActive={false}
-                      />
-                      <Bar
-                        name="Done"
-                        dataKey="completionRate"
-                        stackId="stack"
-                        fill="url(#doneGradient)"
-                        barSize={45}
-                        isAnimationActive={false}
-                      />
-                      <Bar
-                        name="Missed"
-                        dataKey="missedRate"
-                        stackId="stack"
-                        fill="url(#missedGradient)"
-                        barSize={45}
-                        radius={[12, 12, 0, 0]}
-                        isAnimationActive={false}
-                      />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
+                <TaskProgressChart data={taskProgressData} />
               ) : (
                 <div className="flex h-64 flex-col items-center justify-center gap-4 text-light-400">
                   <div className="rounded-full bg-light-100 p-6 dark:bg-dark-300">

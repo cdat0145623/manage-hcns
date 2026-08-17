@@ -9,6 +9,7 @@ import * as cardCommentRepo from "@kan/db/repository/cardComment.repo";
 import * as rewardRepo from "@kan/db/repository/reward.repo";
 import * as taskInstanceRepo from "@kan/db/repository/taskInstance.repo";
 import * as taskMasterRepo from "@kan/db/repository/taskMaster.repo";
+import * as userRepo from "@kan/db/repository/user.repo";
 import { statusTypeEnum } from "@kan/db/schema";
 import { applyMasterWallTimeToAnchorDay } from "@kan/shared/utils";
 
@@ -18,6 +19,7 @@ import {
   revertTaskInstanceConfigToApproved,
   trackTaskInstanceRewardViolations,
 } from "../utils/rewardViolation";
+import { getTaskInstanceUpdateAuthorization } from "../utils/task-instance-authorization";
 import {
   isAllowedUserTaskInstanceStatusTransition,
   resolveActualDateForStatusTransition,
@@ -443,20 +445,16 @@ export const taskInstanceRouter = createTRPCRouter({
         });
       }
 
-      if (
-        !isAllowedUserTaskInstanceStatusTransition({
-          oldStatus: oldTaskInstance.status,
-          newStatus: status,
-        })
-      ) {
+      const currentUser = await userRepo.getById(ctx.db, userId);
+      if (!currentUser) {
         throw new TRPCError({
-          message: `This task status transition is not allowed`,
-          code: "BAD_REQUEST",
+          message: `User not found`,
+          code: "NOT_FOUND",
         });
       }
 
       const taskMaster = await ctx.db.query.taskMasters.findFirst({
-        where: (t, { eq }) => eq(t.id, taskMasterId),
+        where: (t, { eq }) => eq(t.id, oldTaskInstance.taskMasterId),
       });
 
       if (!taskMaster) {
@@ -466,10 +464,38 @@ export const taskInstanceRouter = createTRPCRouter({
         });
       }
 
-      if (taskMaster.targetUser !== userId && taskMaster.createdBy !== userId) {
+      const authorization = getTaskInstanceUpdateAuthorization({
+        actorId: userId,
+        actorRole: currentUser.role,
+        instanceUserId: oldTaskInstance.userId,
+        masterCreatedBy: taskMaster.createdBy,
+        instanceTaskMasterId: oldTaskInstance.taskMasterId,
+        requestedTaskMasterId: taskMasterId,
+      });
+
+      if (authorization === "task-master-mismatch") {
+        throw new TRPCError({
+          message: `Task master does not match this task instance`,
+          code: "BAD_REQUEST",
+        });
+      }
+
+      if (authorization === "forbidden") {
         throw new TRPCError({
           message: `User not authorized to update this task instance`,
           code: "FORBIDDEN",
+        });
+      }
+
+      if (
+        !isAllowedUserTaskInstanceStatusTransition({
+          oldStatus: oldTaskInstance.status,
+          newStatus: status,
+        })
+      ) {
+        throw new TRPCError({
+          message: `This task status transition is not allowed`,
+          code: "BAD_REQUEST",
         });
       }
 

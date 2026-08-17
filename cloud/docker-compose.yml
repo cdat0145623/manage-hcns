@@ -103,6 +103,26 @@ services:
       migrator:
         condition: service_completed_successfully
 
+  scheduler:
+    image: ghcr.io/kanbn/kan-scheduler:latest
+    container_name: ${SCHEDULER_CONTAINER_NAME:-kan-scheduler}
+    networks:
+      - dokploy-network
+    build:
+      context: ..
+      dockerfile: apps/web/Dockerfile
+      target: scheduler
+    env_file:
+      - .env
+    environment:
+      - NODE_ENV=production
+      - POSTGRES_URL=${POSTGRES_URL}
+      - TZ=Asia/Ho_Chi_Minh
+    depends_on:
+      migrator:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
 networks:
   dokploy-network:
     external: true

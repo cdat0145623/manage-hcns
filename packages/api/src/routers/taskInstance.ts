@@ -1,6 +1,7 @@
+import type { Weekday } from "rrule";
 import type { Language } from "rrule/dist/esm/nlp/i18n";
 import { TRPCError } from "@trpc/server";
-import pkg, { Weekday } from "rrule";
+import * as rrule from "rrule";
 import { z } from "zod";
 
 import * as cardActivityRepo from "@kan/db/repository/cardActivity.repo";
@@ -17,8 +18,12 @@ import {
   revertTaskInstanceConfigToApproved,
   trackTaskInstanceRewardViolations,
 } from "../utils/rewardViolation";
+import {
+  isAllowedUserTaskInstanceStatusTransition,
+  resolveActualDateForStatusTransition,
+} from "../utils/taskInstanceStatusTransition";
 
-const { RRule } = pkg;
+const { RRule } = rrule;
 
 const statusTypeEnumSchema = z.enum(statusTypeEnum.enumValues);
 
@@ -189,7 +194,6 @@ export const taskInstanceRouter = createTRPCRouter({
       z.object({
         taskMasterId: z.string(),
         targetDate: z.date(),
-        actualDate: z.date(),
         status: statusTypeEnumSchema,
       }),
     )
@@ -202,7 +206,7 @@ export const taskInstanceRouter = createTRPCRouter({
         });
       }
 
-      const { taskMasterId, targetDate, actualDate, status } = input;
+      const { taskMasterId, targetDate, status } = input;
 
       const taskMaster = await ctx.db.query.taskMasters.findFirst({
         where: (t, { eq }) => eq(t.id, taskMasterId),
@@ -226,7 +230,7 @@ export const taskInstanceRouter = createTRPCRouter({
         name: taskMaster.name!,
         description: taskMaster.description!,
         targetDate,
-        actualDate,
+        actualDate: status === "done" ? new Date() : null,
         endDate: instanceEndDate,
         status,
       });
@@ -357,7 +361,7 @@ export const taskInstanceRouter = createTRPCRouter({
             const newVirtualTaskInstances = virtualTaskInstances.map(
               (virtualInstance) => {
                 const existing = existingTaskInstanceMap.get(
-                  virtualInstance.targetDate!.toISOString(),
+                  virtualInstance.targetDate.toISOString(),
                 );
 
                 const taskMasterInfo = {
@@ -413,7 +417,6 @@ export const taskInstanceRouter = createTRPCRouter({
         name: z.string().optional(),
         description: z.string().optional(),
         targetDate: z.date().optional(),
-        actualDate: z.date().optional(),
         status: statusTypeEnumSchema,
       }),
     )
@@ -427,15 +430,7 @@ export const taskInstanceRouter = createTRPCRouter({
         });
       }
 
-      const {
-        id,
-        taskMasterId,
-        name,
-        description,
-        targetDate,
-        actualDate,
-        status,
-      } = input;
+      const { id, taskMasterId, name, description, targetDate, status } = input;
 
       const oldTaskInstance = await ctx.db.query.taskInstances.findFirst({
         where: (t, { eq }) => eq(t.id, id),
@@ -445,6 +440,18 @@ export const taskInstanceRouter = createTRPCRouter({
         throw new TRPCError({
           message: `Task instance not found`,
           code: "NOT_FOUND",
+        });
+      }
+
+      if (
+        !isAllowedUserTaskInstanceStatusTransition({
+          oldStatus: oldTaskInstance.status,
+          newStatus: status,
+        })
+      ) {
+        throw new TRPCError({
+          message: `This task status transition is not allowed`,
+          code: "BAD_REQUEST",
         });
       }
 
@@ -462,15 +469,27 @@ export const taskInstanceRouter = createTRPCRouter({
       if (taskMaster.targetUser !== userId && taskMaster.createdBy !== userId) {
         throw new TRPCError({
           message: `User not authorized to update this task instance`,
-          code: "UNAUTHORIZED",
+          code: "FORBIDDEN",
         });
       }
 
-      const anchor = targetDate ?? oldTaskInstance.targetDate!;
+      const anchor = targetDate ?? oldTaskInstance.targetDate;
+      if (!anchor) {
+        throw new TRPCError({
+          message: `Task instance start date is required`,
+          code: "BAD_REQUEST",
+        });
+      }
       const instanceEndDate = applyMasterWallTimeToAnchorDay(
         anchor,
         taskMaster.endDate,
       );
+      const actualDate = resolveActualDateForStatusTransition({
+        oldStatus: oldTaskInstance.status,
+        newStatus: status,
+        currentActualDate: oldTaskInstance.actualDate,
+        now: new Date(),
+      });
 
       // Giữ nguyên userId gắn với instance (slot / assignee theo unique index),
       // không ghi đè bằng ctx.user — tránh false "assignee_changed" và sai reward.
@@ -484,6 +503,7 @@ export const taskInstanceRouter = createTRPCRouter({
         actualDate,
         endDate: instanceEndDate,
         status: status,
+        actorUserId: userId,
       });
 
       if (!newTaskInstance) {
@@ -491,23 +511,6 @@ export const taskInstanceRouter = createTRPCRouter({
           message: `Failed to update task instance`,
           code: "INTERNAL_SERVER_ERROR",
         });
-      }
-
-      if (oldTaskInstance.status !== newTaskInstance.status) {
-        const cardActivitesInsert = [
-          {
-            type: "status_changed" as const,
-            taskInstanceId: oldTaskInstance.id,
-            createdBy: userId,
-            oldValue: oldTaskInstance.status,
-            newValue: newTaskInstance.status,
-          },
-        ];
-
-        await cardActivityRepo.bulkCreateForTaskInstance(
-          ctx.db,
-          cardActivitesInsert,
-        );
       }
 
       // ---- Reward Triggers ----

@@ -95,6 +95,11 @@ export const taskInstances = pgTable(
     unique().on(t.userId, t.taskMasterId, t.targetDate),
     index("task_instances_user_target_idx").on(t.userId, t.targetDate),
     index("task_instances_master_idx").on(t.taskMasterId),
+    index("task_instances_status_deleted_end_idx").on(
+      t.status,
+      t.isDeleted,
+      t.endDate,
+    ),
   ],
 );
 

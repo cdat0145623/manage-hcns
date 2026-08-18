@@ -1,13 +1,16 @@
 import { CALENDAR_TIME_ZONE } from "@kan/shared/utils";
 
 export const MATERIALIZE_SCHEDULE = "0 7 * * *";
-export const MISSED_STATUS_SCHEDULE = "*/15 * * * *";
+export const MISSED_STATUS_SCHEDULE = "5,20,35,50 8-23 * * *";
 
-interface ScheduledTask {
+const MATERIALIZE_START_MINUTES = 7 * 60;
+const MISSED_STATUS_START_MINUTES = 8 * 60 + 5;
+
+export interface ScheduledTask {
   stop: () => void | Promise<void>;
 }
 
-type Schedule = (
+export type Schedule = (
   expression: string,
   callback: () => void,
   options: { timezone: string },
@@ -17,7 +20,7 @@ interface RegisterTaskInstanceSchedulerOptions {
   schedule: Schedule;
   materializeToday: () => void | Promise<void>;
   updateMissedNow: () => void | Promise<void>;
-  currentHour: number;
+  currentMinutesOfDay: number;
 }
 
 const preventOverlap = (job: () => void | Promise<void>) => {
@@ -41,10 +44,12 @@ export async function registerTaskInstanceScheduler(
   const runMaterialize = preventOverlap(options.materializeToday);
   const runMissedUpdate = preventOverlap(options.updateMissedNow);
 
-  if (options.currentHour >= 7) {
+  if (options.currentMinutesOfDay >= MATERIALIZE_START_MINUTES) {
     await runMaterialize();
   }
-  await runMissedUpdate();
+  if (options.currentMinutesOfDay >= MISSED_STATUS_START_MINUTES) {
+    await runMissedUpdate();
+  }
 
   return [
     options.schedule(MATERIALIZE_SCHEDULE, () => void runMaterialize(), {

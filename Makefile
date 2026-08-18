@@ -1,4 +1,4 @@
-# Docker images (local names after build — must match root docker-compose.yml)
+# Local Docker image names produced by `make build`
 LOCAL_WEB ?= kanbn-web
 LOCAL_MIGRATE ?= kanbn-migrate
 
@@ -11,12 +11,12 @@ TAG ?= latest
 
 .PHONY: build push deploy
 
-## Build app images (migrate + web) using root docker-compose.yml
+## Build app images (migrate + web)
 build:
 	docker compose build web migrate
 
 ## Tag and push images to GitHub Container Registry (requires: docker login ghcr.io)
-## Run `make build` first so kanbn-web / kanbn-migrate:latest exist locally.
+## Run `make build` first so both local images exist.
 ## Example: make push TAG=v1.2.3
 push:
 	docker tag $(LOCAL_WEB):latest $(IMAGE_WEB):$(TAG)

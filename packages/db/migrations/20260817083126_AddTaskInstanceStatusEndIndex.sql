@@ -1,0 +1,1 @@
+CREATE INDEX IF NOT EXISTS "task_instances_status_deleted_end_idx" ON "taskInstances" USING btree ("status","isDeleted","endDate");

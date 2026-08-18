@@ -491,6 +491,13 @@
       "when": 1785832992831,
       "tag": "20260804084312_AddBoardOwner",
       "breakpoints": true
+    },
+    {
+      "idx": 70,
+      "version": "7",
+      "when": 1786955486230,
+      "tag": "20260817083126_AddTaskInstanceStatusEndIndex",
+      "breakpoints": true
     }
   ]
 }

@@ -296,7 +296,6 @@ export function EventDetailModal({
         id: entry.instanceId!,
         taskMasterId: entry.masterId,
         targetDate: new Date(entry.date),
-        actualDate: new Date(entry.date),
         status: newStatus,
       });
     } catch (err: unknown) {
@@ -537,7 +536,7 @@ export function EventDetailModal({
                     disabled={isBusy || !canEdit}
                     onClick={() =>
                       handleStatusChange(
-                        entry.status === "pending" ? "done" : "pending",
+                        currentStatus === "done" ? "pending" : "done",
                       )
                     }
                     className={`flex min-h-[34px] w-full items-center gap-2 rounded-xl px-3 text-left text-[13px] font-medium shadow-sm transition-all ${!canEdit ? "cursor-not-allowed opacity-50" : statusConfig.activeBg + " " + statusConfig.activeText + " " + statusConfig.activeBorder + " hover:opacity-80"} `}

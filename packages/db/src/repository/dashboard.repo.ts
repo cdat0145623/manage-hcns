@@ -1,4 +1,4 @@
-import { and, eq, inArray, isNull } from "drizzle-orm";
+import { and, eq, gte, inArray, isNull, lt } from "drizzle-orm";
 
 import type { dbClient } from "@kan/db/client";
 import {
@@ -7,10 +7,11 @@ import {
   cards,
   cardToWorkspaceMembers,
   lists,
+  taskInstances,
+  taskMasters,
   workspaceMembers,
 } from "@kan/db/schema";
-
-import { generateVirtualTaskInstances } from "./taskInstance.repo";
+import { parseCalendarDayInZone } from "@kan/shared/utils";
 
 // ================================================================
 // KANBAN METRICS
@@ -197,14 +198,53 @@ export const getKanbanDeadlineRate = async (
 // CALENDAR METRICS
 // ================================================================
 
-interface MergedInstance {
+interface CalendarMetricInstance {
   id: string;
-  userId: string;
   taskMasterId: string;
   taskMasterName: string | null;
   targetDate: Date | null;
-  status: "pending" | "done" | "missed" | "draft" | "waiting_approval" | "approved" | "rejected" | "waiting_evaluation" | "completed";
+  actualDate: Date | null;
+  endDate: Date | null;
+  status: "pending" | "done" | "missed";
 }
+
+const calendarMetricDateRange = (params: {
+  viewMode: "week" | "month" | "year";
+  value?: number;
+  year: number;
+}) => {
+  let fromDateKey: string;
+  let toDateKey: string;
+
+  if (params.viewMode === "week") {
+    const week = params.value ?? 1;
+    const jan1 = new Date(Date.UTC(params.year, 0, 1));
+    const dayOfWeek = jan1.getUTCDay();
+    const diffToMonday =
+      dayOfWeek === 1 ? 0 : dayOfWeek === 0 ? 1 : 8 - dayOfWeek;
+    const firstMonday = new Date(Date.UTC(params.year, 0, 1 + diffToMonday));
+    const fromUtc = new Date(
+      firstMonday.getTime() + (week - 1) * 7 * 24 * 60 * 60 * 1000,
+    );
+    const toUtc = new Date(fromUtc.getTime() + 7 * 24 * 60 * 60 * 1000);
+    fromDateKey = fromUtc.toISOString().slice(0, 10);
+    toDateKey = toUtc.toISOString().slice(0, 10);
+  } else if (params.viewMode === "year") {
+    fromDateKey = `${params.year}-01-01`;
+    toDateKey = `${params.year + 1}-01-01`;
+  } else {
+    const month = params.value ?? 1;
+    const fromUtc = new Date(Date.UTC(params.year, month - 1, 1));
+    const toUtc = new Date(Date.UTC(params.year, month, 1));
+    fromDateKey = fromUtc.toISOString().slice(0, 10);
+    toDateKey = toUtc.toISOString().slice(0, 10);
+  }
+
+  return {
+    from: parseCalendarDayInZone(fromDateKey),
+    to: parseCalendarDayInZone(toDateKey),
+  };
+};
 
 export const getCalendarMetrics = async (
   db: dbClient,
@@ -215,132 +255,27 @@ export const getCalendarMetrics = async (
     year: number;
   },
 ) => {
-  const normalizeToMidnight = (date: Date) => {
-    const d = new Date(date);
-    d.setUTCHours(0, 0, 0, 0);
-    return d.getTime();
-  };
-
-  let from: Date;
-  let to: Date;
-
-  if (params.viewMode === "week") {
-    const week = params.value ?? 1;
-    // Week calculation: start from Jan 1st and add weeks.
-    // To make it simpler and consistent across JS:
-    const jan1 = new Date(Date.UTC(params.year, 0, 1));
-    const dayOfWeek = jan1.getUTCDay();
-    const diffToMonday =
-      dayOfWeek === 1 ? 0 : dayOfWeek === 0 ? 1 : 8 - dayOfWeek;
-    const firstMonday = new Date(Date.UTC(params.year, 0, 1 + diffToMonday));
-
-    from = new Date(
-      firstMonday.getTime() + (week - 1) * 7 * 24 * 60 * 60 * 1000,
-    );
-    to = new Date(from.getTime() + 7 * 24 * 60 * 60 * 1000 - 1);
-  } else if (params.viewMode === "year") {
-    from = new Date(Date.UTC(params.year, 0, 1));
-    to = new Date(Date.UTC(params.year, 11, 31, 23, 59, 59, 999));
-  } else {
-    // Default: month
-    const month = params.value ?? 1;
-    from = new Date(Date.UTC(params.year, month - 1, 1));
-    to = new Date(Date.UTC(params.year, month, 0, 23, 59, 59, 999));
-  }
-
-  // Get all task masters active in range for the selected user
-  const taskMastersData = await db.query.taskMasters.findMany({
-    where: (t, { and: _and, lt, gte, eq: _eq }) =>
-      _and(
-        lt(t.startDate, to),
-        gte(t.endDate, from),
-        _eq(t.targetUser, params.selectedUserId),
-        _eq(t.isDeleted, false),
+  const { from, to } = calendarMetricDateRange(params);
+  const allInstances: CalendarMetricInstance[] = await db
+    .select({
+      id: taskInstances.id,
+      taskMasterId: taskInstances.taskMasterId,
+      taskMasterName: taskMasters.name,
+      targetDate: taskInstances.targetDate,
+      actualDate: taskInstances.actualDate,
+      endDate: taskInstances.endDate,
+      status: taskInstances.status,
+    })
+    .from(taskInstances)
+    .innerJoin(taskMasters, eq(taskInstances.taskMasterId, taskMasters.id))
+    .where(
+      and(
+        eq(taskInstances.userId, params.selectedUserId),
+        eq(taskInstances.isDeleted, false),
+        gte(taskInstances.targetDate, from),
+        lt(taskInstances.targetDate, to),
       ),
-    with: { frequence: true },
-  });
-
-  // Generate virtual instances and merge with actual DB instances
-  const allInstances: MergedInstance[] = [];
-
-  for (const taskMaster of taskMastersData) {
-    try {
-      const freq = taskMaster.frequence as
-        | { rruleString: string; dtStart: Date | null }
-        | undefined
-        | null;
-
-      if (!freq?.rruleString || !freq.dtStart) continue;
-
-      const effectiveFrom =
-        from > taskMaster.startDate ? from : taskMaster.startDate;
-      const effectiveTo = to > taskMaster.endDate ? taskMaster.endDate : to;
-
-      const virtualInstances = await generateVirtualTaskInstances({
-        userId: taskMaster.targetUser,
-        taskMasterId: taskMaster.id,
-        rruleString: freq.rruleString,
-        startDate: taskMaster.startDate,
-        masterEndDate: taskMaster.endDate,
-        from: effectiveFrom,
-        to: effectiveTo,
-      });
-
-      if (virtualInstances.length === 0) continue;
-
-      // Fetch actual DB instances for this task master in range
-      const actualInstances = await db.query.taskInstances.findMany({
-        where: (t, { and: _and, lt, gte, eq: _eq }) =>
-          _and(
-            lt(t.targetDate, effectiveTo),
-            gte(t.targetDate, effectiveFrom),
-            _eq(t.taskMasterId, taskMaster.id),
-            _eq(t.isDeleted, false),
-          ),
-      });
-
-      const actualMap = new Map(
-        actualInstances.map((ti) => [
-          normalizeToMidnight(ti.targetDate ?? new Date(0)),
-          ti,
-        ]),
-      );
-
-      const matchedActualIds = new Set<string>();
-
-      for (const virt of virtualInstances) {
-        const actual = actualMap.get(normalizeToMidnight(virt.targetDate));
-        if (actual) {
-          matchedActualIds.add(actual.id);
-        }
-
-        allInstances.push({
-          id: actual ? actual.id : virt.id,
-          userId: taskMaster.targetUser,
-          taskMasterId: taskMaster.id,
-          taskMasterName: taskMaster.name ?? null,
-          targetDate: virt.targetDate,
-          status: actual ? actual.status : ("pending" as const),
-        });
-      }
-
-      // Add actual instances that didn't match a virtual slot (e.g. ad-hoc or rule changed)
-      for (const actual of actualInstances) {
-        if (!matchedActualIds.has(actual.id)) {
-          allInstances.push({
-            id: actual.id,
-            userId: taskMaster.targetUser,
-            taskMasterId: taskMaster.id,
-            taskMasterName: taskMaster.name ?? null,
-            targetDate: actual.targetDate,
-            status: actual.status,
-          });
-        }
-      }
-    } catch {
-      // Skip task masters with bad rrule config
-    }
-  }
+    );
 
   const totalCount = allInstances.length;
   const doneInstances = allInstances.filter((i) => i.status === "done");
@@ -355,52 +290,12 @@ export const getCalendarMetrics = async (
   };
 
   // ── deadlineCompletionRate ─────────────────────────────────────
-  // Only actual (non-virtual) instances can have activity records
-  const actualDoneInstanceIds = doneInstances
-    .filter((i) => !i.id.startsWith("virtual-"))
-    .map((i) => i.id);
-
-  const doneInstanceActivities =
-    actualDoneInstanceIds.length > 0
-      ? await db
-          .select({
-            taskInstanceId: cardActivities.taskInstanceId,
-            createdAt: cardActivities.createdAt,
-          })
-          .from(cardActivities)
-          .where(
-            and(
-              inArray(cardActivities.taskInstanceId, actualDoneInstanceIds),
-              eq(cardActivities.type, "status_changed"),
-              eq(cardActivities.newValue, "done"),
-            ),
-          )
-      : [];
-
-  // Build map: instanceId → earliest done activity createdAt
-  const firstDoneActivityMap = new Map<string, Date>();
-  for (const activity of doneInstanceActivities) {
-    if (!activity.taskInstanceId) continue;
-    const existing = firstDoneActivityMap.get(activity.taskInstanceId);
-    if (!existing || activity.createdAt < existing) {
-      firstDoneActivityMap.set(activity.taskInstanceId, activity.createdAt);
-    }
-  }
-
-  let calendarOnTimeCount = 0;
-  for (const instance of doneInstances) {
-    if (instance.id.startsWith("virtual-")) continue; // virtual + done is an edge case
-
-    if (!instance.targetDate) {
-      calendarOnTimeCount++;
-      continue;
-    }
-
-    const doneAt = firstDoneActivityMap.get(instance.id);
-    if (doneAt && doneAt < instance.targetDate) {
-      calendarOnTimeCount++;
-    }
-  }
+  const calendarOnTimeCount = doneInstances.filter(
+    (instance) =>
+      instance.actualDate !== null &&
+      instance.endDate !== null &&
+      instance.actualDate <= instance.endDate,
+  ).length;
 
   const deadlineCompletionRate = {
     onTimeCount: calendarOnTimeCount,

@@ -2,15 +2,61 @@ import { and, eq, isNull, lt } from "drizzle-orm";
 import { z } from "zod";
 
 import * as cardRepo from "@kan/db/repository/card.repo";
-import * as taskInstanceRepo from "@kan/db/repository/taskInstance.repo";
-import { cards, taskInstances } from "@kan/db/schema";
+import { materializeTaskInstances } from "@kan/db/repository/taskInstanceMaterializer.repo";
+import { markOverdueTaskInstancesMissed } from "@kan/db/repository/taskInstanceStatus.repo";
+import { cards } from "@kan/db/schema";
 import { createLogger } from "@kan/logger";
+import { calendarDateKeyInAppZone } from "@kan/shared/utils";
 
 import { adminProcedure, createTRPCRouter } from "../trpc";
 
 const logger = createLogger("cron");
 
 export const cronRouter = createTRPCRouter({
+  materializeTaskInstances: adminProcedure
+    .meta({
+      openapi: {
+        method: "POST",
+        path: "/cron/materialize-task-instances",
+        summary: "Create daily task instances",
+        description:
+          "Creates database task instances for scheduled task masters on a calendar day.",
+        tags: ["Cron"],
+        protect: true,
+      },
+    })
+    .input(
+      z.object({
+        date: z
+          .string()
+          .regex(/^\d{4}-\d{2}-\d{2}$/)
+          .optional(),
+        taskMasterId: z.string().uuid().optional(),
+        userId: z.string().uuid().optional(),
+        dryRun: z.boolean().optional(),
+      }),
+    )
+    .output(
+      z.object({
+        created: z.number(),
+        skipped: z.number(),
+        failed: z.number(),
+        errors: z.array(
+          z.object({
+            taskMasterId: z.string(),
+            message: z.string(),
+          }),
+        ),
+      }),
+    )
+    .mutation(async ({ ctx, input }) =>
+      materializeTaskInstances(ctx.db, {
+        date: input.date ?? calendarDateKeyInAppZone(new Date()),
+        taskMasterId: input.taskMasterId,
+        userId: input.userId,
+        dryRun: input.dryRun,
+      }),
+    ),
   updateMissedStatuses: adminProcedure
     .meta({
       openapi: {
@@ -18,7 +64,7 @@ export const cronRouter = createTRPCRouter({
         path: "/cron/update-missed-statuses",
         summary: "Update missed statuses for cards and task instances",
         description:
-          "Updates status to 'missed' for cards with past dueDate and task instances with past targetDate that are still in 'pending' status",
+          "Updates status to 'missed' for cards with past dueDate and task instances with past endDate that are still in 'pending' status",
         tags: ["Cron"],
         protect: true,
       },
@@ -59,30 +105,10 @@ export const cronRouter = createTRPCRouter({
           }
         }
 
-        const pendingTaskInstancesWithPastTargetDate = await db
-          .select({
-            id: taskInstances.id,
-            status: taskInstances.status,
-          })
-          .from(taskInstances)
-          .where(
-            and(
-              eq(taskInstances.status, "pending" as const),
-              eq(taskInstances.isDeleted, false),
-              lt(taskInstances.targetDate, now),
-            ),
-          );
-
-        for (const taskInstance of pendingTaskInstancesWithPastTargetDate) {
-          const result = await taskInstanceRepo.updateStatusById(
-            db,
-            taskInstance.id,
-            "missed",
-          );
-          if (result) {
-            taskInstancesUpdated++;
-          }
-        }
+        const taskInstanceResult = await markOverdueTaskInstancesMissed(db, {
+          now,
+        });
+        taskInstancesUpdated = taskInstanceResult.updated;
 
         logger.info(
           { cardsUpdated, taskInstancesUpdated },

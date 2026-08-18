@@ -228,7 +228,6 @@ export function Calendar() {
         const newInstance = await createInstance.mutateAsync({
           taskMasterId: entry.masterId,
           targetDate: new Date(entry.date),
-          actualDate: new Date(entry.date),
           status: "pending",
         });
 

@@ -6,7 +6,7 @@
 /* eslint-disable react-hooks/exhaustive-deps */
 import { Listbox, Transition } from "@headlessui/react";
 import { t } from "@lingui/core/macro";
-import { Fragment, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import {
   HiCalendar,
   HiChartBar,
@@ -660,119 +660,8 @@ export default function ReportsView() {
     value: i + 1,
   }));
 
-  const { localFrom, localTo } = useMemo(() => {
-    let from: Date;
-    let to: Date;
-
-    if (viewMode === "week") {
-      const jan1 = new Date(year, 0, 1);
-      const dayOfWeek = jan1.getDay();
-      const diffToMonday =
-        dayOfWeek === 1 ? 0 : dayOfWeek === 0 ? 1 : 8 - dayOfWeek;
-      const firstMonday = new Date(year, 0, 1 + diffToMonday);
-      from = new Date(
-        firstMonday.getTime() + (week - 1) * 7 * 24 * 60 * 60 * 1000,
-      );
-      to = new Date(from.getTime() + 7 * 24 * 60 * 60 * 1000 - 1);
-    } else if (viewMode === "year") {
-      from = new Date(year, 0, 1);
-      to = new Date(year, 11, 31, 23, 59, 59, 999);
-    } else {
-      const m = month ?? 1;
-      from = new Date(year, m - 1, 1);
-      to = new Date(year, m, 0, 23, 59, 59, 999);
-    }
-    return { localFrom: from, localTo: to };
-  }, [viewMode, year, month, week]);
-
-  const { data: virtualInstances, isLoading: isCalendarDataLoading } =
-    api.taskInstance.getVirtual.useQuery(
-      { targetUser: selectedUserId, from: localFrom, to: localTo },
-      { enabled: !!selectedUserId },
-    );
-
-  const calendarMetrics = useMemo(() => {
-    if (!virtualInstances) return null;
-
-    const totalCount = virtualInstances.length;
-    const doneInstances = virtualInstances.filter(
-      (i: any) => i.status === "done",
-    );
-    const doneCount = doneInstances.length;
-
-    const taskCompletionRate = {
-      doneCount,
-      totalCount,
-      rate:
-        totalCount > 0 ? Math.round((doneCount / totalCount) * 10000) / 100 : 0,
-    };
-
-    let calendarOnTimeCount = 0;
-    for (const instance of doneInstances) {
-      if (!instance.targetDate) {
-        calendarOnTimeCount++;
-        continue;
-      }
-      const doneAt = instance.actualDate
-        ? new Date(instance.actualDate)
-        : new Date(instance.updatedAt);
-      if (doneAt <= new Date(instance.targetDate)) {
-        calendarOnTimeCount++;
-      }
-    }
-
-    const deadlineCompletionRate = {
-      onTimeCount: calendarOnTimeCount,
-      totalCount,
-      rate:
-        totalCount > 0
-          ? Math.round((calendarOnTimeCount / totalCount) * 10000) / 100
-          : 0,
-    };
-
-    const taskGroupMap = new Map<string, any>();
-    for (const instance of virtualInstances) {
-      const taskName = instance.taskMaster?.name || instance.name || "Unknown";
-      const entry = taskGroupMap.get(taskName) ?? {
-        taskName,
-        doneCount: 0,
-        missedCount: 0,
-        pendingCount: 0,
-        totalCount: 0,
-      };
-
-      entry.totalCount++;
-      if (instance.status === "done") entry.doneCount++;
-      else if (instance.status === "missed") entry.missedCount++;
-      else entry.pendingCount++;
-
-      taskGroupMap.set(taskName, entry);
-    }
-
-    const taskProgressBreakdown = {
-      data: Array.from(taskGroupMap.values()).map((group) => {
-        const completionRate =
-          group.totalCount > 0
-            ? Math.round((group.doneCount / group.totalCount) * 10000) / 100
-            : 0;
-        const missedRate =
-          group.totalCount > 0
-            ? Math.round((group.missedCount / group.totalCount) * 10000) / 100
-            : 0;
-        const pendingRate =
-          group.totalCount > 0
-            ? Math.max(0, 100 - completionRate - missedRate)
-            : 0;
-        return { ...group, completionRate, missedRate, pendingRate };
-      }),
-    };
-
-    return {
-      taskCompletionRate,
-      deadlineCompletionRate,
-      taskProgressBreakdown,
-    };
-  }, [virtualInstances]);
+  const calendarMetrics = metrics?.calendar;
+  const isCalendarDataLoading = isLoading;
 
   const rawPieData = metrics?.kanban?.cardDistributionByList?.data || [];
   const pieData = rawPieData.filter((d: any) => d.cardCount > 0);

@@ -1,13 +1,13 @@
 /* eslint-disable @typescript-eslint/no-unnecessary-condition */
 import { eq } from "drizzle-orm";
-import pkg from "rrule";
+import rrule from "rrule";
 
 import type { dbClient } from "@kan/db/client";
 // eslint-disable-next-line @typescript-eslint/consistent-type-imports
 import { cardActivities, statusTypeEnum, taskInstances } from "@kan/db/schema";
 import { applyMasterWallTimeToAnchorDay, generateUID } from "@kan/shared/utils";
 
-const { RRule } = pkg;
+const { RRule } = rrule;
 
 export type TaskStatus = (typeof statusTypeEnum.enumValues)[number];
 
@@ -19,7 +19,7 @@ export const create = async (
     name: string;
     description: string;
     targetDate: Date;
-    actualDate: Date;
+    actualDate: Date | null;
     endDate: Date;
     status: TaskStatus;
   },
@@ -72,7 +72,7 @@ export const generateVirtualTaskInstances = async (params: {
   const normalizedRrule = params.rruleString.replace(/\\n/g, "\n");
 
   // Phân tách TZID từ chuỗi RRULE (ví dụ: Asia/Ho_Chi_Minh)
-  const tzidMatch = normalizedRrule.match(/TZID=([^;:]+)/);
+  const tzidMatch = /TZID=([^;:]+)/.exec(normalizedRrule);
   const tzid = tzidMatch?.[1] ?? "UTC";
 
   // Hàm lấy offset (ms) của múi giờ tại một thời điểm cụ thể
@@ -162,59 +162,64 @@ export const update = async (
     name?: string;
     description?: string;
     targetDate?: Date;
-    actualDate?: Date;
+    actualDate?: Date | null;
     endDate?: Date;
     status: TaskStatus;
+    actorUserId: string;
   },
 ) => {
-  const oldTaskInstance = await db.query.taskInstances.findFirst({
-    where: (t, { eq }) => eq(t.id, taskInstanceInput.id),
-  });
-
-  const [taskInstance] = await db
-    .update(taskInstances)
-    .set({
-      userId: taskInstanceInput.userId,
-      taskMasterId: taskInstanceInput.taskMasterId,
-      name: taskInstanceInput.name,
-      description: taskInstanceInput.description,
-      status: taskInstanceInput.status,
-      updatedAt: new Date(),
-      ...(taskInstanceInput.targetDate !== undefined
-        ? { targetDate: taskInstanceInput.targetDate }
-        : {}),
-      ...(taskInstanceInput.actualDate !== undefined
-        ? { actualDate: taskInstanceInput.actualDate }
-        : {}),
-      ...(taskInstanceInput.endDate !== undefined
-        ? { endDate: taskInstanceInput.endDate }
-        : {}),
-    })
-    .where(eq(taskInstances.id, taskInstanceInput.id))
-    .returning({
-      id: taskInstances.id,
-      userId: taskInstances.userId,
-      taskMasterId: taskInstances.taskMasterId,
-      targetDate: taskInstances.targetDate,
-      actualDate: taskInstances.actualDate,
-      endDate: taskInstances.endDate,
-      status: taskInstances.status,
+  return db.transaction(async (tx) => {
+    const oldTaskInstance = await tx.query.taskInstances.findFirst({
+      where: (t, { eq }) => eq(t.id, taskInstanceInput.id),
     });
 
-  if (!taskInstance) {
-    throw new Error("Failed to update task instance");
-  }
+    const [taskInstance] = await tx
+      .update(taskInstances)
+      .set({
+        userId: taskInstanceInput.userId,
+        taskMasterId: taskInstanceInput.taskMasterId,
+        name: taskInstanceInput.name,
+        description: taskInstanceInput.description,
+        status: taskInstanceInput.status,
+        updatedAt: new Date(),
+        ...(taskInstanceInput.targetDate !== undefined
+          ? { targetDate: taskInstanceInput.targetDate }
+          : {}),
+        ...(taskInstanceInput.actualDate !== undefined
+          ? { actualDate: taskInstanceInput.actualDate }
+          : {}),
+        ...(taskInstanceInput.endDate !== undefined
+          ? { endDate: taskInstanceInput.endDate }
+          : {}),
+      })
+      .where(eq(taskInstances.id, taskInstanceInput.id))
+      .returning({
+        id: taskInstances.id,
+        userId: taskInstances.userId,
+        taskMasterId: taskInstances.taskMasterId,
+        targetDate: taskInstances.targetDate,
+        actualDate: taskInstances.actualDate,
+        endDate: taskInstances.endDate,
+        status: taskInstances.status,
+      });
 
-  await db.insert(cardActivities).values({
-    publicId: generateUID(),
-    taskInstanceId: taskInstance.id,
-    type: "status_changed",
-    oldValue: oldTaskInstance?.status,
-    newValue: taskInstance.status,
-    createdBy: taskInstance.userId,
+    if (!taskInstance) {
+      throw new Error("Failed to update task instance");
+    }
+
+    if (oldTaskInstance?.status !== taskInstance.status) {
+      await tx.insert(cardActivities).values({
+        publicId: generateUID(),
+        taskInstanceId: taskInstance.id,
+        type: "status_changed",
+        oldValue: oldTaskInstance?.status,
+        newValue: taskInstance.status,
+        createdBy: taskInstanceInput.actorUserId,
+      });
+    }
+
+    return taskInstance;
   });
-
-  return taskInstance;
 };
 
 export const deleteSingle = async (
@@ -227,7 +232,7 @@ export const deleteSingle = async (
 ) => {
   let finalId = taskInstanceInput.id;
   // KIỂM TRA: Nếu ID bắt đầu bằng "virtual_", đây là công việc lặp lại chưa có trong DB
-  let isVirtual = taskInstanceInput.id.startsWith("virtual_");
+  const isVirtual = taskInstanceInput.id.startsWith("virtual_");
   const [taskInstance] = await db
     .update(taskInstances)
     .set({

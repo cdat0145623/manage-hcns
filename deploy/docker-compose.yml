@@ -35,22 +35,6 @@ services:
         condition: service_completed_successfully
     restart: unless-stopped
 
-  scheduler:
-    image: ${SCHEDULER_IMAGE:-ghcr.io/zomzem-audepartment/kanbn-scheduler}:${TAG:-latest}
-    container_name: ${SCHEDULER_CONTAINER_NAME:-kan-scheduler}
-    networks:
-      - kan-network
-    env_file:
-      - .env
-    environment:
-      - NODE_ENV=production
-      - POSTGRES_URL=${POSTGRES_URL}
-      - TZ=Asia/Ho_Chi_Minh
-    depends_on:
-      migrate:
-        condition: service_completed_successfully
-    restart: unless-stopped
-
   postgres:
     image: postgres:15
     container_name: kan-db

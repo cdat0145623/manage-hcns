@@ -1,13 +1,25 @@
 /* eslint-disable @typescript-eslint/no-unnecessary-condition */
 import { eq } from "drizzle-orm";
-import rrule from "rrule";
+import * as rruleModule from "rrule";
 
 import type { dbClient } from "@kan/db/client";
 // eslint-disable-next-line @typescript-eslint/consistent-type-imports
 import { cardActivities, statusTypeEnum, taskInstances } from "@kan/db/schema";
 import { applyMasterWallTimeToAnchorDay, generateUID } from "@kan/shared/utils";
 
-const { RRule } = rrule;
+type RRuleExports = Pick<typeof rruleModule, "RRule">;
+const rruleCandidate = rruleModule as RRuleExports & {
+  default?: RRuleExports;
+};
+const rruleExports = rruleCandidate.RRule
+  ? rruleCandidate
+  : rruleCandidate.default;
+
+if (!rruleExports?.RRule) {
+  throw new Error("rrule did not expose the RRule constructor");
+}
+
+const { RRule } = rruleExports;
 
 export type TaskStatus = (typeof statusTypeEnum.enumValues)[number];
 

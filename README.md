@@ -175,7 +175,21 @@ make push TAG=v1.0.0
 make deploy TAG=v1.0.0
 ```
 
-The deployment Compose file reads its environment from `deploy/.env` and supports overriding `REGISTRY`, `WEB_IMAGE`, `MIGRATE_IMAGE`, and `TAG`.
+The production pipeline builds, pushes, and deploys three application images:
+
+- `kanbn-web`: the Next.js application
+- `kanbn-migrate`: the one-shot database migrator
+- `kanbn-scheduler`: the background process that materializes daily task instances at 07:00 and checks for missed instances every 15 minutes in `Asia/Ho_Chi_Minh`
+
+The deployment Compose file reads its environment from `deploy/.env` and supports overriding `REGISTRY`, `WEB_IMAGE`, `MIGRATE_IMAGE`, `SCHEDULER_IMAGE`, and `TAG`. Run exactly one scheduler container so each scheduled job is registered once.
+
+Check the production scheduler status and logs with:
+
+```bash
+cd deploy
+docker compose ps scheduler
+docker compose logs -f scheduler
+```
 
 ## Database workflow
 

@@ -23,6 +23,7 @@ import { DeleteCommentConfirmation } from "../../card/components/DeleteCommentCo
 import { DueDateSelector } from "../../card/components/DueDateSelector";
 import { NewChecklistForm } from "../../card/components/NewChecklistForm";
 import NewCommentForm from "../../card/components/NewCommentForm";
+import { classifyTaskInstanceUpdateError } from "./task-instance-update-error";
 
 interface EventDetailModalProps {
   isVisible: boolean;
@@ -256,8 +257,48 @@ export function EventDetailModal({
         ]);
       }
     },
-    onError: (error: any) => {
-      console.error("Mutation failed:", error);
+    onError: (error, variables) => {
+      const errorKind = classifyTaskInstanceUpdateError(error);
+
+      if (errorKind === "invalid-transition" || errorKind === "conflict") {
+        void utils.taskInstance.getVirtual.invalidate();
+        if (variables.id) {
+          void utils.taskInstance.byId.invalidate({ id: variables.id });
+        }
+      }
+
+      if (errorKind === "forbidden") {
+        showPopup({
+          header: t`Không thể cập nhật công việc`,
+          message: t`Bạn không có quyền cập nhật công việc này.`,
+          icon: "error",
+        });
+        return;
+      }
+
+      if (errorKind === "invalid-transition") {
+        showPopup({
+          header: t`Trạng thái đã thay đổi`,
+          message: t`Trạng thái hiện tại không cho phép thao tác này. Dữ liệu mới nhất đang được tải lại.`,
+          icon: "info",
+        });
+        return;
+      }
+
+      if (errorKind === "conflict") {
+        showPopup({
+          header: t`Công việc đã được cập nhật`,
+          message: t`Công việc vừa được cập nhật ở nơi khác. Dữ liệu mới nhất đang được tải lại.`,
+          icon: "info",
+        });
+        return;
+      }
+
+      showPopup({
+        header: t`Không thể cập nhật công việc`,
+        message: t`Đã xảy ra lỗi. Vui lòng thử lại.`,
+        icon: "error",
+      });
     },
   });
 
@@ -298,32 +339,8 @@ export function EventDetailModal({
         targetDate: new Date(entry.date),
         status: newStatus,
       });
-    } catch (err: unknown) {
-      const error = err as { message?: string; shape?: { message?: string } };
-      const errStr = JSON.stringify(err).toLowerCase();
-      const isDuplicate =
-        error.message?.toLowerCase().includes("unique constraint") ||
-        error.message?.toLowerCase().includes("duplicate") ||
-        error.shape?.message?.toLowerCase().includes("unique constraint") ||
-        errStr.includes("unique constraint");
-
-      if (isDuplicate) {
-        showPopup({
-          header: "Conflict detected",
-          message:
-            "This task was already updated elsewhere. Refreshing the calendar.",
-          icon: "info",
-        });
-        void utils.taskInstance.getVirtual.invalidate();
-        onClose();
-      } else {
-        showPopup({
-          header: "Error",
-          message:
-            error.message ?? "Unable to update task status. Please try again.",
-          icon: "error",
-        });
-      }
+    } catch {
+      // The mutation's onError handler presents a localized error and refreshes stale data.
     } finally {
       setIsUpdating(false);
     }

@@ -14,7 +14,7 @@ describe("registerTaskInstanceScheduler", () => {
       schedule,
       materializeToday: vi.fn(),
       updateMissedNow: vi.fn(),
-      currentHour: 6,
+      currentMinutesOfDay: 6 * 60,
     });
 
     expect(schedule).toHaveBeenNthCalledWith(
@@ -25,10 +25,11 @@ describe("registerTaskInstanceScheduler", () => {
     );
     expect(schedule).toHaveBeenNthCalledWith(
       2,
-      MISSED_STATUS_SCHEDULE,
+      "5,20,35,50 8-23 * * *",
       expect.any(Function),
       { timezone: "Asia/Ho_Chi_Minh" },
     );
+    expect(MISSED_STATUS_SCHEDULE).toBe("5,20,35,50 8-23 * * *");
   });
 
   it("materializes today on startup at or after 07:00", async () => {
@@ -38,20 +39,33 @@ describe("registerTaskInstanceScheduler", () => {
       schedule: vi.fn(() => ({ stop: vi.fn() })),
       materializeToday,
       updateMissedNow: vi.fn(),
-      currentHour: 7,
+      currentMinutesOfDay: 7 * 60,
     });
 
     expect(materializeToday).toHaveBeenCalledTimes(1);
   });
 
-  it("always checks missed instances once on startup", async () => {
+  it("does not check missed instances on startup before 08:05", async () => {
     const updateMissedNow = vi.fn();
 
     await registerTaskInstanceScheduler({
       schedule: vi.fn(() => ({ stop: vi.fn() })),
       materializeToday: vi.fn(),
       updateMissedNow,
-      currentHour: 6,
+      currentMinutesOfDay: 8 * 60 + 4,
+    });
+
+    expect(updateMissedNow).not.toHaveBeenCalled();
+  });
+
+  it("checks missed instances once on startup at or after 08:05", async () => {
+    const updateMissedNow = vi.fn();
+
+    await registerTaskInstanceScheduler({
+      schedule: vi.fn(() => ({ stop: vi.fn() })),
+      materializeToday: vi.fn(),
+      updateMissedNow,
+      currentMinutesOfDay: 8 * 60 + 5,
     });
 
     expect(updateMissedNow).toHaveBeenCalledTimes(1);
@@ -74,7 +88,7 @@ describe("registerTaskInstanceScheduler", () => {
       }),
       materializeToday,
       updateMissedNow: vi.fn(),
-      currentHour: 6,
+      currentMinutesOfDay: 6 * 60,
     });
 
     callbacks[0]?.();

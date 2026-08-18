@@ -36,13 +36,6 @@ RUN git fetch --tags --unshallow 2>/dev/null || git fetch --tags 2>/dev/null || 
 
 RUN turbo prune --scope=@kan/web --scope=@kan/db --docker
 
-# Prune a smaller workspace for the background scheduler image.
-FROM alpine AS scheduler-pruner
-
-WORKDIR /app
-COPY . .
-RUN turbo prune --scope=@kan/db --docker
-
 # ============================================
 # Stage 3: Install dependencies
 # ============================================
@@ -55,17 +48,6 @@ COPY --from=pruner /app/out/json/ .
 
 ENV CI=true
 RUN --mount=type=cache,id=pnpm,target=/root/.pnpm-store pnpm install --frozen-lockfile
-
-FROM alpine AS scheduler-deps
-WORKDIR /app
-
-COPY --from=scheduler-pruner /app/out/pnpm-lock.yaml ./pnpm-lock.yaml
-COPY --from=scheduler-pruner /app/out/pnpm-workspace.yaml ./pnpm-workspace.yaml
-COPY --from=scheduler-pruner /app/out/json/ .
-
-ENV CI=true
-RUN --mount=type=cache,id=pnpm,target=/root/.pnpm-store \
-    pnpm install --frozen-lockfile --prod
 
 # ============================================
 # Stage 4: Build the web application
@@ -124,22 +106,6 @@ EXPOSE 3000
 
 # Default command (can be overridden in docker-compose)
 CMD ["pnpm", "dev"]
-
-# ============================================
-# Stage 4.6: Production task instance scheduler
-# ============================================
-FROM alpine AS scheduler
-WORKDIR /app
-
-RUN apk add --no-cache tzdata
-
-COPY --from=scheduler-deps /app/ ./
-COPY --from=scheduler-pruner /app/out/full/ .
-
-ENV NODE_ENV=production
-ENV TZ=Asia/Ho_Chi_Minh
-
-CMD ["pnpm", "exec", "tsx", "packages/db/src/scripts/task-instance-scheduler.ts"]
 # ============================================
 # Stage 5: Migration image (run-once container)
 # ============================================

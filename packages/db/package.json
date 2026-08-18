@@ -27,6 +27,10 @@
     "./redis": {
       "types": "./dist/redis.d.ts",
       "default": "./src/redis.ts"
+    },
+    "./scheduler/task-instance-scheduler-runtime": {
+      "types": "./dist/scheduler/task-instance-scheduler-runtime.d.ts",
+      "default": "./src/scheduler/task-instance-scheduler-runtime.ts"
     }
   },
   "license": "GPL-3.0",

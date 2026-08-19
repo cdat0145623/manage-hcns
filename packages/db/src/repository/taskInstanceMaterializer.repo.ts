@@ -1,7 +1,8 @@
-import { and, eq, gte, lt } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 
 import type { dbClient } from "@kan/db/client";
 import { cardActivities, taskInstances } from "@kan/db/schema";
+import type { taskMasters } from "@kan/db/schema";
 import { createLogger } from "@kan/logger";
 import {
   calendarDateKeyInAppZone,
@@ -53,6 +54,23 @@ const normalizeDateKey = (date: string | Date) => {
 const getNextDayStart = (dayStart: Date) =>
   new Date(dayStart.getTime() + 24 * 60 * 60 * 1000);
 
+export const buildTaskMasterMaterializationConditions = (
+  taskMaster: Pick<typeof taskMasters, "isDeleted" | "id" | "targetUser">,
+  options: Pick<MaterializeTaskInstancesOptions, "taskMasterId" | "userId">,
+) => {
+  const conditions = [eq(taskMaster.isDeleted, false)];
+
+  if (options.taskMasterId) {
+    conditions.push(eq(taskMaster.id, options.taskMasterId));
+  }
+
+  if (options.userId) {
+    conditions.push(eq(taskMaster.targetUser, options.userId));
+  }
+
+  return conditions;
+};
+
 export async function materializeTaskInstances(
   db: dbClient,
   options: MaterializeTaskInstancesOptions,
@@ -63,15 +81,7 @@ export async function materializeTaskInstances(
 
   const masters = await db.query.taskMasters.findMany({
     where: (taskMaster) =>
-      and(
-        eq(taskMaster.isDeleted, false),
-        lt(taskMaster.startDate, nextDayStart),
-        gte(taskMaster.endDate, dayStart),
-        ...(options.taskMasterId
-          ? [eq(taskMaster.id, options.taskMasterId)]
-          : []),
-        ...(options.userId ? [eq(taskMaster.targetUser, options.userId)] : []),
-      ),
+      and(...buildTaskMasterMaterializationConditions(taskMaster, options)),
     with: { frequence: true },
   });
 

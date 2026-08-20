@@ -29,16 +29,6 @@ import {
 
 import { useLocalisation } from "~/hooks/useLocalisation";
 
-const parseTime = (t: string) => {
-  const [h, m] = t.split(":").map((n) => parseInt(n ?? "0", 10));
-  return { hours: h ?? 0, minutes: m ?? 0 };
-};
-
-const timeToMinutes = (t: string) => {
-  const { hours, minutes } = parseTime(t);
-  return hours * 60 + minutes;
-};
-
 const minutesToTime = (mins: number) => {
   const clamped = Math.min(mins, 24 * 60 - 1);
   return `${String(Math.floor(clamped / 60)).padStart(2, "0")}:${String(clamped % 60).padStart(2, "0")}`;
@@ -52,6 +42,8 @@ interface DueDateSelectorProps {
   onDateSelect?: (date: Date | undefined) => void;
   weekStartsOn?: 0 | 1 | 6;
   label?: string;
+  title?: string;
+  className?: string;
 }
 
 export function DueDateSelector({
@@ -61,6 +53,8 @@ export function DueDateSelector({
   onDateSelect,
   weekStartsOn = 1,
   label,
+  title,
+  className,
 }: DueDateSelectorProps) {
   const { dateLocale } = useLocalisation();
   const [isOpen, setIsOpen] = useState(false);
@@ -404,9 +398,12 @@ export function DueDateSelector({
           !disabled && !isLoading && (isOpen ? handleClose() : openDropdown())
         }
         disabled={isLoading || disabled}
-        className={`flex min-h-[34px] w-full items-center rounded-xl bg-white px-3 text-left text-[13px] font-medium text-neutral-900 shadow-sm ring-1 ring-light-300 transition-all hover:bg-light-50 hover:ring-light-400 dark:bg-dark-300/30 dark:text-dark-1000 dark:ring-dark-300/50 dark:hover:bg-dark-300/50 ${
-          disabled ? "cursor-not-allowed opacity-60" : ""
-        }`}
+        title={title}
+        className={twMerge(
+          "flex min-h-[34px] w-full items-center rounded-xl bg-white px-3 text-left text-[13px] font-medium text-neutral-900 shadow-sm ring-1 ring-light-300 transition-all hover:bg-light-50 hover:ring-light-400 dark:bg-dark-300/30 dark:text-dark-1000 dark:ring-dark-300/50 dark:hover:bg-dark-300/50",
+          disabled && "cursor-not-allowed opacity-60",
+          className,
+        )}
       >
         {pendingDate ? (
           <span className="truncate">

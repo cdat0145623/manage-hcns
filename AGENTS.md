@@ -345,6 +345,7 @@ Update all of the following:
 ## Learned User Preferences
 
 - Bug reports and feature discussions may be in Vietnamese; when validating reward UI behavior, align with the Vietnamese copy in `apps/web` card reward components.
+- Do not run Lingui extraction in a way that rewrites every locale catalog when adding UI. Keep locale JSON files unchanged unless the user explicitly requests translation updates; use the existing `t`/Lingui source pattern and update only narrowly required entries.
 
 ## Learned Workspace Facts
 

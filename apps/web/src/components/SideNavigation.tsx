@@ -131,6 +131,18 @@ function SideNavigation({
       },
     },
     {
+      name: "Dự án",
+      href: "/projects",
+      icon: isDarkMode ? boardsIconDark : boardsIconLight,
+      keyboardShortcut: {
+        type: "SEQUENCE",
+        strokes: [{ key: "G" }, { key: "J" }],
+        action: () => router.push("/projects"),
+        group: "NAVIGATION",
+        description: t`Go to projects`,
+      },
+    },
+    {
       name: "Lịch",
       href: "/calendar",
       icon: isDarkMode ? activityLogsIconDark : activityLogsIconLight,

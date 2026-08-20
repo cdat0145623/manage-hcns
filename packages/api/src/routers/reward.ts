@@ -121,7 +121,7 @@ async function assertUserCanActOnCardRewardConfig(
       with: {
         list: {
           with: {
-            board: { columns: { workspaceId: true } },
+            board: { columns: { workspaceId: true, mode: true } },
           },
         },
       },
@@ -131,6 +131,13 @@ async function assertUserCanActOnCardRewardConfig(
       throw new TRPCError({
         code: "NOT_FOUND",
         message: "Không tìm thấy thẻ gắn với cấu hình.",
+      });
+    }
+
+    if (card.list.board.mode === "project") {
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: "Project cards do not support reward configuration.",
       });
     }
 
@@ -792,11 +799,22 @@ export const rewardConfigRouter = createTRPCRouter({
         if (cardPublicId && cardPublicId.trim().length > 0) {
           const card = await tx.query.cards.findFirst({
             where: eq(cards.publicId, cardPublicId),
+            with: {
+              list: {
+                with: { board: { columns: { mode: true } } },
+              },
+            },
           });
           if (!card) {
             throw new TRPCError({
               message: "Card not found",
               code: "NOT_FOUND",
+            });
+          }
+          if (card.list.board.mode === "project") {
+            throw new TRPCError({
+              code: "BAD_REQUEST",
+              message: "Project cards do not support reward configuration.",
             });
           }
           resolvedCardId = card.id;

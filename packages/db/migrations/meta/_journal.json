@@ -498,6 +498,34 @@
       "when": 1786955486230,
       "tag": "20260817083126_AddTaskInstanceStatusEndIndex",
       "breakpoints": true
+    },
+    {
+      "idx": 71,
+      "version": "7",
+      "when": 1787123719751,
+      "tag": "20260819071519_AddProjectBoards",
+      "breakpoints": true
+    },
+    {
+      "idx": 72,
+      "version": "7",
+      "when": 1787128100596,
+      "tag": "20260819082820_AddProjectPlanningLayer",
+      "breakpoints": true
+    },
+    {
+      "idx": 73,
+      "version": "7",
+      "when": 1787191594886,
+      "tag": "20260820020634_AddProjectCustomLabelFields",
+      "breakpoints": true
+    },
+    {
+      "idx": 74,
+      "version": "7",
+      "when": 1787198817490,
+      "tag": "20260820040657_AddProjectAndCardCodes",
+      "breakpoints": true
     }
   ]
 }

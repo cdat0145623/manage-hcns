@@ -8,7 +8,10 @@ import { twMerge } from "tailwind-merge";
 import PlainTextEditor from "~/components/PlainTextEditor";
 import { usePopup } from "~/providers/popup";
 import { api } from "~/utils/api";
-import { invalidateCard, invalidateTaskInstance } from "~/utils/cardInvalidation";
+import {
+  invalidateCard,
+  invalidateTaskInstance,
+} from "~/utils/cardInvalidation";
 
 interface ChecklistItemRowProps {
   item: {
@@ -19,6 +22,7 @@ interface ChecklistItemRowProps {
   cardPublicId?: string;
   taskInstanceId?: string;
   onCreateNewItem?: () => void;
+  onChanged?: () => void | Promise<void>;
   viewOnly?: boolean;
   dragHandleProps?: DraggableProvided["dragHandleProps"];
   isDragging?: boolean;
@@ -29,6 +33,7 @@ export default function ChecklistItemRow({
   cardPublicId,
   taskInstanceId,
   onCreateNewItem,
+  onChanged,
   viewOnly = false,
   dragHandleProps,
   isDragging = false,
@@ -110,6 +115,7 @@ export default function ChecklistItemRow({
       if (taskInstanceId) {
         await invalidateTaskInstance(utils, taskInstanceId);
       }
+      await onChanged?.();
     },
   });
 
@@ -149,6 +155,7 @@ export default function ChecklistItemRow({
       if (taskInstanceId) {
         await utils.taskInstance.byId.invalidate({ id: taskInstanceId });
       }
+      await onChanged?.();
     },
   });
 

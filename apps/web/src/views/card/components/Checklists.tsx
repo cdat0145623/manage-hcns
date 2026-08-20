@@ -8,10 +8,10 @@ import { StrictModeDroppable as Droppable } from "~/components/StrictModeDroppab
 import { useModal } from "~/providers/modal";
 import { usePopup } from "~/providers/popup";
 import { api } from "~/utils/api";
+import { invalidateTaskInstance } from "~/utils/cardInvalidation";
 import ChecklistItemRow from "./ChecklistItemRow";
 import ChecklistNameInput from "./ChecklistNameInput";
 import NewChecklistItemForm from "./NewChecklistItemForm";
-import { invalidateTaskInstance } from "~/utils/cardInvalidation";
 
 interface ChecklistItem {
   publicId: string;
@@ -31,6 +31,7 @@ interface ChecklistsProps {
   taskInstanceId?: string;
   activeChecklistForm?: string | null;
   setActiveChecklistForm?: (id: string | null) => void;
+  onChanged?: () => void | Promise<void>;
   viewOnly?: boolean;
 }
 
@@ -40,6 +41,7 @@ export default function Checklists({
   taskInstanceId,
   activeChecklistForm,
   setActiveChecklistForm,
+  onChanged,
   viewOnly = false,
 }: ChecklistsProps) {
   const { openModal } = useModal();
@@ -255,6 +257,7 @@ export default function Checklists({
                                 onCreateNewItem={() =>
                                   setActiveChecklistForm?.(checklist.publicId)
                                 }
+                                onChanged={onChanged}
                                 viewOnly={viewOnly}
                                 dragHandleProps={provided.dragHandleProps}
                                 isDragging={snapshot.isDragging}
@@ -274,6 +277,7 @@ export default function Checklists({
                       cardPublicId={cardPublicId}
                       taskInstanceId={taskInstanceId}
                       onCancel={() => setActiveChecklistForm?.(null)}
+                      onChanged={onChanged}
                       readOnly={viewOnly}
                     />
                   </div>

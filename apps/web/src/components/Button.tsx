@@ -29,7 +29,7 @@ const Button = ({
   ...props
 }: ButtonProps) => {
   const classes = twMerge(
-    "inline-flex items-center justify-center whitespace-nowrap rounded-md px-3 py-2 text-sm font-semibold text-light-50 shadow-sm focus-visible:outline-none",
+    "inline-flex items-center justify-center whitespace-nowrap rounded-md px-3 py-2 text-sm font-semibold text-light-50 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-light-700 focus-visible:ring-offset-2 dark:focus-visible:ring-dark-700",
     size === "xs" && "text-xs px-2 py-1",
     size === "sm" && "text-xs",
     size === "lg" && "py-[0.65rem]",

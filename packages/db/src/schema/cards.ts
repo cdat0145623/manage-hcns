@@ -2,6 +2,7 @@ import { relations } from "drizzle-orm";
 import {
   bigint,
   bigserial,
+  index,
   integer,
   jsonb,
   pgEnum,
@@ -18,10 +19,15 @@ import { checklists } from "./checklists";
 import { imports } from "./imports";
 import { labels } from "./labels";
 import { lists } from "./lists";
+import {
+  fileActivityLog,
+  frequence,
+  statusTypeEnum,
+  taskInstances,
+  taskMasters,
+} from "./tasks";
 import { users } from "./users";
 import { workspaceMembers } from "./workspaces";
-import { taskInstances, fileActivityLog, taskMasters, frequence } from "./tasks";
-import { statusTypeEnum } from "./tasks";
 
 export const activityTypes = [
   "created",
@@ -70,32 +76,62 @@ export type ActivityType = (typeof activityTypes)[number];
 
 export const activityTypeEnum = pgEnum("card_activity_type", activityTypes);
 
-export const cards = pgTable("card", {
-  id: bigserial("id", { mode: "number" }).primaryKey(),
-  publicId: varchar("publicId", { length: 12 }).notNull().unique(),
-  title: text("title").notNull(),
-  description: text("description"),
-  index: integer("index").notNull(),
-  targetUser: uuid("targetUser").references(() => users.id, {
-    onDelete: "set null",
-  }),
-  status: statusTypeEnum("status").notNull().default("pending"),
-  createdBy: uuid("createdBy").references(() => users.id, {
-    onDelete: "set null",
-  }),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt"),
-  deletedAt: timestamp("deletedAt"),
-  deletedBy: uuid("deletedBy").references(() => users.id, {
-    onDelete: "set null",
-  }),
-  listId: bigint("listId", { mode: "number" })
-    .notNull()
-    .references(() => lists.id, { onDelete: "restrict" }),
-  importId: bigint("importId", { mode: "number" }).references(() => imports.id),
-  dueDate: timestamp("dueDate"),
-  startDate: timestamp("startDate"),
-}).enableRLS();
+export const cards = pgTable(
+  "card",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    publicId: varchar("publicId", { length: 12 }).notNull().unique(),
+    cardNumber: integer("cardNumber"),
+    title: text("title").notNull(),
+    description: text("description"),
+    index: integer("index").notNull(),
+    targetUser: uuid("targetUser").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    status: statusTypeEnum("status").notNull().default("pending"),
+    createdBy: uuid("createdBy").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt"),
+    deletedAt: timestamp("deletedAt"),
+    deletedBy: uuid("deletedBy").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    listId: bigint("listId", { mode: "number" })
+      .notNull()
+      .references(() => lists.id, { onDelete: "restrict" }),
+    importId: bigint("importId", { mode: "number" }).references(
+      () => imports.id,
+    ),
+    dueDate: timestamp("dueDate"),
+    startDate: timestamp("startDate"),
+    // Parent-child relationships are validated in the project-card repository.
+    // The foreign key is added by the migration to avoid recursive Drizzle type inference.
+    parentCardId: bigint("parentCardId", { mode: "number" }),
+  },
+  (table) => [index("card_parent_idx").on(table.parentCardId)],
+).enableRLS();
+
+export const projectCardMembers = pgTable(
+  "project_card_member",
+  {
+    cardId: bigint("cardId", { mode: "number" })
+      .notNull()
+      .references(() => cards.id, { onDelete: "restrict" }),
+    workspaceMemberId: bigint("workspaceMemberId", { mode: "number" })
+      .notNull()
+      .references(() => workspaceMembers.id, { onDelete: "restrict" }),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.cardId, table.workspaceMemberId] }),
+    index("project_card_member_card_idx").on(table.cardId),
+    index("project_card_member_workspace_member_idx").on(
+      table.workspaceMemberId,
+    ),
+  ],
+).enableRLS();
 
 export const cardActivities = pgTable("card_activity", {
   id: bigserial("id", { mode: "number" }).primaryKey(),
@@ -143,10 +179,9 @@ export const cardActivities = pgTable("card_activity", {
     () => boards.id,
     { onDelete: "set null" },
   ),
-  attachmentId: uuid("attachmentId").references(
-    () => fileActivityLog.id,
-    { onDelete: "restrict" },
-  ),
+  attachmentId: uuid("attachmentId").references(() => fileActivityLog.id, {
+    onDelete: "restrict",
+  }),
   taskMasterId: uuid("taskMasterId").references(() => taskMasters.id),
   freqId: uuid("freqId").references(() => frequence.id),
 }).enableRLS();
@@ -196,7 +231,7 @@ export const comments = pgTable("comments", {
   }),
 }).enableRLS();
 
-// Relations definitions 
+// Relations definitions
 
 export const cardsRelations = relations(cards, ({ one, many }) => ({
   createdBy: one(users, {
@@ -221,6 +256,7 @@ export const cardsRelations = relations(cards, ({ one, many }) => ({
   }),
   labels: many(cardsToLabels),
   members: many(cardToWorkspaceMembers),
+  projectMembers: many(projectCardMembers),
   import: one(imports, {
     fields: [cards.importId],
     references: [imports.id],
@@ -310,6 +346,22 @@ export const cardToWorkspaceMembersRelations = relations(
       fields: [cardToWorkspaceMembers.workspaceMemberId],
       references: [workspaceMembers.id],
       relationName: "cardToWorkspaceMembersMember",
+    }),
+  }),
+);
+
+export const projectCardMembersRelations = relations(
+  projectCardMembers,
+  ({ one }) => ({
+    card: one(cards, {
+      fields: [projectCardMembers.cardId],
+      references: [cards.id],
+      relationName: "projectCardMembersCard",
+    }),
+    workspaceMember: one(workspaceMembers, {
+      fields: [projectCardMembers.workspaceMemberId],
+      references: [workspaceMembers.id],
+      relationName: "projectCardMembersWorkspaceMember",
     }),
   }),
 );

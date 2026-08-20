@@ -63,11 +63,13 @@ export function AttachmentThumbnails({
   cardPublicId,
   taskInstanceId,
   isReadOnly = false,
+  onChanged,
 }: {
   attachments?: Attachment[];
   cardPublicId?: string;
   taskInstanceId?: string;
   isReadOnly?: boolean;
+  onChanged?: () => void | Promise<void>;
 }) {
   const { showPopup } = usePopup();
   const utils = api.useUtils();
@@ -118,6 +120,7 @@ export function AttachmentThumbnails({
       if (isReadOnly) return;
       // Close viewer if the deleted image was being viewed
       setSelectedIndex(null);
+      void onChanged?.();
     },
     onSettled: async () => {
       if (isReadOnly) return;

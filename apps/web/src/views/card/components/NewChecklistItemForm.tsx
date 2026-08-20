@@ -18,6 +18,7 @@ interface NewChecklistItemFormProps {
   cardPublicId?: string;
   taskInstanceId?: string;
   onCancel: () => void;
+  onChanged?: () => void | Promise<void>;
   readOnly?: boolean;
 }
 
@@ -26,6 +27,7 @@ const NewChecklistItemForm = ({
   cardPublicId,
   taskInstanceId,
   onCancel,
+  onChanged,
   readOnly = false,
 }: NewChecklistItemFormProps) => {
   const utils = api.useUtils();
@@ -129,6 +131,7 @@ const NewChecklistItemForm = ({
       if (taskInstanceId) {
         await utils.taskInstance.byId.invalidate({ id: taskInstanceId });
       }
+      await onChanged?.();
     },
   });
 

@@ -20,10 +20,7 @@ import {
   trackTaskInstanceRewardViolations,
 } from "../utils/rewardViolation";
 import { getTaskInstanceUpdateAuthorization } from "../utils/task-instance-authorization";
-import {
-  isAllowedUserTaskInstanceStatusTransition,
-  resolveActualDateForStatusTransition,
-} from "../utils/taskInstanceStatusTransition";
+import { resolveTaskInstanceStatusTransition } from "../utils/taskInstanceStatusTransition";
 
 const { RRule } = rrule;
 
@@ -487,12 +484,15 @@ export const taskInstanceRouter = createTRPCRouter({
         });
       }
 
-      if (
-        !isAllowedUserTaskInstanceStatusTransition({
-          oldStatus: oldTaskInstance.status,
-          newStatus: status,
-        })
-      ) {
+      const resolvedTransition = resolveTaskInstanceStatusTransition({
+        oldStatus: oldTaskInstance.status,
+        requestedStatus: status,
+        currentActualDate: oldTaskInstance.actualDate,
+        endDate: oldTaskInstance.endDate,
+        now: new Date(),
+      });
+
+      if (!resolvedTransition) {
         throw new TRPCError({
           message: `This task status transition is not allowed`,
           code: "BAD_REQUEST",
@@ -510,13 +510,6 @@ export const taskInstanceRouter = createTRPCRouter({
         anchor,
         taskMaster.endDate,
       );
-      const actualDate = resolveActualDateForStatusTransition({
-        oldStatus: oldTaskInstance.status,
-        newStatus: status,
-        currentActualDate: oldTaskInstance.actualDate,
-        now: new Date(),
-      });
-
       // Giữ nguyên userId gắn với instance (slot / assignee theo unique index),
       // không ghi đè bằng ctx.user — tránh false "assignee_changed" và sai reward.
       const newTaskInstance = await taskInstanceRepo.update(ctx.db, {
@@ -526,9 +519,9 @@ export const taskInstanceRouter = createTRPCRouter({
         name,
         description,
         targetDate,
-        actualDate,
+        actualDate: resolvedTransition.actualDate,
         endDate: instanceEndDate,
-        status: status,
+        status: resolvedTransition.status,
         actorUserId: userId,
       });
 

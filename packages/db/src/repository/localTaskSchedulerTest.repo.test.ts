@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   buildLocalDailyTaskSeedPlan,
+  LOCAL_TEST_TASK_NAMES,
   LOCAL_TEST_WEEKDAYS,
 } from "./localTaskSchedulerTest.repo";
 
@@ -18,6 +19,12 @@ describe("buildLocalDailyTaskSeedPlan", () => {
     });
 
     expect(plan).toHaveLength(20);
+    expect(new Set(plan.map((item) => item.name)).size).toBe(20);
+    expect(plan.map((item) => item.name)).toEqual(
+      LOCAL_TEST_TASK_NAMES.map(
+        (name) => `[LOCAL-SCHEDULER-TEST:batch-1] ${name}`,
+      ),
+    );
     expect(plan.map((item) => item.userId)).toEqual([
       "user-1",
       "user-2",

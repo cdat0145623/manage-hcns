@@ -12,6 +12,29 @@ export const LOCAL_TEST_WEEKDAYS = [
   { code: "SA", count: 4 },
 ] as const;
 
+export const LOCAL_TEST_TASK_NAMES = [
+  "Kiểm tra bảng công việc trong ngày",
+  "Cập nhật tiến độ công việc",
+  "Rà soát công việc quá hạn",
+  "Kiểm tra yêu cầu mới",
+  "Xử lý công việc ưu tiên",
+  "Cập nhật thông tin nhân sự",
+  "Kiểm tra dữ liệu tài khoản",
+  "Rà soát phân quyền thành viên",
+  "Theo dõi tiến độ phòng ban",
+  "Kiểm tra báo cáo ngày",
+  "Cập nhật kế hoạch tuần",
+  "Rà soát lịch làm việc",
+  "Kiểm tra trạng thái nhiệm vụ",
+  "Xử lý các ghi chú tồn đọng",
+  "Đối chiếu dữ liệu công việc",
+  "Kiểm tra hoạt động thành viên",
+  "Cập nhật danh sách cần theo dõi",
+  "Rà soát kết quả trong ngày",
+  "Chuẩn bị công việc ngày tiếp theo",
+  "Tổng hợp công việc cuối ngày",
+] as const;
+
 export interface LocalDailyTaskSeedInput {
   count: number;
   userIds: string[];
@@ -100,7 +123,7 @@ export const buildLocalDailyTaskSeedPlan = (
 
       plan.push({
         userId,
-        name: `[LOCAL-SCHEDULER-TEST:${input.batchId}] Daily task ${taskIndex + 1}`,
+        name: `[LOCAL-SCHEDULER-TEST:${input.batchId}] ${LOCAL_TEST_TASK_NAMES[taskIndex % LOCAL_TEST_TASK_NAMES.length]}`,
         description: input.batchId,
         startDate: buildInstantFromAppCalendarDayAndTime(
           startDay,
@@ -125,7 +148,7 @@ export const buildLocalDailyTaskSeedPlan = (
 
     plan.push({
       userId,
-      name: `[LOCAL-SCHEDULER-TEST:${input.batchId}] Daily task ${taskIndex + 1}`,
+      name: `[LOCAL-SCHEDULER-TEST:${input.batchId}] ${LOCAL_TEST_TASK_NAMES[taskIndex % LOCAL_TEST_TASK_NAMES.length]}`,
       description: input.batchId,
       startDate: buildInstantFromAppCalendarDayAndTime(startDay, taskStartTime),
       endDate: buildInstantFromAppCalendarDayAndTime(endDay, taskEndTime),

@@ -4,12 +4,18 @@ import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useState } from "react";
 import {
   HiEllipsisVertical,
+  HiMiniPlus,
+  HiOutlineArrowPath,
+  HiOutlineCalendarDays,
   HiOutlinePlusSmall,
   HiOutlineTrash,
   HiXMark,
 } from "react-icons/hi2";
 
+import { formatInAppCalendarZone } from "@kan/shared/utils";
+
 import type { RouterOutputs } from "~/utils/api";
+import Badge from "~/components/Badge";
 import Button from "~/components/Button";
 import CheckboxDropdown from "~/components/CheckboxDropdown";
 import Dropdown from "~/components/Dropdown";
@@ -27,6 +33,7 @@ import { AttachmentUpload } from "../../card/components/AttachmentUpload";
 import Checklists from "../../card/components/Checklists";
 import { DeleteChecklistConfirmation } from "../../card/components/DeleteChecklistConfirmation";
 import { DueDateSelector } from "../../card/components/DueDateSelector";
+import { NewChecklistForm } from "../../card/components/NewChecklistForm";
 import NewCommentForm from "../../card/components/NewCommentForm";
 
 type ProjectBoard = RouterOutputs["projectBoard"]["byId"];
@@ -35,6 +42,7 @@ type ProjectCard = ProjectBoard["lists"][number]["cards"][number] & {
   depth: number;
 };
 type ProjectCardDetail = RouterOutputs["projectBoard"]["getCard"];
+type ProjectCardLabel = ProjectCard["labels"][number];
 interface WorkspaceMember {
   publicId: string;
   email: string | null;
@@ -53,6 +61,23 @@ const truncateBreadcrumbTitle = (title: string) =>
   title.length > MAX_BREADCRUMB_TITLE_LENGTH
     ? `${title.slice(0, MAX_BREADCRUMB_TITLE_LENGTH - 1)}…`
     : title;
+
+const getBreadcrumbLabel = (card: Pick<ProjectCard, "code" | "title">) =>
+  `${card.code ? `${card.code} - ` : ""}${truncateBreadcrumbTitle(card.title)}`;
+
+const updateBoardCardLabels = (
+  board: ProjectBoard,
+  cardPublicId: string,
+  labels: ProjectCardLabel[],
+): ProjectBoard => ({
+  ...board,
+  lists: board.lists.map((list) => ({
+    ...list,
+    cards: list.cards.map((listCard) =>
+      listCard.publicId === cardPublicId ? { ...listCard, labels } : listCard,
+    ),
+  })),
+});
 
 interface ProjectCardDetailsModalProps {
   board: ProjectBoard;
@@ -92,8 +117,9 @@ export default function ProjectCardDetailsModal({
   onOpenCard,
   onRefresh,
 }: ProjectCardDetailsModalProps) {
-  const { entityId, modalContentType } = useModal();
+  const { entityId, modalContentType, openModal } = useModal();
   const { showPopup } = usePopup();
+  const utils = api.useUtils();
   const [title, setTitle] = useState(card.title);
   const [description, setDescription] = useState(card.description ?? "");
   const [selectedMemberIds, setSelectedMemberIds] = useState<string[]>([]);
@@ -106,7 +132,6 @@ export default function ProjectCardDetailsModal({
   const [activeChecklistForm, setActiveChecklistForm] = useState<string | null>(
     null,
   );
-  const [checklistName, setChecklistName] = useState("");
   const [isParentSelectorOpen, setIsParentSelectorOpen] = useState(false);
   const [selectedParentCardId, setSelectedParentCardId] = useState(
     card.parentCardPublicId ?? "",
@@ -125,7 +150,36 @@ export default function ProjectCardDetailsModal({
   }, [card.publicId]);
 
   const updateCard = api.projectBoard.updateCard.useMutation({
-    onSuccess: onRefresh,
+    onSuccess: async (_data, variables) => {
+      if (variables.description !== undefined) {
+        const description = variables.description;
+        utils.projectBoard.byId.setData(
+          { boardPublicId: board.publicId },
+          (currentBoard) => {
+            if (!currentBoard) return currentBoard;
+            return {
+              ...currentBoard,
+              lists: currentBoard.lists.map((list) => ({
+                ...list,
+                cards: list.cards.map((listCard) =>
+                  listCard.publicId === card.publicId
+                    ? { ...listCard, description }
+                    : listCard,
+                ),
+              })),
+            };
+          },
+        );
+        utils.projectBoard.getCard.setData(
+          { cardPublicId: card.publicId },
+          (currentCard) =>
+            currentCard ? { ...currentCard, description } : currentCard,
+        );
+        return;
+      }
+
+      await onRefresh();
+    },
     onError: (error) =>
       showPopup({
         header: t`Không thể cập nhật card`,
@@ -140,7 +194,7 @@ export default function ProjectCardDetailsModal({
     },
     onError: (error) =>
       showPopup({
-        header: t`Không thể tạo card con`,
+        header: t`Không thể tạo công việc con`,
         message: getErrorMessage(error),
         icon: "error",
       }),
@@ -173,34 +227,141 @@ export default function ProjectCardDetailsModal({
       }),
   });
   const toggleCardLabel = api.projectBoard.toggleCardLabel.useMutation({
+    onMutate: async (variables) => {
+      await Promise.all([
+        utils.projectBoard.byId.cancel({ boardPublicId: board.publicId }),
+        utils.projectBoard.getCard.cancel({ cardPublicId: card.publicId }),
+      ]);
+      const previousBoard = utils.projectBoard.byId.getData({
+        boardPublicId: board.publicId,
+      });
+      const previousCard = utils.projectBoard.getCard.getData({
+        cardPublicId: card.publicId,
+      });
+      const currentBoardCard = previousBoard?.lists
+        .flatMap((list) => list.cards)
+        .find((listCard) => listCard.publicId === card.publicId);
+      const currentLabels =
+        previousCard?.labels ?? currentBoardCard?.labels ?? card.labels;
+      const label =
+        previousBoard?.labels.find(
+          (boardLabel) => boardLabel.publicId === variables.labelPublicId,
+        ) ??
+        board.labels.find(
+          (boardLabel) => boardLabel.publicId === variables.labelPublicId,
+        );
+      if (label) {
+        const isSelected = currentLabels.some(
+          (currentLabel) => currentLabel.publicId === label.publicId,
+        );
+        const nextLabels = isSelected
+          ? currentLabels.filter(
+              (currentLabel) => currentLabel.publicId !== label.publicId,
+            )
+          : [...currentLabels, label];
+        if (previousBoard) {
+          utils.projectBoard.byId.setData(
+            { boardPublicId: board.publicId },
+            updateBoardCardLabels(previousBoard, card.publicId, nextLabels),
+          );
+        }
+        utils.projectBoard.getCard.setData(
+          { cardPublicId: card.publicId },
+          (currentCard) =>
+            currentCard ? { ...currentCard, labels: nextLabels } : currentCard,
+        );
+      }
+      return { previousBoard, previousCard };
+    },
     onSuccess: onRefresh,
-    onError: (error) =>
+    onError: (error, _variables, context) => {
+      if (context?.previousBoard) {
+        utils.projectBoard.byId.setData(
+          { boardPublicId: board.publicId },
+          context.previousBoard,
+        );
+      }
+      if (context?.previousCard) {
+        utils.projectBoard.getCard.setData(
+          { cardPublicId: card.publicId },
+          context.previousCard,
+        );
+      }
       showPopup({
         header: t`Không thể cập nhật nhãn`,
         message: getErrorMessage(error),
         icon: "error",
-      }),
+      });
+    },
   });
   const setCardLabelOptions = api.projectBoard.setCardLabelOptions.useMutation({
+    onMutate: async (variables) => {
+      await Promise.all([
+        utils.projectBoard.byId.cancel({ boardPublicId: board.publicId }),
+        utils.projectBoard.getCard.cancel({ cardPublicId: card.publicId }),
+      ]);
+      const previousBoard = utils.projectBoard.byId.getData({
+        boardPublicId: board.publicId,
+      });
+      const previousCard = utils.projectBoard.getCard.getData({
+        cardPublicId: card.publicId,
+      });
+      const field =
+        previousBoard?.labelFields.find(
+          (labelField) => labelField.publicId === variables.fieldPublicId,
+        ) ??
+        board.labelFields.find(
+          (labelField) => labelField.publicId === variables.fieldPublicId,
+        );
+      const currentBoardCard = previousBoard?.lists
+        .flatMap((list) => list.cards)
+        .find((listCard) => listCard.publicId === card.publicId);
+      const currentLabels =
+        previousCard?.labels ?? currentBoardCard?.labels ?? card.labels;
+      const fieldOptionIds = new Set(
+        field?.options.map((option) => option.publicId) ?? [],
+      );
+      const nextLabels = [
+        ...currentLabels.filter(
+          (currentLabel) => !fieldOptionIds.has(currentLabel.publicId),
+        ),
+        ...(field?.options.filter((option) =>
+          variables.optionPublicIds.includes(option.publicId),
+        ) ?? []),
+      ];
+      if (previousBoard) {
+        utils.projectBoard.byId.setData(
+          { boardPublicId: board.publicId },
+          updateBoardCardLabels(previousBoard, card.publicId, nextLabels),
+        );
+      }
+      utils.projectBoard.getCard.setData(
+        { cardPublicId: card.publicId },
+        (currentCard) =>
+          currentCard ? { ...currentCard, labels: nextLabels } : currentCard,
+      );
+      return { previousBoard, previousCard };
+    },
     onSuccess: onRefresh,
-    onError: (error) =>
+    onError: (error, _variables, context) => {
+      if (context?.previousBoard) {
+        utils.projectBoard.byId.setData(
+          { boardPublicId: board.publicId },
+          context.previousBoard,
+        );
+      }
+      if (context?.previousCard) {
+        utils.projectBoard.getCard.setData(
+          { cardPublicId: card.publicId },
+          context.previousCard,
+        );
+      }
       showPopup({
         header: t`Không thể cập nhật nhãn card`,
         message: getErrorMessage(error),
         icon: "error",
-      }),
-  });
-  const createChecklist = api.checklist.create.useMutation({
-    onSuccess: async () => {
-      setChecklistName("");
-      await onRefresh();
+      });
     },
-    onError: () =>
-      showPopup({
-        header: t`Không thể tạo checklist`,
-        message: t`Vui lòng thử lại sau.`,
-        icon: "error",
-      }),
   });
   const deleteCard = api.projectBoard.deleteCard.useMutation({
     onSuccess: async () => {
@@ -346,11 +507,11 @@ export default function ProjectCardDetailsModal({
                       {index > 0 && <span aria-hidden="true">/</span>}
                       <button
                         type="button"
-                        title={ancestor.title}
+                        title={`${ancestor.code ? `${ancestor.code} - ` : ""}${ancestor.title}`}
                         onClick={() => onOpenCard(ancestor.publicId)}
                         className="max-w-[14rem] truncate rounded px-1 py-0.5 text-left transition-colors hover:bg-light-200 hover:text-light-1000 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-light-700 dark:hover:bg-dark-300 dark:hover:text-dark-1000 dark:focus-visible:ring-dark-700"
                       >
-                        {truncateBreadcrumbTitle(ancestor.title)}
+                        {getBreadcrumbLabel(ancestor)}
                       </button>
                     </span>
                   ))
@@ -403,41 +564,19 @@ export default function ProjectCardDetailsModal({
             </div>
 
             <section className="mt-8 border-t border-light-200 pt-6 dark:border-dark-300">
-              <div className="mb-3 flex items-center justify-between gap-3">
+              <div className="mb-3 flex items-center gap-3">
                 <h3 className="text-[10px] font-semibold uppercase tracking-widest text-light-900 dark:text-dark-800">
                   {t`Checklist`}
                 </h3>
                 {canEdit && (
-                  <form
-                    className="flex min-w-0 gap-2"
-                    onSubmit={(event) => {
-                      event.preventDefault();
-                      const name = checklistName.trim();
-                      if (!name) return;
-                      createChecklist.mutate({
-                        cardPublicId: card.publicId,
-                        name,
-                      });
-                    }}
+                  <button
+                    type="button"
+                    onClick={() => openModal("ADD_CHECKLIST", card.publicId)}
+                    className="flex items-center justify-center rounded-lg bg-light-100 p-1 text-neutral-600 transition-all hover:bg-light-200 hover:text-neutral-900 dark:bg-dark-300 dark:text-dark-800 dark:hover:bg-dark-400 dark:hover:text-dark-1000"
+                    title={t`Thêm Checklist`}
                   >
-                    <Input
-                      name="checklistName"
-                      value={checklistName}
-                      onChange={(event) => setChecklistName(event.target.value)}
-                      placeholder={t`Thêm checklist…`}
-                      className="w-40 min-w-0"
-                      disabled={createChecklist.isPending}
-                    />
-                    <Button
-                      type="submit"
-                      size="sm"
-                      variant="ghost"
-                      iconOnly
-                      iconLeft={<HiOutlinePlusSmall className="h-4 w-4" />}
-                      aria-label={t`Thêm checklist`}
-                      disabled={createChecklist.isPending}
-                    />
-                  </form>
+                    <HiMiniPlus className="h-4 w-4" />
+                  </button>
                 )}
               </div>
               <Checklists
@@ -457,7 +596,7 @@ export default function ProjectCardDetailsModal({
 
             <section className="mt-8 border-t border-light-200 pt-6 dark:border-dark-300">
               <h3 className="mb-3 text-[10px] font-semibold uppercase tracking-widest text-light-900 dark:text-dark-800">
-                {t`Card con`}
+                {t`Công việc con`}
               </h3>
               {cardDetail ? (
                 cardDetail.children.length ? (
@@ -469,13 +608,55 @@ export default function ProjectCardDetailsModal({
                         onClick={() => onOpenCard(child.publicId)}
                         className="block w-full rounded-xl border border-light-200 bg-white px-3 py-2 text-left text-sm text-neutral-900 transition-colors hover:bg-light-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-light-700 dark:border-dark-300 dark:bg-dark-200 dark:text-dark-1000 dark:hover:bg-dark-300 dark:focus-visible:ring-dark-700"
                       >
-                        {child.title}
+                        <div className="flex items-start gap-2">
+                          {child.code && (
+                            <span className="shrink-0 text-xs font-semibold tracking-wide text-light-900 dark:text-dark-800">
+                              {child.code}
+                            </span>
+                          )}
+                          <span className="min-w-0 break-words font-medium">
+                            {child.title}
+                          </span>
+                        </div>
+                        {child.labels.length > 0 && (
+                          <div className="mt-2 flex flex-wrap gap-1">
+                            {child.labels.map((label) => (
+                              <Badge
+                                key={label.publicId}
+                                value={label.name}
+                                iconLeft={
+                                  <LabelIcon colourCode={label.colourCode} />
+                                }
+                              />
+                            ))}
+                          </div>
+                        )}
+                        <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px]">
+                          <span
+                            className={`rounded-full px-2 py-0.5 font-medium ${child.status === "done" ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300" : child.status === "missed" ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300" : "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300"}`}
+                          >
+                            {child.status === "done"
+                              ? t`Đã hoàn thành`
+                              : child.status === "missed"
+                                ? t`Đã bỏ lỡ`
+                                : t`Đang thực hiện`}
+                          </span>
+                          {child.dueDate && (
+                            <span className="flex items-center gap-1 text-light-800 dark:text-dark-800">
+                              <HiOutlineCalendarDays className="h-3.5 w-3.5" />
+                              {formatInAppCalendarZone(
+                                child.dueDate,
+                                "MMM dd, yyyy",
+                              )}
+                            </span>
+                          )}
+                        </div>
                       </button>
                     ))}
                   </div>
                 ) : (
                   <p className="text-sm text-light-800 dark:text-dark-800">
-                    {t`Chưa có card con.`}
+                    {t`Chưa có công việc con.`}
                   </p>
                 )
               ) : (
@@ -489,7 +670,7 @@ export default function ProjectCardDetailsModal({
                     name="childTitle"
                     value={childTitle}
                     onChange={(event) => setChildTitle(event.target.value)}
-                    placeholder={t`Tên card con…`}
+                    placeholder={t`Tên công việc con…`}
                     className="min-w-0 flex-1"
                     disabled={createCard.isPending}
                   />
@@ -499,7 +680,7 @@ export default function ProjectCardDetailsModal({
                     variant="ghost"
                     iconOnly
                     iconLeft={<HiOutlinePlusSmall className="h-4 w-4" />}
-                    aria-label={t`Tạo card con`}
+                    aria-label={t`Tạo công việc con`}
                     disabled={createCard.isPending}
                     isLoading={createCard.isPending}
                     className="text-light-900 hover:bg-light-300 dark:text-dark-1000 dark:hover:bg-dark-300"
@@ -543,6 +724,16 @@ export default function ProjectCardDetailsModal({
                   <Dropdown
                     disabled={deleteCard.isPending}
                     items={[
+                      {
+                        label: t`Đổi công việc cha`,
+                        icon: <HiOutlineArrowPath className="h-4 w-4" />,
+                        action: () => {
+                          setSelectedParentCardId(
+                            card.parentCardPublicId ?? "",
+                          );
+                          setIsParentSelectorOpen(true);
+                        },
+                      },
                       {
                         label: t`Xóa card`,
                         icon: <HiOutlineTrash className="h-4 w-4" />,
@@ -991,12 +1182,22 @@ export default function ProjectCardDetailsModal({
       <Modal
         modalSize="sm"
         centered
+        isVisible={isOpen && modalContentType === "ADD_CHECKLIST"}
+      >
+        <NewChecklistForm
+          cardPublicId={card.publicId}
+          onSuccess={() => void onRefresh()}
+        />
+      </Modal>
+      <Modal
+        modalSize="sm"
+        centered
         isVisible={isParentSelectorOpen}
         onClose={() => setIsParentSelectorOpen(false)}
       >
         <div className="p-6">
           <h2 className="text-lg font-bold text-neutral-900 dark:text-dark-1000">
-            {t`Thêm card cha`}
+            {card.parentCardPublicId ? t`Đổi công việc cha` : t`Thêm card cha`}
           </h2>
           <p className="mt-1 text-sm text-light-800 dark:text-dark-800">
             {t`Chọn card cha cho card hiện tại.`}

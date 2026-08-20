@@ -99,6 +99,23 @@ export const getListSettings = async (db: dbClient, listIds: number[]) => {
   return new Map(rows.map((row) => [row.listId, row.isCompletionColumn]));
 };
 
+export const getCompletionListId = async (db: dbClient, boardId: number) => {
+  const [row] = await db
+    .select({ listId: lists.id })
+    .from(lists)
+    .innerJoin(projectListSettings, eq(projectListSettings.listId, lists.id))
+    .where(
+      and(
+        eq(lists.boardId, boardId),
+        isNull(lists.deletedAt),
+        eq(projectListSettings.isCompletionColumn, true),
+      ),
+    )
+    .limit(1);
+
+  return row?.listId ?? null;
+};
+
 export const getCardPlanning = async (db: dbClient, cardIds: number[]) => {
   if (cardIds.length === 0)
     return new Map<
@@ -300,21 +317,49 @@ export const completeCycle = async (
 
 export const setListCompletion = async (
   db: dbClient,
-  input: { listId: number; isCompletionColumn: boolean },
-) => {
-  const [settings] = await db
-    .insert(projectListSettings)
-    .values(input)
-    .onConflictDoUpdate({
-      target: projectListSettings.listId,
-      set: {
+  input: { boardId: number; listId: number; isCompletionColumn: boolean },
+) =>
+  db.transaction(async (tx) => {
+    if (input.isCompletionColumn) {
+      const boardLists = await tx
+        .select({ id: lists.id })
+        .from(lists)
+        .where(and(eq(lists.boardId, input.boardId), isNull(lists.deletedAt)));
+
+      if (boardLists.length > 0) {
+        await tx
+          .update(projectListSettings)
+          .set({ isCompletionColumn: false, updatedAt: new Date() })
+          .where(
+            and(
+              inArray(
+                projectListSettings.listId,
+                boardLists.map((list) => list.id),
+              ),
+              eq(projectListSettings.isCompletionColumn, true),
+            ),
+          );
+      }
+    }
+
+    const [settings] = await tx
+      .insert(projectListSettings)
+      .values({
+        listId: input.listId,
         isCompletionColumn: input.isCompletionColumn,
-        updatedAt: new Date(),
-      },
-    })
-    .returning({ isCompletionColumn: projectListSettings.isCompletionColumn });
-  return settings;
-};
+      })
+      .onConflictDoUpdate({
+        target: projectListSettings.listId,
+        set: {
+          isCompletionColumn: input.isCompletionColumn,
+          updatedAt: new Date(),
+        },
+      })
+      .returning({
+        isCompletionColumn: projectListSettings.isCompletionColumn,
+      });
+    return settings;
+  });
 
 export const setCardPlanning = async (
   db: dbClient,

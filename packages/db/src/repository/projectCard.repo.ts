@@ -176,6 +176,7 @@ export const create = async (
     parentCardId?: number | null;
     dueDate?: Date | null;
     startDate?: Date | null;
+    status?: "pending" | "done" | "missed";
     workspaceMemberIds: number[];
   },
 ) =>
@@ -249,6 +250,7 @@ export const create = async (
         parentCardId: input.parentCardId ?? null,
         dueDate: input.dueDate ?? null,
         startDate: input.startDate ?? null,
+        status: input.status,
       })
       .returning({ id: cards.id, publicId: cards.publicId });
 
@@ -367,12 +369,18 @@ export const toggleLabel = async (
 
 export const reorder = async (
   db: dbClient,
-  input: { cardId: number; newListId?: number; newIndex?: number },
+  input: {
+    cardId: number;
+    newListId?: number;
+    newIndex?: number;
+    status?: "pending" | "done" | "missed";
+  },
 ) => {
   await cardRepo.reorder(db, {
     cardId: input.cardId,
     newListId: input.newListId,
     newIndex: input.newIndex,
+    status: input.status,
   });
   return { success: true };
 };
@@ -504,9 +512,30 @@ export const getByPublicId = async (db: dbClient, cardPublicId: string) => {
         })
       : Promise.resolve(null),
     db.query.cards.findMany({
-      columns: { publicId: true, title: true, index: true },
+      columns: {
+        publicId: true,
+        cardNumber: true,
+        title: true,
+        index: true,
+        dueDate: true,
+        status: true,
+      },
       where: and(eq(cards.parentCardId, card.id), isNull(cards.deletedAt)),
       orderBy: [asc(cards.index)],
+      with: {
+        labels: {
+          with: {
+            label: {
+              columns: {
+                publicId: true,
+                name: true,
+                colourCode: true,
+                deletedAt: true,
+              },
+            },
+          },
+        },
+      },
     }),
   ]);
 
@@ -535,7 +564,23 @@ export const getByPublicId = async (db: dbClient, cardPublicId: string) => {
               : null,
         }
       : null,
-    children,
+    children: children.map((child) => ({
+      publicId: child.publicId,
+      code:
+        child.cardNumber != null && card.list.board.projectCode
+          ? `${card.list.board.projectCode}-${child.cardNumber}`
+          : null,
+      title: child.title,
+      dueDate: child.dueDate,
+      status: child.status,
+      labels: child.labels
+        .filter((label) => !label.label.deletedAt)
+        .map((label) => ({
+          publicId: label.label.publicId,
+          name: label.label.name,
+          colourCode: label.label.colourCode,
+        })),
+    })),
     list: {
       publicId: card.list.publicId,
       name: card.list.name,

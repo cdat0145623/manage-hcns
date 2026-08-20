@@ -6,6 +6,7 @@ export default function Dropdown({
   children,
   disabled,
   portal = false,
+  buttonLabel,
 }: {
   items: {
     label: string;
@@ -16,12 +17,15 @@ export default function Dropdown({
   children: React.ReactNode;
   disabled?: boolean;
   portal?: boolean;
+  buttonLabel?: string;
 }) {
   return (
     <Menu as="div" className="relative inline-block text-left">
       <div>
         <Menu.Button
           disabled={disabled}
+          aria-label={buttonLabel}
+          title={buttonLabel}
           className="flex h-7 w-7 items-center justify-center rounded-[5px] hover:bg-light-200 focus:outline-none dark:hover:bg-dark-200"
         >
           {children}

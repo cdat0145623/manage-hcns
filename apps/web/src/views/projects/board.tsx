@@ -1,5 +1,5 @@
 import type { FormEvent } from "react";
-import type { DropResult } from "react-beautiful-dnd";
+import type { DragStart, DropResult } from "react-beautiful-dnd";
 import { useRouter } from "next/router";
 import { t } from "@lingui/core/macro";
 import { useEffect, useMemo, useState } from "react";
@@ -7,6 +7,7 @@ import { DragDropContext, Draggable, Droppable } from "react-beautiful-dnd";
 import {
   HiBars3BottomLeft,
   HiChatBubbleLeft,
+  HiEllipsisVertical,
   HiOutlineCalendarDays,
   HiOutlineCheckCircle,
   HiOutlineClock,
@@ -27,6 +28,7 @@ import Avatar from "~/components/Avatar";
 import Badge from "~/components/Badge";
 import Button from "~/components/Button";
 import CircularProgress from "~/components/CircularProgress";
+import Dropdown from "~/components/Dropdown";
 import Input from "~/components/Input";
 import LabelIcon from "~/components/LabelIcon";
 import Modal from "~/components/modal";
@@ -50,6 +52,82 @@ type ProjectCard = ProjectBoard["lists"][number]["cards"][number] & {
 const getErrorMessage = (error: { message?: string }) =>
   error.message ?? t`Vui lòng thử lại sau.`;
 
+const moveListOptimistically = (
+  board: ProjectBoard,
+  listPublicId: string,
+  destinationIndex: number,
+): ProjectBoard => {
+  const sourceIndex = board.lists.findIndex(
+    (list) => list.publicId === listPublicId,
+  );
+  if (sourceIndex < 0) return board;
+
+  const lists = [...board.lists];
+  const [movedList] = lists.splice(sourceIndex, 1);
+  if (!movedList) return board;
+
+  lists.splice(Math.min(destinationIndex, lists.length), 0, movedList);
+
+  return {
+    ...board,
+    lists: lists.map((list, index) => ({ ...list, index })),
+  };
+};
+
+const moveCardOptimistically = (
+  board: ProjectBoard,
+  cardPublicId: string,
+  destinationListPublicId: string,
+  destinationIndex: number,
+): ProjectBoard => {
+  const sourceListIndex = board.lists.findIndex((list) =>
+    list.cards.some((card) => card.publicId === cardPublicId),
+  );
+  const destinationListIndex = board.lists.findIndex(
+    (list) => list.publicId === destinationListPublicId,
+  );
+
+  if (sourceListIndex < 0 || destinationListIndex < 0) return board;
+
+  const lists = board.lists.map((list) => ({
+    ...list,
+    cards: [...list.cards],
+  }));
+  const sourceCards = lists[sourceListIndex]?.cards;
+  const destinationCards = lists[destinationListIndex]?.cards;
+  if (!sourceCards || !destinationCards) return board;
+
+  const sourceCardIndex = sourceCards.findIndex(
+    (card) => card.publicId === cardPublicId,
+  );
+  if (sourceCardIndex < 0) return board;
+  const [movedCard] = sourceCards.splice(sourceCardIndex, 1);
+  if (!movedCard) return board;
+
+  const destinationList = lists[destinationListIndex];
+  const sourceList = lists[sourceListIndex];
+  const nextStatus = destinationList?.isCompletionColumn
+    ? "done"
+    : sourceList?.isCompletionColumn
+      ? "pending"
+      : movedCard.status;
+  const movedCardWithStatus = { ...movedCard, status: nextStatus };
+
+  destinationCards.splice(
+    Math.min(destinationIndex, destinationCards.length),
+    0,
+    movedCardWithStatus,
+  );
+
+  return {
+    ...board,
+    lists: lists.map((list) => ({
+      ...list,
+      cards: list.cards.map((card, index) => ({ ...card, index })),
+    })),
+  };
+};
+
 export default function ProjectBoardView() {
   const router = useRouter();
   const { workspace } = useWorkspace();
@@ -65,6 +143,10 @@ export default function ProjectBoardView() {
   const [newCardTitles, setNewCardTitles] = useState<Record<string, string>>(
     {},
   );
+  const [draggedCardDimensions, setDraggedCardDimensions] = useState<{
+    cardPublicId: string;
+    height: number;
+  } | null>(null);
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
   const [workflowType, setWorkflowType] = useState<"general" | "scrum">(
     "general",
@@ -79,6 +161,16 @@ export default function ProjectBoardView() {
   const [isMembersModalOpen, setIsMembersModalOpen] = useState(false);
   const [memberToAdd, setMemberToAdd] = useState("");
   const [isCreateColumnOpen, setIsCreateColumnOpen] = useState(false);
+  const [editingListId, setEditingListId] = useState<string | null>(null);
+  const [completionChange, setCompletionChange] = useState<{
+    currentName: string;
+    targetId: string;
+    targetName: string;
+  } | null>(null);
+  const [listToDelete, setListToDelete] = useState<{
+    publicId: string;
+    name: string;
+  } | null>(null);
 
   const boardQuery = api.projectBoard.byId.useQuery(
     { boardPublicId },
@@ -211,13 +303,35 @@ export default function ProjectBoardView() {
       }),
   });
   const reorderList = api.projectBoard.reorderList.useMutation({
+    onMutate: async (variables) => {
+      await utils.projectBoard.byId.cancel({ boardPublicId });
+      const previousBoard = utils.projectBoard.byId.getData({ boardPublicId });
+      if (previousBoard) {
+        utils.projectBoard.byId.setData(
+          { boardPublicId },
+          moveListOptimistically(
+            previousBoard,
+            variables.listPublicId,
+            variables.index,
+          ),
+        );
+      }
+      return { previousBoard };
+    },
     onSuccess: refresh,
-    onError: (error) =>
+    onError: (error, _variables, context) => {
+      if (context?.previousBoard) {
+        utils.projectBoard.byId.setData(
+          { boardPublicId },
+          context.previousBoard,
+        );
+      }
       showPopup({
         header: t`Không thể sắp xếp cột`,
         message: getErrorMessage(error),
         icon: "error",
-      }),
+      });
+    },
   });
   const createCard = api.projectBoard.createCard.useMutation({
     onSuccess: async (_, variables) => {
@@ -235,13 +349,40 @@ export default function ProjectBoardView() {
       }),
   });
   const moveCard = api.projectBoard.moveCard.useMutation({
-    onSuccess: refresh,
-    onError: (error) =>
+    onMutate: async (variables) => {
+      await utils.projectBoard.byId.cancel({ boardPublicId });
+      const previousBoard = utils.projectBoard.byId.getData({ boardPublicId });
+      if (previousBoard) {
+        utils.projectBoard.byId.setData(
+          { boardPublicId },
+          moveCardOptimistically(
+            previousBoard,
+            variables.cardPublicId,
+            variables.listPublicId,
+            variables.index,
+          ),
+        );
+      }
+      return { previousBoard };
+    },
+    onSuccess: async () => {
+      await refresh();
+      setDraggedCardDimensions(null);
+    },
+    onError: (error, _variables, context) => {
+      if (context?.previousBoard) {
+        utils.projectBoard.byId.setData(
+          { boardPublicId },
+          context.previousBoard,
+        );
+      }
       showPopup({
         header: t`Không thể di chuyển card`,
         message: getErrorMessage(error),
         icon: "error",
-      }),
+      });
+      setDraggedCardDimensions(null);
+    },
   });
   const updateSettings = api.projectBoard.updateSettings.useMutation({
     onSuccess: refresh,
@@ -292,6 +433,40 @@ export default function ProjectBoardView() {
         icon: "error",
       }),
   });
+  const deleteList = api.projectBoard.deleteList.useMutation({
+    onSuccess: async () => {
+      setListToDelete(null);
+      await refresh();
+    },
+    onError: (error) =>
+      showPopup({
+        header: t`Không thể xóa cột`,
+        message: getErrorMessage(error),
+        icon: "error",
+      }),
+  });
+  const requestSetCompletion = (list: ProjectBoard["lists"][number]) => {
+    if (!canEdit || list.isCompletionColumn || setListCompletion.isPending) {
+      return;
+    }
+
+    const currentCompletionList = boardQuery.data?.lists.find(
+      (candidate) => candidate.isCompletionColumn,
+    );
+    if (currentCompletionList) {
+      setCompletionChange({
+        currentName: currentCompletionList.name,
+        targetId: list.publicId,
+        targetName: list.name,
+      });
+      return;
+    }
+
+    setListCompletion.mutate({
+      listPublicId: list.publicId,
+      isCompletionColumn: true,
+    });
+  };
   const submitColumn = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!canEdit) return;
@@ -316,11 +491,30 @@ export default function ProjectBoardView() {
     });
   };
 
+  const onBeforeDragStart = (start: DragStart) => {
+    if (start.type !== "CARD") return;
+    const element = document.querySelector<HTMLElement>(
+      `[data-rbd-draggable-id="${start.draggableId}"]`,
+    );
+    if (!element) return;
+    setDraggedCardDimensions({
+      cardPublicId: start.draggableId,
+      height: element.getBoundingClientRect().height,
+    });
+  };
+
   const onDragEnd = (result: DropResult) => {
-    if (!canEdit) return;
+    if (!canEdit) {
+      setDraggedCardDimensions(null);
+      return;
+    }
     const { destination, draggableId, type } = result;
-    if (!destination) return;
+    if (!destination) {
+      setDraggedCardDimensions(null);
+      return;
+    }
     if (type === "LIST") {
+      setDraggedCardDimensions(null);
       reorderList.mutate({
         listPublicId: draggableId,
         index: destination.index,
@@ -830,6 +1024,97 @@ export default function ProjectBoardView() {
           </form>
         </Modal>
 
+        <Modal
+          isVisible={completionChange !== null}
+          onClose={() => {
+            if (!setListCompletion.isPending) setCompletionChange(null);
+          }}
+          modalSize="sm"
+          centered
+        >
+          {completionChange && (
+            <div className="p-6">
+              <h2 className="text-lg font-bold text-neutral-900 dark:text-dark-1000">
+                {t`Đổi cột hoàn thành?`}
+              </h2>
+              <p className="mt-2 text-sm leading-6 text-light-900 dark:text-dark-800">
+                {t`Bạn có muốn đổi cột hoàn thành từ ${completionChange.currentName} sang ${completionChange.targetName} không?`}
+              </p>
+              <div className="mt-5 flex justify-end gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => setCompletionChange(null)}
+                  disabled={setListCompletion.isPending}
+                >
+                  {t`Hủy`}
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  isLoading={setListCompletion.isPending}
+                  onClick={() => {
+                    setListCompletion.mutate(
+                      {
+                        listPublicId: completionChange.targetId,
+                        isCompletionColumn: true,
+                      },
+                      { onSuccess: () => setCompletionChange(null) },
+                    );
+                  }}
+                >
+                  {t`Đổi cột`}
+                </Button>
+              </div>
+            </div>
+          )}
+        </Modal>
+
+        <Modal
+          isVisible={listToDelete !== null}
+          onClose={() => {
+            if (!deleteList.isPending) setListToDelete(null);
+          }}
+          modalSize="sm"
+          centered
+        >
+          {listToDelete && (
+            <div className="p-6">
+              <h2 className="text-lg font-bold text-neutral-900 dark:text-dark-1000">
+                {t`Xóa cột?`}
+              </h2>
+              <p className="mt-2 text-sm leading-6 text-light-900 dark:text-dark-800">
+                {t`Bạn có chắc muốn xóa cột ${listToDelete.name} không? Các card trong cột cũng sẽ bị xóa.`}
+              </p>
+              <div className="mt-5 flex justify-end gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => setListToDelete(null)}
+                  disabled={deleteList.isPending}
+                >
+                  {t`Hủy`}
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="danger"
+                  isLoading={deleteList.isPending}
+                  onClick={() => {
+                    deleteList.mutate({
+                      listPublicId: listToDelete.publicId,
+                    });
+                  }}
+                >
+                  {t`Xóa cột`}
+                </Button>
+              </div>
+            </div>
+          )}
+        </Modal>
+
         {workflowType === "scrum" && scrumReport.data && (
           <div className="relative z-10 grid gap-3 border-b border-light-300 bg-light-50/60 px-5 py-3 text-sm dark:border-dark-300 dark:bg-dark-100/60 md:grid-cols-3 md:px-6">
             <div>
@@ -881,7 +1166,10 @@ export default function ProjectBoardView() {
         )}
 
         <div className="relative z-10 flex min-h-0 flex-1 overflow-x-auto p-5 md:p-6">
-          <DragDropContext onDragEnd={onDragEnd}>
+          <DragDropContext
+            onBeforeDragStart={onBeforeDragStart}
+            onDragEnd={onDragEnd}
+          >
             <Droppable
               droppableId="project-lists"
               direction="horizontal"
@@ -910,48 +1198,82 @@ export default function ProjectBoardView() {
                             {...listDraggable.dragHandleProps}
                             className="mb-2 flex items-center gap-2"
                           >
-                            <input
-                              defaultValue={list.name}
-                              onBlur={(event) => {
-                                const value = event.target.value.trim();
-                                if (canEdit && value && value !== list.name) {
-                                  updateList.mutate({
-                                    listPublicId: list.publicId,
-                                    name: value,
-                                  });
-                                }
-                              }}
-                              className="min-w-0 flex-1 border-0 bg-transparent px-2 pt-1 text-sm font-medium text-neutral-900 focus:ring-0 dark:text-dark-1000"
-                              aria-label={t`Tên cột`}
-                              disabled={!canEdit || updateList.isPending}
-                            />
+                            {editingListId === list.publicId ? (
+                              <input
+                                defaultValue={list.name}
+                                autoFocus
+                                onBlur={(event) => {
+                                  const value = event.target.value.trim();
+                                  if (canEdit && value && value !== list.name) {
+                                    updateList.mutate({
+                                      listPublicId: list.publicId,
+                                      name: value,
+                                    });
+                                  }
+                                  setEditingListId(null);
+                                }}
+                                onKeyDown={(event) => {
+                                  if (event.key === "Escape") {
+                                    setEditingListId(null);
+                                  } else if (event.key === "Enter") {
+                                    event.currentTarget.blur();
+                                  }
+                                }}
+                                className="min-w-0 flex-1 border-0 bg-transparent px-2 pt-1 text-sm font-medium text-neutral-900 focus:ring-0 dark:text-dark-1000"
+                                aria-label={t`Tên cột`}
+                                disabled={updateList.isPending}
+                              />
+                            ) : (
+                              <span className="min-w-0 flex-1 truncate px-2 pt-1 text-sm font-medium text-neutral-900 dark:text-dark-1000">
+                                {list.name}
+                              </span>
+                            )}
                             <span className="rounded-full bg-light-200 px-2 py-0.5 text-xs text-light-900 dark:bg-dark-300 dark:text-dark-800">
                               {list.cards.length}
                             </span>
-                            {workflowType === "scrum" && (
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  canEdit &&
-                                  setListCompletion.mutate({
-                                    listPublicId: list.publicId,
-                                    isCompletionColumn:
-                                      !list.isCompletionColumn,
-                                  })
-                                }
-                                className={`rounded px-1 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-light-700 dark:focus-visible:ring-dark-700 ${list.isCompletionColumn ? "bg-green-200 text-green-900" : "text-light-800"}`}
-                                title={t`Completion column`}
-                                aria-label={
-                                  list.isCompletionColumn
-                                    ? t`Bỏ đánh dấu cột hoàn tất`
-                                    : t`Đánh dấu cột hoàn tất`
-                                }
-                                disabled={
-                                  !canEdit || setListCompletion.isPending
-                                }
+                            {list.isCompletionColumn && (
+                              <HiOutlineCheckCircle
+                                className="h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400"
+                                aria-label={t`Cột hoàn thành`}
+                                title={t`Cột hoàn thành`}
+                              />
+                            )}
+                            {canEdit && (
+                              <div
+                                className="mr-1 shrink-0"
+                                onMouseDown={(event) => event.stopPropagation()}
                               >
-                                ✓
-                              </button>
+                                <Dropdown
+                                  buttonLabel={t`Thao tác với cột`}
+                                  items={[
+                                    {
+                                      label: t`Đổi tên cột`,
+                                      action: () =>
+                                        setEditingListId(list.publicId),
+                                    },
+                                    {
+                                      label: t`Đặt làm cột hoàn thành`,
+                                      action: () => requestSetCompletion(list),
+                                      disabled:
+                                        list.isCompletionColumn ||
+                                        setListCompletion.isPending,
+                                    },
+                                    {
+                                      label: t`Xóa cột`,
+                                      action: () =>
+                                        setListToDelete({
+                                          publicId: list.publicId,
+                                          name: list.name,
+                                        }),
+                                    },
+                                  ]}
+                                >
+                                  <HiEllipsisVertical
+                                    className="h-5 w-5 text-light-800 dark:text-dark-800"
+                                    aria-hidden="true"
+                                  />
+                                </Dropdown>
+                              </div>
                             )}
                           </div>
                           <StrictModeDroppable
@@ -995,19 +1317,18 @@ export default function ProjectBoardView() {
                                           style={{
                                             ...cardDraggable.draggableProps
                                               .style,
+                                            ...(draggedCardDimensions?.cardPublicId ===
+                                            card.publicId
+                                              ? {
+                                                  height: `${draggedCardDimensions.height}px`,
+                                                }
+                                              : {}),
                                           }}
                                           className={`min-h-[72px] w-[calc(100%-0px)] cursor-grab touch-manipulation select-none rounded-md border border-light-200 bg-light-50 px-3 py-2 text-left text-sm text-neutral-900 shadow-sm transition-colors hover:border-light-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-light-700 active:cursor-grabbing dark:border-dark-400 dark:bg-dark-200 dark:text-dark-1000 dark:focus-visible:ring-dark-700 ${card.status === "done" ? "bg-emerald-50 dark:bg-emerald-900/20" : ""}`}
                                         >
-                                          <div className="flex items-start gap-2">
-                                            {card.code && (
-                                              <span className="shrink-0 pt-0.5 text-[10px] font-semibold tracking-wide text-light-800 dark:text-dark-700">
-                                                {card.code}
-                                              </span>
-                                            )}
-                                            <span className="min-w-0 break-words leading-5">
-                                              {card.title}
-                                            </span>
-                                          </div>
+                                          <span className="block break-words leading-5">
+                                            {card.title}
+                                          </span>
                                           {card.labels.length > 0 && (
                                             <div className="mt-2 flex flex-wrap gap-1">
                                               {card.labels.map((label) => (
@@ -1174,6 +1495,13 @@ export default function ProjectBoardView() {
                                               )}
                                             </div>
                                           </div>
+                                          {card.code && (
+                                            <div className="mt-1 flex">
+                                              <span className="inline-flex items-center rounded-full border border-light-400 bg-light-100 px-1.5 py-0.5 text-[10px] font-semibold tracking-wide text-light-900 dark:border-dark-600 dark:bg-dark-300 dark:text-dark-800">
+                                                {card.code}
+                                              </span>
+                                            </div>
+                                          )}
                                           {(card.cyclePublicId ??
                                             card.estimateValue != null) && (
                                             <span className="mt-1 block text-[11px] text-light-800 dark:text-dark-800">

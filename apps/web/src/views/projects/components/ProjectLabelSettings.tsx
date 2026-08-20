@@ -203,6 +203,29 @@ export default function ProjectLabelSettings({
                     disabled={!canEdit || updateOption.isPending}
                     className="min-w-0 flex-1 !py-2"
                   />
+                  <div className="flex shrink-0 items-center gap-1">
+                    {colours.map((colour) => (
+                      <button
+                        key={colour.code}
+                        type="button"
+                        aria-label={`${t`Chọn màu`} ${colour.name}`}
+                        aria-pressed={option.colourCode === colour.code}
+                        title={colour.name}
+                        onClick={() => {
+                          if (canEdit && option.colourCode !== colour.code) {
+                            updateOption.mutate({
+                              boardPublicId,
+                              optionPublicId: option.publicId,
+                              colourCode: colour.code,
+                            });
+                          }
+                        }}
+                        disabled={!canEdit || updateOption.isPending}
+                        className={`h-4 w-4 rounded-full transition-transform hover:scale-125 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-light-900 focus-visible:ring-offset-1 dark:focus-visible:ring-dark-1000 dark:focus-visible:ring-offset-dark-200 ${option.colourCode === colour.code ? "ring-2 ring-light-1000 ring-offset-1 dark:ring-dark-1000" : ""}`}
+                        style={{ backgroundColor: colour.code }}
+                      />
+                    ))}
+                  </div>
                   {canEdit && (
                     <button
                       type="button"

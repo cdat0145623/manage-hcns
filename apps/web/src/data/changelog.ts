@@ -12,11 +12,33 @@ export interface ChangelogEntry {
 }
 
 // Update this value and add a new entry at the top for each release.
-export const APP_VERSION = "1.0.4";
+export const APP_VERSION = "1.0.5";
 
 export const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     version: APP_VERSION,
+    date: "2026-08-20",
+    sections: [
+      {
+        type: "added",
+        items: [
+          "Quản lý cột project board với thao tác đổi tên, xóa và chọn cột hoàn thành có xác nhận.",
+          "Đổi công việc cha, thêm checklist qua modal và hiển thị mã, nhãn, trạng thái cùng deadline của công việc con.",
+          "Chọn nhanh màu cho từng lựa chọn trong nhóm nhãn tùy chỉnh.",
+        ],
+      },
+      {
+        type: "changed",
+        items: [
+          "Cải thiện kéo thả cột và card với cập nhật tức thời, khôi phục dữ liệu khi thao tác thất bại và giữ ổn định chiều cao card.",
+          "Tự động đồng bộ trạng thái card khi tạo, di chuyển hoặc chuyển cột hoàn thành.",
+          "Tối ưu cập nhật label và mô tả card để giao diện phản hồi nhanh hơn.",
+        ],
+      },
+    ],
+  },
+  {
+    version: "1.0.4",
     date: "2026-08-20",
     sections: [
       {

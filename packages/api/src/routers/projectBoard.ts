@@ -933,6 +933,7 @@ export const projectBoardRouter = createTRPCRouter({
       const { list, board } = await getListContext(ctx.db, input.listPublicId);
       await getProjectAccess(ctx.db, userId, board.publicId, "editor");
       return projectPlanningRepo.setListCompletion(ctx.db, {
+        boardId: board.id,
         listId: list.id,
         isCompletionColumn: input.isCompletionColumn,
       });
@@ -1205,6 +1206,11 @@ export const projectBoardRouter = createTRPCRouter({
         });
       }
 
+      const completionListId = await projectPlanningRepo.getCompletionListId(
+        ctx.db,
+        board.id,
+      );
+
       return projectCardRepo.create(ctx.db, {
         title: input.title,
         description: input.description,
@@ -1214,6 +1220,7 @@ export const projectBoardRouter = createTRPCRouter({
         parentCardId: parent?.id ?? null,
         dueDate: input.dueDate,
         startDate: input.startDate,
+        status: list.id === completionListId ? "done" : undefined,
         workspaceMemberIds: members.map((member) => member.id),
       });
     }),
@@ -1375,7 +1382,17 @@ export const projectBoardRouter = createTRPCRouter({
         parentCardId = parent?.id ?? null;
       }
 
-      return projectCardRepo.update(ctx.db, {
+      const completionListId =
+        input.status === "done"
+          ? await projectPlanningRepo.getCompletionListId(
+              ctx.db,
+              card.list.board.id,
+            )
+          : null;
+      const shouldMoveToCompletion =
+        completionListId !== null && card.list.id !== completionListId;
+
+      const updatedCard = await projectCardRepo.update(ctx.db, {
         cardId: card.id,
         boardId: card.list.board.id,
         title: input.title,
@@ -1385,6 +1402,14 @@ export const projectBoardRouter = createTRPCRouter({
         startDate: input.startDate,
         status: input.status,
       });
+      if (shouldMoveToCompletion) {
+        await projectCardRepo.reorder(ctx.db, {
+          cardId: card.id,
+          newListId: completionListId,
+          status: "done",
+        });
+      }
+      return updatedCard;
     }),
 
   moveCard: protectedProcedure
@@ -1422,10 +1447,21 @@ export const projectBoardRouter = createTRPCRouter({
           message: "Destination column must belong to this board",
         });
       }
+      const completionListId = await projectPlanningRepo.getCompletionListId(
+        ctx.db,
+        board.id,
+      );
+      const status =
+        destination.id === completionListId
+          ? "done"
+          : card.list.id === completionListId
+            ? "pending"
+            : undefined;
       return projectCardRepo.reorder(ctx.db, {
         cardId: card.id,
         newListId: destination.id,
         newIndex: input.index,
+        status,
       });
     }),
 

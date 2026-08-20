@@ -1,67 +1,76 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  isAllowedUserTaskInstanceStatusTransition,
-  resolveActualDateForStatusTransition,
-} from "./taskInstanceStatusTransition";
+import { resolveTaskInstanceStatusTransition } from "./taskInstanceStatusTransition";
 
 const now = new Date("2026-08-17T02:20:00.000Z");
 const previousActualDate = new Date("2026-08-17T01:30:00.000Z");
 
-describe("resolveActualDateForStatusTransition", () => {
-  it.each([
-    ["pending", "done"],
-    ["missed", "done"],
-  ] as const)("records server time for %s to %s", (oldStatus, newStatus) => {
-    expect(
-      resolveActualDateForStatusTransition({
-        oldStatus,
-        newStatus,
-        currentActualDate: null,
-        now,
-      }),
-    ).toEqual(now);
-  });
+describe("resolveTaskInstanceStatusTransition", () => {
+  const endDate = new Date("2026-08-17T02:00:00.000Z");
 
-  it("clears actualDate when a done instance is reopened", () => {
-    expect(
-      resolveActualDateForStatusTransition({
-        oldStatus: "done",
-        newStatus: "pending",
-        currentActualDate: previousActualDate,
-        now,
-      }),
-    ).toBeNull();
-  });
+  it.each(["pending", "missed"] as const)(
+    "records server time when %s is completed",
+    (oldStatus) => {
+      expect(
+        resolveTaskInstanceStatusTransition({
+          oldStatus,
+          requestedStatus: "done",
+          currentActualDate: null,
+          endDate,
+          now,
+        }),
+      ).toEqual({ status: "done", actualDate: now });
+    },
+  );
 
   it("preserves actualDate when status does not change", () => {
     expect(
-      resolveActualDateForStatusTransition({
+      resolveTaskInstanceStatusTransition({
         oldStatus: "done",
-        newStatus: "done",
+        requestedStatus: "done",
         currentActualDate: previousActualDate,
+        endDate,
         now,
       }),
-    ).toEqual(previousActualDate);
-  });
-});
-
-describe("isAllowedUserTaskInstanceStatusTransition", () => {
-  it("allows a missed instance to be completed", () => {
-    expect(
-      isAllowedUserTaskInstanceStatusTransition({
-        oldStatus: "missed",
-        newStatus: "done",
-      }),
-    ).toBe(true);
+    ).toEqual({ status: "done", actualDate: previousActualDate });
   });
 
-  it("does not allow a missed instance to be reset to pending", () => {
+  it("converts done to pending before or at the deadline", () => {
     expect(
-      isAllowedUserTaskInstanceStatusTransition({
-        oldStatus: "missed",
-        newStatus: "pending",
+      resolveTaskInstanceStatusTransition({
+        oldStatus: "done",
+        requestedStatus: "pending",
+        currentActualDate: previousActualDate,
+        endDate,
+        now: endDate,
       }),
-    ).toBe(false);
+    ).toEqual({ status: "pending", actualDate: null });
+  });
+
+  it("converts done to missed after the deadline", () => {
+    expect(
+      resolveTaskInstanceStatusTransition({
+        oldStatus: "done",
+        requestedStatus: "pending",
+        currentActualDate: previousActualDate,
+        endDate,
+        now: new Date("2026-08-17T02:10:00.000Z"),
+      }),
+    ).toEqual({ status: "missed", actualDate: null });
+  });
+
+  it.each([
+    ["missed", "pending"],
+    ["pending", "missed"],
+  ] as const)("rejects %s to %s", (oldStatus, requestedStatus) => {
+    expect(
+      resolveTaskInstanceStatusTransition({
+        oldStatus,
+        requestedStatus,
+        currentActualDate: null,
+        endDate,
+        now: new Date("2026-08-17T02:10:00.000Z"),
+      }),
+    ).toBeNull();
   });
 });

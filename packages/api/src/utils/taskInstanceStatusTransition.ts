@@ -1,31 +1,33 @@
 import type { TaskStatus } from "@kan/db/repository/taskInstance.repo";
 
-export function isAllowedUserTaskInstanceStatusTransition(params: {
+export function resolveTaskInstanceStatusTransition(params: {
   oldStatus: TaskStatus;
-  newStatus: TaskStatus;
-}): boolean {
-  if (params.oldStatus === params.newStatus) return true;
-  if (params.newStatus === "done") return true;
-  return params.oldStatus === "done" && params.newStatus === "pending";
-}
-
-export function resolveActualDateForStatusTransition(params: {
-  oldStatus: TaskStatus;
-  newStatus: TaskStatus;
+  requestedStatus: TaskStatus;
   currentActualDate: Date | null;
+  endDate: Date | null;
   now: Date;
-}): Date | null {
-  if (params.oldStatus === params.newStatus) {
-    return params.currentActualDate;
+}): { status: TaskStatus; actualDate: Date | null } | null {
+  if (params.oldStatus === params.requestedStatus) {
+    return {
+      status: params.oldStatus,
+      actualDate: params.currentActualDate,
+    };
   }
 
-  if (params.newStatus === "done") {
-    return params.now;
+  if (params.requestedStatus === "done") {
+    return { status: "done", actualDate: params.now };
   }
 
-  if (params.oldStatus === "done" && params.newStatus === "pending") {
-    return null;
+  if (params.oldStatus === "done" && params.requestedStatus === "pending") {
+    const isAfterEndDate =
+      params.endDate !== null &&
+      params.now.getTime() > params.endDate.getTime();
+
+    return {
+      status: isAfterEndDate ? "missed" : "pending",
+      actualDate: null,
+    };
   }
 
-  return params.currentActualDate;
+  return null;
 }

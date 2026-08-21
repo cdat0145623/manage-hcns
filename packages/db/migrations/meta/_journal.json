@@ -526,6 +526,13 @@
       "when": 1787198817490,
       "tag": "20260820040657_AddProjectAndCardCodes",
       "breakpoints": true
+    },
+    {
+      "idx": 75,
+      "version": "7",
+      "when": 1787299520249,
+      "tag": "20260821080520_AddProjectCardPriority",
+      "breakpoints": true
     }
   ]
 }

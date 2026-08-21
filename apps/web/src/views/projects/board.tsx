@@ -2,7 +2,7 @@ import type { FormEvent } from "react";
 import type { DragStart, DropResult } from "react-beautiful-dnd";
 import { useRouter } from "next/router";
 import { t } from "@lingui/core/macro";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { DragDropContext, Draggable, Droppable } from "react-beautiful-dnd";
 import {
   HiBars3BottomLeft,
@@ -12,6 +12,7 @@ import {
   HiOutlineCheckCircle,
   HiOutlineClock,
   HiOutlineCog6Tooth,
+  HiOutlineFlag,
   HiOutlinePaperClip,
   HiOutlinePlusSmall,
   HiOutlineUsers,
@@ -27,8 +28,11 @@ import type { RouterOutputs } from "~/utils/api";
 import Avatar from "~/components/Avatar";
 import Badge from "~/components/Badge";
 import Button from "~/components/Button";
+import { CardCreationModalLayout } from "~/components/card-creation-modal-layout";
+import CheckboxDropdown from "~/components/CheckboxDropdown";
 import CircularProgress from "~/components/CircularProgress";
 import Dropdown from "~/components/Dropdown";
+import Editor from "~/components/Editor";
 import Input from "~/components/Input";
 import LabelIcon from "~/components/LabelIcon";
 import Modal from "~/components/modal";
@@ -40,6 +44,7 @@ import { usePopup } from "~/providers/popup";
 import { useWorkspace } from "~/providers/workspace";
 import { api } from "~/utils/api";
 import { getAvatarUrl } from "~/utils/helpers";
+import { DueDateSelector } from "../card/components/DueDateSelector";
 import ProjectCardDetailsModal from "./components/ProjectCardDetailsModal";
 import ProjectLabelSettings from "./components/ProjectLabelSettings";
 
@@ -47,6 +52,26 @@ type ProjectBoard = RouterOutputs["projectBoard"]["byId"];
 type ProjectCard = ProjectBoard["lists"][number]["cards"][number] & {
   listPublicId: string;
   depth: number;
+};
+
+const getPriorityPresentation = (priority: ProjectCard["priority"]) => {
+  switch (priority) {
+    case "high":
+      return {
+        label: t`Ưu tiên cao`,
+        className: "text-red-600 dark:text-red-400",
+      };
+    case "low":
+      return {
+        label: t`Ưu tiên thấp`,
+        className: "text-sky-600 dark:text-sky-400",
+      };
+    default:
+      return {
+        label: t`Ưu tiên trung bình`,
+        className: "text-amber-600 dark:text-amber-400",
+      };
+  }
 };
 
 const getErrorMessage = (error: { message?: string }) =>
@@ -140,9 +165,13 @@ export default function ProjectBoardView() {
   const [boardName, setBoardName] = useState("");
   const [projectCode, setProjectCode] = useState("");
   const [newColumnName, setNewColumnName] = useState("");
-  const [newCardTitles, setNewCardTitles] = useState<Record<string, string>>(
-    {},
-  );
+  const [createCardListId, setCreateCardListId] = useState<string | null>(null);
+  const [newCardTitle, setNewCardTitle] = useState("");
+  const [newCardDescription, setNewCardDescription] = useState("");
+  const [newCardMemberIds, setNewCardMemberIds] = useState<string[]>([]);
+  const [newCardLabelIds, setNewCardLabelIds] = useState<string[]>([]);
+  const [newCardStartDate, setNewCardStartDate] = useState<Date | null>(null);
+  const [newCardDueDate, setNewCardDueDate] = useState<Date | null>(null);
   const [draggedCardDimensions, setDraggedCardDimensions] = useState<{
     cardPublicId: string;
     height: number;
@@ -179,12 +208,6 @@ export default function ProjectBoardView() {
   const workspaceQuery = api.workspace.byId.useQuery(
     { workspacePublicId: workspace.publicId },
     { enabled: !!workspace.publicId },
-  );
-  const scrumReport = api.projectBoard.scrumReport.useQuery(
-    { boardPublicId },
-    {
-      enabled: boardQuery.data?.settings.workflowType === "scrum",
-    },
   );
   const canEdit = boardQuery.data?.permissions.canEdit ?? false;
 
@@ -237,21 +260,35 @@ export default function ProjectBoardView() {
     { enabled: !!selectedCardId },
   );
 
+  const refreshKanban = useCallback(async () => {
+    await utils.projectBoard.byId.invalidate({ boardPublicId });
+  }, [boardPublicId, utils.projectBoard.byId]);
+
+  const openCard = useCallback(
+    (cardPublicId: string) => {
+      setSelectedCardId(cardPublicId);
+      void refreshKanban();
+    },
+    [refreshKanban],
+  );
+
+  const closeCard = useCallback(() => {
+    setSelectedCardId(null);
+    void refreshKanban();
+  }, [refreshKanban]);
+
   useEffect(() => {
     if (!selectedCardId) return;
 
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setSelectedCardId(null);
+      if (event.key === "Escape") closeCard();
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [selectedCardId]);
+  }, [closeCard, selectedCardId]);
 
   const refresh = async () => {
-    await Promise.all([
-      utils.projectBoard.byId.invalidate({ boardPublicId }),
-      utils.projectBoard.all.invalidate(),
-    ]);
+    await Promise.all([refreshKanban(), utils.projectBoard.all.invalidate()]);
     if (selectedCardId) {
       await utils.projectBoard.getCard.invalidate({
         cardPublicId: selectedCardId,
@@ -334,11 +371,14 @@ export default function ProjectBoardView() {
     },
   });
   const createCard = api.projectBoard.createCard.useMutation({
-    onSuccess: async (_, variables) => {
-      setNewCardTitles((current) => ({
-        ...current,
-        [variables.listPublicId]: "",
-      }));
+    onSuccess: async () => {
+      setCreateCardListId(null);
+      setNewCardTitle("");
+      setNewCardDescription("");
+      setNewCardMemberIds([]);
+      setNewCardLabelIds([]);
+      setNewCardStartDate(null);
+      setNewCardDueDate(null);
       await refresh();
     },
     onError: (error) =>
@@ -474,20 +514,35 @@ export default function ProjectBoardView() {
     if (name && boardPublicId) createList.mutate({ boardPublicId, name });
   };
 
-  const submitCard = (
-    event: FormEvent<HTMLFormElement>,
-    listPublicId: string,
-  ) => {
+  const openCreateCardModal = (listPublicId: string) => {
+    if (!canEdit || createCard.isPending) return;
+    setCreateCardListId(listPublicId);
+    setNewCardTitle("");
+    setNewCardDescription("");
+    setNewCardMemberIds([]);
+    setNewCardLabelIds([]);
+    setNewCardStartDate(null);
+    setNewCardDueDate(null);
+  };
+
+  const closeCreateCardModal = () => {
+    if (!createCard.isPending) setCreateCardListId(null);
+  };
+
+  const submitCard = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!canEdit) return;
-    const title = newCardTitles[listPublicId]?.trim();
+    if (!canEdit || !createCardListId) return;
+    const title = newCardTitle.trim();
     if (!title) return;
     createCard.mutate({
-      listPublicId,
+      listPublicId: createCardListId,
       title,
-      description: "",
-      memberPublicIds: [],
+      description: newCardDescription.trim(),
+      memberPublicIds: newCardMemberIds,
       position: "end",
+      startDate: newCardStartDate,
+      dueDate: newCardDueDate,
+      labelPublicIds: newCardLabelIds,
     });
   };
 
@@ -569,6 +624,84 @@ export default function ProjectBoardView() {
 
   const members = boardQuery.data?.members ?? [];
   const workspaceMembers = workspaceQuery.data?.members ?? [];
+  const boardWorkspaceMembers = members.map((member) => member.workspaceMember);
+  const newCardMemberOptions = boardWorkspaceMembers.map((member) => ({
+    key: member.publicId,
+    value: member.user?.name ?? member.email ?? member.publicId,
+    selected: newCardMemberIds.includes(member.publicId),
+    leftIcon: (
+      <Avatar
+        size="xs"
+        name={member.user?.name ?? ""}
+        email={member.user?.email ?? member.email ?? ""}
+        imageUrl={
+          member.user?.image ? getAvatarUrl(member.user.image) : undefined
+        }
+      />
+    ),
+  }));
+  const selectedNewCardMembers = boardWorkspaceMembers.filter((member) =>
+    newCardMemberIds.includes(member.publicId),
+  );
+  const newCardLabelOptions = (boardQuery.data?.labels ?? []).map((label) => ({
+    key: label.publicId,
+    value: label.name,
+    selected: newCardLabelIds.includes(label.publicId),
+    leftIcon: <LabelIcon colourCode={label.colourCode} />,
+  }));
+  const newCardEditorMembers = workspaceMembers.map((member) => ({
+    publicId: member.publicId,
+    email: member.email ?? "",
+    user: member.user
+      ? {
+          id: member.publicId,
+          name: member.user.name,
+          image: member.user.image ?? null,
+        }
+      : null,
+  }));
+
+  const toggleNewCardLabel = (labelPublicId: string) => {
+    const field = boardQuery.data?.labelFields.find((candidate) =>
+      candidate.options.some((option) => option.publicId === labelPublicId),
+    );
+    if (!field) {
+      setNewCardLabelIds((current) =>
+        current.includes(labelPublicId)
+          ? current.filter((id) => id !== labelPublicId)
+          : [...current, labelPublicId],
+      );
+      return;
+    }
+
+    const fieldOptionIds = new Set(
+      field.options.map((option) => option.publicId),
+    );
+    setNewCardLabelIds((current) => {
+      const isSelected = current.includes(labelPublicId);
+      if (field.selectionMode === "single") {
+        return isSelected
+          ? current.filter((id) => !fieldOptionIds.has(id))
+          : [...current.filter((id) => !fieldOptionIds.has(id)), labelPublicId];
+      }
+      return isSelected
+        ? current.filter((id) => id !== labelPublicId)
+        : [...current, labelPublicId];
+    });
+  };
+
+  const setNewCardLabelField = (
+    field: ProjectBoard["labelFields"][number],
+    labelPublicId: string,
+  ) => {
+    const fieldOptionIds = new Set(
+      field.options.map((option) => option.publicId),
+    );
+    setNewCardLabelIds((current) => [
+      ...current.filter((id) => !fieldOptionIds.has(id)),
+      ...(labelPublicId ? [labelPublicId] : []),
+    ]);
+  };
 
   if (boardQuery.isLoading) {
     return (
@@ -1025,6 +1158,295 @@ export default function ProjectBoardView() {
         </Modal>
 
         <Modal
+          isVisible={createCardListId !== null}
+          onClose={closeCreateCardModal}
+          modalSize="md"
+          centered
+        >
+          <form onSubmit={submitCard}>
+            <CardCreationModalLayout
+              title={t`Thêm thẻ mới`}
+              closeLabel={t`Đóng thêm thẻ mới`}
+              onClose={closeCreateCardModal}
+              footer={
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="secondary"
+                    onClick={closeCreateCardModal}
+                    disabled={createCard.isPending}
+                  >
+                    {t`Hủy`}
+                  </Button>
+                  <Button
+                    type="submit"
+                    size="sm"
+                    disabled={createCard.isPending || !newCardTitle.trim()}
+                    isLoading={createCard.isPending}
+                  >
+                    {t`Tạo thẻ`}
+                  </Button>
+                </div>
+              }
+            >
+              <p className="mb-3 text-xs text-light-800 dark:text-dark-800">
+                {t`Thêm card vào cột ${board.lists.find((list) => list.publicId === createCardListId)?.name ?? ""}.`}
+              </p>
+
+              <div className="space-y-4">
+                <Input
+                  id="new-card-title"
+                  value={newCardTitle}
+                  onChange={(event) => setNewCardTitle(event.target.value)}
+                  placeholder={t`Tiêu đề thẻ`}
+                  name="newCardTitle"
+                  autoFocus
+                  disabled={createCard.isPending}
+                />
+
+                <div>
+                  <div className="block max-h-48 min-h-24 w-full overflow-y-auto rounded-md border-0 bg-dark-300 bg-white/5 px-3 py-2 text-sm shadow-sm ring-1 ring-inset ring-light-600 focus-within:ring-2 focus-within:ring-inset focus-within:ring-light-700 dark:ring-dark-700 dark:focus-within:ring-dark-700">
+                    <Editor
+                      content={newCardDescription}
+                      onChange={setNewCardDescription}
+                      workspaceMembers={newCardEditorMembers}
+                      enableYouTubeEmbed={false}
+                      placeholder={t`Mô tả`}
+                    />
+                  </div>
+                </div>
+
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="min-w-0">
+                    <span className="mb-1 block truncate text-[10px] font-semibold uppercase tracking-widest text-light-900 dark:text-dark-800">
+                      {t`Cột`}
+                    </span>
+                    <Select
+                      value={createCardListId ?? ""}
+                      onChange={setCreateCardListId}
+                      options={board.lists.map((list) => ({
+                        value: list.publicId,
+                        label: list.name,
+                      }))}
+                      disabled={createCard.isPending}
+                      title={t`Chọn cột`}
+                      buttonClassName="!min-h-[42px] !rounded-xl !border-light-300 !px-3 !py-2 dark:!border-dark-300/50"
+                    />
+                  </div>
+
+                  <div className="min-w-0">
+                    <span className="mb-1 block truncate text-[10px] font-semibold uppercase tracking-widest text-light-900 dark:text-dark-800">
+                      {t`Thành viên`}
+                    </span>
+                    <CheckboxDropdown
+                      items={newCardMemberOptions}
+                      handleSelect={(_groupKey, item) => {
+                        setNewCardMemberIds((current) =>
+                          current.includes(item.key)
+                            ? current.filter(
+                                (memberId) => memberId !== item.key,
+                              )
+                            : [...current, item.key],
+                        );
+                      }}
+                      disabled={createCard.isPending}
+                      asChild
+                    >
+                      <div className="flex min-h-[42px] w-full items-center rounded-xl bg-white px-3 py-2 text-left text-sm font-medium text-neutral-900 shadow-sm ring-1 ring-light-300 transition-colors hover:bg-light-50 hover:ring-light-400 dark:bg-dark-300/30 dark:text-dark-1000 dark:ring-dark-300/50 dark:hover:bg-dark-300/50">
+                        {selectedNewCardMembers.length > 0 ? (
+                          <div className="flex max-h-24 flex-wrap gap-1.5 overflow-y-auto">
+                            {selectedNewCardMembers.map((member) => {
+                              const name =
+                                member.user?.name ??
+                                member.email ??
+                                member.publicId;
+                              return (
+                                <span
+                                  key={member.publicId}
+                                  className="inline-flex max-w-full items-center gap-1.5 rounded-lg bg-light-100 px-2 py-1 text-xs font-medium text-neutral-900 dark:bg-dark-300 dark:text-dark-1000"
+                                  title={name}
+                                >
+                                  <Avatar
+                                    size="xs"
+                                    name={member.user?.name ?? ""}
+                                    email={
+                                      member.user?.email ?? member.email ?? ""
+                                    }
+                                    imageUrl={
+                                      member.user?.image
+                                        ? getAvatarUrl(member.user.image)
+                                        : undefined
+                                    }
+                                  />
+                                  <span className="max-w-[12rem] truncate">
+                                    {name}
+                                  </span>
+                                </span>
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          t`Chọn thành viên`
+                        )}
+                      </div>
+                    </CheckboxDropdown>
+                  </div>
+
+                  {board.labelFields.length > 0
+                    ? board.labelFields.map((field) => {
+                        const fieldOptionIds = new Set(
+                          field.options.map((option) => option.publicId),
+                        );
+                        const selectedOptionIds = newCardLabelIds.filter((id) =>
+                          fieldOptionIds.has(id),
+                        );
+                        const fieldLabel = (
+                          <span className="mb-1 block truncate text-[10px] font-semibold uppercase tracking-widest text-light-900 dark:text-dark-800">
+                            {field.name}
+                          </span>
+                        );
+
+                        if (field.selectionMode === "single") {
+                          return (
+                            <div key={field.publicId} className="min-w-0">
+                              {fieldLabel}
+                              <Select
+                                value={selectedOptionIds[0] ?? ""}
+                                onChange={(labelPublicId) =>
+                                  setNewCardLabelField(field, labelPublicId)
+                                }
+                                options={[
+                                  { value: "", label: t`Chưa chọn` },
+                                  ...field.options.map((option) => ({
+                                    value: option.publicId,
+                                    label: option.name,
+                                  })),
+                                ]}
+                                disabled={createCard.isPending}
+                                title={t`Chọn ${field.name}`}
+                                buttonClassName="!min-h-[42px] !rounded-xl !border-light-300 !px-3 !py-2 dark:!border-dark-300/50"
+                              />
+                            </div>
+                          );
+                        }
+
+                        const items = field.options.map((option) => ({
+                          key: option.publicId,
+                          value: option.name,
+                          selected: selectedOptionIds.includes(option.publicId),
+                          leftIcon: (
+                            <LabelIcon colourCode={option.colourCode} />
+                          ),
+                        }));
+                        return (
+                          <div key={field.publicId} className="min-w-0">
+                            {fieldLabel}
+                            <CheckboxDropdown
+                              items={items}
+                              handleSelect={(_, option) =>
+                                toggleNewCardLabel(option.key)
+                              }
+                              disabled={createCard.isPending}
+                              asChild
+                            >
+                              <div className="flex min-h-[42px] w-full flex-wrap items-center gap-1.5 rounded-xl bg-white px-3 py-2 text-sm text-neutral-900 shadow-sm ring-1 ring-light-300 dark:bg-dark-300/30 dark:text-dark-1000 dark:ring-dark-300/50">
+                                {selectedOptionIds.length
+                                  ? field.options
+                                      .filter((option) =>
+                                        selectedOptionIds.includes(
+                                          option.publicId,
+                                        ),
+                                      )
+                                      .map((option) => (
+                                        <span
+                                          key={option.publicId}
+                                          className="inline-flex items-center gap-1 rounded-md bg-light-100 px-2 py-1 text-xs dark:bg-dark-300"
+                                        >
+                                          <LabelIcon
+                                            colourCode={option.colourCode}
+                                          />
+                                          {option.name}
+                                        </span>
+                                      ))
+                                  : t`Thêm nhãn`}
+                              </div>
+                            </CheckboxDropdown>
+                          </div>
+                        );
+                      })
+                    : newCardLabelOptions.length > 0 && (
+                        <div className="min-w-0">
+                          <span className="mb-1 block truncate text-[10px] font-semibold uppercase tracking-widest text-light-900 dark:text-dark-800">
+                            {t`Nhãn`}
+                          </span>
+                          <CheckboxDropdown
+                            items={newCardLabelOptions}
+                            handleSelect={(_groupKey, item) =>
+                              toggleNewCardLabel(item.key)
+                            }
+                            disabled={createCard.isPending}
+                            asChild
+                          >
+                            <div className="flex min-h-[42px] w-full flex-wrap items-center gap-1.5 rounded-xl bg-white px-3 py-2 text-sm text-neutral-900 shadow-sm ring-1 ring-light-300 dark:bg-dark-300/30 dark:text-dark-1000 dark:ring-dark-300/50">
+                              {newCardLabelIds.length
+                                ? newCardLabelOptions
+                                    .filter((option) =>
+                                      newCardLabelIds.includes(option.key),
+                                    )
+                                    .map((option) => (
+                                      <span
+                                        key={option.key}
+                                        className="inline-flex items-center gap-1 rounded-md bg-light-100 px-2 py-1 text-xs dark:bg-dark-300"
+                                      >
+                                        {option.leftIcon}
+                                        {option.value}
+                                      </span>
+                                    ))
+                                : t`Thêm nhãn`}
+                            </div>
+                          </CheckboxDropdown>
+                        </div>
+                      )}
+
+                  <div className="min-w-0">
+                    <span className="mb-1 block truncate text-[10px] font-semibold uppercase tracking-widest text-light-900 dark:text-dark-800">
+                      {t`Bắt đầu`}
+                    </span>
+                    <DueDateSelector
+                      cardPublicId={createCardListId ?? ""}
+                      dueDate={newCardStartDate}
+                      disabled={createCard.isPending}
+                      weekStartsOn={workspace.weekStartDay}
+                      label={t`Bắt đầu`}
+                      title={t`Chọn ngày bắt đầu`}
+                      className="!min-h-[42px] !rounded-xl !px-3 !py-2"
+                      onDateSelect={(date) => setNewCardStartDate(date ?? null)}
+                    />
+                  </div>
+
+                  <div className="min-w-0">
+                    <span className="mb-1 block truncate text-[10px] font-semibold uppercase tracking-widest text-light-900 dark:text-dark-800">
+                      {t`Hạn chót`}
+                    </span>
+                    <DueDateSelector
+                      cardPublicId={createCardListId ?? ""}
+                      dueDate={newCardDueDate}
+                      disabled={createCard.isPending}
+                      weekStartsOn={workspace.weekStartDay}
+                      label={t`Hạn chót`}
+                      title={t`Chọn hạn chót`}
+                      className="!min-h-[42px] !rounded-xl !px-3 !py-2"
+                      onDateSelect={(date) => setNewCardDueDate(date ?? null)}
+                    />
+                  </div>
+                </div>
+              </div>
+            </CardCreationModalLayout>
+          </form>
+        </Modal>
+
+        <Modal
           isVisible={completionChange !== null}
           onClose={() => {
             if (!setListCompletion.isPending) setCompletionChange(null);
@@ -1115,56 +1537,6 @@ export default function ProjectBoardView() {
           )}
         </Modal>
 
-        {workflowType === "scrum" && scrumReport.data && (
-          <div className="relative z-10 grid gap-3 border-b border-light-300 bg-light-50/60 px-5 py-3 text-sm dark:border-dark-300 dark:bg-dark-100/60 md:grid-cols-3 md:px-6">
-            <div>
-              <div className="text-xs font-semibold uppercase tracking-wide text-light-900 dark:text-dark-800">
-                {t`Current cycle`}
-              </div>
-              <div className="mt-1 font-semibold text-neutral-900 dark:text-dark-1000">
-                {scrumReport.data.cycle?.name ?? t`No active cycle`}
-              </div>
-              <div className="text-xs text-light-800 dark:text-dark-800">
-                {scrumReport.data.cycle?.status ?? t`Backlog only`}
-              </div>
-            </div>
-            <div>
-              <div className="text-xs font-semibold uppercase tracking-wide text-light-900 dark:text-dark-800">
-                {t`Burndown snapshot`}
-              </div>
-              <div className="mt-1 font-semibold text-neutral-900 dark:text-dark-1000">
-                {scrumReport.data.burndown.remainingCards} /{" "}
-                {scrumReport.data.burndown.totalCards} {t`cards remaining`}
-              </div>
-              <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-light-300 dark:bg-dark-400">
-                <div
-                  className="h-full rounded-full bg-green-500"
-                  style={{
-                    width: `${scrumReport.data.burndown.totalCards > 0 ? Math.round((scrumReport.data.burndown.completedCards / scrumReport.data.burndown.totalCards) * 100) : 0}%`,
-                  }}
-                />
-              </div>
-            </div>
-            <div>
-              <div className="text-xs font-semibold uppercase tracking-wide text-light-900 dark:text-dark-800">
-                {t`Velocity`}
-              </div>
-              <div className="mt-1 flex flex-wrap gap-1 text-xs text-light-900 dark:text-dark-800">
-                {scrumReport.data.velocity.length > 0
-                  ? scrumReport.data.velocity.map((cycle) => (
-                      <span
-                        key={cycle.publicId}
-                        className="rounded-full bg-light-200 px-2 py-1 dark:bg-dark-300"
-                      >
-                        {cycle.name}: {cycle.completedEstimate}
-                      </span>
-                    ))
-                  : t`No completed cycles`}
-              </div>
-            </div>
-          </div>
-        )}
-
         <div className="relative z-10 flex min-h-0 flex-1 overflow-x-auto p-5 md:p-6">
           <DragDropContext
             onBeforeDragStart={onBeforeDragStart}
@@ -1179,7 +1551,7 @@ export default function ProjectBoardView() {
                 <div
                   ref={listProvided.innerRef}
                   {...listProvided.droppableProps}
-                  className="flex gap-4"
+                  className="flex"
                 >
                   {board.lists.map((list, listIndex) => (
                     <Draggable
@@ -1192,7 +1564,7 @@ export default function ProjectBoardView() {
                         <div
                           ref={listDraggable.innerRef}
                           {...listDraggable.draggableProps}
-                          className="flex h-fit max-h-[calc(100vh-170px)] w-[18rem] shrink-0 flex-col rounded-md border border-light-400 bg-light-300 py-2 pl-2 pr-1 dark:border-dark-300 dark:bg-dark-100"
+                          className="mr-4 flex h-fit max-h-[calc(100vh-170px)] w-[18rem] shrink-0 flex-col rounded-md border border-light-400 bg-light-300 py-2 pl-2 pr-1 dark:border-dark-300 dark:bg-dark-100"
                         >
                           <div
                             {...listDraggable.dragHandleProps}
@@ -1228,6 +1600,24 @@ export default function ProjectBoardView() {
                                 {list.name}
                               </span>
                             )}
+                            {canEdit && (
+                              <button
+                                type="button"
+                                aria-label={t`Thêm card`}
+                                title={t`Thêm card`}
+                                onMouseDown={(event) => event.stopPropagation()}
+                                onClick={() =>
+                                  openCreateCardModal(list.publicId)
+                                }
+                                disabled={createCard.isPending}
+                                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-[5px] text-light-800 hover:bg-light-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-light-700 disabled:cursor-not-allowed disabled:opacity-50 dark:text-dark-800 dark:hover:bg-dark-200 dark:focus-visible:ring-dark-700"
+                              >
+                                <HiOutlinePlusSmall
+                                  className="h-5 w-5"
+                                  aria-hidden="true"
+                                />
+                              </button>
+                            )}
                             <span className="rounded-full bg-light-200 px-2 py-0.5 text-xs text-light-900 dark:bg-dark-300 dark:text-dark-800">
                               {list.cards.length}
                             </span>
@@ -1246,6 +1636,14 @@ export default function ProjectBoardView() {
                                 <Dropdown
                                   buttonLabel={t`Thao tác với cột`}
                                   items={[
+                                    {
+                                      label: t`Thêm card`,
+                                      action: () =>
+                                        openCreateCardModal(list.publicId),
+                                      icon: (
+                                        <HiOutlinePlusSmall className="h-4 w-4" />
+                                      ),
+                                    },
                                     {
                                       label: t`Đổi tên cột`,
                                       action: () =>
@@ -1287,6 +1685,9 @@ export default function ProjectBoardView() {
                                 className="scrollbar-w-[6px] min-h-8 space-y-2 overflow-y-auto pr-1 scrollbar scrollbar-thumb-light-400 dark:scrollbar-thumb-dark-500"
                               >
                                 {list.cards.map((card, cardIndex) => {
+                                  const priority = getPriorityPresentation(
+                                    card.priority,
+                                  );
                                   return (
                                     <Draggable
                                       key={card.publicId}
@@ -1303,7 +1704,7 @@ export default function ProjectBoardView() {
                                           {...cardDraggable.draggableProps}
                                           {...cardDraggable.dragHandleProps}
                                           onClick={() =>
-                                            setSelectedCardId(card.publicId)
+                                            openCard(card.publicId)
                                           }
                                           onKeyDown={(event) => {
                                             if (
@@ -1311,7 +1712,7 @@ export default function ProjectBoardView() {
                                               event.key === " "
                                             ) {
                                               event.preventDefault();
-                                              setSelectedCardId(card.publicId);
+                                              openCard(card.publicId);
                                             }
                                           }}
                                           style={{
@@ -1348,6 +1749,11 @@ export default function ProjectBoardView() {
                                           )}
                                           <div className="mt-2 flex items-center justify-between gap-2 text-[11px] text-light-800 dark:text-dark-800">
                                             <div className="flex min-w-0 items-center gap-2">
+                                              <HiOutlineFlag
+                                                className={`h-3.5 w-3.5 shrink-0 ${priority.className}`}
+                                                aria-label={priority.label}
+                                                title={priority.label}
+                                              />
                                               {card.description && (
                                                 <HiBars3BottomLeft
                                                   className="h-3.5 w-3.5 shrink-0"
@@ -1525,41 +1931,6 @@ export default function ProjectBoardView() {
                               </div>
                             )}
                           </StrictModeDroppable>
-                          {canEdit && (
-                            <form
-                              onSubmit={(event) =>
-                                submitCard(event, list.publicId)
-                              }
-                              className="mt-3 flex gap-2"
-                            >
-                              <Input
-                                value={newCardTitles[list.publicId] ?? ""}
-                                onChange={(event) =>
-                                  setNewCardTitles((current) => ({
-                                    ...current,
-                                    [list.publicId]: event.target.value,
-                                  }))
-                                }
-                                placeholder={t`Thêm card...`}
-                                className="min-w-0 flex-1"
-                                name={`newCard-${list.publicId}`}
-                                disabled={createCard.isPending}
-                              />
-                              <Button
-                                type="submit"
-                                size="sm"
-                                variant="ghost"
-                                iconOnly
-                                iconLeft={
-                                  <HiOutlinePlusSmall className="h-4 w-4" />
-                                }
-                                aria-label={t`Thêm card`}
-                                disabled={createCard.isPending}
-                                isLoading={createCard.isPending}
-                                className="text-light-900 hover:bg-light-300 dark:text-dark-1000 dark:hover:bg-dark-300"
-                              />
-                            </form>
-                          )}
                         </div>
                       )}
                     </Draggable>
@@ -1581,13 +1952,13 @@ export default function ProjectBoardView() {
             members={members}
             workspaceMembers={workspaceMembers}
             canEdit={canEdit}
+            workflowType={workflowType}
             enableCycles={enableCycles}
-            estimationType={estimationType}
             weekStartsOn={workspace.weekStartDay}
             isAdmin={workspace.role === "ADMIN"}
             isOpen={true}
-            onClose={() => setSelectedCardId(null)}
-            onOpenCard={setSelectedCardId}
+            onClose={closeCard}
+            onOpenCard={openCard}
             onRefresh={refresh}
           />
         )}

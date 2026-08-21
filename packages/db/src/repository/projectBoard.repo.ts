@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray, isNotNull, isNull } from "drizzle-orm";
+import { and, asc, eq, inArray, isNotNull, isNull, sql } from "drizzle-orm";
 
 import type { dbClient } from "@kan/db/client";
 import * as projectLabelRepo from "@kan/db/repository/projectLabel.repo";
@@ -32,7 +32,13 @@ export const getActiveWorkspaceMember = async (
   workspaceId: number,
 ) =>
   db.query.workspaceMembers.findFirst({
-    columns: { id: true, publicId: true, userId: true, status: true },
+    columns: {
+      id: true,
+      publicId: true,
+      userId: true,
+      status: true,
+      role: true,
+    },
     where: and(
       eq(workspaceMembers.userId, userId),
       eq(workspaceMembers.workspaceId, workspaceId),
@@ -108,6 +114,28 @@ export const getAccessibleBoardIds = async (
   return rows.map((row) => row.boardId);
 };
 
+const getAccessibleCardIds = async (
+  db: dbClient,
+  boardId: number,
+  workspaceMemberId: number,
+) => {
+  const rows = await db
+    .select({ cardId: projectCardMembers.cardId })
+    .from(projectCardMembers)
+    .innerJoin(cards, eq(projectCardMembers.cardId, cards.id))
+    .innerJoin(lists, eq(cards.listId, lists.id))
+    .where(
+      and(
+        eq(lists.boardId, boardId),
+        eq(projectCardMembers.workspaceMemberId, workspaceMemberId),
+        isNull(cards.deletedAt),
+        isNull(lists.deletedAt),
+      ),
+    );
+
+  return rows.map((row) => row.cardId);
+};
+
 export const getAllAccessible = async (
   db: dbClient,
   workspaceId: number,
@@ -164,7 +192,30 @@ export const getMembers = async (db: dbClient, boardId: number) =>
     },
   });
 
-export const getByPublicId = async (db: dbClient, boardPublicId: string) => {
+export const getByPublicId = async (
+  db: dbClient,
+  boardPublicId: string,
+  cardAccess?: { isAdmin: boolean; workspaceMemberId?: number },
+) => {
+  const boardId = await db.query.boards.findFirst({
+    columns: { id: true },
+    where: activeBoardWhere(boardPublicId),
+  });
+  if (!boardId) return null;
+
+  const accessibleCardIds = cardAccess?.isAdmin
+    ? undefined
+    : cardAccess?.workspaceMemberId
+      ? await getAccessibleCardIds(db, boardId.id, cardAccess.workspaceMemberId)
+      : [];
+  const cardVisibilityWhere = cardAccess
+    ? accessibleCardIds && accessibleCardIds.length > 0
+      ? inArray(cards.id, accessibleCardIds)
+      : cardAccess.isAdmin
+        ? undefined
+        : sql`false`
+    : undefined;
+
   const board = await db.query.boards.findFirst({
     columns: {
       id: true,
@@ -197,8 +248,9 @@ export const getByPublicId = async (db: dbClient, boardPublicId: string) => {
               startDate: true,
               parentCardId: true,
               status: true,
+              priority: true,
             },
-            where: isNull(cards.deletedAt),
+            where: and(isNull(cards.deletedAt), cardVisibilityWhere),
             orderBy: [asc(cards.index)],
             with: {
               labels: {
@@ -328,6 +380,7 @@ export const getByPublicId = async (db: dbClient, boardPublicId: string) => {
           dueDate: card.dueDate,
           startDate: card.startDate,
           status: card.status,
+          priority: card.priority,
           labels: card.labels
             .filter((label) => !label.label.deletedAt)
             .map((label) => ({

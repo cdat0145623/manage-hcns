@@ -2,11 +2,7 @@ import { t } from "@lingui/core/macro";
 import { Trans } from "@lingui/react/macro";
 import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
-import {
-  HiOutlineBarsArrowDown,
-  HiOutlineBarsArrowUp,
-  HiXMark,
-} from "react-icons/hi2";
+import { HiOutlineBarsArrowDown, HiOutlineBarsArrowUp } from "react-icons/hi2";
 
 import type { NewCardInput } from "@kan/api/types";
 import { authClient } from "@kan/auth/client";
@@ -15,6 +11,7 @@ import { formatInAppCalendarZone, generateUID } from "@kan/shared/utils";
 import type { WorkspaceMember } from "~/components/Editor";
 import Avatar from "~/components/Avatar";
 import Button from "~/components/Button";
+import { CardCreationModalLayout } from "~/components/card-creation-modal-layout";
 import CheckboxDropdown from "~/components/CheckboxDropdown";
 import DateSelector from "~/components/DateSelector";
 import Editor from "~/components/Editor";
@@ -339,23 +336,28 @@ export function NewCardForm({
 
   return (
     <form onSubmit={handleSubmit(onSubmit)}>
-      <div className="px-5 pt-5">
-        <div className="flex w-full items-center justify-between pb-5">
-          <h2 className="text-sm font-bold text-neutral-900 dark:text-dark-1000">
-            {t`Thêm thẻ mới`}
-          </h2>
-          <button
-            type="button"
-            className="rounded p-1 hover:bg-light-200 focus:outline-none dark:hover:bg-dark-300"
-            onClick={(e) => {
-              closeModal();
-              e.preventDefault();
-            }}
-          >
-            <HiXMark size={18} className="text-light-900 dark:text-dark-900" />
-          </button>
-        </div>
-
+      <CardCreationModalLayout
+        title={t`Thêm thẻ mới`}
+        closeLabel={t`Đóng thêm thẻ mới`}
+        onClose={closeModal}
+        footer={
+          <>
+            <Toggle
+              label={t`Create another`}
+              isChecked={isCreateAnotherEnabled}
+              onChange={handleToggleCreateAnother}
+            />
+            <div>
+              <Button
+                type="submit"
+                disabled={title.length === 0 || createCard.isPending}
+              >
+                {t`Tạo thẻ`}
+              </Button>
+            </div>
+          </>
+        }
+      >
         <div>
           <Input
             id="title"
@@ -558,24 +560,7 @@ export function NewCardForm({
             )}
           </button>
         </div>
-      </div>
-
-      <div className="mt-5 flex items-center justify-end border-t border-light-600 px-5 pb-5 pt-5 dark:border-dark-600">
-        <Toggle
-          label={t`Create another`}
-          isChecked={isCreateAnotherEnabled}
-          onChange={handleToggleCreateAnother}
-        />
-
-        <div>
-          <Button
-            type="submit"
-            disabled={title.length === 0 || createCard.isPending}
-          >
-            {t`Tạo thẻ`}
-          </Button>
-        </div>
-      </div>
+      </CardCreationModalLayout>
     </form>
   );
 }

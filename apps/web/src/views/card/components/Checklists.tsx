@@ -3,6 +3,7 @@ import { t } from "@lingui/core/macro";
 import { DragDropContext, Draggable } from "react-beautiful-dnd";
 import { HiPlus, HiXMark } from "react-icons/hi2";
 
+import type { RouterOutputs } from "~/utils/api";
 import CircularProgress from "~/components/CircularProgress";
 import { StrictModeDroppable as Droppable } from "~/components/StrictModeDroppable";
 import { useModal } from "~/providers/modal";
@@ -31,6 +32,10 @@ interface ChecklistsProps {
   taskInstanceId?: string;
   activeChecklistForm?: string | null;
   setActiveChecklistForm?: (id: string | null) => void;
+  onItemCreated?: (
+    checklistPublicId: string,
+    item: RouterOutputs["checklist"]["createItem"],
+  ) => void;
   onChanged?: () => void | Promise<void>;
   viewOnly?: boolean;
 }
@@ -41,6 +46,7 @@ export default function Checklists({
   taskInstanceId,
   activeChecklistForm,
   setActiveChecklistForm,
+  onItemCreated,
   onChanged,
   viewOnly = false,
 }: ChecklistsProps) {
@@ -277,6 +283,9 @@ export default function Checklists({
                       cardPublicId={cardPublicId}
                       taskInstanceId={taskInstanceId}
                       onCancel={() => setActiveChecklistForm?.(null)}
+                      onCreated={(item) =>
+                        onItemCreated?.(checklist.publicId, item)
+                      }
                       onChanged={onChanged}
                       readOnly={viewOnly}
                     />

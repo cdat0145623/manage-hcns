@@ -18,6 +18,7 @@ import { assertPermission } from "../utils/permissions";
 
 const roleSchema = z.enum(["editor", "viewer"]);
 const cardStatusSchema = z.enum(["pending", "done", "missed"]);
+const cardPrioritySchema = z.enum(["high", "medium", "low"]);
 const projectCodeSchema = z
   .string()
   .trim()
@@ -74,7 +75,8 @@ const getProjectAccess = async (
     board.workspaceId,
   );
   const user = await userRepo.getById(db, userId);
-  const isWorkspaceAdmin = user?.role === "ADMIN";
+  const isWorkspaceAdmin =
+    user?.role === "ADMIN" || workspaceMember?.role === "ADMIN";
   const membership = workspaceMember
     ? await projectBoardRepo.getMembership(db, board.id, workspaceMember.id)
     : undefined;
@@ -164,6 +166,17 @@ const getCardAccess = async (
     requiredRole,
   );
 
+  if (
+    !access.isWorkspaceAdmin &&
+    (!access.workspaceMember ||
+      !(await projectCardRepo.isMember(db, card.id, access.workspaceMember.id)))
+  ) {
+    throw new TRPCError({
+      code: "NOT_FOUND",
+      message: "Project card not found",
+    });
+  }
+
   return { card, ...access };
 };
 
@@ -232,7 +245,7 @@ export const projectBoardRouter = createTRPCRouter({
         workspace.id,
       );
       const accessibleBoardIds =
-        user?.role === "ADMIN"
+        user?.role === "ADMIN" || member?.role === "ADMIN"
           ? undefined
           : member
             ? await projectBoardRepo.getAccessibleBoardIds(
@@ -337,6 +350,10 @@ export const projectBoardRouter = createTRPCRouter({
       const board = await projectBoardRepo.getByPublicId(
         ctx.db,
         input.boardPublicId,
+        {
+          isAdmin: access.isWorkspaceAdmin,
+          workspaceMemberId: access.workspaceMember?.id,
+        },
       );
       if (!board) {
         throw new TRPCError({
@@ -1182,6 +1199,8 @@ export const projectBoardRouter = createTRPCRouter({
         position: z.enum(["start", "end"]).default("end"),
         dueDate: z.date().nullable().optional(),
         startDate: z.date().nullable().optional(),
+        priority: cardPrioritySchema.optional(),
+        labelPublicIds: z.array(z.string().min(12)).max(100).default([]),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -1221,6 +1240,8 @@ export const projectBoardRouter = createTRPCRouter({
         dueDate: input.dueDate,
         startDate: input.startDate,
         status: list.id === completionListId ? "done" : undefined,
+        priority: input.priority,
+        labelPublicIds: input.labelPublicIds,
         workspaceMemberIds: members.map((member) => member.id),
       });
     }),
@@ -1320,10 +1341,14 @@ export const projectBoardRouter = createTRPCRouter({
     .input(z.object({ cardPublicId: z.string().min(12) }))
     .query(async ({ ctx, input }) => {
       const userId = requireUser(ctx.user?.id);
-      await getCardAccess(ctx.db, userId, input.cardPublicId);
+      const access = await getCardAccess(ctx.db, userId, input.cardPublicId);
       const card = await projectCardRepo.getByPublicId(
         ctx.db,
         input.cardPublicId,
+        {
+          isAdmin: access.isWorkspaceAdmin,
+          workspaceMemberId: access.workspaceMember?.id,
+        },
       );
       if (!card)
         throw new TRPCError({
@@ -1352,6 +1377,7 @@ export const projectBoardRouter = createTRPCRouter({
         dueDate: z.date().nullable().optional(),
         startDate: z.date().nullable().optional(),
         status: cardStatusSchema.optional(),
+        priority: cardPrioritySchema.optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -1401,6 +1427,7 @@ export const projectBoardRouter = createTRPCRouter({
         dueDate: input.dueDate,
         startDate: input.startDate,
         status: input.status,
+        priority: input.priority,
       });
       if (shouldMoveToCompletion) {
         await projectCardRepo.reorder(ctx.db, {

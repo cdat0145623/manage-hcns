@@ -4,7 +4,6 @@ import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useState } from "react";
 import {
   HiEllipsisVertical,
-  HiMiniPlus,
   HiOutlineArrowPath,
   HiOutlineCalendarDays,
   HiOutlinePlusSmall,
@@ -15,6 +14,7 @@ import {
 import { formatInAppCalendarZone } from "@kan/shared/utils";
 
 import type { RouterOutputs } from "~/utils/api";
+import Avatar from "~/components/Avatar";
 import Badge from "~/components/Badge";
 import Button from "~/components/Button";
 import CheckboxDropdown from "~/components/CheckboxDropdown";
@@ -27,14 +27,14 @@ import Select from "~/components/Select";
 import { useModal } from "~/providers/modal";
 import { usePopup } from "~/providers/popup";
 import { api } from "~/utils/api";
+import { getAvatarUrl } from "~/utils/helpers";
 import ActivityList from "../../card/components/ActivityList";
 import { AttachmentThumbnails } from "../../card/components/AttachmentThumbnails";
 import { AttachmentUpload } from "../../card/components/AttachmentUpload";
-import Checklists from "../../card/components/Checklists";
-import { DeleteChecklistConfirmation } from "../../card/components/DeleteChecklistConfirmation";
+import { DeleteCommentConfirmation } from "../../card/components/DeleteCommentConfirmation";
 import { DueDateSelector } from "../../card/components/DueDateSelector";
-import { NewChecklistForm } from "../../card/components/NewChecklistForm";
 import NewCommentForm from "../../card/components/NewCommentForm";
+import ProjectCardChecklistSection from "./project-card-checklist-section";
 
 type ProjectBoard = RouterOutputs["projectBoard"]["byId"];
 type ProjectCard = ProjectBoard["lists"][number]["cards"][number] & {
@@ -50,6 +50,7 @@ interface WorkspaceMember {
     id?: string;
     name: string | null;
     email?: string | null;
+    image?: string | null;
   } | null;
 }
 
@@ -87,8 +88,8 @@ interface ProjectCardDetailsModalProps {
   members: ProjectBoard["members"];
   workspaceMembers: WorkspaceMember[];
   canEdit: boolean;
+  workflowType: "general" | "scrum";
   enableCycles: boolean;
-  estimationType: "none" | "story_points" | "hours";
   weekStartsOn: 0 | 1 | 6;
   isAdmin: boolean;
   isOpen: boolean;
@@ -108,8 +109,8 @@ export default function ProjectCardDetailsModal({
   members,
   workspaceMembers,
   canEdit,
+  workflowType,
   enableCycles,
-  estimationType,
   weekStartsOn,
   isAdmin,
   isOpen,
@@ -117,14 +118,14 @@ export default function ProjectCardDetailsModal({
   onOpenCard,
   onRefresh,
 }: ProjectCardDetailsModalProps) {
-  const { entityId, modalContentType, openModal } = useModal();
+  const { entityId, modalContentType } = useModal();
   const { showPopup } = usePopup();
   const utils = api.useUtils();
   const [title, setTitle] = useState(card.title);
   const [description, setDescription] = useState(card.description ?? "");
+  const [selectedPriority, setSelectedPriority] = useState(card.priority);
   const [selectedMemberIds, setSelectedMemberIds] = useState<string[]>([]);
   const [selectedCycleId, setSelectedCycleId] = useState<string | null>(null);
-  const [selectedEstimate, setSelectedEstimate] = useState("");
   const [childTitle, setChildTitle] = useState("");
   const [activeTab, setActiveTab] = useState<"features" | "activity">(
     "features",
@@ -140,11 +141,9 @@ export default function ProjectCardDetailsModal({
   useEffect(() => {
     setTitle(card.title);
     setDescription(card.description ?? "");
+    setSelectedPriority(card.priority);
     setSelectedMemberIds(card.members.map((member) => member.publicId));
     setSelectedCycleId(card.cyclePublicId ?? null);
-    setSelectedEstimate(
-      card.estimateValue == null ? "" : String(card.estimateValue),
-    );
     // Keep draft fields stable while the board cache refreshes after a save.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [card.publicId]);
@@ -180,12 +179,14 @@ export default function ProjectCardDetailsModal({
 
       await onRefresh();
     },
-    onError: (error) =>
+    onError: (error) => {
+      setSelectedPriority(card.priority);
       showPopup({
         header: t`Không thể cập nhật card`,
         message: getErrorMessage(error),
         icon: "error",
-      }),
+      });
+    },
   });
   const createCard = api.projectBoard.createCard.useMutation({
     onSuccess: async () => {
@@ -208,14 +209,16 @@ export default function ProjectCardDetailsModal({
         icon: "error",
       }),
   });
-  const setCardPlanning = api.projectBoard.setCardPlanning.useMutation({
+  const setCardCycle = api.projectBoard.setCardPlanning.useMutation({
     onSuccess: onRefresh,
-    onError: (error) =>
+    onError: (error) => {
+      setSelectedCycleId(card.cyclePublicId ?? null);
       showPopup({
-        header: t`Không thể cập nhật planning card`,
+        header: t`Không thể cập nhật cycle`,
         message: getErrorMessage(error),
         icon: "error",
-      }),
+      });
+    },
   });
   const moveCard = api.projectBoard.moveCard.useMutation({
     onSuccess: onRefresh,
@@ -401,7 +404,27 @@ export default function ProjectCardDetailsModal({
       member.workspaceMember.email ??
       member.workspaceMember.publicId,
     selected: selectedMemberIds.includes(member.workspaceMember.publicId),
+    member: member.workspaceMember,
+    leftIcon: (
+      <Avatar
+        size="xs"
+        name={member.workspaceMember.user?.name ?? ""}
+        email={
+          member.workspaceMember.user?.email ??
+          member.workspaceMember.email ??
+          ""
+        }
+        imageUrl={
+          member.workspaceMember.user?.image
+            ? getAvatarUrl(member.workspaceMember.user.image)
+            : undefined
+        }
+      />
+    ),
   }));
+  const selectedMemberOptions = memberOptions.filter(
+    (member) => member.selected,
+  );
   const cardsById = new Map(allCards.map((item) => [item.publicId, item]));
   const ancestorCards: ProjectCard[] = [];
   const visitedCardIds = new Set([card.publicId]);
@@ -469,6 +492,13 @@ export default function ProjectCardDetailsModal({
   }));
   const selectedLabelIds = new Set(
     (cardDetail?.labels ?? []).map((label) => label.publicId),
+  );
+  const listNameByCardPublicId = new Map(
+    allCards.map((item) => [
+      item.publicId,
+      board.lists.find((list) => list.publicId === item.listPublicId)?.name ??
+        "",
+    ]),
   );
   const hasComments = activeTab === "features";
 
@@ -547,7 +577,11 @@ export default function ProjectCardDetailsModal({
                     content={description}
                     onChange={setDescription}
                     onBlur={() => {
-                      if (canEdit && description !== (card.description ?? "")) {
+                      if (
+                        canEdit &&
+                        !updateCard.isPending &&
+                        description !== (card.description ?? "")
+                      ) {
                         updateCard.mutate({
                           cardPublicId: card.publicId,
                           description,
@@ -555,7 +589,7 @@ export default function ProjectCardDetailsModal({
                       }
                     }}
                     workspaceMembers={editorWorkspaceMembers}
-                    readOnly={!canEdit || updateCard.isPending}
+                    readOnly={!canEdit}
                     placeholder={t`Mô tả card…`}
                     maxHeightClass="max-h-64"
                   />
@@ -563,36 +597,16 @@ export default function ProjectCardDetailsModal({
               </div>
             </div>
 
-            <section className="mt-8 border-t border-light-200 pt-6 dark:border-dark-300">
-              <div className="mb-3 flex items-center gap-3">
-                <h3 className="text-[10px] font-semibold uppercase tracking-widest text-light-900 dark:text-dark-800">
-                  {t`Checklist`}
-                </h3>
-                {canEdit && (
-                  <button
-                    type="button"
-                    onClick={() => openModal("ADD_CHECKLIST", card.publicId)}
-                    className="flex items-center justify-center rounded-lg bg-light-100 p-1 text-neutral-600 transition-all hover:bg-light-200 hover:text-neutral-900 dark:bg-dark-300 dark:text-dark-800 dark:hover:bg-dark-400 dark:hover:text-dark-1000"
-                    title={t`Thêm Checklist`}
-                  >
-                    <HiMiniPlus className="h-4 w-4" />
-                  </button>
-                )}
-              </div>
-              <Checklists
-                checklists={cardDetail?.checklists ?? []}
-                cardPublicId={card.publicId}
-                activeChecklistForm={activeChecklistForm}
-                setActiveChecklistForm={setActiveChecklistForm}
-                onChanged={onRefresh}
-                viewOnly={!canEdit}
-              />
-              {!cardDetail?.checklists.length && (
-                <p className="text-sm text-light-800 dark:text-dark-800">
-                  {t`Chưa có checklist.`}
-                </p>
-              )}
-            </section>
+            <ProjectCardChecklistSection
+              boardPublicId={board.publicId}
+              cardPublicId={card.publicId}
+              cardDetail={cardDetail}
+              canEdit={canEdit}
+              isOpen={isOpen}
+              activeChecklistForm={activeChecklistForm}
+              setActiveChecklistForm={setActiveChecklistForm}
+              onRefresh={onRefresh}
+            />
 
             <section className="mt-8 border-t border-light-200 pt-6 dark:border-dark-300">
               <h3 className="mb-3 text-[10px] font-semibold uppercase tracking-widest text-light-900 dark:text-dark-800">
@@ -601,58 +615,65 @@ export default function ProjectCardDetailsModal({
               {cardDetail ? (
                 cardDetail.children.length ? (
                   <div className="space-y-2">
-                    {cardDetail.children.map((child) => (
-                      <button
-                        key={child.publicId}
-                        type="button"
-                        onClick={() => onOpenCard(child.publicId)}
-                        className="block w-full rounded-xl border border-light-200 bg-white px-3 py-2 text-left text-sm text-neutral-900 transition-colors hover:bg-light-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-light-700 dark:border-dark-300 dark:bg-dark-200 dark:text-dark-1000 dark:hover:bg-dark-300 dark:focus-visible:ring-dark-700"
-                      >
-                        <div className="flex items-start gap-2">
-                          {child.code && (
-                            <span className="shrink-0 text-xs font-semibold tracking-wide text-light-900 dark:text-dark-800">
-                              {child.code}
+                    {cardDetail.children.map((child) => {
+                      const childListName = listNameByCardPublicId.get(
+                        child.publicId,
+                      );
+                      return (
+                        <button
+                          key={child.publicId}
+                          type="button"
+                          onClick={() => onOpenCard(child.publicId)}
+                          className="block w-full rounded-xl border border-light-200 bg-white px-3 py-2 text-left text-sm text-neutral-900 transition-colors hover:bg-light-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-light-700 dark:border-dark-300 dark:bg-dark-200 dark:text-dark-1000 dark:hover:bg-dark-300 dark:focus-visible:ring-dark-700"
+                        >
+                          <div className="flex items-start gap-2">
+                            {child.code && (
+                              <span className="shrink-0 text-xs font-semibold tracking-wide text-light-900 dark:text-dark-800">
+                                {child.code}
+                              </span>
+                            )}
+                            <span className="min-w-0 break-words font-medium">
+                              {child.title}
                             </span>
-                          )}
-                          <span className="min-w-0 break-words font-medium">
-                            {child.title}
-                          </span>
-                        </div>
-                        {child.labels.length > 0 && (
-                          <div className="mt-2 flex flex-wrap gap-1">
-                            {child.labels.map((label) => (
-                              <Badge
-                                key={label.publicId}
-                                value={label.name}
-                                iconLeft={
-                                  <LabelIcon colourCode={label.colourCode} />
-                                }
-                              />
-                            ))}
                           </div>
-                        )}
-                        <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px]">
-                          <span
-                            className={`rounded-full px-2 py-0.5 font-medium ${child.status === "done" ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300" : child.status === "missed" ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300" : "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300"}`}
-                          >
-                            {child.status === "done"
-                              ? t`Đã hoàn thành`
-                              : child.status === "missed"
-                                ? t`Đã bỏ lỡ`
-                                : t`Đang thực hiện`}
-                          </span>
-                          {child.dueDate && (
-                            <span className="flex items-center gap-1 text-light-800 dark:text-dark-800">
-                              <HiOutlineCalendarDays className="h-3.5 w-3.5" />
-                              {formatInAppCalendarZone(
-                                child.dueDate,
-                                "MMM dd, yyyy",
+                          {(childListName || child.labels.length > 0) && (
+                            <div className="mt-2 flex flex-wrap gap-1">
+                              {childListName && (
+                                <Badge
+                                  value={childListName}
+                                  iconLeft={
+                                    <span
+                                      className="h-1.5 w-1.5 rounded-full bg-light-600 dark:bg-dark-700"
+                                      aria-hidden="true"
+                                    />
+                                  }
+                                />
                               )}
-                            </span>
+                              {child.labels.map((label) => (
+                                <Badge
+                                  key={label.publicId}
+                                  value={label.name}
+                                  iconLeft={
+                                    <LabelIcon colourCode={label.colourCode} />
+                                  }
+                                />
+                              ))}
+                            </div>
                           )}
-                        </div>
-                      </button>
-                    ))}
+                          {child.dueDate && (
+                            <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-light-800 dark:text-dark-800">
+                              <span className="flex items-center gap-1">
+                                <HiOutlineCalendarDays className="h-3.5 w-3.5" />
+                                {formatInAppCalendarZone(
+                                  child.dueDate,
+                                  "MMM dd, yyyy",
+                                )}
+                              </span>
+                            </div>
+                          )}
+                        </button>
+                      );
+                    })}
                   </div>
                 ) : (
                   <p className="text-sm text-light-800 dark:text-dark-800">
@@ -775,7 +796,7 @@ export default function ProjectCardDetailsModal({
                       {t`Danh sách`}
                     </span>
                     <Select
-                      value={cardDetail?.list.publicId ?? card.listPublicId}
+                      value={card.listPublicId}
                       onChange={(value) => {
                         if (!value || value === card.listPublicId) return;
                         moveCard.mutate({
@@ -795,6 +816,59 @@ export default function ProjectCardDetailsModal({
                       buttonClassName="!min-h-[42px] !rounded-xl !border-light-300 !px-3 !py-2 dark:!border-dark-300/50"
                     />
                   </div>
+                  <div className="min-w-0">
+                    <span className={INFO_FIELD_LABEL_CLASS}>
+                      {t`Mức độ ưu tiên`}
+                    </span>
+                    <Select
+                      value={selectedPriority}
+                      onChange={(value) => {
+                        const priority = value as ProjectCard["priority"];
+                        setSelectedPriority(priority);
+                        updateCard.mutate({
+                          cardPublicId: card.publicId,
+                          priority,
+                        });
+                      }}
+                      options={[
+                        { value: "high", label: t`Cao` },
+                        { value: "medium", label: t`Trung bình` },
+                        { value: "low", label: t`Thấp` },
+                      ]}
+                      disabled={!canEdit || updateCard.isPending}
+                      title={t`Chọn mức độ ưu tiên`}
+                      buttonClassName="!min-h-[42px] !rounded-xl !border-light-300 !px-3 !py-2 dark:!border-dark-300/50"
+                    />
+                  </div>
+                  {workflowType === "scrum" && enableCycles && (
+                    <div className="min-w-0">
+                      <span className={INFO_FIELD_LABEL_CLASS}>{t`Cycle`}</span>
+                      <Select
+                        value={selectedCycleId ?? ""}
+                        onChange={(value) => {
+                          const cyclePublicId = value || null;
+                          setSelectedCycleId(cyclePublicId);
+                          setCardCycle.mutate({
+                            cardPublicId: card.publicId,
+                            cyclePublicId,
+                            estimateValue: card.estimateValue ?? null,
+                          });
+                        }}
+                        options={[
+                          { value: "", label: t`Backlog` },
+                          ...board.cycles
+                            .filter((cycle) => cycle.status !== "completed")
+                            .map((cycle) => ({
+                              value: cycle.publicId,
+                              label: `${cycle.name} · ${cycle.status}`,
+                            })),
+                        ]}
+                        disabled={!canEdit || setCardCycle.isPending}
+                        title={t`Chọn cycle`}
+                        buttonClassName="!min-h-[42px] !rounded-xl !border-light-300 !px-3 !py-2 dark:!border-dark-300/50"
+                      />
+                    </div>
+                  )}
                   <div className="min-w-0">
                     <span className={INFO_FIELD_LABEL_CLASS}>
                       {t`Thành viên`}
@@ -820,9 +894,24 @@ export default function ProjectCardDetailsModal({
                         title={t`Chọn thành viên`}
                         className={`flex min-h-[42px] w-full items-center rounded-xl bg-white px-3 py-2 text-left text-sm font-medium text-neutral-900 shadow-sm ring-1 ring-light-300 transition-colors hover:bg-light-50 hover:ring-light-400 dark:bg-dark-300/30 dark:text-dark-1000 dark:ring-dark-300/50 dark:hover:bg-dark-300/50 ${!canEdit ? "cursor-not-allowed opacity-60" : "cursor-pointer"}`}
                       >
-                        {selectedMemberIds.length > 0
-                          ? `${selectedMemberIds.length} ${t`thành viên đã chọn`}`
-                          : t`Chọn thành viên`}
+                        {selectedMemberOptions.length > 0 ? (
+                          <div className="flex max-h-24 flex-wrap gap-1.5 overflow-y-auto">
+                            {selectedMemberOptions.map((member) => (
+                              <span
+                                key={member.key}
+                                className="inline-flex max-w-full items-center gap-1.5 rounded-lg bg-light-100 px-2 py-1 text-xs font-medium text-neutral-900 dark:bg-dark-300 dark:text-dark-1000"
+                                title={member.value}
+                              >
+                                {member.leftIcon}
+                                <span className="max-w-[12rem] truncate">
+                                  {member.value}
+                                </span>
+                              </span>
+                            ))}
+                          </div>
+                        ) : (
+                          t`Chọn thành viên`
+                        )}
                       </div>
                     </CheckboxDropdown>
                   </div>
@@ -997,78 +1086,6 @@ export default function ProjectCardDetailsModal({
                 </div>
               </section>
 
-              {(enableCycles || estimationType !== "none") && (
-                <section>
-                  <h3 className="mb-3 text-[10px] font-semibold uppercase tracking-widest text-light-900 dark:text-dark-800">
-                    {t`Planning card`}
-                  </h3>
-                  {enableCycles && (
-                    <div>
-                      <span className={INFO_FIELD_LABEL_CLASS}>{t`Cycle`}</span>
-                      <Select
-                        value={selectedCycleId ?? ""}
-                        onChange={(value) => setSelectedCycleId(value || null)}
-                        options={[
-                          { value: "", label: t`Backlog` },
-                          ...board.cycles
-                            .filter((cycle) => cycle.status !== "completed")
-                            .map((cycle) => ({
-                              value: cycle.publicId,
-                              label: `${cycle.name} · ${cycle.status}`,
-                            })),
-                        ]}
-                        disabled={!canEdit || setCardPlanning.isPending}
-                        title={t`Chọn cycle`}
-                        className="mb-3 w-full"
-                      />
-                    </div>
-                  )}
-                  {estimationType !== "none" && (
-                    <div>
-                      <span className={INFO_FIELD_LABEL_CLASS}>
-                        {t`Estimate`}
-                      </span>
-                      <Input
-                        name="estimateValue"
-                        type="number"
-                        min={estimationType === "hours" ? 0.01 : 0}
-                        step={estimationType === "hours" ? 0.25 : 1}
-                        value={selectedEstimate}
-                        onChange={(event) =>
-                          setSelectedEstimate(event.target.value)
-                        }
-                        title={t`Nhập estimate`}
-                        disabled={!canEdit || setCardPlanning.isPending}
-                        placeholder={
-                          estimationType === "hours"
-                            ? t`Estimate in hours`
-                            : t`Story points`
-                        }
-                      />
-                    </div>
-                  )}
-                  <Button
-                    type="button"
-                    size="sm"
-                    className="mt-3"
-                    disabled={!canEdit || setCardPlanning.isPending}
-                    isLoading={setCardPlanning.isPending}
-                    onClick={() =>
-                      setCardPlanning.mutate({
-                        cardPublicId: card.publicId,
-                        cyclePublicId: selectedCycleId,
-                        estimateValue:
-                          selectedEstimate.trim() === ""
-                            ? null
-                            : Number(selectedEstimate),
-                      })
-                    }
-                  >
-                    {t`Save planning`}
-                  </Button>
-                </section>
-              )}
-
               <section className="mt-7 border-t border-light-200 pt-6 dark:border-dark-300">
                 <div className="relative mb-4 flex rounded-2xl border border-light-200 bg-white p-1 shadow-sm dark:border-dark-300 dark:bg-dark-100">
                   <button
@@ -1182,11 +1199,11 @@ export default function ProjectCardDetailsModal({
       <Modal
         modalSize="sm"
         centered
-        isVisible={isOpen && modalContentType === "ADD_CHECKLIST"}
+        isVisible={isOpen && modalContentType === "DELETE_COMMENT"}
       >
-        <NewChecklistForm
+        <DeleteCommentConfirmation
           cardPublicId={card.publicId}
-          onSuccess={() => void onRefresh()}
+          commentPublicId={entityId}
         />
       </Modal>
       <Modal
@@ -1241,19 +1258,6 @@ export default function ProjectCardDetailsModal({
             </Button>
           </div>
         </div>
-      </Modal>
-      <Modal
-        modalSize="sm"
-        centered
-        isVisible={
-          isOpen && modalContentType === "DELETE_CHECKLIST" && Boolean(entityId)
-        }
-      >
-        <DeleteChecklistConfirmation
-          cardPublicId={card.publicId}
-          checklistPublicId={entityId}
-          onChanged={onRefresh}
-        />
       </Modal>
     </Modal>
   );

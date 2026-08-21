@@ -1,6 +1,7 @@
 import { and, asc, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 
 import type { dbClient } from "@kan/db/client";
+import type { CardPriority } from "@kan/db/schema";
 import * as cardRepo from "@kan/db/repository/card.repo";
 import {
   boards,
@@ -37,6 +38,22 @@ export const getCardContext = async (db: dbClient, cardPublicId: string) =>
       },
     },
   });
+
+export const isMember = async (
+  db: dbClient,
+  cardId: number,
+  workspaceMemberId: number,
+) => {
+  const membership = await db.query.projectCardMembers.findFirst({
+    columns: { cardId: true },
+    where: and(
+      eq(projectCardMembers.cardId, cardId),
+      eq(projectCardMembers.workspaceMemberId, workspaceMemberId),
+    ),
+  });
+
+  return membership !== undefined;
+};
 
 const getParentDepth = async (db: dbClient, parentCardId: number) => {
   let currentId: number | null = parentCardId;
@@ -177,6 +194,8 @@ export const create = async (
     dueDate?: Date | null;
     startDate?: Date | null;
     status?: "pending" | "done" | "missed";
+    priority?: CardPriority;
+    labelPublicIds?: string[];
     workspaceMemberIds: number[];
   },
 ) =>
@@ -218,6 +237,23 @@ export const create = async (
       list.boardId,
       input.workspaceMemberIds,
     );
+    const labelPublicIds = [...new Set(input.labelPublicIds ?? [])];
+    const selectedLabels =
+      labelPublicIds.length > 0
+        ? await tx
+            .select({ id: labels.id, publicId: labels.publicId })
+            .from(labels)
+            .where(
+              and(
+                eq(labels.boardId, list.boardId),
+                inArray(labels.publicId, labelPublicIds),
+                isNull(labels.deletedAt),
+              ),
+            )
+        : [];
+    if (selectedLabels.length !== labelPublicIds.length) {
+      throw new Error("Every label must belong to the project board");
+    }
 
     let index = 0;
     if (input.position === "end") {
@@ -251,10 +287,29 @@ export const create = async (
         dueDate: input.dueDate ?? null,
         startDate: input.startDate ?? null,
         status: input.status,
+        priority: input.priority,
       })
       .returning({ id: cards.id, publicId: cards.publicId });
 
     if (!card) throw new Error("Unable to create project card");
+
+    if (selectedLabels.length > 0) {
+      await tx.insert(cardsToLabels).values(
+        selectedLabels.map((label) => ({
+          cardId: card.id,
+          labelId: label.id,
+        })),
+      );
+      await tx.insert(cardActivities).values(
+        selectedLabels.map((label) => ({
+          publicId: generateUID(),
+          cardId: card.id,
+          labelId: label.id,
+          type: "updated_label_added" as const,
+          createdBy: input.createdBy,
+        })),
+      );
+    }
 
     await tx.insert(cardActivities).values({
       publicId: generateUID(),
@@ -289,6 +344,7 @@ export const update = async (
     dueDate?: Date | null;
     startDate?: Date | null;
     status?: "pending" | "done" | "missed";
+    priority?: CardPriority;
   },
 ) => {
   if (input.parentCardId !== undefined) {
@@ -305,6 +361,7 @@ export const update = async (
       dueDate: input.dueDate,
       startDate: input.startDate,
       status: input.status,
+      priority: input.priority,
       updatedAt: new Date(),
     })
     .where(and(eq(cards.id, input.cardId), isNull(cards.deletedAt)))
@@ -462,7 +519,11 @@ export const softDelete = async (
     return { success: true, deletedCount: existingCards.length };
   });
 
-export const getByPublicId = async (db: dbClient, cardPublicId: string) => {
+export const getByPublicId = async (
+  db: dbClient,
+  cardPublicId: string,
+  cardAccess?: { isAdmin: boolean; workspaceMemberId?: number },
+) => {
   const card = await db.query.cards.findFirst({
     columns: {
       id: true,
@@ -475,6 +536,7 @@ export const getByPublicId = async (db: dbClient, cardPublicId: string) => {
       startDate: true,
       parentCardId: true,
       status: true,
+      priority: true,
     },
     where: and(eq(cards.publicId, cardPublicId), isNull(cards.deletedAt)),
     with: {
@@ -507,12 +569,13 @@ export const getByPublicId = async (db: dbClient, cardPublicId: string) => {
   const [parent, children] = await Promise.all([
     card.parentCardId
       ? db.query.cards.findFirst({
-          columns: { publicId: true, title: true, cardNumber: true },
+          columns: { id: true, publicId: true, title: true, cardNumber: true },
           where: and(eq(cards.id, card.parentCardId), isNull(cards.deletedAt)),
         })
       : Promise.resolve(null),
     db.query.cards.findMany({
       columns: {
+        id: true,
         publicId: true,
         cardNumber: true,
         title: true,
@@ -539,6 +602,41 @@ export const getByPublicId = async (db: dbClient, cardPublicId: string) => {
     }),
   ]);
 
+  const relatedCardIds = [
+    ...(parent ? [parent.id] : []),
+    ...children.map((child) => child.id),
+  ];
+  const accessibleRelatedCardIds =
+    !cardAccess || cardAccess.isAdmin
+      ? undefined
+      : cardAccess.workspaceMemberId && relatedCardIds.length > 0
+        ? (
+            await db
+              .select({ cardId: projectCardMembers.cardId })
+              .from(projectCardMembers)
+              .where(
+                and(
+                  eq(
+                    projectCardMembers.workspaceMemberId,
+                    cardAccess.workspaceMemberId,
+                  ),
+                  inArray(projectCardMembers.cardId, relatedCardIds),
+                ),
+              )
+          ).map((row) => row.cardId)
+        : [];
+  const visibleRelatedCardIds =
+    accessibleRelatedCardIds === undefined
+      ? undefined
+      : new Set(accessibleRelatedCardIds);
+  const isRelatedCardVisible = (cardId: number) =>
+    visibleRelatedCardIds === undefined || visibleRelatedCardIds.has(cardId);
+  const visibleParent =
+    parent && isRelatedCardVisible(parent.id) ? parent : null;
+  const visibleChildren = children.filter((child) =>
+    isRelatedCardVisible(child.id),
+  );
+
   return {
     publicId: card.publicId,
     code:
@@ -551,20 +649,21 @@ export const getByPublicId = async (db: dbClient, cardPublicId: string) => {
     dueDate: card.dueDate,
     startDate: card.startDate,
     status: card.status,
+    priority: card.priority,
     labels: detailedCard?.labels ?? [],
     checklists: detailedCard?.checklists ?? [],
     attachments: detailedCard?.attachments ?? [],
-    parent: parent
+    parent: visibleParent
       ? {
-          publicId: parent.publicId,
-          title: parent.title,
+          publicId: visibleParent.publicId,
+          title: visibleParent.title,
           code:
-            parent.cardNumber != null && card.list.board.projectCode
-              ? `${card.list.board.projectCode}-${parent.cardNumber}`
+            visibleParent.cardNumber != null && card.list.board.projectCode
+              ? `${card.list.board.projectCode}-${visibleParent.cardNumber}`
               : null,
         }
       : null,
-    children: children.map((child) => ({
+    children: visibleChildren.map((child) => ({
       publicId: child.publicId,
       code:
         child.cardNumber != null && card.list.board.projectCode

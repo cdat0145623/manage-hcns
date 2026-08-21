@@ -12,11 +12,32 @@ export interface ChangelogEntry {
 }
 
 // Update this value and add a new entry at the top for each release.
-export const APP_VERSION = "1.0.5";
+export const APP_VERSION = "1.0.6";
 
 export const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     version: APP_VERSION,
+    date: "2026-08-21",
+    sections: [
+      {
+        type: "added",
+        items: [
+          "Tạo card project với mô tả, thành viên, nhãn, ngày bắt đầu và deadline ngay trong modal.",
+          "Thêm mức độ ưu tiên cho card project và hiển thị thông tin danh sách, nhãn cùng deadline của công việc con.",
+          "Hỗ trợ checklist trong card project với cập nhật tức thời khi thêm checklist hoặc mục checklist.",
+        ],
+      },
+      {
+        type: "changed",
+        items: [
+          "Cải thiện quyền truy cập card project để thành viên chỉ xem được các card được giao, đồng thời admin vẫn xem đầy đủ board.",
+          "Cải thiện modal tạo card và đồng bộ dữ liệu board sau các thao tác trên card, checklist và trường planning.",
+        ],
+      },
+    ],
+  },
+  {
+    version: "1.0.5",
     date: "2026-08-20",
     sections: [
       {

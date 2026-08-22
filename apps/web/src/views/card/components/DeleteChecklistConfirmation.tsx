@@ -10,10 +10,12 @@ export function DeleteChecklistConfirmation({
   cardPublicId,
   taskInstanceId,
   checklistPublicId,
+  onChanged,
 }: {
   cardPublicId?: string;
   taskInstanceId?: string;
   checklistPublicId: string;
+  onChanged?: () => void | Promise<void>;
 }) {
   const { closeModal, closeModals } = useModal();
   const { showPopup } = usePopup();
@@ -55,6 +57,7 @@ export function DeleteChecklistConfirmation({
       if (taskInstanceId) {
         await utils.taskInstance.byId.invalidate({ id: taskInstanceId });
       }
+      await onChanged?.();
     },
   });
 

@@ -139,7 +139,7 @@ const Comment = ({
     ...(isAuthor && canEditComment
       ? [
           {
-            label: t`Edit comment`,
+            label: t`Sửa bình luận`,
             action: () => setIsEditing(true),
             icon: <HiPencil className="h-[16px] w-[16px] text-dark-900" />,
           },
@@ -148,7 +148,7 @@ const Comment = ({
     ...(isAuthor || canDeleteComment
       ? [
           {
-            label: t`Delete comment`,
+            label: t`Xóa bình luận`,
             action: () => openModal("DELETE_COMMENT", publicId),
             icon: <HiTrash className="h-[16px] w-[16px] text-dark-900" />,
           },
@@ -159,14 +159,14 @@ const Comment = ({
   return (
     <div
       key={publicId}
-      className="group relative flex w-full flex-col rounded-xl border border-light-600 bg-light-200 px-3 py-2 text-left text-light-900 focus-visible:outline-none transition-all focus-within:border-light-900 focus-within:shadow-sm dark:border-dark-400 dark:bg-dark-100 dark:text-dark-1000 dark:focus-within:border-dark-600 sm:text-xs sm:leading-5"
+      className="group relative flex w-full flex-col rounded-xl border border-light-600 bg-light-200 px-3 py-2 text-left text-light-900 transition-all focus-within:border-light-900 focus-within:shadow-sm focus-visible:outline-none dark:border-dark-400 dark:bg-dark-100 dark:text-dark-1000 dark:focus-within:border-dark-600 sm:text-xs sm:leading-5"
     >
       <div className="flex justify-between">
         <div className="flex items-center space-x-2">
           <Avatar
             size="sm"
-            name={name ?? ""}
-            email={email ?? ""}
+            name={name}
+            email={email}
             imageUrl={getAvatarUrl(image) || undefined}
             isLoading={isLoading}
           />
@@ -189,7 +189,7 @@ const Comment = ({
 
         {dropdownItems.length > 0 && !isViewOnly && (
           <div className="absolute right-4 top-4">
-            <Dropdown items={dropdownItems}>
+            <Dropdown items={dropdownItems} portal>
               <HiEllipsisHorizontal className="h-5 w-5 text-light-900 dark:text-dark-800" />
             </Dropdown>
           </div>

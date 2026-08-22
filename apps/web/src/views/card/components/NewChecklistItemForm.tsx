@@ -5,6 +5,7 @@ import { useForm } from "react-hook-form";
 
 import { generateUID } from "@kan/shared/utils";
 
+import type { RouterOutputs } from "~/utils/api";
 import { usePopup } from "~/providers/popup";
 import { api } from "~/utils/api";
 import { invalidateCard } from "~/utils/cardInvalidation";
@@ -18,6 +19,8 @@ interface NewChecklistItemFormProps {
   cardPublicId?: string;
   taskInstanceId?: string;
   onCancel: () => void;
+  onCreated?: (item: RouterOutputs["checklist"]["createItem"]) => void;
+  onChanged?: () => void | Promise<void>;
   readOnly?: boolean;
 }
 
@@ -26,6 +29,8 @@ const NewChecklistItemForm = ({
   cardPublicId,
   taskInstanceId,
   onCancel,
+  onCreated,
+  onChanged,
   readOnly = false,
 }: NewChecklistItemFormProps) => {
   const utils = api.useUtils();
@@ -108,6 +113,9 @@ const NewChecklistItemForm = ({
 
       return { previousCard, previousTaskInstance };
     },
+    onSuccess: (data) => {
+      onCreated?.(data);
+    },
     onError: (_err, _vars, ctx) => {
       if (ctx?.previousCard && cardPublicId)
         utils.card.byId.setData({ cardPublicId }, ctx.previousCard);
@@ -129,6 +137,7 @@ const NewChecklistItemForm = ({
       if (taskInstanceId) {
         await utils.taskInstance.byId.invalidate({ id: taskInstanceId });
       }
+      await onChanged?.();
     },
   });
 

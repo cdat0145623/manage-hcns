@@ -1,10 +1,12 @@
-import { Menu, Portal, Transition } from "@headlessui/react";
+import { Menu, Transition } from "@headlessui/react";
 import { Fragment } from "react";
 
 export default function Dropdown({
   items,
   children,
   disabled,
+  portal = false,
+  buttonLabel,
 }: {
   items: {
     label: string;
@@ -14,12 +16,16 @@ export default function Dropdown({
   }[];
   children: React.ReactNode;
   disabled?: boolean;
+  portal?: boolean;
+  buttonLabel?: string;
 }) {
   return (
     <Menu as="div" className="relative inline-block text-left">
       <div>
         <Menu.Button
           disabled={disabled}
+          aria-label={buttonLabel}
+          title={buttonLabel}
           className="flex h-7 w-7 items-center justify-center rounded-[5px] hover:bg-light-200 focus:outline-none dark:hover:bg-dark-200"
         >
           {children}
@@ -36,7 +42,11 @@ export default function Dropdown({
         leaveTo="transform opacity-0 scale-95"
       >
         <div className="relative z-[999]">
-          <Menu.Items className="absolute right-0 mt-2 w-64 origin-top-right rounded-[24px] border border-neutral-200 bg-white p-2.5 shadow-[0_20px_50px_rgba(0,0,0,0.12),0_0_0_1px_rgba(0,0,0,0.06)] focus:outline-none dark:border-dark-400 dark:bg-dark-100">
+          <Menu.Items
+            anchor={portal ? "bottom end" : undefined}
+            portal={portal}
+            className={`${portal ? "z-[9999]" : "absolute right-0 mt-2"} w-64 origin-top-right rounded-[24px] border border-neutral-200 bg-white p-2.5 shadow-[0_20px_50px_rgba(0,0,0,0.12),0_0_0_1px_rgba(0,0,0,0.06)] focus:outline-none dark:border-dark-400 dark:bg-dark-100`}
+          >
             <div className="flex flex-col gap-1">
               {items.map((item) => (
                 <Menu.Item key={item.label} disabled={item.disabled}>

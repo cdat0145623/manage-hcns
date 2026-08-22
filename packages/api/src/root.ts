@@ -13,18 +13,20 @@ import { listRouter } from "./routers/list";
 import { memberRouter } from "./routers/member";
 import { permissionRouter } from "./routers/permission";
 import { positionRouter } from "./routers/position";
+import { projectBoardRouter } from "./routers/projectBoard";
+import { rewardConfigRouter } from "./routers/reward";
+import { rewardPublicRouter } from "./routers/rewardPublic";
 import { taskInstanceRouter } from "./routers/taskInstance";
 import { taskMasterRouter } from "./routers/taskMaster";
 import { userRouter } from "./routers/user";
 import { webhookRouter } from "./routers/webhook";
 import { workspaceRouter } from "./routers/workspace";
-import { rewardConfigRouter } from "./routers/reward";
-import { rewardPublicRouter } from "./routers/rewardPublic";
 import { createTRPCRouter } from "./trpc";
 
 export const appRouter = createTRPCRouter({
   attachment: attachmentRouter,
   board: boardRouter,
+  projectBoard: projectBoardRouter,
   card: cardRouter,
   checklist: checklistRouter,
   cron: cronRouter,

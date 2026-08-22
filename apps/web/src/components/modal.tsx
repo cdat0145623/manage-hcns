@@ -6,7 +6,7 @@ import { useModal } from "~/providers/modal";
 
 interface Props {
   children: React.ReactNode;
-  modalSize?: "sm" | "md" | "lg" | "hh" | "xl";
+  modalSize?: "sm" | "md" | "lg" | "hh" | "xl" | "project";
   positionFromTop?: "sm" | "md" | "lg";
   isVisible?: boolean;
   closeOnClickOutside?: boolean;
@@ -45,6 +45,7 @@ const Modal: React.FC<Props> = ({
     hh: "max-w-[800px]",
     lg: "max-w-[1100px]",
     xl: "max-w-[1240px]",
+    project: "max-w-[1600px]",
   };
 
   const positionFromTopMap = {
@@ -89,9 +90,9 @@ const Modal: React.FC<Props> = ({
             >
               <Dialog.Panel
                 className={twMerge(
-                  "relative transform transition-all w-full",
+                  "relative w-full transform transition-all",
                   !centered && positionFromTopMap[positionFromTop],
-                  modalSizeMap[modalSize],
+                  widthCustom ?? modalSizeMap[modalSize],
                   !hideDefaultStyles &&
                     "rounded-lg border border-light-600 bg-white/90 text-left shadow-3xl-light backdrop-blur-[6px] dark:border-dark-600 dark:bg-dark-100/90 dark:shadow-3xl-dark",
                 )}

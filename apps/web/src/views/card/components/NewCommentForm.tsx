@@ -21,10 +21,12 @@ const NewCommentForm = ({
   cardPublicId,
   taskInstanceId,
   workspaceMembers,
+  onSuccess,
 }: {
   cardPublicId?: string;
   taskInstanceId?: string;
   workspaceMembers: WorkspaceMember[];
+  onSuccess?: () => void | Promise<void>;
 }) => {
   const utils = api.useUtils();
   const { showPopup } = usePopup();
@@ -45,6 +47,7 @@ const NewCommentForm = ({
     onSettled: async () => {
       reset();
       if (cardPublicId) await invalidateCard(utils, cardPublicId);
+      await onSuccess?.();
     },
   });
 

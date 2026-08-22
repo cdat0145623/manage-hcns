@@ -5,6 +5,7 @@ import { HiXMark } from "react-icons/hi2";
 
 import { generateUID } from "@kan/shared/utils";
 
+import type { RouterOutputs } from "~/utils/api";
 import Button from "~/components/Button";
 import Input from "~/components/Input";
 import { useModal } from "~/providers/modal";
@@ -25,11 +26,13 @@ export function NewChecklistForm({
   cardPublicId,
   taskInstanceId,
   hideHeader,
+  onCreated,
   onSuccess,
 }: {
   cardPublicId?: string;
   taskInstanceId?: string;
   hideHeader?: boolean;
+  onCreated?: (checklist: RouterOutputs["checklist"]["create"]) => void;
   onSuccess?: () => void;
 }) {
   const { closeModal, setModalState } = useModal();
@@ -101,6 +104,7 @@ export function NewChecklistForm({
       return { previousCard, previousTaskInstance };
     },
     onSuccess: (data) => {
+      onCreated?.(data);
       setModalState("ADD_CHECKLIST", { createdChecklistId: data.publicId });
       setTimeout(() => closeModal(), 0);
     },

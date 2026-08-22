@@ -2,7 +2,9 @@ import { relations, sql } from "drizzle-orm";
 import {
   bigint,
   bigserial,
+  boolean,
   index,
+  integer,
   pgEnum,
   pgTable,
   primaryKey,
@@ -11,13 +13,13 @@ import {
   uniqueIndex,
   uuid,
   varchar,
-  boolean,
 } from "drizzle-orm/pg-core";
+
 import { imports } from "./imports";
 import { labels } from "./labels";
 import { lists } from "./lists";
 import { users } from "./users";
-import { workspaces } from "./workspaces";
+import { workspaceMembers, workspaces } from "./workspaces";
 
 export const boardVisibilityStatuses = ["private", "public"] as const;
 export type BoardVisibilityStatus = (typeof boardVisibilityStatuses)[number];
@@ -30,12 +32,25 @@ export const boardTypes = ["regular", "template"] as const;
 export type BoardType = (typeof boardTypes)[number];
 export const boardTypeEnum = pgEnum("board_type", boardTypes);
 
+export const boardModes = ["classic", "project"] as const;
+export type BoardMode = (typeof boardModes)[number];
+export const boardModeEnum = pgEnum("board_mode", boardModes);
+
+export const projectBoardMemberRoles = ["owner", "editor", "viewer"] as const;
+export type ProjectBoardMemberRole = (typeof projectBoardMemberRoles)[number];
+export const projectBoardMemberRoleEnum = pgEnum(
+  "project_board_member_role",
+  projectBoardMemberRoles,
+);
+
 export const boards = pgTable(
   "board",
   {
     id: bigserial("id", { mode: "number" }).primaryKey(),
     publicId: varchar("publicId", { length: 12 }).notNull().unique(),
     name: varchar("name", { length: 255 }).notNull(),
+    projectCode: varchar("projectCode", { length: 10 }),
+    nextCardNumber: integer("nextCardNumber").notNull().default(1),
     description: text("description"),
     slug: varchar("slug", { length: 255 }).notNull(),
     createdBy: uuid("createdBy").references(() => users.id, {
@@ -58,6 +73,7 @@ export const boards = pgTable(
       .references(() => workspaces.id, { onDelete: "restrict" }),
     visibility: boardVisibilityEnum("visibility").notNull().default("private"),
     type: boardTypeEnum("type").notNull().default("regular"),
+    mode: boardModeEnum("mode").notNull().default("classic"),
     isArchived: boolean("isArchived").notNull().default(false),
     sourceBoardId: bigint("sourceBoardId", { mode: "number" }),
     isTemplateDefault: boolean("isTemplateDefault").notNull().default(false),
@@ -110,6 +126,56 @@ export const boardsRelations = relations(boards, ({ one, many }) => ({
     relationName: "boardUser",
   }),
 }));
+
+export const projectBoardMembers = pgTable(
+  "project_board_member",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    publicId: varchar("publicId", { length: 12 }).notNull().unique(),
+    boardId: bigint("boardId", { mode: "number" })
+      .notNull()
+      .references(() => boards.id, { onDelete: "restrict" }),
+    workspaceMemberId: bigint("workspaceMemberId", { mode: "number" })
+      .notNull()
+      .references(() => workspaceMembers.id, { onDelete: "restrict" }),
+    role: projectBoardMemberRoleEnum("role").notNull().default("viewer"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    deletedAt: timestamp("deletedAt"),
+    deletedBy: uuid("deletedBy").references(() => users.id, {
+      onDelete: "set null",
+    }),
+  },
+  (table) => [
+    uniqueIndex("project_board_member_unique_idx")
+      .on(table.boardId, table.workspaceMemberId)
+      .where(sql`${table.deletedAt} IS NULL`),
+    index("project_board_member_board_idx").on(table.boardId),
+    index("project_board_member_workspace_member_idx").on(
+      table.workspaceMemberId,
+    ),
+  ],
+).enableRLS();
+
+export const projectBoardMembersRelations = relations(
+  projectBoardMembers,
+  ({ one }) => ({
+    board: one(boards, {
+      fields: [projectBoardMembers.boardId],
+      references: [boards.id],
+      relationName: "projectBoardMembersBoard",
+    }),
+    workspaceMember: one(workspaceMembers, {
+      fields: [projectBoardMembers.workspaceMemberId],
+      references: [workspaceMembers.id],
+      relationName: "projectBoardMembersWorkspaceMember",
+    }),
+    deletedBy: one(users, {
+      fields: [projectBoardMembers.deletedBy],
+      references: [users.id],
+      relationName: "projectBoardMembersDeletedBy",
+    }),
+  }),
+);
 
 export const userBoardFavorites = pgTable(
   "user_board_favorites",

@@ -3,15 +3,16 @@ import { t } from "@lingui/core/macro";
 import { DragDropContext, Draggable } from "react-beautiful-dnd";
 import { HiPlus, HiXMark } from "react-icons/hi2";
 
+import type { RouterOutputs } from "~/utils/api";
 import CircularProgress from "~/components/CircularProgress";
 import { StrictModeDroppable as Droppable } from "~/components/StrictModeDroppable";
 import { useModal } from "~/providers/modal";
 import { usePopup } from "~/providers/popup";
 import { api } from "~/utils/api";
+import { invalidateTaskInstance } from "~/utils/cardInvalidation";
 import ChecklistItemRow from "./ChecklistItemRow";
 import ChecklistNameInput from "./ChecklistNameInput";
 import NewChecklistItemForm from "./NewChecklistItemForm";
-import { invalidateTaskInstance } from "~/utils/cardInvalidation";
 
 interface ChecklistItem {
   publicId: string;
@@ -31,6 +32,11 @@ interface ChecklistsProps {
   taskInstanceId?: string;
   activeChecklistForm?: string | null;
   setActiveChecklistForm?: (id: string | null) => void;
+  onItemCreated?: (
+    checklistPublicId: string,
+    item: RouterOutputs["checklist"]["createItem"],
+  ) => void;
+  onChanged?: () => void | Promise<void>;
   viewOnly?: boolean;
 }
 
@@ -40,6 +46,8 @@ export default function Checklists({
   taskInstanceId,
   activeChecklistForm,
   setActiveChecklistForm,
+  onItemCreated,
+  onChanged,
   viewOnly = false,
 }: ChecklistsProps) {
   const { openModal } = useModal();
@@ -255,6 +263,7 @@ export default function Checklists({
                                 onCreateNewItem={() =>
                                   setActiveChecklistForm?.(checklist.publicId)
                                 }
+                                onChanged={onChanged}
                                 viewOnly={viewOnly}
                                 dragHandleProps={provided.dragHandleProps}
                                 isDragging={snapshot.isDragging}
@@ -274,6 +283,10 @@ export default function Checklists({
                       cardPublicId={cardPublicId}
                       taskInstanceId={taskInstanceId}
                       onCancel={() => setActiveChecklistForm?.(null)}
+                      onCreated={(item) =>
+                        onItemCreated?.(checklist.publicId, item)
+                      }
+                      onChanged={onChanged}
                       readOnly={viewOnly}
                     />
                   </div>

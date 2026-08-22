@@ -54,6 +54,7 @@ export const getAllForPublic = async (
     where: and(
       eq(boards.workspaceId, workspaceId),
       isNull(boards.deletedAt),
+      eq(boards.mode, "classic"),
       opts?.type ? eq(boards.type, opts.type) : undefined,
       opts?.archived !== undefined
         ? eq(boards.isArchived, opts.archived)
@@ -112,6 +113,7 @@ export const getAllByUserId = async (
     where: and(
       eq(boards.workspaceId, workspaceId),
       isNull(boards.deletedAt),
+      eq(boards.mode, "classic"),
       eq(boards.ownerUserId, userId),
       opts?.archived !== undefined
         ? eq(boards.isArchived, opts.archived)
@@ -184,6 +186,7 @@ export const getAllByWorkspaceId = async (
     where: and(
       eq(boards.workspaceId, workspaceId),
       isNull(boards.deletedAt),
+      eq(boards.mode, "classic"),
       // Regular boards: non-admins only see boards they own. Template boards are shared
       // workspace samples (list is gated by board:view on the API); do not filter by creator.
       userRole === "ADMIN" || opts?.type === "template"
@@ -220,7 +223,7 @@ export const getIdByPublicId = async (db: dbClient, boardPublicId: string) => {
       type: true,
       isArchived: true,
     },
-    where: eq(boards.publicId, boardPublicId),
+    where: and(eq(boards.publicId, boardPublicId), eq(boards.mode, "classic")),
   });
 
   return board;
@@ -486,6 +489,7 @@ export const getByPublicId = async (
     where: and(
       eq(boards.publicId, boardPublicId),
       isNull(boards.deletedAt),
+      eq(boards.mode, "classic"),
       eq(boards.type, filters.type ?? "regular"),
     ),
   });
@@ -699,6 +703,7 @@ export const getBySlug = async (
       eq(boards.slug, boardSlug),
       eq(boards.workspaceId, workspaceId),
       isNull(boards.deletedAt),
+      eq(boards.mode, "classic"),
       eq(boards.visibility, "public"),
     ),
   });
@@ -757,7 +762,7 @@ export const getWithListIdsByPublicId = (
         },
       },
     },
-    where: eq(boards.publicId, boardPublicId),
+    where: and(eq(boards.publicId, boardPublicId), eq(boards.mode, "classic")),
   });
 };
 
@@ -780,7 +785,7 @@ export const getWithLatestListIndexByPublicId = (
         limit: 1,
       },
     },
-    where: eq(boards.publicId, boardPublicId),
+    where: and(eq(boards.publicId, boardPublicId), eq(boards.mode, "classic")),
   });
 };
 
@@ -939,7 +944,7 @@ export const getWorkspaceAndBoardIdByBoardPublicId = async (
       createdBy: true,
       ownerUserId: true,
     },
-    where: eq(boards.publicId, boardPublicId),
+    where: and(eq(boards.publicId, boardPublicId), eq(boards.mode, "classic")),
   });
 
   return result;

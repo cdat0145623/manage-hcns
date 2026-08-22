@@ -59,23 +59,14 @@ describe("resolveTaskInstanceStatusTransition", () => {
     ).toEqual({ status: "missed", actualDate: null });
   });
 
-  it("rejects missed to pending when a client bypasses the UI", () => {
+  it.each([
+    ["missed", "pending"],
+    ["pending", "missed"],
+  ] as const)("rejects %s to %s", (oldStatus, requestedStatus) => {
     expect(
       resolveTaskInstanceStatusTransition({
-        oldStatus: "missed",
-        requestedStatus: "pending",
-        currentActualDate: null,
-        endDate,
-        now: new Date("2026-08-17T02:10:00.000Z"),
-      }),
-    ).toBeNull();
-  });
-
-  it("rejects a user-requested pending to missed transition", () => {
-    expect(
-      resolveTaskInstanceStatusTransition({
-        oldStatus: "pending",
-        requestedStatus: "missed",
+        oldStatus,
+        requestedStatus,
         currentActualDate: null,
         endDate,
         now: new Date("2026-08-17T02:10:00.000Z"),

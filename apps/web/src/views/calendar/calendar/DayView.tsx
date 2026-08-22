@@ -286,7 +286,7 @@ export function DayView({
                               variant="DETAILED"
                               index={index}
                               isDraggable={false}
-                              isDayStacked
+                              isStacked
                             />
                           ))}
                         </div>

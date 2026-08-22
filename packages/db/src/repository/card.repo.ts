@@ -710,6 +710,7 @@ export const reorder = async (
     newListId: number | undefined;
     newIndex: number | undefined;
     cardId: number;
+    status?: TaskStatus;
   },
 ) => {
   return db.transaction(async (tx) => {
@@ -873,6 +874,13 @@ export const reorder = async (
       }
     }
 
+    if (args.status !== undefined) {
+      await tx
+        .update(cards)
+        .set({ status: args.status, updatedAt: new Date() })
+        .where(eq(cards.id, card.id));
+    }
+
     const updatedCard = await tx.query.cards.findFirst({
       columns: {
         id: true,
@@ -881,6 +889,7 @@ export const reorder = async (
         description: true,
         dueDate: true,
         startDate: true,
+        status: true,
       },
       where: eq(cards.id, card.id),
     });

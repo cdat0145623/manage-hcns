@@ -130,9 +130,14 @@ export const generateVirtualTaskInstances = async (params: {
 
   const rule = RRule.fromString(normalizedRrule);
 
+  // The evaluation rule uses floating UTC values whose fields represent
+  // calendar wall-clock values in `tzid`. Keeping RRule's original tzid here
+  // makes it apply the timezone conversion a second time on UTC runtimes.
+  const { tzid: _tzid, ...floatingRuleOptions } = rule.options;
+
   // Ghi đè dtstart và các thành phần thời gian để RRule evaluation chuẩn xác
   const evaluationRule = new RRule({
-    ...rule.options,
+    ...floatingRuleOptions,
     dtstart: floatingStart,
     // Đảm bảo RRule sử dụng đúng giờ/phút của floatingStart
     byhour: [floatingStart.getUTCHours()],

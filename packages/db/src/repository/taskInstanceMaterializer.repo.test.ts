@@ -26,6 +26,26 @@ describe("buildTaskMasterMaterializationConditions", () => {
     expect(query.sql).not.toContain('"endDate"');
   });
 
+  it("keeps a DTSTART wall-clock time stable when the process timezone is UTC", async () => {
+    const occurrences = await generateVirtualTaskInstances({
+      userId: "user-id",
+      taskMasterId: "master-id",
+      rruleString:
+        "DTSTART;TZID=Asia/Ho_Chi_Minh:20260822T030000\\nRRULE:FREQ=WEEKLY;BYDAY=SA",
+      startDate: new Date("2026-08-22T03:00:00.000Z"),
+      masterEndDate: new Date("2026-08-22T04:00:00.000Z"),
+      from: new Date("2026-08-21T17:00:00.000Z"),
+      to: new Date("2026-08-22T16:59:59.999Z"),
+    });
+
+    expect(occurrences[0]?.targetDate.toISOString()).toBe(
+      "2026-08-22T03:00:00.000Z",
+    );
+    expect(occurrences[0]?.endDate.toISOString()).toBe(
+      "2026-08-22T04:00:00.000Z",
+    );
+  });
+
   it("generates an occurrence from an old master on the requested recurring day", async () => {
     const occurrences = await generateVirtualTaskInstances({
       userId: "user-id",

@@ -23,6 +23,7 @@ import { DeleteCommentConfirmation } from "../../card/components/DeleteCommentCo
 import { DueDateSelector } from "../../card/components/DueDateSelector";
 import { NewChecklistForm } from "../../card/components/NewChecklistForm";
 import NewCommentForm from "../../card/components/NewCommentForm";
+import { getOptimisticTaskStatus } from "./task-instance-optimistic-status";
 import { classifyTaskInstanceUpdateError } from "./task-instance-update-error";
 
 interface EventDetailModalProps {
@@ -175,6 +176,9 @@ export function EventDetailModal({
     openModal,
   } = useModal();
   const [isUpdating, setIsUpdating] = useState(false);
+  const [optimisticStatus, setOptimisticStatus] = useState<TaskStatus | null>(
+    null,
+  );
   const [activeChecklistForm, setActiveChecklistForm] = useState<string | null>(
     null,
   );
@@ -214,18 +218,23 @@ export function EventDetailModal({
   );
 
   /** Ưu tiên dữ liệu từ API — entry từ lịch có thể stale sau khi đánh dấu hoàn thành */
-  const currentStatus: TaskStatus = useMemo(() => {
+  const serverStatus: TaskStatus = useMemo(() => {
     if (latestInstance?.status != null) {
       return normalizeTaskStatus(latestInstance.status);
     }
     return normalizeTaskStatus(entry?.status);
   }, [latestInstance?.status, entry?.status]);
+  const currentStatus = optimisticStatus ?? serverStatus;
 
   const [description, setDescription] = useState(entry?.description ?? "");
 
   useEffect(() => {
     setDescription(entry?.description ?? "");
   }, [entry?.description, isVisible]);
+
+  useEffect(() => {
+    setOptimisticStatus(null);
+  }, [entry?.instanceId, isVisible]);
 
   useEffect(() => {
     if (entry?.type !== "INSTANCE" && activeTab === "rewards") {
@@ -246,18 +255,66 @@ export function EventDetailModal({
     currentUser?.role === "ADMIN";
 
   const updateInstance = api.taskInstance.update.useMutation({
-    onSuccess: async (_data, variables) => {
-      void utils.taskInstance.getVirtual.invalidate();
-      if (variables.id) {
+    onMutate: async (variables) => {
+      const nextOptimisticStatus = getOptimisticTaskStatus(
+        currentStatus,
+        normalizeTaskStatus(variables.status),
+      );
+
+      if (nextOptimisticStatus == null) {
+        return { didOptimisticallyUpdateStatus: false };
+      }
+
+      await utils.taskInstance.byId.cancel({ id: variables.id });
+      const previousInstance = utils.taskInstance.byId.getData({
+        id: variables.id,
+      });
+      const completedAt = new Date();
+
+      setOptimisticStatus(nextOptimisticStatus);
+      utils.taskInstance.byId.setData({ id: variables.id }, (instance) =>
+        instance
+          ? {
+              ...instance,
+              status: nextOptimisticStatus,
+              actualDate: completedAt,
+            }
+          : instance,
+      );
+
+      return {
+        didOptimisticallyUpdateStatus: true,
+        previousInstance,
+      };
+    },
+    onSuccess: async (data, variables, context) => {
+      utils.taskInstance.byId.setData({ id: variables.id }, (instance) =>
+        instance ? { ...instance, ...data } : instance,
+      );
+
+      try {
         await Promise.all([
+          utils.taskInstance.getVirtual.invalidate(),
           utils.taskInstance.byId.invalidate({ id: variables.id }),
           utils.reward.getByTaskInstanceId.invalidate({
             taskInstanceId: variables.id,
           }),
         ]);
+      } finally {
+        if (context.didOptimisticallyUpdateStatus) {
+          setOptimisticStatus(null);
+        }
       }
     },
-    onError: (error, variables) => {
+    onError: (error, variables, context) => {
+      if (context?.didOptimisticallyUpdateStatus) {
+        utils.taskInstance.byId.setData(
+          { id: variables.id },
+          context.previousInstance,
+        );
+        setOptimisticStatus(null);
+      }
+
       const errorKind = classifyTaskInstanceUpdateError(error);
 
       if (errorKind === "invalid-transition" || errorKind === "conflict") {
@@ -551,6 +608,7 @@ export function EventDetailModal({
                 <div>
                   <button
                     disabled={isBusy || !canEdit}
+                    aria-busy={isBusy}
                     onClick={() =>
                       handleStatusChange(
                         currentStatus === "done" ? "pending" : "done",
@@ -559,9 +617,11 @@ export function EventDetailModal({
                     className={`flex min-h-[34px] w-full items-center gap-2 rounded-xl px-3 text-left text-[13px] font-medium shadow-sm transition-all ${!canEdit ? "cursor-not-allowed opacity-50" : statusConfig.activeBg + " " + statusConfig.activeText + " " + statusConfig.activeBorder + " hover:opacity-80"} `}
                   >
                     {statusConfig.icon}
-                    {statusConfig.label === "Done"
-                      ? "Đánh dấu chưa xong"
-                      : "Đánh dấu đã xong"}
+                    {isBusy
+                      ? t`Đang lưu...`
+                      : statusConfig.label === "Done"
+                        ? "Đánh dấu chưa xong"
+                        : "Đánh dấu đã xong"}
                   </button>
                 </div>
               </div>

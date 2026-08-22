@@ -1,9 +1,11 @@
 import type { Options } from "rrule";
 import * as rrule from "rrule";
 
+import { buildInstantFromAppCalendarDayAndTime } from "./calendarTimezone";
+
 const { RRule } = rrule;
 
-type FreqType = "dayOfWeek" | "monthlyDate" | "monthlyDayRank";
+type FreqType = "daily" | "dayOfWeek" | "monthlyDate" | "monthlyDayRank";
 
 interface FreqConfig {
   type: FreqType;
@@ -33,8 +35,10 @@ export const generateRRuleString = (config: FreqConfig): string => {
 
   // TẠO NGÀY BẮT ĐẦU VỚI MÚI GIỜ VIỆT NAM
   // Chúng ta tạo một ngày dựa trên startDate nhưng set đúng giờ/phút
-  const dtstart = new Date(startDate);
-  dtstart.setHours(hour, minute, 0, 0);
+  const dtstart = buildInstantFromAppCalendarDayAndTime(
+    startDate,
+    `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`,
+  );
 
   const ruleOptions: Partial<Options> = {
     dtstart: dtstart,
@@ -44,6 +48,10 @@ export const generateRRuleString = (config: FreqConfig): string => {
   };
 
   switch (type) {
+    case "daily":
+      ruleOptions.freq = RRule.DAILY;
+      break;
+
     case "dayOfWeek":
       ruleOptions.freq = RRule.WEEKLY;
       ruleOptions.byweekday = days;

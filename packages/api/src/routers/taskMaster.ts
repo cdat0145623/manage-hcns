@@ -3,8 +3,14 @@ import { z } from "zod";
 
 import * as taskInstanceRepo from "@kan/db/repository/taskInstance.repo";
 import * as taskMasterRepo from "@kan/db/repository/taskMaster.repo";
+import * as userRepo from "@kan/db/repository/user.repo";
+import {
+  calendarDateKeyInAppZone,
+  parseCalendarDayInZone,
+} from "@kan/shared/utils";
 
 import { createTRPCRouter, protectedProcedure } from "../trpc";
+import { canUpdateTaskMaster } from "../utils/task-master-authorization";
 
 export const taskMasterRouter = createTRPCRouter({
   create: protectedProcedure
@@ -104,6 +110,16 @@ export const taskMasterRouter = createTRPCRouter({
         endDate: z.date().optional(),
         selectedUserId: z.string().optional(),
         rruleString: z.string().optional(),
+        effectiveFrom: z
+          .string()
+          .regex(/^\d{4}-\d{2}-\d{2}$/)
+          .refine((value) => {
+            const parsed = parseCalendarDayInZone(value);
+            return (
+              !Number.isNaN(parsed.getTime()) &&
+              calendarDateKeyInAppZone(parsed) === value
+            );
+          }, "effectiveFrom must be a valid calendar date"),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -124,19 +140,74 @@ export const taskMasterRouter = createTRPCRouter({
         endDate,
         selectedUserId,
         rruleString,
+        effectiveFrom,
       } = input;
 
-      // Only persist template changes on taskMasters. Existing taskInstances keep
-      // their snapshot (dates, title, assignee on the row) until edited via taskInstance.update.
-      return taskMasterRepo.update(ctx.db, {
-        id,
-        name,
-        description,
-        startDate,
-        endDate,
-        selectedUserId,
-        rruleString,
-        userId,
-      });
+      const [currentUser, existingTaskMaster] = await Promise.all([
+        userRepo.getById(ctx.db, userId),
+        ctx.db.query.taskMasters.findFirst({
+          where: (taskMaster, { eq }) => eq(taskMaster.id, id),
+          columns: { createdBy: true, targetUser: true },
+        }),
+      ]);
+
+      if (!currentUser) {
+        throw new TRPCError({ message: "User not found", code: "NOT_FOUND" });
+      }
+      if (!existingTaskMaster) {
+        throw new TRPCError({
+          message: "Task master not found",
+          code: "NOT_FOUND",
+        });
+      }
+      if (
+        !canUpdateTaskMaster({
+          actorId: userId,
+          actorRole: currentUser.role,
+          createdBy: existingTaskMaster.createdBy,
+          targetUser: existingTaskMaster.targetUser,
+        })
+      ) {
+        throw new TRPCError({
+          message: "User not authorized to update this task series",
+          code: "FORBIDDEN",
+        });
+      }
+
+      try {
+        return await taskMasterRepo.update(ctx.db, {
+          id,
+          name,
+          description,
+          startDate,
+          endDate,
+          selectedUserId,
+          rruleString,
+          effectiveFrom,
+          userId,
+        });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        if (message.includes("TASK_MASTER_FORBIDDEN")) {
+          throw new TRPCError({
+            message: "User not authorized to update this task series",
+            code: "FORBIDDEN",
+            cause: error,
+          });
+        }
+        if (
+          message.includes("TASK_MASTER_SCHEDULE_CONFLICT") ||
+          message.includes("unique constraint") ||
+          message.includes("duplicate key")
+        ) {
+          throw new TRPCError({
+            message:
+              "Lịch mới xung đột với một công việc đã tồn tại. Không có thay đổi nào được lưu.",
+            code: "CONFLICT",
+            cause: error,
+          });
+        }
+        throw error;
+      }
     }),
 });

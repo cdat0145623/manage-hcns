@@ -1,14 +1,11 @@
-import {
-  addMonths,
-  differenceInMinutes,
-  endOfMonth,
-  startOfMonth,
-} from "date-fns";
+import { differenceInMinutes } from "date-fns";
 import { useMemo } from "react";
 
 import { applyMasterWallTimeToAnchorDay } from "@kan/shared/utils";
 
 import { api } from "~/utils/api";
+import { getAppCalendarMonthRange } from "~/utils/calendar";
+import { inferCalendarRecurrenceType } from "~/utils/calendarEventSchedule";
 
 export type RecurrenceType =
   | "DAILY"
@@ -58,17 +55,18 @@ export interface CalendarEntry {
   rruleStringToText?: string;
   checklists: any[];
   createdBy?: string;
+  isCreating?: boolean;
 }
 
 export function useRecurrence(
   currentDate: Date,
   selectedUserId: string | undefined,
 ) {
-  const monthStart = startOfMonth(currentDate);
-  const monthEnd = endOfMonth(currentDate); // Buffer
+  const { from: monthStart, to: monthEnd } =
+    getAppCalendarMonthRange(currentDate);
 
   // Lấy dữ liệu thực tế từ backend
-  const { data: virtualTasks } = api.taskInstance.getVirtual.useQuery(
+  const virtualTaskQuery = api.taskInstance.getVirtual.useQuery(
     {
       from: monthStart,
       to: monthEnd,
@@ -78,6 +76,7 @@ export function useRecurrence(
       staleTime: 1000 * 60 * 5, // 5 minutes
     },
   );
+  const { data: virtualTasks } = virtualTaskQuery;
 
   const utils = api.useUtils();
   const updateTask = api.taskInstance.update.useMutation({
@@ -86,7 +85,7 @@ export function useRecurrence(
     },
   });
 
-  const calendarEntries = useMemo(() => {
+  const calendarEntries = useMemo<CalendarEntry[]>(() => {
     if (!virtualTasks) return [];
 
     return virtualTasks.map((task: any) => {
@@ -122,9 +121,9 @@ export function useRecurrence(
         type: isVirtual ? "VIRTUAL" : "INSTANCE",
         color: task.color ?? "bg-blue-500",
         duration: duration,
-        recurrence: (task.taskMaster?.recurrence ||
-          task.recurrence ||
-          "NONE") as RecurrenceType,
+        recurrence: inferCalendarRecurrenceType(
+          task.taskMaster?.rruleString || task.rruleString || "",
+        ),
         rruleString: task.taskMaster?.rruleString || task.rruleString || "",
         rruleStringToText: task.taskMaster?.rruleStringToText || "",
         checklists: task.checklists || [],
@@ -164,5 +163,13 @@ export function useRecurrence(
     cards: data.data?.filterCards,
     formattedResult: data.data?.formattedResult,
     moveTask,
+    isInitialLoading:
+      virtualTaskQuery.isLoading && virtualTaskQuery.data === undefined,
+    isRefreshing:
+      virtualTaskQuery.isFetching && virtualTaskQuery.data !== undefined,
+    error: virtualTaskQuery.error,
+    refetch: async () => {
+      await Promise.all([virtualTaskQuery.refetch(), data.refetch()]);
+    },
   };
 }

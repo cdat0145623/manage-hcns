@@ -1,10 +1,10 @@
 import { t } from "@lingui/macro";
-import { format } from "date-fns";
 import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useMemo, useState } from "react";
 import { HiMiniPlus, HiXMark } from "react-icons/hi2";
 
 import { authClient } from "@kan/auth/client";
+import { buildInstantFromAppCalendarDayAndTime } from "@kan/shared/utils";
 
 import type { EditableEntry } from "./CreateEventModal";
 import type { WorkspaceMember } from "~/components/Editor";
@@ -406,17 +406,13 @@ export function EventDetailModal({
   const statusConfig = STATUS_CONFIG[currentStatus];
   const displayChecklists = latestInstance?.checklists ?? entry?.checklists;
 
-  const startDate = entry?.date ? new Date(entry.date) : new Date();
-  if (entry?.startTime) {
-    const [h, m] = entry.startTime.split(":");
-    if (h && m) startDate.setHours(parseInt(h, 10), parseInt(m, 10), 0, 0);
-  }
-
-  const endDate = entry?.date ? new Date(entry.date) : new Date();
-  if (entry?.endTime) {
-    const [h, m] = entry.endTime.split(":");
-    if (h && m) endDate.setHours(parseInt(h, 10), parseInt(m, 10), 0, 0);
-  }
+  const entryDay = entry?.date ? new Date(entry.date) : new Date();
+  const startDate = entry?.startTime
+    ? buildInstantFromAppCalendarDayAndTime(entryDay, entry.startTime)
+    : entryDay;
+  const endDate = entry?.endTime
+    ? buildInstantFromAppCalendarDayAndTime(entryDay, entry.endTime)
+    : entryDay;
 
   const isInstanceEvent =
     entry?.type === "INSTANCE" && Boolean(entry?.instanceId);

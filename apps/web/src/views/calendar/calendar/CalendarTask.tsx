@@ -1,9 +1,11 @@
 import type { DraggableProvided } from "react-beautiful-dnd";
-import { format } from "date-fns";
 import { motion } from "framer-motion";
 import { Draggable } from "react-beautiful-dnd";
 
+import { formatInAppCalendarZone } from "@kan/shared/utils";
+
 import type { CalendarEntry } from "~/hooks/useRecurrence";
+import LoadingSpinner from "~/components/LoadingSpinner";
 
 interface CalendarTaskProps {
   entry: CalendarEntry;
@@ -114,9 +116,8 @@ export function CalendarTask({
     if (!isPositioned) return {};
 
     const hourHeight = 128; // Matching h-32
-    const date = new Date(entry.date);
-    const hours = date.getHours();
-    const minutes = date.getMinutes();
+    const hours = Number(formatInAppCalendarZone(entry.date, "H"));
+    const minutes = Number(formatInAppCalendarZone(entry.date, "m"));
     const top = (hours - startHour) * hourHeight + (minutes * hourHeight) / 60;
 
     // Google Calendar style midnight cutoff
@@ -174,8 +175,11 @@ export function CalendarTask({
         }}
         onClick={(e) => {
           e.stopPropagation();
+          if (entry.isCreating) return;
           onClick(entry);
         }}
+        disabled={entry.isCreating}
+        aria-busy={entry.isCreating}
         ref={provided?.innerRef}
         {...safeDraggableProps}
         {...safeDragHandleProps}
@@ -190,7 +194,7 @@ export function CalendarTask({
           zIndex: isPositioned
             ? (isVirtual ? 5 : 10) + overlapIndex
             : undefined,
-          borderLeftColor: entry.color ?? undefined,
+          borderLeftColor: entry.color,
         }}
       >
         {/* Accent Bar Fallback */}
@@ -204,11 +208,12 @@ export function CalendarTask({
           <div
             className={`pointer-events-none ml-1 flex h-full w-full flex-row items-center justify-start gap-2 overflow-hidden ${colors.text}`}
           >
+            {entry.isCreating ? <LoadingSpinner size="sm" /> : null}
             <span className="truncate text-left text-[10px] font-black leading-none">
               {entry.title || "(No title)"}
             </span>
             <span className="shrink-0 text-[10px] font-black opacity-50">
-              {format(new Date(entry.date), "H:mm")}
+              {formatInAppCalendarZone(entry.date, "H:mm")}
             </span>
           </div>
         ) : (
@@ -220,8 +225,9 @@ export function CalendarTask({
             </span>
             <div className="flex w-full items-center gap-1.5 overflow-hidden opacity-60">
               <span className="block whitespace-nowrap text-[10px] font-bold">
-                {format(new Date(entry.date), "H:mm")} -{" "}
-                {format(new Date(entry.endDate), "H:mm")}
+                {entry.isCreating ? <LoadingSpinner size="sm" /> : null}
+                {formatInAppCalendarZone(entry.date, "H:mm")} -{" "}
+                {formatInAppCalendarZone(entry.endDate, "H:mm")}
               </span>
             </div>
           </div>

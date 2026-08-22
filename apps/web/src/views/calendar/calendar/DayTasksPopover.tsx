@@ -1,7 +1,8 @@
-import { format } from "date-fns";
 import { motion } from "framer-motion";
 import { useEffect } from "react";
 import { MdClose } from "react-icons/md";
+
+import { formatInAppCalendarZone } from "@kan/shared/utils";
 
 import type { CalendarEntry } from "~/hooks/useRecurrence";
 import { CalendarTask } from "./CalendarTask";
@@ -61,11 +62,12 @@ export function DayTasksPopover({
                   "Thứ Năm",
                   "Thứ Sáu",
                   "Thứ Bảy",
-                ][day.getDay()]
+                ][Number(formatInAppCalendarZone(day, "i")) % 7]
               }
             </span>
             <span className="text-xl font-black text-neutral-900 dark:text-white">
-              {format(day, "d")} Tháng {day.getMonth() + 1}
+              {formatInAppCalendarZone(day, "d")} Tháng{" "}
+              {formatInAppCalendarZone(day, "M")}
             </span>
           </div>
           <button

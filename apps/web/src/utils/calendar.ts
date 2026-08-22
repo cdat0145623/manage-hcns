@@ -1,4 +1,102 @@
+import {
+  calendarDateKeyInAppZone,
+  formatInAppCalendarZone,
+  parseCalendarDayInZone,
+} from "@kan/shared/utils";
+
 import type { CalendarEntry } from "~/hooks/useRecurrence";
+
+export const getCalendarHour = (date: Date | string | number): number =>
+  Number(formatInAppCalendarZone(date, "H"));
+
+export const getCalendarMinute = (date: Date | string | number): number =>
+  Number(formatInAppCalendarZone(date, "m"));
+
+export const isSameAppCalendarDay = (
+  first: Date | string | number,
+  second: Date | string | number,
+): boolean =>
+  calendarDateKeyInAppZone(first) === calendarDateKeyInAppZone(second);
+
+const appCalendarDateFromUtcParts = (
+  year: number,
+  monthIndex: number,
+  day: number,
+): Date => {
+  const key = new Date(Date.UTC(year, monthIndex, day))
+    .toISOString()
+    .slice(0, 10);
+  return parseCalendarDayInZone(key);
+};
+
+export const addAppCalendarDays = (
+  date: Date | string | number,
+  amount: number,
+): Date => {
+  const [year = 0, month = 0, day = 0] = calendarDateKeyInAppZone(date)
+    .split("-")
+    .map(Number);
+  return appCalendarDateFromUtcParts(year, month - 1, day + amount);
+};
+
+export const addAppCalendarMonths = (
+  date: Date | string | number,
+  amount: number,
+): Date => {
+  const [year = 0, month = 0, day = 0] = calendarDateKeyInAppZone(date)
+    .split("-")
+    .map(Number);
+  const monthAnchor = new Date(Date.UTC(year, month - 1 + amount, 1));
+  const targetYear = monthAnchor.getUTCFullYear();
+  const targetMonth = monthAnchor.getUTCMonth();
+  const lastDay = new Date(
+    Date.UTC(targetYear, targetMonth + 1, 0),
+  ).getUTCDate();
+  return appCalendarDateFromUtcParts(
+    targetYear,
+    targetMonth,
+    Math.min(day, lastDay),
+  );
+};
+
+export const getAppCalendarMonthRange = (
+  date: Date | string | number,
+): { from: Date; to: Date } => {
+  const [year = 0, month = 0] = calendarDateKeyInAppZone(date)
+    .split("-")
+    .map(Number);
+  const from = appCalendarDateFromUtcParts(year, month - 1, 1);
+  const nextMonth = appCalendarDateFromUtcParts(year, month, 1);
+  return { from, to: new Date(nextMonth.getTime() - 1) };
+};
+
+export const getAppCalendarWeekDays = (
+  date: Date | string | number,
+): Date[] => {
+  const isoWeekday = Number(formatInAppCalendarZone(date, "i"));
+  const monday = addAppCalendarDays(date, 1 - isoWeekday);
+  return Array.from({ length: 7 }, (_, index) =>
+    addAppCalendarDays(monday, index),
+  );
+};
+
+export const getAppCalendarMonthGridDays = (
+  date: Date | string | number,
+): Date[] => {
+  const { from: monthStart } = getAppCalendarMonthRange(date);
+  const isoWeekday = Number(formatInAppCalendarZone(monthStart, "i"));
+  const gridStart = addAppCalendarDays(monthStart, 1 - isoWeekday);
+  return Array.from({ length: 42 }, (_, index) =>
+    addAppCalendarDays(gridStart, index),
+  );
+};
+
+export const isSameAppCalendarMonth = (
+  first: Date | string | number,
+  second: Date | string | number,
+): boolean =>
+  formatInAppCalendarZone(first, "yyyy-MM") ===
+  formatInAppCalendarZone(second, "yyyy-MM");
 
 export interface OverlapInfo {
   totalOverlap: number;
@@ -49,14 +147,14 @@ export function getCurrentTimeTop(
   currentTime: Date,
 ): number | null {
   const currentHourLayout = hourLayout.find(
-    ({ hour }) => hour === currentTime.getHours(),
+    ({ hour }) => hour === getCalendarHour(currentTime),
   );
 
   if (!currentHourLayout) return null;
 
   return (
     currentHourLayout.top +
-    (currentTime.getMinutes() * currentHourLayout.height) / 60
+    (getCalendarMinute(currentTime) * currentHourLayout.height) / 60
   );
 }
 
@@ -70,7 +168,7 @@ export function calculateDayHourLayout(
   return Array.from({ length: 24 - startHour }, (_, index) => {
     const hour = startHour + index;
     const hourEntries = sortedEntries.filter(
-      (entry) => new Date(entry.date).getHours() === hour,
+      (entry) => getCalendarHour(entry.date) === hour,
     );
     const height = calculateHourHeight(hourEntries.length);
     const layout = { hour, top, height, entries: hourEntries };
@@ -91,7 +189,7 @@ export function calculateWeekHourLayout(
     const busiestDayEntryCount = entriesByDay.reduce((maxCount, dayEntries) => {
       const entryCount = dayEntries.reduce(
         (count, entry) =>
-          new Date(entry.date).getHours() === hour ? count + 1 : count,
+          getCalendarHour(entry.date) === hour ? count + 1 : count,
         0,
       );
 

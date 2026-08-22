@@ -5,8 +5,46 @@ import {
   calculateDayHourLayout,
   calculateWeekHourLayout,
   compareCalendarEntriesByTime,
+  getAppCalendarMonthGridDays,
+  getAppCalendarMonthRange,
+  getAppCalendarWeekDays,
+  getCalendarHour,
   getCurrentTimeTop,
+  isSameAppCalendarDay,
 } from "./calendar";
+
+describe("calendar timezone helpers", () => {
+  it("reads hour and day in Asia/Ho_Chi_Minh", () => {
+    expect(getCalendarHour("2026-08-24T02:00:00.000Z")).toBe(9);
+    expect(
+      isSameAppCalendarDay(
+        "2026-08-24T18:00:00.000Z",
+        "2026-08-25T00:00:00+07:00",
+      ),
+    ).toBe(true);
+  });
+
+  it("builds month and week boundaries from Vietnam day keys", () => {
+    const anchor = new Date("2026-08-31T18:00:00.000Z");
+    const monthRange = getAppCalendarMonthRange(anchor);
+    const weekDays = getAppCalendarWeekDays(anchor);
+    const monthGrid = getAppCalendarMonthGridDays(anchor);
+
+    expect(monthRange.from.toISOString()).toBe("2026-08-31T17:00:00.000Z");
+    expect(monthRange.to.toISOString()).toBe("2026-09-30T16:59:59.999Z");
+    expect(weekDays.map((date) => date.toISOString())).toEqual([
+      "2026-08-30T17:00:00.000Z",
+      "2026-08-31T17:00:00.000Z",
+      "2026-09-01T17:00:00.000Z",
+      "2026-09-02T17:00:00.000Z",
+      "2026-09-03T17:00:00.000Z",
+      "2026-09-04T17:00:00.000Z",
+      "2026-09-05T17:00:00.000Z",
+    ]);
+    expect(monthGrid).toHaveLength(42);
+    expect(monthGrid[0]?.toISOString()).toBe("2026-08-30T17:00:00.000Z");
+  });
+});
 
 const createEntry = ({
   id,

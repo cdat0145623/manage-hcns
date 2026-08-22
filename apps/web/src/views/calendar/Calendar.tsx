@@ -6,12 +6,14 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
 import type { DropResult } from "react-beautiful-dnd";
 import { t } from "@lingui/macro";
-import { isSameMonth, startOfMonth } from "date-fns";
 import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { DragDropContext } from "react-beautiful-dnd";
 
-import { parseCalendarDayInZone } from "@kan/shared/utils";
+import {
+  formatInAppCalendarZone,
+  parseCalendarDayInZone,
+} from "@kan/shared/utils";
 
 import type { ViewMode } from "./calendar/CalendarHeader";
 import type {
@@ -25,6 +27,10 @@ import { useRecurrence } from "~/hooks/useRecurrence";
 import { useModal } from "~/providers/modal";
 import { usePopup } from "~/providers/popup";
 import { api } from "~/utils/api";
+import {
+  getAppCalendarMonthRange,
+  isSameAppCalendarMonth,
+} from "~/utils/calendar";
 import CardDetailsModalContent from "../card/components/CardDetailsModalContent";
 import { CalendarHeader } from "./calendar/CalendarHeader";
 import { CreateEventModal } from "./calendar/CreateEventModal";
@@ -37,8 +43,8 @@ import { WeekView } from "./calendar/WeekView";
 function toEditableEntry(entry: CalendarEntry): EditableEntry {
   const startDate = new Date(entry.startDate);
   const endDate = new Date(entry.endDate);
-  const startTime = `${String(startDate.getHours()).padStart(2, "0")}:${String(startDate.getMinutes()).padStart(2, "0")}`;
-  const endTime = `${String(endDate.getHours()).padStart(2, "0")}:${String(endDate.getMinutes()).padStart(2, "0")}`;
+  const startTime = formatInAppCalendarZone(startDate, "HH:mm");
+  const endTime = formatInAppCalendarZone(endDate, "HH:mm");
   return {
     id: entry.id,
     masterId: entry.masterId,
@@ -62,6 +68,24 @@ function toEditableEntry(entry: CalendarEntry): EditableEntry {
     checklists: entry.checklists,
     createdBy: entry.createdBy,
   };
+}
+
+function CalendarLoadingSkeleton() {
+  return (
+    <div className="grid h-full grid-cols-7 gap-px bg-neutral-200/70 p-px dark:bg-neutral-800">
+      {Array.from({ length: 35 }, (_, index) => (
+        <div
+          key={index}
+          className="relative min-h-24 animate-pulse bg-white p-3 dark:bg-neutral-900"
+        >
+          <div className="h-3 w-6 rounded bg-neutral-200 dark:bg-neutral-700" />
+          {index % 3 === 0 ? (
+            <div className="mt-5 h-8 w-full rounded-lg bg-blue-100/70 dark:bg-blue-950/50" />
+          ) : null}
+        </div>
+      ))}
+    </div>
+  );
 }
 
 export function Calendar() {
@@ -126,10 +150,16 @@ export function Calendar() {
   }, [displayUsers, currentUser, selectedUserId]);
 
   const [viewMode, setViewMode] = useState<ViewMode>("DAY");
-  const { calendarEntries, cards, formattedResult, moveTask } = useRecurrence(
-    currentDate,
-    selectedUserId,
-  );
+  const {
+    calendarEntries,
+    cards,
+    formattedResult,
+    moveTask,
+    isInitialLoading,
+    isRefreshing,
+    error,
+    refetch,
+  } = useRecurrence(currentDate, selectedUserId);
   const { showPopup } = usePopup();
   const utils = api.useUtils();
 
@@ -150,6 +180,16 @@ export function Calendar() {
 
   const [activeCardId, setActiveCardId] = useState<string | null>(null);
   const [isCardModalOpen, setIsCardModalOpen] = useState(false);
+  const [creatingEntryId, setCreatingEntryId] = useState<string | null>(null);
+  const creatingEntryIdRef = useRef<string | null>(null);
+  const displayedCalendarEntries = useMemo(
+    () =>
+      calendarEntries.map((entry) => ({
+        ...entry,
+        isCreating: entry.id === creatingEntryId,
+      })),
+    [calendarEntries, creatingEntryId],
+  );
 
   const handleCardClick = (card: any) => {
     setActiveCardId(card.publicId);
@@ -214,6 +254,9 @@ export function Calendar() {
 
   const handleTaskClick = async (entry: CalendarEntry) => {
     if (entry.type === "VIRTUAL") {
+      if (creatingEntryIdRef.current === entry.id) return;
+      creatingEntryIdRef.current = entry.id;
+      setCreatingEntryId(entry.id);
       try {
         const userId = currentUser?.id;
         if (!userId) {
@@ -261,6 +304,11 @@ export function Calendar() {
               error.message || "Không thể tạo công việc. Vui lòng thử lại sau.",
             icon: "error",
           });
+        }
+      } finally {
+        if (creatingEntryIdRef.current === entry.id) {
+          creatingEntryIdRef.current = null;
+          setCreatingEntryId(null);
         }
       }
     } else {
@@ -386,12 +434,15 @@ export function Calendar() {
           setSelectedUserId={setSelectedUserId}
           users={displayUsers}
           viewMode={viewMode}
+          isRefreshing={isRefreshing}
+          hasError={Boolean(error)}
+          onRetry={() => void refetch()}
           setViewMode={(mode) => {
             setDirection(0);
 
-            if (!isSameMonth(currentDate, new Date())) {
+            if (!isSameAppCalendarMonth(currentDate, new Date())) {
               if (mode === "WEEK" || mode === "DAY") {
-                setCurrentDate(startOfMonth(currentDate));
+                setCurrentDate(getAppCalendarMonthRange(currentDate).from);
               }
             }
 
@@ -401,134 +452,138 @@ export function Calendar() {
       </div>
 
       <div className="relative flex-1 overflow-hidden">
-        <DragDropContext onDragEnd={onDragEnd}>
-          <div className="relative h-full w-full overflow-hidden">
-            <AnimatePresence
-              initial={false}
-              mode="popLayout"
-              custom={direction}
-            >
-              {viewMode === "MONTH" && (
-                <motion.div
-                  key={`month-${currentDate.getFullYear()}-${currentDate.getMonth()}`}
-                  custom={direction}
-                  variants={{
-                    enter: (dir: number) => ({
-                      x: dir > 0 ? "100%" : dir < 0 ? "-100%" : 0,
-                      opacity: 0,
-                    }),
-                    center: {
-                      x: 0,
-                      opacity: 1,
-                    },
-                    exit: (dir: number) => ({
-                      x: dir > 0 ? "-100%" : dir < 0 ? "100%" : 0,
-                      opacity: 0,
-                    }),
-                  }}
-                  initial="enter"
-                  animate="center"
-                  exit="exit"
-                  transition={{
-                    x: { type: "spring", stiffness: 300, damping: 30 },
-                    opacity: { duration: 0.2 },
-                  }}
-                  className="absolute inset-0"
-                >
-                  <MonthView
-                    currentDate={currentDate}
-                    entries={calendarEntries}
-                    onTaskClick={handleTaskClick}
-                    onCellClick={handleCellClick}
-                    onViewDay={handleViewDay}
-                    onCardClick={handleCardClick}
-                    cards={cards || []}
-                    formattedResult={formattedResult || []}
-                  />
-                </motion.div>
-              )}
+        {isInitialLoading ? (
+          <CalendarLoadingSkeleton />
+        ) : (
+          <DragDropContext onDragEnd={onDragEnd}>
+            <div className="relative h-full w-full overflow-hidden">
+              <AnimatePresence
+                initial={false}
+                mode="popLayout"
+                custom={direction}
+              >
+                {viewMode === "MONTH" && (
+                  <motion.div
+                    key={`month-${formatInAppCalendarZone(currentDate, "yyyy-MM")}`}
+                    custom={direction}
+                    variants={{
+                      enter: (dir: number) => ({
+                        x: dir > 0 ? "100%" : dir < 0 ? "-100%" : 0,
+                        opacity: 0,
+                      }),
+                      center: {
+                        x: 0,
+                        opacity: 1,
+                      },
+                      exit: (dir: number) => ({
+                        x: dir > 0 ? "-100%" : dir < 0 ? "100%" : 0,
+                        opacity: 0,
+                      }),
+                    }}
+                    initial="enter"
+                    animate="center"
+                    exit="exit"
+                    transition={{
+                      x: { type: "spring", stiffness: 300, damping: 30 },
+                      opacity: { duration: 0.2 },
+                    }}
+                    className="absolute inset-0"
+                  >
+                    <MonthView
+                      currentDate={currentDate}
+                      entries={displayedCalendarEntries}
+                      onTaskClick={handleTaskClick}
+                      onCellClick={handleCellClick}
+                      onViewDay={handleViewDay}
+                      onCardClick={handleCardClick}
+                      cards={cards || []}
+                      formattedResult={formattedResult || []}
+                    />
+                  </motion.div>
+                )}
 
-              {viewMode === "WEEK" && (
-                <motion.div
-                  key={`week-${currentDate.toISOString()}`}
-                  custom={direction}
-                  variants={{
-                    enter: (dir: number) => ({
-                      x: dir > 0 ? "100%" : dir < 0 ? "-100%" : 0,
-                      opacity: 0,
-                    }),
-                    center: {
-                      x: 0,
-                      opacity: 1,
-                    },
-                    exit: (dir: number) => ({
-                      x: dir > 0 ? "-100%" : dir < 0 ? "100%" : 0,
-                      opacity: 0,
-                    }),
-                  }}
-                  initial="enter"
-                  animate="center"
-                  exit="exit"
-                  transition={{
-                    x: { type: "spring", stiffness: 300, damping: 30 },
-                    opacity: { duration: 0.2 },
-                  }}
-                  className="absolute inset-0"
-                >
-                  <WeekView
-                    currentDate={currentDate}
-                    entries={calendarEntries}
-                    onTaskClick={handleTaskClick}
-                    onCardClick={handleCardClick}
-                    onCellClick={handleCellClick}
-                    onViewDay={handleViewDay}
-                    cards={cards || []}
-                    formattedResult={formattedResult || []}
-                  />
-                </motion.div>
-              )}
+                {viewMode === "WEEK" && (
+                  <motion.div
+                    key={`week-${currentDate.toISOString()}`}
+                    custom={direction}
+                    variants={{
+                      enter: (dir: number) => ({
+                        x: dir > 0 ? "100%" : dir < 0 ? "-100%" : 0,
+                        opacity: 0,
+                      }),
+                      center: {
+                        x: 0,
+                        opacity: 1,
+                      },
+                      exit: (dir: number) => ({
+                        x: dir > 0 ? "-100%" : dir < 0 ? "100%" : 0,
+                        opacity: 0,
+                      }),
+                    }}
+                    initial="enter"
+                    animate="center"
+                    exit="exit"
+                    transition={{
+                      x: { type: "spring", stiffness: 300, damping: 30 },
+                      opacity: { duration: 0.2 },
+                    }}
+                    className="absolute inset-0"
+                  >
+                    <WeekView
+                      currentDate={currentDate}
+                      entries={displayedCalendarEntries}
+                      onTaskClick={handleTaskClick}
+                      onCardClick={handleCardClick}
+                      onCellClick={handleCellClick}
+                      onViewDay={handleViewDay}
+                      cards={cards || []}
+                      formattedResult={formattedResult || []}
+                    />
+                  </motion.div>
+                )}
 
-              {viewMode === "DAY" && (
-                <motion.div
-                  key={`day-${currentDate.toISOString()}`}
-                  custom={direction}
-                  variants={{
-                    enter: (dir: number) => ({
-                      x: dir > 0 ? "100%" : dir < 0 ? "-100%" : 0,
-                      opacity: 0,
-                    }),
-                    center: {
-                      x: 0,
-                      opacity: 1,
-                    },
-                    exit: (dir: number) => ({
-                      x: dir > 0 ? "-100%" : dir < 0 ? "100%" : 0,
-                      opacity: 0,
-                    }),
-                  }}
-                  initial="enter"
-                  animate="center"
-                  exit="exit"
-                  transition={{
-                    x: { type: "spring", stiffness: 300, damping: 30 },
-                    opacity: { duration: 0.2 },
-                  }}
-                  className="absolute inset-0"
-                >
-                  <DayView
-                    currentDate={currentDate}
-                    entries={calendarEntries}
-                    onCardClick={handleCardClick}
-                    onTaskClick={handleTaskClick}
-                    onCellClick={handleCellClick}
-                    cards={cards || []}
-                    formattedResult={formattedResult || []}
-                  />
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
-        </DragDropContext>
+                {viewMode === "DAY" && (
+                  <motion.div
+                    key={`day-${currentDate.toISOString()}`}
+                    custom={direction}
+                    variants={{
+                      enter: (dir: number) => ({
+                        x: dir > 0 ? "100%" : dir < 0 ? "-100%" : 0,
+                        opacity: 0,
+                      }),
+                      center: {
+                        x: 0,
+                        opacity: 1,
+                      },
+                      exit: (dir: number) => ({
+                        x: dir > 0 ? "-100%" : dir < 0 ? "100%" : 0,
+                        opacity: 0,
+                      }),
+                    }}
+                    initial="enter"
+                    animate="center"
+                    exit="exit"
+                    transition={{
+                      x: { type: "spring", stiffness: 300, damping: 30 },
+                      opacity: { duration: 0.2 },
+                    }}
+                    className="absolute inset-0"
+                  >
+                    <DayView
+                      currentDate={currentDate}
+                      entries={displayedCalendarEntries}
+                      onCardClick={handleCardClick}
+                      onTaskClick={handleTaskClick}
+                      onCellClick={handleCellClick}
+                      cards={cards || []}
+                      formattedResult={formattedResult || []}
+                    />
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          </DragDropContext>
+        )}
       </div>
 
       <EventDetailModal

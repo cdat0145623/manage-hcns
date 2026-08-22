@@ -1,4 +1,14 @@
-import { and, asc, count, desc, eq, gt, inArray, isNull, or } from "drizzle-orm";
+import {
+  and,
+  asc,
+  count,
+  desc,
+  eq,
+  gt,
+  inArray,
+  isNull,
+  or,
+} from "drizzle-orm";
 
 import type { dbClient } from "@kan/db/client";
 import type { ActivityType } from "@kan/db/schema";
@@ -140,6 +150,7 @@ export const bulkCreateForTaskInstance = async (
     commentId?: number;
     fromComment?: string;
     toComment?: string;
+    metadata?: Record<string, unknown>;
   }[],
 ) => {
   const activitiesWithPublicIds = activityInputs.map((activity) => ({

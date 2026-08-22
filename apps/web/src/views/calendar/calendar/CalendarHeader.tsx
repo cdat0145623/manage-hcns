@@ -5,19 +5,8 @@ import {
   ListboxOptions,
   Transition,
 } from "@headlessui/react";
-import {
-  addDays,
-  addMonths,
-  addWeeks,
-  endOfWeek,
-  format,
-  startOfWeek,
-  subDays,
-  subMonths,
-  subWeeks,
-} from "date-fns";
-import { AnimatePresence, motion } from "framer-motion";
-import { Fragment, useMemo } from "react";
+import { motion } from "framer-motion";
+import { Fragment } from "react";
 import {
   HiCheck,
   HiChevronUpDown,
@@ -25,6 +14,14 @@ import {
   HiOutlineChevronRight,
   HiOutlineUserCircle,
 } from "react-icons/hi2";
+
+import { formatInAppCalendarZone } from "@kan/shared/utils";
+
+import {
+  addAppCalendarDays,
+  addAppCalendarMonths,
+  getAppCalendarWeekDays,
+} from "~/utils/calendar";
 
 export type ViewMode = "DAY" | "WEEK" | "MONTH";
 
@@ -43,6 +40,9 @@ interface CalendarHeaderProps {
   selectedUserId: string | undefined;
   setSelectedUserId: (id: string | undefined) => void;
   users: User[] | undefined;
+  isRefreshing?: boolean;
+  hasError?: boolean;
+  onRetry?: () => void;
 }
 
 export function CalendarHeader({
@@ -53,17 +53,28 @@ export function CalendarHeader({
   selectedUserId,
   setSelectedUserId,
   users,
+  isRefreshing = false,
+  hasError = false,
+  onRetry,
 }: CalendarHeaderProps) {
+  const weekDays = getAppCalendarWeekDays(currentDate);
+  const weekStart = weekDays[0] ?? currentDate;
+  const weekEnd = weekDays[6] ?? currentDate;
+
   const onPrev = () => {
-    if (viewMode === "MONTH") setCurrentDate(subMonths(currentDate, 1));
-    else if (viewMode === "WEEK") setCurrentDate(subWeeks(currentDate, 1));
-    else setCurrentDate(subDays(currentDate, 1));
+    if (viewMode === "MONTH")
+      setCurrentDate(addAppCalendarMonths(currentDate, -1));
+    else if (viewMode === "WEEK")
+      setCurrentDate(addAppCalendarDays(currentDate, -7));
+    else setCurrentDate(addAppCalendarDays(currentDate, -1));
   };
 
   const onNext = () => {
-    if (viewMode === "MONTH") setCurrentDate(addMonths(currentDate, 1));
-    else if (viewMode === "WEEK") setCurrentDate(addWeeks(currentDate, 1));
-    else setCurrentDate(addDays(currentDate, 1));
+    if (viewMode === "MONTH")
+      setCurrentDate(addAppCalendarMonths(currentDate, 1));
+    else if (viewMode === "WEEK")
+      setCurrentDate(addAppCalendarDays(currentDate, 7));
+    else setCurrentDate(addAppCalendarDays(currentDate, 1));
   };
 
   const onToday = () => setCurrentDate(new Date());
@@ -73,17 +84,16 @@ export function CalendarHeader({
       <div className="flex items-center space-x-4 pl-2">
         <h2 className="text-xl font-bold text-neutral-900 dark:text-white">
           {viewMode === "MONTH" ? (
-            `Tháng ${currentDate.getMonth() + 1} ${currentDate.getFullYear()}`
+            `Tháng ${formatInAppCalendarZone(currentDate, "M yyyy")}`
           ) : viewMode === "WEEK" ? (
             <>
-              {format(startOfWeek(currentDate, { weekStartsOn: 1 }), "d")} Tháng{" "}
-              {startOfWeek(currentDate, { weekStartsOn: 1 }).getMonth() + 1} —
-              {format(endOfWeek(currentDate, { weekStartsOn: 1 }), "d")} Tháng{" "}
-              {endOfWeek(currentDate, { weekStartsOn: 1 }).getMonth() + 1},{" "}
-              {format(endOfWeek(currentDate, { weekStartsOn: 1 }), "yyyy")}
+              {formatInAppCalendarZone(weekStart, "d")} Tháng{" "}
+              {formatInAppCalendarZone(weekStart, "M")} —{" "}
+              {formatInAppCalendarZone(weekEnd, "d")} Tháng{" "}
+              {formatInAppCalendarZone(weekEnd, "M, yyyy")}
             </>
           ) : (
-            `${currentDate.getDate()} Tháng ${currentDate.getMonth() + 1}, ${format(currentDate, "yyyy")}`
+            `${formatInAppCalendarZone(currentDate, "d")} Tháng ${formatInAppCalendarZone(currentDate, "M, yyyy")}`
           )}
         </h2>
         <div className="flex items-center gap-1.5 rounded-full bg-neutral-100/80 p-1 shadow-inner dark:bg-neutral-800/80">
@@ -115,6 +125,20 @@ export function CalendarHeader({
       </div>
 
       <div className="flex items-center gap-1">
+        {isRefreshing ? (
+          <span className="mr-2 text-xs font-semibold text-neutral-500 dark:text-neutral-400">
+            Đang đồng bộ…
+          </span>
+        ) : null}
+        {hasError ? (
+          <button
+            type="button"
+            onClick={onRetry}
+            className="mr-2 rounded-lg bg-red-50 px-2.5 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-100 dark:bg-red-950/40 dark:text-red-400"
+          >
+            Lỗi tải lịch · Thử lại
+          </button>
+        ) : null}
         <div className="relative w-[200px]">
           <Listbox value={selectedUserId} onChange={setSelectedUserId}>
             <div className="relative">
@@ -123,7 +147,7 @@ export function CalendarHeader({
                 <span className="flex items-center gap-2.5 truncate">
                   <HiOutlineUserCircle className="h-5 w-5 shrink-0 text-neutral-400 dark:text-neutral-500" />
                   <span className="block truncate">
-                    {users?.find((u) => u.id === selectedUserId)?.name ||
+                    {users?.find((u) => u.id === selectedUserId)?.name ??
                       "Chọn người dùng"}
                   </span>
                 </span>
@@ -159,7 +183,7 @@ export function CalendarHeader({
                           <span
                             className={`block truncate ${selected ? "text-blue-600 dark:text-blue-400" : ""}`}
                           >
-                            {user.name || user.username || user.email}
+                            {user.name ?? user.username ?? user.email}
                           </span>
                           {selected ? (
                             <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-blue-600 dark:text-blue-400">

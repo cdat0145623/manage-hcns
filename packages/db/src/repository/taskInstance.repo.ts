@@ -5,7 +5,9 @@ import * as rruleModule from "rrule";
 import type { dbClient } from "@kan/db/client";
 // eslint-disable-next-line @typescript-eslint/consistent-type-imports
 import { cardActivities, statusTypeEnum, taskInstances } from "@kan/db/schema";
-import { applyMasterWallTimeToAnchorDay, generateUID } from "@kan/shared/utils";
+import { generateUID } from "@kan/shared/utils";
+
+import { buildScheduleOnAnchorDay } from "./task-master-schedule";
 
 type RRuleExports = Pick<typeof rruleModule, "RRule">;
 const rruleCandidate = rruleModule as RRuleExports & {
@@ -85,7 +87,7 @@ export const generateVirtualTaskInstances = async (params: {
 
   // Phân tách TZID từ chuỗi RRULE (ví dụ: Asia/Ho_Chi_Minh)
   const tzidMatch = /TZID=([^;:]+)/.exec(normalizedRrule);
-  const tzid = tzidMatch?.[1] ?? "UTC";
+  const tzid = tzidMatch?.[1] ?? "Asia/Ho_Chi_Minh";
 
   // Hàm lấy offset (ms) của múi giờ tại một thời điểm cụ thể
   const getOffset = (date: Date, timeZone: string) => {
@@ -148,8 +150,9 @@ export const generateVirtualTaskInstances = async (params: {
     // Chuyển đổi ngược lại từ Floating Time về UTC thật sự
     const target = new Date(date.getTime() - offset);
 
-    const instanceEndDate = applyMasterWallTimeToAnchorDay(
+    const { endDate: instanceEndDate } = buildScheduleOnAnchorDay(
       target,
+      params.startDate,
       params.masterEndDate,
     );
 

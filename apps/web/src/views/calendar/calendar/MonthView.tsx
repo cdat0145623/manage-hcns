@@ -1,24 +1,22 @@
-import {
-  addDays,
-  eachDayOfInterval,
-  format,
-  isSameDay,
-  isSameMonth,
-  isToday,
-  startOfMonth,
-  startOfWeek,
-  isAfter,
-  isBefore,
-  endOfMonth,
-} from "date-fns";
+import { isAfter, isBefore } from "date-fns";
 import { AnimatePresence, motion } from "framer-motion";
 import { useMemo, useState } from "react";
 
+import {
+  calendarDateKeyInAppZone,
+  formatInAppCalendarZone,
+} from "@kan/shared/utils";
+
 import type { CalendarEntry } from "~/hooks/useRecurrence";
 import { StrictModeDroppable as Droppable } from "~/components/StrictModeDroppable";
-import { CalendarTask } from "./CalendarTask";
-import { DayTasksPopover } from "./DayTasksPopover";
+import {
+  getAppCalendarMonthGridDays,
+  getAppCalendarMonthRange,
+  isSameAppCalendarDay,
+  isSameAppCalendarMonth,
+} from "~/utils/calendar";
 import { DayCardPopover } from "./DayCardPopover";
+import { DayTasksPopover } from "./DayTasksPopover";
 
 interface Card {
   publicId: string;
@@ -50,30 +48,26 @@ export function MonthView({
   cards,
   formattedResult,
 }: MonthViewProps) {
-  const monthStart = startOfMonth(currentDate);
+  const { from: monthStart } = getAppCalendarMonthRange(currentDate);
   const [popoverCard, setPopoverCard] = useState<Date | null>(null);
   const [popoverDay, setPopoverDay] = useState<Date | null>(null);
 
-  const calendarStart = startOfWeek(monthStart, { weekStartsOn: 1 });
-  // BUG-4 FIX: Always generate 42 days (6 weeks) so months that start
-  // near the end of a week (needing 6 rows) are never truncated
-  const calendarEnd = addDays(calendarStart, 41);
-
   const days = useMemo(
-    () => eachDayOfInterval({ start: calendarStart, end: calendarEnd }),
-    [calendarStart, calendarEnd],
+    () => getAppCalendarMonthGridDays(currentDate),
+    [currentDate],
   );
 
   const getEntriesForDay = (day: Date) => {
     return entries
-      .filter((entry) => isSameDay(new Date(entry.date), day))
+      .filter((entry) => isSameAppCalendarDay(entry.date, day))
       .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
   };
 
   const getCardsForDay = (day: Date) => {
-    const cardMetas = cards.filter((card) => 
-      isAfter(card.dueDate ?? endOfMonth(day), day) && 
-      isBefore(card.startDate || card.createdAt, day)
+    const cardMetas = cards.filter(
+      (card) =>
+        isAfter(card.dueDate ?? getAppCalendarMonthRange(day).to, day) &&
+        isBefore(card.startDate || card.createdAt, day),
     );
 
     // Resolve full card data from formattedResult
@@ -81,7 +75,7 @@ export function MonthView({
     formattedResult.forEach((board: any) => {
       board.lists.forEach((list: any) => {
         list.cards.forEach((card: any) => {
-          if (cardMetas.some(m => m.publicId === card.publicId)) {
+          if (cardMetas.some((m) => m.publicId === card.publicId)) {
             fullCards.push({
               ...card,
               boardName: board.name,
@@ -92,9 +86,10 @@ export function MonthView({
       });
     });
 
-    return fullCards.sort((a, b) => 
-      (new Date(a.dueDate ?? endOfMonth(day)).getTime()) - 
-      (new Date(b.dueDate ?? endOfMonth(day)).getTime())
+    return fullCards.sort(
+      (a, b) =>
+        new Date(a.dueDate ?? getAppCalendarMonthRange(day).to).getTime() -
+        new Date(b.dueDate ?? getAppCalendarMonthRange(day).to).getTime(),
     );
   };
 
@@ -104,7 +99,7 @@ export function MonthView({
         {WEEKDAYS.map((day) => (
           <div
             key={day}
-            className="p-3 text-center text-[10px] font-black uppercase tracking-[0.2em] text-neutral-1000 dark:text-neutral-1000"
+            className="text-neutral-1000 dark:text-neutral-1000 p-3 text-center text-[10px] font-black uppercase tracking-[0.2em]"
           >
             {day}
           </div>
@@ -113,10 +108,10 @@ export function MonthView({
 
       <div className="grid h-full flex-1 grid-cols-7 grid-rows-6 overflow-hidden border-t border-dark-400 dark:border-dark-600">
         {days.map((day) => {
-          const isCurrentMonth = isSameMonth(day, monthStart);
-          const isDayToday = isToday(day);
+          const isCurrentMonth = isSameAppCalendarMonth(day, monthStart);
+          const isDayToday = isSameAppCalendarDay(day, new Date());
           const dayEntries = getEntriesForDay(day);
-          const droppableId = `droppable-${format(day, "yyyy-MM-dd")}`;
+          const droppableId = `droppable-${calendarDateKeyInAppZone(day)}`;
           const dayCards = getCardsForDay(day);
 
           return (
@@ -128,11 +123,11 @@ export function MonthView({
               onClick={() => onCellClick(day)}
               className={`group relative flex min-h-0 cursor-pointer flex-col border-b border-r border-dark-200/50 p-1 transition-all duration-300 hover:bg-blue-50/40 dark:border-neutral-800 dark:hover:bg-blue-900/10 ${
                 !isCurrentMonth
-                  ? "bg-neutral-50/20 dark:bg-neutral-900/5 text-neutral-300 dark:text-neutral-600"
+                  ? "bg-neutral-50/20 text-neutral-300 dark:bg-neutral-900/5 dark:text-neutral-600"
                   : "bg-white dark:bg-neutral-900"
               }`}
             >
-              <div className="flex items-center justify-between pb-1 h-6">
+              <div className="flex h-6 items-center justify-between pb-1">
                 <div
                   onClick={(e) => {
                     e.stopPropagation();
@@ -146,7 +141,7 @@ export function MonthView({
                         : "text-neutral-500 dark:text-neutral-700 dark:hover:text-white"
                   }`}
                 >
-                  {format(day, "d")}
+                  {formatInAppCalendarZone(day, "d")}
                 </div>
 
                 <motion.div
@@ -176,7 +171,7 @@ export function MonthView({
                   <div
                     ref={provided.innerRef}
                     {...provided.droppableProps}
-                    className="flex-1 flex flex-col items-center justify-center space-y-1 overflow-y-auto overflow-x-hidden"
+                    className="flex flex-1 flex-col items-center justify-center space-y-1 overflow-y-auto overflow-x-hidden"
                   >
                     {/* {dayEntries.slice(0, 3).map((entry, idx) => (
                       <CalendarTask
@@ -241,4 +236,3 @@ export function MonthView({
     </div>
   );
 }
-

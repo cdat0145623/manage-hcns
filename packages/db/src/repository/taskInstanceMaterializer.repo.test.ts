@@ -4,10 +4,8 @@ import { describe, expect, it } from "vitest";
 
 import { taskMasters } from "@kan/db/schema";
 
-import {
-  buildTaskMasterMaterializationConditions,
-} from "./taskInstanceMaterializer.repo";
 import { generateVirtualTaskInstances } from "./taskInstance.repo";
+import { buildTaskMasterMaterializationConditions } from "./taskInstanceMaterializer.repo";
 
 describe("buildTaskMasterMaterializationConditions", () => {
   it("does not use occurrence dates to exclude an active recurring task master", () => {
@@ -48,12 +46,28 @@ describe("buildTaskMasterMaterializationConditions", () => {
     );
   });
 
+  it("treats an RRULE without TZID as a Vietnam calendar rule", async () => {
+    const occurrences = await generateVirtualTaskInstances({
+      userId: "user-id",
+      taskMasterId: "master-id",
+      rruleString: "FREQ=WEEKLY;BYDAY=MO",
+      startDate: new Date("2026-08-24T01:00:00+07:00"),
+      masterEndDate: new Date("2026-08-24T02:00:00+07:00"),
+      from: new Date("2026-08-24T00:00:00+07:00"),
+      to: new Date("2026-08-24T23:59:59+07:00"),
+    });
+
+    expect(occurrences).toHaveLength(1);
+    expect(occurrences[0]?.targetDate.toISOString()).toBe(
+      "2026-08-23T18:00:00.000Z",
+    );
+  });
+
   it("does not generate an occurrence after an RRULE UNTIL date", async () => {
     const occurrences = await generateVirtualTaskInstances({
       userId: "user-id",
       taskMasterId: "master-id",
-      rruleString:
-        "FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR,SA;UNTIL=20260818T235959Z",
+      rruleString: "FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR,SA;UNTIL=20260818T235959Z",
       startDate: new Date("2026-07-10T08:00:00+07:00"),
       masterEndDate: new Date("2026-07-10T08:30:00+07:00"),
       from: new Date("2026-08-19T00:00:00+07:00"),
@@ -61,5 +75,24 @@ describe("buildTaskMasterMaterializationConditions", () => {
     });
 
     expect(occurrences).toHaveLength(0);
+  });
+
+  it("materializes an overnight task with its end on the next calendar day", async () => {
+    const occurrences = await generateVirtualTaskInstances({
+      userId: "user-id",
+      taskMasterId: "master-id",
+      rruleString: "FREQ=WEEKLY;BYDAY=MO",
+      startDate: new Date("2026-08-24T22:00:00+07:00"),
+      masterEndDate: new Date("2026-08-25T01:00:00+07:00"),
+      from: new Date("2026-08-24T00:00:00+07:00"),
+      to: new Date("2026-08-24T23:59:59+07:00"),
+    });
+
+    expect(occurrences[0]?.targetDate.toISOString()).toBe(
+      "2026-08-24T15:00:00.000Z",
+    );
+    expect(occurrences[0]?.endDate.toISOString()).toBe(
+      "2026-08-24T18:00:00.000Z",
+    );
   });
 });

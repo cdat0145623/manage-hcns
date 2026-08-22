@@ -1,25 +1,23 @@
-import {
-  addHours,
-  eachDayOfInterval,
-  endOfMonth,
-  endOfWeek,
-  format,
-  isAfter,
-  isBefore,
-  isSameDay,
-  isToday,
-  startOfDay,
-  startOfWeek,
-} from "date-fns";
+import { isAfter, isBefore } from "date-fns";
 import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useMemo, useState } from "react";
+
+import {
+  buildInstantFromAppCalendarDayAndTime,
+  calendarDateKeyInAppZone,
+  formatInAppCalendarZone,
+} from "@kan/shared/utils";
 
 import type { CalendarEntry } from "~/hooks/useRecurrence";
 import { StrictModeDroppable as Droppable } from "~/components/StrictModeDroppable";
 import {
   calculateWeekHourLayout,
   compareCalendarEntriesByTime,
+  getAppCalendarMonthRange,
+  getAppCalendarWeekDays,
+  getCalendarHour,
   getCurrentTimeTop,
+  isSameAppCalendarDay,
 } from "~/utils/calendar";
 import { CalendarTask } from "./CalendarTask";
 import { DayCardPopover } from "./DayCardPopover";
@@ -59,24 +57,23 @@ export function WeekView({
   const [popoverCard, setPopoverCard] = useState<Date | null>(null);
 
   const days = useMemo(() => {
-    const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 });
-    const weekEnd = endOfWeek(currentDate, { weekStartsOn: 1 });
-
-    return eachDayOfInterval({ start: weekStart, end: weekEnd });
+    return getAppCalendarWeekDays(currentDate);
   }, [currentDate]);
 
   const entriesByDay = useMemo(
     () =>
       days.map((day) =>
         entries
-          .filter((entry) => isSameDay(new Date(entry.date), day))
+          .filter((entry) => isSameAppCalendarDay(entry.date, day))
           .sort(compareCalendarEntriesByTime),
       ),
     [days, entries],
   );
 
   const getEntriesForDay = (day: Date) => {
-    const dayIndex = days.findIndex((weekDay) => isSameDay(weekDay, day));
+    const dayIndex = days.findIndex((weekDay) =>
+      isSameAppCalendarDay(weekDay, day),
+    );
     return dayIndex >= 0 ? (entriesByDay[dayIndex] ?? []) : [];
   };
 
@@ -90,7 +87,7 @@ export function WeekView({
     const weekEntries = entriesByDay.flat();
     if (weekEntries.length === 0) return DEFAULT_START_HOUR;
     const earliestTaskHour = Math.min(
-      ...weekEntries.map((entry) => new Date(entry.date).getHours()),
+      ...weekEntries.map((entry) => getCalendarHour(entry.date)),
     );
     return Math.min(DEFAULT_START_HOUR, earliestTaskHour);
   }, [entriesByDay]);
@@ -108,15 +105,17 @@ export function WeekView({
   const nowTop = getCurrentTimeTop(hourLayout, now);
 
   const handleTimeSlotClick = (day: Date, hour: number) => {
-    const clickedDate = new Date(day);
-    clickedDate.setHours(hour, 0, 0, 0);
+    const clickedDate = buildInstantFromAppCalendarDayAndTime(
+      day,
+      `${String(hour).padStart(2, "0")}:00`,
+    );
     onCellClick(clickedDate);
   };
 
   const getCardsForDay = (day: Date) => {
     const cardMetas = cards.filter(
       (card) =>
-        isAfter(card.dueDate ?? endOfMonth(day), day) &&
+        isAfter(card.dueDate ?? getAppCalendarMonthRange(day).to, day) &&
         isBefore(card.startDate || card.createdAt, day),
     );
 
@@ -138,8 +137,8 @@ export function WeekView({
 
     return fullCards.sort(
       (a, b) =>
-        new Date(a.dueDate ?? endOfMonth(day)).getTime() -
-        new Date(b.dueDate ?? endOfMonth(day)).getTime(),
+        new Date(a.dueDate ?? getAppCalendarMonthRange(day).to).getTime() -
+        new Date(b.dueDate ?? getAppCalendarMonthRange(day).to).getTime(),
     );
   };
 
@@ -155,14 +154,18 @@ export function WeekView({
               <div
                 key={day.toISOString()}
                 className={`flex flex-1 cursor-pointer flex-col items-center justify-start p-2 transition-all ${
-                  isToday(day)
+                  isSameAppCalendarDay(day, new Date())
                     ? "relative"
                     : "text-neutral-500 dark:text-neutral-600"
                 }`}
                 onClick={() => onCellClick(day)}
               >
                 <span className="text-[10px] font-black uppercase tracking-[0.2em] text-neutral-900">
-                  {["CN", "T2", "T3", "T4", "T5", "T6", "T7"][day.getDay()]}
+                  {
+                    ["CN", "T2", "T3", "T4", "T5", "T6", "T7"][
+                      Number(formatInAppCalendarZone(day, "i")) % 7
+                    ]
+                  }
                 </span>
                 <div
                   onClick={(e) => {
@@ -170,12 +173,12 @@ export function WeekView({
                     onViewDay(day);
                   }}
                   className={`mt-2 flex h-10 w-10 cursor-pointer items-center justify-center rounded-xl text-lg font-black transition-all ${
-                    isToday(day)
+                    isSameAppCalendarDay(day, new Date())
                       ? "bg-blue-600 text-white shadow-lg shadow-blue-500/30"
                       : "border border-neutral-100 bg-white text-neutral-900 shadow-sm hover:bg-blue-600 hover:text-white hover:shadow-sm dark:border-neutral-800 dark:bg-neutral-900 dark:text-white"
                   }`}
                 >
-                  {format(day, "d")}
+                  {formatInAppCalendarZone(day, "d")}
                 </div>
                 <div className="flex flex-col items-center justify-center gap-1">
                   {dayEntries.length > 0 && (
@@ -233,7 +236,7 @@ export function WeekView({
                 style={{ height: `${height}px` }}
               >
                 <span className="absolute -top-3 left-0 w-full pr-4 text-right text-[10px] font-black uppercase tracking-tighter text-neutral-600 dark:text-neutral-600">
-                  {format(addHours(startOfDay(currentDate), hour), "H:mm")}
+                  {String(hour).padStart(2, "0")}:00
                 </span>
               </div>
             ))}
@@ -246,13 +249,13 @@ export function WeekView({
                 .filter((entry) => entry.type !== "VIRTUAL")
                 .map((entry, index) => [entry.id, index]),
             );
-            const droppableId = `droppable-${format(day, "yyyy-MM-dd")}`;
+            const droppableId = `droppable-${calendarDateKeyInAppZone(day)}`;
 
             return (
               <div
                 key={day.toISOString()}
                 className={`relative flex min-w-0 flex-1 flex-col border-r border-dark-400 transition-colors dark:border-dark-400 ${
-                  isToday(day)
+                  isSameAppCalendarDay(day, new Date())
                     ? "from-primary-500/5 dark:from-primary-500/10 bg-gradient-to-b to-transparent"
                     : ""
                 }`}
@@ -268,7 +271,7 @@ export function WeekView({
                   ))}
                 </div>
 
-                {isToday(day) && nowTop !== null && (
+                {isSameAppCalendarDay(day, new Date()) && nowTop !== null && (
                   <div
                     className="pointer-events-none absolute left-0 right-0 z-30 flex items-center"
                     style={{ top: `${nowTop}px` }}
@@ -311,7 +314,7 @@ export function WeekView({
                       <div className="pointer-events-none absolute inset-0 z-10 flex flex-col">
                         {hourLayout.map(({ hour, height }) => {
                           const hourEntries = dayEntries.filter(
-                            (entry) => new Date(entry.date).getHours() === hour,
+                            (entry) => getCalendarHour(entry.date) === hour,
                           );
 
                           return (

@@ -1,22 +1,22 @@
-import {
-  addHours,
-  endOfMonth,
-  format,
-  isAfter,
-  isBefore,
-  isSameDay,
-  isToday,
-  startOfDay,
-} from "date-fns";
+import { isAfter, isBefore } from "date-fns";
 import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useMemo, useState } from "react";
+
+import {
+  buildInstantFromAppCalendarDayAndTime,
+  calendarDateKeyInAppZone,
+  formatInAppCalendarZone,
+} from "@kan/shared/utils";
 
 import type { CalendarEntry } from "~/hooks/useRecurrence";
 import { StrictModeDroppable as Droppable } from "~/components/StrictModeDroppable";
 import {
   calculateDayHourLayout,
   compareCalendarEntriesByTime,
+  getAppCalendarMonthRange,
+  getCalendarHour,
   getCurrentTimeTop,
+  isSameAppCalendarDay,
 } from "~/utils/calendar";
 import { CalendarCard } from "./CalendarCard";
 import { CalendarTask } from "./CalendarTask";
@@ -50,18 +50,18 @@ export function DayView({
   cards,
   formattedResult,
 }: DayViewProps) {
-  const isDayToday = isToday(currentDate);
+  const isDayToday = isSameAppCalendarDay(currentDate, new Date());
   const [popoverDay, setPopoverDay] = useState<Date | null>(null);
   const [popoverCard, setPopoverCard] = useState<Date | null>(null);
 
   const dayEntries = useMemo(
     () =>
       entries
-        .filter((entry) => isSameDay(new Date(entry.date), currentDate))
+        .filter((entry) => isSameAppCalendarDay(entry.date, currentDate))
         .sort(compareCalendarEntriesByTime),
     [entries, currentDate],
   );
-  const droppableId = `droppable-${format(currentDate, "yyyy-MM-dd")}`;
+  const droppableId = `droppable-${calendarDateKeyInAppZone(currentDate)}`;
 
   const [now, setNow] = useState(new Date());
   useEffect(() => {
@@ -72,7 +72,7 @@ export function DayView({
   const startHour = useMemo(() => {
     if (dayEntries.length === 0) return DEFAULT_START_HOUR;
     const earliestTaskHour = Math.min(
-      ...dayEntries.map((e) => new Date(e.date).getHours()),
+      ...dayEntries.map((e) => getCalendarHour(e.date)),
     );
     return Math.min(DEFAULT_START_HOUR, earliestTaskHour);
   }, [dayEntries]);
@@ -90,16 +90,20 @@ export function DayView({
   const nowTop = getCurrentTimeTop(hourLayout, now);
 
   const handleTimeSlotClick = (hour: number) => {
-    const clickedDate = new Date(currentDate);
-    clickedDate.setHours(hour, 0, 0, 0);
+    const clickedDate = buildInstantFromAppCalendarDayAndTime(
+      currentDate,
+      `${String(hour).padStart(2, "0")}:00`,
+    );
     onCellClick(clickedDate);
   };
 
   const dayCards = useMemo(() => {
     const cardMetas = cards.filter(
       (card) =>
-        isAfter(card.dueDate ?? endOfMonth(currentDate), currentDate) &&
-        isBefore(card.startDate || card.createdAt, currentDate),
+        isAfter(
+          card.dueDate ?? getAppCalendarMonthRange(currentDate).to,
+          currentDate,
+        ) && isBefore(card.startDate || card.createdAt, currentDate),
     );
 
     // Resolve full card data from formattedResult
@@ -120,8 +124,12 @@ export function DayView({
 
     return fullCards.sort(
       (a, b) =>
-        new Date(a.dueDate ?? endOfMonth(currentDate)).getTime() -
-        new Date(b.dueDate ?? endOfMonth(currentDate)).getTime(),
+        new Date(
+          a.dueDate ?? getAppCalendarMonthRange(currentDate).to,
+        ).getTime() -
+        new Date(
+          b.dueDate ?? getAppCalendarMonthRange(currentDate).to,
+        ).getTime(),
     );
   }, [cards, formattedResult, currentDate]);
 
@@ -141,7 +149,7 @@ export function DayView({
                   "Thứ Năm",
                   "Thứ Sáu",
                   "Thứ Bảy",
-                ][currentDate.getDay()]
+                ][Number(formatInAppCalendarZone(currentDate, "i")) % 7]
               }
             </span>
           </div>
@@ -153,11 +161,11 @@ export function DayView({
                   : "border border-neutral-100 bg-white text-neutral-900 shadow-sm hover:bg-neutral-50 dark:border-neutral-800 dark:bg-neutral-900 dark:text-white"
               }`}
             >
-              {format(currentDate, "d")}
+              {formatInAppCalendarZone(currentDate, "d")}
             </div>
             <div className="flex flex-col">
               <span className="text-lg font-black text-neutral-900 dark:text-white">
-                {format(currentDate, "MMMM yyyy")}
+                {formatInAppCalendarZone(currentDate, "MMMM yyyy")}
               </span>
               <div className="flex flex-col items-center justify-center gap-1">
                 {dayEntries.length > 0 && (
@@ -211,7 +219,7 @@ export function DayView({
                 style={{ height: `${height}px` }}
               >
                 <span className="absolute -top-3 left-0 w-full pr-4 text-right text-[10px] font-black uppercase tracking-tighter text-neutral-600 dark:text-neutral-600">
-                  {format(addHours(startOfDay(currentDate), hour), "H:mm")}
+                  {String(hour).padStart(2, "0")}:00
                 </span>
               </div>
             ))}

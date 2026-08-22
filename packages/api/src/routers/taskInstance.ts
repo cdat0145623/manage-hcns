@@ -370,6 +370,7 @@ export const taskInstanceRouter = createTRPCRouter({
                   startDate: taskMaster.startDate,
                   endDate: taskMaster.endDate,
                   createdBy: taskMaster.createdBy,
+                  rruleString: taskMaster.frequence.rruleString,
                   rruleStringToText: ruleText,
                 };
 

@@ -14,6 +14,24 @@ import { assertPermission } from "../utils/permissions";
 
 const logger = createLogger("attachment");
 
+const shouldProxyStorageEndpoint = (endpoint: string) => {
+  try {
+    const hostname = new URL(endpoint).hostname.toLowerCase();
+
+    return (
+      hostname === "localhost" ||
+      hostname === "127.0.0.1" ||
+      hostname === "::1" ||
+      hostname === "minio" ||
+      hostname === "minio-server" ||
+      hostname === "s3" ||
+      hostname.endsWith(".localtest.me")
+    );
+  } catch {
+    return false;
+  }
+};
+
 export const attachmentRouter = createTRPCRouter({
   generateUploadUrl: protectedProcedure
     .meta({
@@ -77,7 +95,7 @@ export const attachmentRouter = createTRPCRouter({
             message: `Task instance with ID ${input.taskInstanceId} not found`,
             code: "NOT_FOUND",
           });
-        
+
         // Use user's ID as workspace ID placeholder or fetch real one
         // For now, task instances don't have workspaceId directly, but task masters are linked to users.
         // Let's assume permission is checked by task ownership for now if no workspace.
@@ -122,10 +140,16 @@ export const attachmentRouter = createTRPCRouter({
         3600, // 1 hour
       );
 
-      if (process.env.NEXT_PUBLIC_KAN_ENV !== "cloud") {
-        const endpoint = (process.env.S3_ENDPOINT ?? "http://localhost:9000").replace(/\/$/, "");
-        const appUrl = (process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3001").replace(/\/$/, "");
-        
+      const endpoint = (
+        process.env.S3_ENDPOINT ?? "http://localhost:9000"
+      ).replace(/\/$/, "");
+
+      if (shouldProxyStorageEndpoint(endpoint)) {
+        const appUrl = (
+          process.env.NEXT_PUBLIC_APP_URL ??
+          "http://localhost:3001"
+        ).replace(/\/$/, "");
+
         if (url.startsWith(endpoint)) {
           url = url.replace(endpoint, `${appUrl}/api/minio`);
         }

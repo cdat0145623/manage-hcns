@@ -3,6 +3,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { t } from "@lingui/core/macro";
 import { Trans } from "@lingui/react/macro";
 import { env } from "next-runtime-env";
+import { useEffect } from "react";
 
 import { authClient } from "@kan/auth/client";
 
@@ -18,7 +19,11 @@ export default function LoginPage() {
 
   const { data, isPending } = authClient.useSession();
 
-  if (!isPending && data?.user.id) router.push("/boards");
+  useEffect(() => {
+    if (!isPending && data?.user.id) {
+      void router.replace("/boards");
+    }
+  }, [data?.user.id, isPending, router]);
 
   return (
     <>

@@ -2,6 +2,8 @@ import type { ReactNode } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import React, { createContext, useContext, useEffect, useState } from "react";
 
+import { authClient } from "@kan/auth/client";
+
 import { api } from "~/utils/api";
 
 interface WorkspaceContextProps {
@@ -48,10 +50,31 @@ export const WorkspaceProvider: React.FC<{ children: ReactNode }> = ({
   );
   const [hasLoaded, setHasLoaded] = useState(false);
 
+  const { data: session, isPending: sessionLoading } = authClient.useSession();
+
   const workspacePublicId = useSearchParams().get("workspacePublicId");
 
-  const { data, isLoading, isSuccess } = api.workspace.all.useQuery();
+  const {
+    data,
+    isPending: workspaceQueryPending,
+    isSuccess,
+  } = api.workspace.all.useQuery(undefined, {
+    enabled: Boolean(session?.user),
+  });
   const utils = api.useUtils();
+
+  useEffect(() => {
+    if (sessionLoading) {
+      setHasLoaded(false);
+      return;
+    }
+
+    if (!session?.user) {
+      setWorkspace(initialWorkspace);
+      setAvailableWorkspaces(initialAvailableWorkspaces);
+      setHasLoaded(false);
+    }
+  }, [session?.user, sessionLoading]);
 
   const switchWorkspace = (_workspace: Workspace) => {
     localStorage.setItem("workspacePublicId", _workspace.publicId);
@@ -65,7 +88,7 @@ export const WorkspaceProvider: React.FC<{ children: ReactNode }> = ({
   };
 
   useEffect(() => {
-    if (isLoading) {
+    if (workspaceQueryPending) {
       setHasLoaded(false);
       return;
     }
@@ -74,7 +97,7 @@ export const WorkspaceProvider: React.FC<{ children: ReactNode }> = ({
       return;
     }
 
-    if (data == null || data.length === 0) {
+    if (data.length === 0) {
       setHasLoaded(true);
       return;
     }
@@ -134,7 +157,11 @@ export const WorkspaceProvider: React.FC<{ children: ReactNode }> = ({
     }
 
     setHasLoaded(true);
-  }, [data, isLoading, isSuccess, workspacePublicId, router]);
+  }, [data, workspaceQueryPending, isSuccess, workspacePublicId, router]);
+
+  const isLoading =
+    sessionLoading ||
+    (Boolean(session?.user) && (workspaceQueryPending || !hasLoaded));
 
   return (
     <WorkspaceContext.Provider

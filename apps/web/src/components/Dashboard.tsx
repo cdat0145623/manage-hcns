@@ -12,8 +12,9 @@ import { authClient } from "@kan/auth/client";
 
 import { useClickOutside } from "~/hooks/useClickOutside";
 import { useModal } from "~/providers/modal";
-import { useWorkspace, WorkspaceProvider } from "~/providers/workspace";
+import { useWorkspace } from "~/providers/workspace";
 import { api } from "~/utils/api";
+import { AuthLoadingScreen } from "./AuthLoadingScreen";
 import SideNavigation from "./SideNavigation";
 
 interface DashboardProps {
@@ -107,9 +108,22 @@ export default function Dashboard({
   // Only redirect on initial mount if role requirement is not met
   const hasCheckedRoleRef = useRef(false);
   useEffect(() => {
+    if (sessionLoading || session?.user) {
+      return;
+    }
+
+    const currentPath =
+      typeof window === "undefined"
+        ? "/"
+        : `${window.location.pathname}${window.location.search}`;
+
+    void router.replace(`/login?next=${encodeURIComponent(currentPath)}`);
+  }, [router, session?.user, sessionLoading]);
+
+  useEffect(() => {
     if (
-      router.isReady &&
       !hasCheckedRoleRef.current &&
+      session?.user &&
       !userLoading &&
       requiredRole &&
       user &&
@@ -118,15 +132,30 @@ export default function Dashboard({
       hasCheckedRoleRef.current = true;
       void router.push("/boards");
     }
-  }, [router.isReady, userLoading, user?.role, requiredRole, router]);
+  }, [session?.user, user, userLoading, requiredRole, router]);
 
   const isDarkMode = resolvedTheme === "dark";
 
   useEffect(() => {
-    if (!sessionLoading && hasLoaded && availableWorkspaces.length === 0) {
+    if (
+      session?.user &&
+      !sessionLoading &&
+      hasLoaded &&
+      availableWorkspaces.length === 0
+    ) {
       openModal("NEW_WORKSPACE", undefined, undefined, false);
     }
-  }, [sessionLoading, hasLoaded, availableWorkspaces.length, openModal]);
+  }, [
+    session?.user,
+    sessionLoading,
+    hasLoaded,
+    availableWorkspaces.length,
+    openModal,
+  ]);
+
+  if (sessionLoading || !session?.user) {
+    return <AuthLoadingScreen />;
+  }
 
   return (
     <>

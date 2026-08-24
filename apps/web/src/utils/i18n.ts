@@ -5,7 +5,7 @@ import { defaultLocale } from "~/locales";
 import { messages as enMessages } from "~/locales/en/messages";
 import { messages as viMessages } from "~/locales/vi/messages";
 
-const loadMessages = async (locale: Locale) => {
+const loadMessages = (locale: Locale) => {
   switch (locale) {
     case "vi":
       return viMessages;
@@ -30,7 +30,7 @@ export function initializeI18n() {
 
 export async function activateLocale(locale: Locale) {
   if (!loadedLocales.has(locale)) {
-    const messages = await loadMessages(locale);
+    const messages = await Promise.resolve(loadMessages(locale));
     i18n.load(locale, messages);
     loadedLocales.add(locale);
   }

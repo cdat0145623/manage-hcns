@@ -2,7 +2,7 @@ import { useSearchParams } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { t } from "@lingui/core/macro";
 import { useLingui } from "@lingui/react";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 
@@ -11,8 +11,8 @@ import { authClient } from "@kan/auth/client";
 import Button from "~/components/Button";
 import Input from "~/components/Input";
 import { usePopup } from "~/providers/popup";
+import type { AuthFormValues } from "~/components/auth-form-i18n";
 import {
-  type AuthFormValues,
   createSignInSchema,
   createSignUpSchema,
   getAuthErrorMessage,
@@ -35,10 +35,9 @@ export function Auth({ isSignUp }: AuthProps) {
     redirect && ALLOWED_REDIRECTS.includes(redirect)
       ? redirect
       : "/boards";
-  const schema = useMemo(
-    () => (isSignUp ? createSignUpSchema(i18n) : createSignInSchema(i18n)),
-    [i18n, i18n.locale, isSignUp],
-  );
+  const schema = isSignUp
+    ? createSignUpSchema(i18n)
+    : createSignInSchema(i18n);
 
   const {
     register,

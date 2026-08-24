@@ -1,44 +1,32 @@
 import { useSearchParams } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { t } from "@lingui/core/macro";
-import { useState } from "react";
+import { useLingui } from "@lingui/react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
-import { z } from "zod";
 
 import { authClient } from "@kan/auth/client";
 
 import Button from "~/components/Button";
 import Input from "~/components/Input";
 import { usePopup } from "~/providers/popup";
-
-interface FormValues {
-  name?: string;
-  username: string;
-  password?: string;
-  email?: string;
-}
+import {
+  type AuthFormValues,
+  createSignInSchema,
+  createSignUpSchema,
+  getAuthErrorMessage,
+} from "~/components/auth-form-i18n";
 
 interface AuthProps {
   isSignUp?: boolean;
 }
 
-const SignUpSchema = z.object({
-  name: z.string().optional(),
-  username: z.string().min(3, t`Username must be at least 3 characters`),
-  password: z.string().min(6, t`Password must be at least 6 characters`),
-  email: z.string().email(t`Invalid email`),
-});
-
-const SignInSchema = z.object({
-  username: z.string().min(3, t`Username must be at least 3 characters`),
-  password: z.string().min(6, t`Password must be at least 6 characters`),
-});
-
 export function Auth({ isSignUp }: AuthProps) {
   const [isLoginPending, setIsLoginPending] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
   const { showPopup } = usePopup();
+  const { i18n } = useLingui();
   const router = useRouter();
   const ALLOWED_REDIRECTS = ["/boards", "/reports"];
 
@@ -47,16 +35,20 @@ export function Auth({ isSignUp }: AuthProps) {
     redirect && ALLOWED_REDIRECTS.includes(redirect)
       ? redirect
       : "/boards";
+  const schema = useMemo(
+    () => (isSignUp ? createSignUpSchema(i18n) : createSignInSchema(i18n)),
+    [i18n, i18n.locale, isSignUp],
+  );
 
   const {
     register,
     handleSubmit,
     formState: { errors },
-  } = useForm<FormValues>({
-    resolver: zodResolver(isSignUp ? SignUpSchema : SignInSchema),
+  } = useForm<AuthFormValues>({
+    resolver: zodResolver(schema),
   });
 
-  const onSubmit = async (values: FormValues) => {
+  const onSubmit = async (values: AuthFormValues) => {
     setIsLoginPending(true);
     setLoginError(null);
 
@@ -81,10 +73,10 @@ export function Auth({ isSignUp }: AuthProps) {
             router.push(callbackURL);
           },
           onError: (ctx: { error: { message?: string } }) =>
-            setLoginError(ctx.error.message || t`An error occurred`),
+            setLoginError(getAuthErrorMessage(i18n, ctx.error.message)),
         },
       );
-      if (error) setLoginError(error.message || t`An error occurred`);
+      if (error) setLoginError(getAuthErrorMessage(i18n, error.message));
     } else {
       // @ts-ignore - Better Auth plugin inference issue in monorepo
       const { error } = await authClient.signInUsername(
@@ -103,10 +95,10 @@ export function Auth({ isSignUp }: AuthProps) {
             window.location.href = callbackURL;
           },
           onError: (ctx: { error: { message?: string } }) =>
-            setLoginError(ctx.error.message || t`An error occurred`),
+            setLoginError(getAuthErrorMessage(i18n, ctx.error.message)),
         },
       );
-      if (error) setLoginError(error.message || t`An error occurred`);
+      if (error) setLoginError(getAuthErrorMessage(i18n, error.message));
     }
 
     setIsLoginPending(false);

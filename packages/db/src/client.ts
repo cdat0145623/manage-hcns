@@ -16,7 +16,22 @@ export type dbClient = NodePgDatabase<typeof schema> & {
   $client?: Pool;
 };
 
-export const createDrizzleClient = (): dbClient => {
+interface DatabaseSingleton {
+  db: dbClient;
+  pool: Pool | null;
+}
+
+const DATABASE_SINGLETON_SYMBOL = Symbol.for("@kan/db/database-singleton");
+const globalForDatabase = globalThis as typeof globalThis &
+  Record<symbol, DatabaseSingleton | undefined>;
+
+const getDatabaseSingleton = () => globalForDatabase[DATABASE_SINGLETON_SYMBOL];
+
+const setDatabaseSingleton = (singleton: DatabaseSingleton) => {
+  globalForDatabase[DATABASE_SINGLETON_SYMBOL] = singleton;
+};
+
+const initializeDatabase = (): DatabaseSingleton => {
   const connectionString = process.env.POSTGRES_URL;
 
   if (!connectionString) {
@@ -30,12 +45,48 @@ export const createDrizzleClient = (): dbClient => {
 
     void migrate(db, { migrationsFolder: "./migrations" });
 
-    return db as unknown as dbClient;
+    return {
+      db: db as unknown as dbClient,
+      pool: null,
+    };
   }
 
   const pool = new Pool({
     connectionString,
+    max: 5,
+    connectionTimeoutMillis: 5_000,
+    idleTimeoutMillis: 10_000,
+    keepAlive: true,
+    keepAliveInitialDelayMillis: 10_000,
   });
 
-  return drizzlePg(pool, { schema }) as dbClient;
+  pool.on("error", (error: Error & { code?: string }) => {
+    log.error(
+      { code: error.code, message: error.message },
+      "Unexpected PostgreSQL pool error",
+    );
+  });
+
+  return {
+    db: drizzlePg(pool, { schema }) as dbClient,
+    pool,
+  };
+};
+
+export const createDrizzleClient = (): dbClient => {
+  const existingSingleton = getDatabaseSingleton();
+  if (existingSingleton) return existingSingleton.db;
+
+  const singleton = initializeDatabase();
+  setDatabaseSingleton(singleton);
+
+  return singleton.db;
+};
+
+export const getPostgresPool = (): Pool | null => {
+  const singleton = getDatabaseSingleton();
+  if (singleton) return singleton.pool;
+
+  createDrizzleClient();
+  return getDatabaseSingleton()?.pool ?? null;
 };

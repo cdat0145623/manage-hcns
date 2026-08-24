@@ -12,11 +12,12 @@ import posthog from "posthog-js";
 import { PostHogProvider } from "posthog-js/react";
 import { useEffect } from "react";
 
+import { PageProgress } from "~/components/PageProgress";
+import { AuthSessionProvider } from "~/providers/auth-session";
 import { FontSizeProvider } from "~/providers/font-size";
 import { KeyboardShortcutProvider } from "~/providers/keyboard-shortcuts";
 import { LinguiProviderWrapper } from "~/providers/lingui";
 import { ModalProvider } from "~/providers/modal";
-import { PageProgress } from "~/components/PageProgress";
 import { PopupProvider } from "~/providers/popup";
 import { WorkspaceProvider } from "~/providers/workspace";
 import { api } from "~/utils/api";
@@ -91,15 +92,17 @@ const MyApp: AppType = ({ Component, pageProps }: AppPropsWithLayout) => {
               <ThemeProvider attribute="class" forcedTheme="light">
                 <ModalProvider>
                   <PopupProvider>
-                    <WorkspaceProvider>
-                      {posthogKey ? (
-                        <PostHogProvider client={posthog}>
-                          {getLayout(<Component {...pageProps} />)}
-                        </PostHogProvider>
-                      ) : (
-                        getLayout(<Component {...pageProps} />)
-                      )}
-                    </WorkspaceProvider>
+                    <AuthSessionProvider>
+                      <WorkspaceProvider>
+                        {posthogKey ? (
+                          <PostHogProvider client={posthog}>
+                            {getLayout(<Component {...pageProps} />)}
+                          </PostHogProvider>
+                        ) : (
+                          getLayout(<Component {...pageProps} />)
+                        )}
+                      </WorkspaceProvider>
+                    </AuthSessionProvider>
                   </PopupProvider>
                 </ModalProvider>
               </ThemeProvider>

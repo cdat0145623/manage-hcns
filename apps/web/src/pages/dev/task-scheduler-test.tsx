@@ -24,6 +24,8 @@ const TaskSchedulerTestPage: NextPageWithLayout = () => {
   const utils = api.useUtils();
   const seedMutation = api.cron.seedLocalDailyTasks.useMutation();
   const runMutation = api.cron.runLocalScheduler.useMutation();
+  const runMissedMutation =
+    api.cron.runLocalMissedStatusScheduler.useMutation();
   const cleanupMutation = api.cron.cleanupLocalDailyTasks.useMutation();
 
   const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
@@ -78,6 +80,20 @@ const TaskSchedulerTestPage: NextPageWithLayout = () => {
     } catch (error) {
       setMessage(
         error instanceof Error ? error.message : "Chạy scheduler thất bại.",
+      );
+    }
+  };
+
+  const runMissedStatusScheduler = async () => {
+    setMessage("");
+    try {
+      const result = await runMissedMutation.mutateAsync();
+      setMessage(
+        `Đã kiểm tra ${result.matched} task instance quá hạn, cập nhật ${result.updated} task thành missed.`,
+      );
+    } catch (error) {
+      setMessage(
+        error instanceof Error ? error.message : "Chạy job missed thất bại.",
       );
     }
   };
@@ -221,6 +237,15 @@ const TaskSchedulerTestPage: NextPageWithLayout = () => {
               onClick={() => void runScheduler()}
             >
               {runMutation.isPending ? "Đang chạy..." : "Chạy scheduler ngay"}
+            </button>
+            <button
+              className="rounded bg-amber-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+              disabled={runMissedMutation.isPending}
+              onClick={() => void runMissedStatusScheduler()}
+            >
+              {runMissedMutation.isPending
+                ? "Đang chạy..."
+                : "Chạy job missed ngay"}
             </button>
             <button
               className="rounded border border-red-600 px-4 py-2 text-sm font-medium text-red-600 disabled:opacity-50"

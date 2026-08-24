@@ -20,6 +20,7 @@ import {
   trackTaskInstanceRewardViolations,
 } from "../utils/rewardViolation";
 import { getTaskInstanceUpdateAuthorization } from "../utils/task-instance-authorization";
+import { mergeStoredAndVirtualTaskInstances } from "../utils/task-instance-calendar";
 import { resolveTaskInstanceStatusTransition } from "../utils/taskInstanceStatusTransition";
 
 const { RRule } = rrule;
@@ -300,70 +301,106 @@ export const taskInstanceRouter = createTRPCRouter({
         with: { frequence: true, assignee: true },
       });
 
-      const results = await Promise.all(
-        taskMasters.map(async (taskMaster) => {
+      const storedTaskInstances = await ctx.db.query.taskInstances.findMany({
+        where: (t, { and, eq, gte, isNotNull, lte }) =>
+          and(
+            isNotNull(t.targetDate),
+            gte(t.targetDate, input.from),
+            lte(t.targetDate, input.to),
+            ...(input.targetUser ? [eq(t.userId, input.targetUser)] : []),
+          ),
+        with: {
+          user: true,
+          taskMaster: {
+            with: { frequence: true },
+          },
+          checklists: {
+            with: {
+              items: {
+                where: (t, { isNull }) => isNull(t.deletedAt),
+              },
+            },
+            where: (t, { isNull }) => isNull(t.deletedAt),
+          },
+        },
+      });
+
+      const storedInstances = storedTaskInstances.flatMap((taskInstance) => {
+        const taskMaster = taskInstance.taskMaster;
+        if (
+          !taskInstance.targetDate ||
+          taskMaster.isDeleted ||
+          (input.createdBy && taskMaster.createdBy !== input.createdBy)
+        ) {
+          return [];
+        }
+
+        const rruleString = taskMaster.frequence.rruleString;
+        let ruleText = "";
+        if (rruleString) {
           try {
-            if (
-              !taskMaster.frequence?.rruleString ||
-              !taskMaster.frequence?.dtStart
-            ) {
-              return [];
-            }
+            ruleText = RRule.fromString(
+              rruleString.replace(/\\n/g, "\n"),
+            ).toText(vietnameseGettext, VIETNAMESE);
+          } catch {
+            ruleText = "";
+          }
+        }
 
-            const normalizedRrule = taskMaster.frequence.rruleString.replace(
-              /\\n/g,
-              "\n",
-            );
-            const rule = RRule.fromString(normalizedRrule);
-            const ruleText = rule.toText(vietnameseGettext, VIETNAMESE);
+        return [
+          {
+            ...taskInstance,
+            targetDate: taskInstance.targetDate,
+            taskMaster: {
+              name: taskMaster.name,
+              description: taskMaster.description,
+              selectedUserId: taskMaster.targetUser,
+              startDate: taskMaster.startDate,
+              endDate: taskMaster.endDate,
+              createdBy: taskMaster.createdBy,
+              rruleString,
+              rruleStringToText: ruleText,
+            },
+            assignee: taskInstance.user,
+          },
+        ];
+      });
 
-            const from = input.from;
-            const to = input.to;
+      const virtualInstances = (
+        await Promise.all(
+          taskMasters.map(async (taskMaster) => {
+            try {
+              if (
+                !taskMaster.frequence.rruleString ||
+                !taskMaster.frequence.dtStart
+              ) {
+                return [];
+              }
 
-            const virtualTaskInstances =
-              await taskInstanceRepo.generateVirtualTaskInstances({
-                userId: taskMaster.targetUser,
-                taskMasterId: taskMaster.id,
-                rruleString: taskMaster.frequence.rruleString,
-                startDate: taskMaster.startDate,
-                masterEndDate: taskMaster.endDate,
-                from,
-                to,
-              });
+              const normalizedRrule = taskMaster.frequence.rruleString.replace(
+                /\\n/g,
+                "\n",
+              );
+              const rule = RRule.fromString(normalizedRrule);
+              const ruleText = rule.toText(vietnameseGettext, VIETNAMESE);
 
-            const existingTaskInstances =
-              await ctx.db.query.taskInstances.findMany({
-                where: (t, { and, eq }) =>
-                  and(
-                    eq(t.taskMasterId, taskMaster.id),
-                    eq(t.isDeleted, false),
-                  ),
-                with: {
-                  checklists: {
-                    with: {
-                      items: {
-                        where: (t, { isNull }) => isNull(t.deletedAt),
-                      },
-                    },
-                    where: (t, { isNull }) => isNull(t.deletedAt),
-                  },
-                },
-              });
+              const from = input.from;
+              const to = input.to;
 
-            const existingTaskInstanceMap = new Map(
-              existingTaskInstances.map((taskInstance) => [
-                taskInstance.targetDate!.toISOString(),
-                taskInstance,
-              ]),
-            );
+              const virtualTaskInstances =
+                await taskInstanceRepo.generateVirtualTaskInstances({
+                  userId: taskMaster.targetUser,
+                  taskMasterId: taskMaster.id,
+                  rruleString: taskMaster.frequence.rruleString,
+                  startDate: taskMaster.startDate,
+                  masterEndDate: taskMaster.endDate,
+                  from,
+                  to,
+                });
 
-            const newVirtualTaskInstances = virtualTaskInstances.map(
-              (virtualInstance) => {
-                const existing = existingTaskInstanceMap.get(
-                  virtualInstance.targetDate.toISOString(),
-                );
-
-                const taskMasterInfo = {
+              return virtualTaskInstances.map((virtualInstance) => ({
+                ...virtualInstance,
+                taskMaster: {
                   name: taskMaster.name,
                   description: taskMaster.description,
                   selectedUserId: taskMaster.targetUser,
@@ -372,32 +409,20 @@ export const taskInstanceRouter = createTRPCRouter({
                   createdBy: taskMaster.createdBy,
                   rruleString: taskMaster.frequence.rruleString,
                   rruleStringToText: ruleText,
-                };
+                },
+                assignee: taskMaster.assignee,
+              }));
+            } catch {
+              return [];
+            }
+          }),
+        )
+      ).flat();
 
-                if (existing) {
-                  return {
-                    ...existing,
-                    taskMaster: taskMasterInfo,
-                    assignee: taskMaster.assignee,
-                  };
-                }
-
-                return {
-                  ...virtualInstance,
-                  taskMaster: taskMasterInfo,
-                  assignee: taskMaster.assignee,
-                };
-              },
-            );
-
-            return newVirtualTaskInstances;
-          } catch (err) {
-            return [];
-          }
-        }),
-      );
-
-      return results.flat();
+      return mergeStoredAndVirtualTaskInstances({
+        storedInstances,
+        virtualInstances,
+      });
     }),
   update: protectedProcedure
     .meta({

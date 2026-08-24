@@ -1,6 +1,6 @@
 import type { Locale as DateFnsLocale } from "date-fns";
 import { useLingui } from "@lingui/react";
-import { de, enGB, es, fr, it, nl, pl, ru, ptBR} from "date-fns/locale";
+import { enGB, vi } from "date-fns/locale";
 
 import type { Locale } from "~/locales";
 import { useLinguiContext } from "~/providers/lingui";
@@ -12,14 +12,7 @@ export function useLocalisation() {
 
   const dateLocaleMap: Partial<Record<Locale, DateFnsLocale>> = {
     en: enGB,
-    fr,
-    de,
-    es,
-    it,
-    nl,
-    ru,
-    pl,
-    "pt-BR": ptBR,
+    vi,
   };
 
   const currentDateLocale = dateLocaleMap[locale] ?? enGB;

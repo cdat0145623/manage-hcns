@@ -8,13 +8,16 @@ import {
   TbLayoutSidebarRightExpand,
 } from "react-icons/tb";
 
-import { authClient } from "@kan/auth/client";
-
 import { useClickOutside } from "~/hooks/useClickOutside";
+import { useAuthSession } from "~/providers/auth-session";
 import { useModal } from "~/providers/modal";
 import { useWorkspace } from "~/providers/workspace";
 import { api } from "~/utils/api";
 import { AuthLoadingScreen } from "./AuthLoadingScreen";
+import {
+  AuthSessionUnavailableScreen,
+  SessionUnavailableBanner,
+} from "./SessionUnavailable";
 import SideNavigation from "./SideNavigation";
 
 interface DashboardProps {
@@ -51,7 +54,13 @@ export default function Dashboard({
   const { resolvedTheme } = useTheme();
   const { openModal } = useModal();
 
-  const { data: session, isPending: sessionLoading } = authClient.useSession();
+  const {
+    session,
+    status: sessionStatus,
+    isRetrying,
+    retrySession,
+  } = useAuthSession();
+  const sessionLoading = sessionStatus === "loading";
   const { data: user, isLoading: userLoading } = api.user.getUser.useQuery(
     undefined,
     {
@@ -108,7 +117,7 @@ export default function Dashboard({
   // Only redirect on initial mount if role requirement is not met
   const hasCheckedRoleRef = useRef(false);
   useEffect(() => {
-    if (sessionLoading || session?.user) {
+    if (sessionStatus !== "unauthenticated") {
       return;
     }
 
@@ -118,7 +127,7 @@ export default function Dashboard({
         : `${window.location.pathname}${window.location.search}`;
 
     void router.replace(`/login?next=${encodeURIComponent(currentPath)}`);
-  }, [router, session?.user, sessionLoading]);
+  }, [router, sessionStatus]);
 
   useEffect(() => {
     if (
@@ -153,12 +162,29 @@ export default function Dashboard({
     openModal,
   ]);
 
-  if (sessionLoading || !session?.user) {
+  if (sessionLoading) {
     return <AuthLoadingScreen />;
   }
 
+  if (sessionStatus === "unavailable" && !session?.user) {
+    return (
+      <AuthSessionUnavailableScreen
+        isRetrying={isRetrying}
+        onRetry={() => void retrySession()}
+      />
+    );
+  }
+
+  if (!session?.user) return <AuthLoadingScreen />;
+
   return (
     <>
+      {sessionStatus === "unavailable" ? (
+        <SessionUnavailableBanner
+          isRetrying={isRetrying}
+          onRetry={() => void retrySession()}
+        />
+      ) : null}
       <style jsx global>{`
         html {
           height: 100vh;
@@ -219,11 +245,11 @@ export default function Dashboard({
             ) : (
               <SideNavigation
                 user={{
-                  displayName: user?.name ?? session?.user.name,
-                  email: user?.email ?? session?.user.email ?? "",
+                  displayName: user?.name ?? session.user.name,
+                  email: user?.email ?? session.user.email,
                   image: user?.image ?? undefined,
                 }}
-                isLoading={sessionLoading || userLoading}
+                isLoading={userLoading}
                 onCloseSideNav={closeSideNav}
               />
             )}

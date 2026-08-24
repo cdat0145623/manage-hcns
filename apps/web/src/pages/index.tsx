@@ -4,7 +4,13 @@ import { initAuth } from "@kan/auth/server";
 import { createDrizzleClient } from "@kan/db/client";
 import { createLogger } from "@kan/logger";
 
+import { AuthSessionUnavailableScreen } from "~/components/SessionUnavailable";
+
 const logger = createLogger("home-route");
+
+interface HomeProps {
+  sessionUnavailable?: boolean;
+}
 
 export const getServerSideProps: GetServerSideProps = async (context) => {
   const db = createDrizzleClient();
@@ -28,18 +34,23 @@ export const getServerSideProps: GetServerSideProps = async (context) => {
     };
   } catch (error) {
     logger.error({ error }, "Failed to resolve session for home route");
+    context.res.statusCode = 503;
 
     return {
-      redirect: {
-        destination: "/login",
-        permanent: false,
-      },
+      props: { sessionUnavailable: true },
     };
-  } finally {
-    await db.$client?.end();
   }
 };
 
-export default function Home() {
+export default function Home({ sessionUnavailable }: HomeProps) {
+  if (sessionUnavailable) {
+    return (
+      <AuthSessionUnavailableScreen
+        isRetrying={false}
+        onRetry={() => window.location.reload()}
+      />
+    );
+  }
+
   return null;
 }

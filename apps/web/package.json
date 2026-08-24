@@ -60,6 +60,7 @@
     "@trpc/next": "^11.0.0-rc.660",
     "@trpc/react-query": "catalog:",
     "@trpc/server": "catalog:",
+    "@vercel/functions": "^3.9.5",
     "date-fns": "^4.1.0",
     "formidable": "^3.5.4",
     "framer-motion": "^12.26.2",

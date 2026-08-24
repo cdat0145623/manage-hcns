@@ -2,9 +2,8 @@ import type { ReactNode } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import React, { createContext, useContext, useEffect, useState } from "react";
 
-import { authClient } from "@kan/auth/client";
-
 import { api } from "~/utils/api";
+import { useAuthSession } from "./auth-session";
 
 interface WorkspaceContextProps {
   workspace: Workspace;
@@ -50,7 +49,8 @@ export const WorkspaceProvider: React.FC<{ children: ReactNode }> = ({
   );
   const [hasLoaded, setHasLoaded] = useState(false);
 
-  const { data: session, isPending: sessionLoading } = authClient.useSession();
+  const { session, status: sessionStatus } = useAuthSession();
+  const sessionLoading = sessionStatus === "loading";
 
   const workspacePublicId = useSearchParams().get("workspacePublicId");
 
@@ -69,12 +69,12 @@ export const WorkspaceProvider: React.FC<{ children: ReactNode }> = ({
       return;
     }
 
-    if (!session?.user) {
+    if (sessionStatus === "unauthenticated") {
       setWorkspace(initialWorkspace);
       setAvailableWorkspaces(initialAvailableWorkspaces);
       setHasLoaded(false);
     }
-  }, [session?.user, sessionLoading]);
+  }, [sessionLoading, sessionStatus]);
 
   const switchWorkspace = (_workspace: Workspace) => {
     localStorage.setItem("workspacePublicId", _workspace.publicId);

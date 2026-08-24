@@ -3,12 +3,12 @@ import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useMemo, useState } from "react";
 import { HiMiniPlus, HiXMark } from "react-icons/hi2";
 
-import { authClient } from "@kan/auth/client";
 import { buildInstantFromAppCalendarDayAndTime } from "@kan/shared/utils";
 
 import type { EditableEntry } from "./CreateEventModal";
 import type { WorkspaceMember } from "~/components/Editor";
 import Editor from "~/components/Editor";
+import { useAuthSession } from "~/providers/auth-session";
 import { useModal } from "~/providers/modal";
 import { usePopup } from "~/providers/popup";
 import { api } from "~/utils/api";
@@ -25,6 +25,7 @@ import { NewChecklistForm } from "../../card/components/NewChecklistForm";
 import NewCommentForm from "../../card/components/NewCommentForm";
 import { getOptimisticTaskStatus } from "./task-instance-optimistic-status";
 import { classifyTaskInstanceUpdateError } from "./task-instance-update-error";
+import { canUpdateTaskStatus } from "./task-status-availability";
 
 interface EventDetailModalProps {
   isVisible: boolean;
@@ -153,7 +154,7 @@ export function EventDetailModal({
   onDelete,
   isDeleting,
 }: EventDetailModalProps) {
-  const { data: session } = authClient.useSession();
+  const { session, status: sessionStatus } = useAuthSession();
   const { data: users = [] } = api.user.getAll.useQuery();
   const utils = api.useUtils();
 
@@ -372,13 +373,29 @@ export function EventDetailModal({
   };
 
   const isBusy = updateInstance.isPending || isUpdating;
+  const isStatusUpdateAllowed = canUpdateTaskStatus({
+    canEdit,
+    isBusy,
+    sessionStatus,
+  });
 
   const handleStatusChange = async (newStatus: TaskStatus) => {
     if (!entry) return;
     if (newStatus === currentStatus || isBusy) return;
     if (!entry.masterId) return;
 
-    const userId = session?.user?.id;
+    if (sessionStatus === "unavailable") {
+      showPopup({
+        header: t`Không thể cập nhật công việc`,
+        message: t`Đang mất kết nối tới máy chủ. Vui lòng thử lại khi kết nối được khôi phục.`,
+        icon: "info",
+      });
+      return;
+    }
+
+    if (!isStatusUpdateAllowed) return;
+
+    const userId = session?.user.id;
     if (!userId) {
       showPopup({
         header: "Yêu cầu xác thực",
@@ -603,14 +620,14 @@ export function EventDetailModal({
               <div className="col-span-1 min-w-0 space-y-1.5">
                 <div>
                   <button
-                    disabled={isBusy || !canEdit}
+                    disabled={!isStatusUpdateAllowed}
                     aria-busy={isBusy}
                     onClick={() =>
                       handleStatusChange(
                         currentStatus === "done" ? "pending" : "done",
                       )
                     }
-                    className={`flex min-h-[34px] w-full items-center gap-2 rounded-xl px-3 text-left text-[13px] font-medium shadow-sm transition-all ${!canEdit ? "cursor-not-allowed opacity-50" : statusConfig.activeBg + " " + statusConfig.activeText + " " + statusConfig.activeBorder + " hover:opacity-80"} `}
+                    className={`flex min-h-[34px] w-full items-center gap-2 rounded-xl px-3 text-left text-[13px] font-medium shadow-sm transition-all ${!isStatusUpdateAllowed ? "cursor-not-allowed opacity-50" : statusConfig.activeBg + " " + statusConfig.activeText + " " + statusConfig.activeBorder + " hover:opacity-80"} `}
                   >
                     {statusConfig.icon}
                     {isBusy

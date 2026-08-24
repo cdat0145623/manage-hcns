@@ -10,6 +10,8 @@ import superjson from "superjson";
 
 import type { AppRouter } from "@kan/api/root";
 
+import { isUnauthenticatedTRPCError } from "./trpc-auth-error";
+
 /**
  * This is the client-side entrypoint for your tRPC API. It is used to create the `api` object which
  * contains the Next.js App-wrapper, as well as your type-safe React Query hooks.
@@ -25,7 +27,10 @@ const authLink: TRPCLink<AppRouter> = () => {
           observer.next(value);
         },
         error(err) {
-          if (typeof window !== "undefined" && err.message === "UNAUTHORIZED") {
+          if (
+            typeof window !== "undefined" &&
+            isUnauthenticatedTRPCError(err)
+          ) {
             const path = window.location.pathname;
             if (!path.startsWith("/login") && !path.startsWith("/signup")) {
               window.location.href = "/login";

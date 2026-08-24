@@ -211,6 +211,12 @@ export const cronRouter = createTRPCRouter({
       return { materialized, missed };
     }),
 
+  runLocalMissedStatusScheduler: localAdminProcedure
+    .input(z.void())
+    .mutation(async ({ ctx }) =>
+      markOverdueTaskInstancesMissed(ctx.db, { now: new Date() }),
+    ),
+
   cleanupLocalDailyTasks: localAdminProcedure
     .input(z.object({ batchId: z.string().min(1).max(80) }))
     .mutation(async ({ ctx, input }) => {

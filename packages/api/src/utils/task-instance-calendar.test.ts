@@ -2,22 +2,22 @@ import { describe, expect, it } from "vitest";
 
 import { mergeStoredAndVirtualTaskInstances } from "./task-instance-calendar";
 
-type StoredOccurrence = {
+interface StoredOccurrence {
   id: string;
   userId: string;
   taskMasterId: string;
   targetDate: Date;
   status: "pending" | "done" | "missed";
   isDeleted: boolean;
-};
+}
 
-type VirtualOccurrence = {
+interface VirtualOccurrence {
   id: string;
   userId: string;
   taskMasterId: string;
   targetDate: Date;
   status: "pending";
-};
+}
 
 const saturday = new Date("2026-08-22T01:00:00.000Z");
 const monday = new Date("2026-08-24T01:00:00.000Z");

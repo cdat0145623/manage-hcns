@@ -1,12 +1,12 @@
-type CalendarOccurrence = {
+interface CalendarOccurrence {
   userId: string;
   taskMasterId: string;
   targetDate: Date;
-};
+}
 
-type StoredCalendarOccurrence = CalendarOccurrence & {
+interface StoredCalendarOccurrence extends CalendarOccurrence {
   isDeleted: boolean;
-};
+}
 
 const getOccurrenceKey = ({
   taskMasterId,
@@ -24,10 +24,8 @@ export const mergeStoredAndVirtualTaskInstances = <
 }: {
   storedInstances: TStored[];
   virtualInstances: TVirtual[];
-}): Array<TStored | TVirtual> => {
-  const occupiedOccurrenceKeys = new Set(
-    storedInstances.map(getOccurrenceKey),
-  );
+}): (TStored | TVirtual)[] => {
+  const occupiedOccurrenceKeys = new Set(storedInstances.map(getOccurrenceKey));
   const visibleStoredInstances = storedInstances.filter(
     (instance) => !instance.isDeleted,
   );

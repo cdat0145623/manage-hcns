@@ -1,27 +1,21 @@
 export const locales = [
+  "vi",
   "en",
-  "fr",
-  "de",
-  "es",
-  "it",
-  "nl",
-  "ru",
-  "pl",
-  "ptbr"
 ] as const;
 
 export type Locale = (typeof locales)[number];
 
-export const defaultLocale: Locale = "en";
+export const defaultLocale: Locale = "vi";
 
 export const localeNames: Record<Locale, string> = {
+  vi: "Tiếng Việt",
   en: "English",
-  fr: "Français",
-  de: "Deutsch",
-  es: "Español",
-  it: "Italiano",
-  nl: "Nederlands",
-  ru: "Русский",
-  pl: "Polski",
-  ptbr: "Português",
 };
+
+export function isLocale(value: string): value is Locale {
+  return (locales as readonly string[]).includes(value);
+}
+
+export function resolveInitialLocale(savedLocale: string | null): Locale {
+  return savedLocale && isLocale(savedLocale) ? savedLocale : defaultLocale;
+}

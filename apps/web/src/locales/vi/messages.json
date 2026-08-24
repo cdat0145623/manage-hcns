@@ -1,0 +1,98 @@
+{
+  "WnEwDO": {
+    "message": "Already have an account? <0><1>Sign in</1></0>",
+    "translation": "Đã có tài khoản? <0><1>Đăng nhập</1></0>"
+  },
+  "Vw8l6h": {
+    "message": "An error occurred",
+    "translation": "Đã xảy ra lỗi."
+  },
+  "auth.invalid-credentials": {
+    "message": "Invalid username or password",
+    "translation": "Tên đăng nhập hoặc mật khẩu không đúng."
+  },
+  "auth.username-taken": {
+    "message": "Username already taken",
+    "translation": "Tên đăng nhập đã được sử dụng."
+  },
+  "vUr5JT": {
+    "message": "Don't have an account? <0><1>Sign up</1></0>",
+    "translation": "Chưa có tài khoản? <0><1>Đăng ký</1></0>"
+  },
+  "C3nD/1": {
+    "message": "Enter your email",
+    "translation": "Nhập email"
+  },
+  "n9V+ps": {
+    "message": "Enter your name",
+    "translation": "Nhập họ tên"
+  },
+  "NgaR6B": {
+    "message": "Enter your password",
+    "translation": "Nhập mật khẩu"
+  },
+  "2d/OiW": {
+    "message": "Enter your username",
+    "translation": "Nhập tên đăng nhập"
+  },
+  "ZDIydz": {
+    "message": "Get started",
+    "translation": "Bắt đầu"
+  },
+  "B2Tpo0": {
+    "message": "Invalid email",
+    "translation": "Email không hợp lệ."
+  },
+  "z0t9bb": {
+    "message": "Login",
+    "translation": "Đăng nhập"
+  },
+  "N/bcWA": {
+    "message": "Login | kan.bn",
+    "translation": "Đăng nhập | kan.bn"
+  },
+  "BfZAc7": {
+    "message": "Password must be at least 6 characters",
+    "translation": "Mật khẩu phải có ít nhất 6 ký tự."
+  },
+  "vwGkYB": {
+    "message": "Password must be at least 8 characters",
+    "translation": "Mật khẩu phải có ít nhất 8 ký tự."
+  },
+  "e+RpCP": {
+    "message": "Sign up",
+    "translation": "Đăng ký"
+  },
+  "sUZo7y": {
+    "message": "Sign up | kan.bn",
+    "translation": "Đăng ký | kan.bn"
+  },
+  "WRkpB1": {
+    "message": "Sign up disabled",
+    "translation": "Chức năng đăng ký đã bị tắt"
+  },
+  "s6iE/c": {
+    "message": "Sign up is currently disabled. Please try again later.",
+    "translation": "Chức năng đăng ký hiện đang tạm tắt. Vui lòng thử lại sau."
+  },
+  "zzDlyQ": {
+    "message": "Success",
+    "translation": "Thành công"
+  },
+  "riEdaP": {
+    "message": "Username must be at least 3 characters",
+    "translation": "Tên đăng nhập phải có ít nhất 3 ký tự."
+  },
+  "9eF5oV": {
+    "message": "Welcome back",
+    "translation": "Chào mừng bạn trở lại"
+  },
+  "p/hk9N": {
+    "message": "You have been logged in successfully.",
+    "translation": "Đăng nhập thành công."
+  },
+  "mchgzf": {
+    "message": "You have been signed up successfully.",
+    "translation": "Đăng ký tài khoản thành công."
+  }
+}

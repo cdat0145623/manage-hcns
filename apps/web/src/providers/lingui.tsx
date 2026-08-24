@@ -3,7 +3,7 @@ import { I18nProvider } from "@lingui/react";
 import { createContext, useContext, useEffect, useState } from "react";
 
 import type { Locale } from "~/locales";
-import { defaultLocale, locales } from "~/locales";
+import { defaultLocale, locales, resolveInitialLocale } from "~/locales";
 import { activateLocale, i18n, initializeI18n } from "~/utils/i18n";
 
 interface LinguiContextType {
@@ -22,58 +22,25 @@ export function useLinguiContext() {
   return context;
 }
 
-interface LinguiProviderProps {
-  children: ReactNode;
-  initialLocale?: Locale;
-}
-
-function detectBrowserLocale(availableLocales: readonly string[]): Locale {
-  if (typeof navigator === "undefined") {
-    return defaultLocale;
-  }
-
-  const browserLanguages = navigator.languages || [navigator.language];
-
-  for (const browserLang of browserLanguages) {
-    const langCode = browserLang.split("-")[0];
-
-    if (langCode && availableLocales.includes(langCode.toLowerCase())) {
-      return langCode.toLowerCase() as Locale;
-    }
-  }
-
-  return defaultLocale;
-}
-
-export function LinguiProviderWrapper({
-  children,
-  initialLocale = defaultLocale,
-}: LinguiProviderProps) {
+export function LinguiProviderWrapper({ children }: { children: ReactNode }) {
   const [locale, setLocale] = useState<Locale>(defaultLocale);
   const [isHydrated, setIsHydrated] = useState(false);
 
   initializeI18n();
 
   useEffect(() => {
-    const savedLocale = localStorage.getItem("locale") as Locale;
+    const locale = resolveInitialLocale(localStorage.getItem("locale"));
 
-    if (savedLocale && locales.includes(savedLocale)) {
-      setLocale(savedLocale);
-    } else {
-      const detectedLocale = detectBrowserLocale(locales);
-      setLocale(detectedLocale);
-    }
+    setLocale(locale);
     setIsHydrated(true);
-  }, [initialLocale]);
+  }, []);
 
   useEffect(() => {
-    if (isHydrated && locale !== defaultLocale) {
-      activateLocale(locale).then(() => {
-        localStorage.setItem("locale", locale);
-      });
-    } else if (isHydrated) {
+    if (!isHydrated) return;
+
+    void activateLocale(locale).then(() => {
       localStorage.setItem("locale", locale);
-    }
+    });
   }, [locale, isHydrated]);
 
   return (

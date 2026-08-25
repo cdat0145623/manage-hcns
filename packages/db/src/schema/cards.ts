@@ -23,6 +23,7 @@ import {
   fileActivityLog,
   frequence,
   statusTypeEnum,
+  taskInstanceExtensions,
   taskInstances,
   taskMasters,
 } from "./tasks";
@@ -36,6 +37,7 @@ export const activityTypes = [
   "updated_list",
   "updated_index",
   "status_changed",
+  "deadline_extended",
   "member_assigned",
   "member_unassigned",
   "deadline_changed",
@@ -146,6 +148,10 @@ export const cardActivities = pgTable("card_activity", {
     onDelete: "restrict",
   }),
   taskInstanceId: uuid("taskInstanceId").references(() => taskInstances.id),
+  taskInstanceExtensionId: uuid("taskInstanceExtensionId").references(
+    () => taskInstanceExtensions.id,
+    { onDelete: "restrict" },
+  ),
   oldValue: text("oldValue"),
   newValue: text("newValue"),
   metadata: jsonb("metadata"),
@@ -283,6 +289,11 @@ export const cardActivitiesRelations = relations(cardActivities, ({ one }) => ({
     fields: [cardActivities.taskInstanceId],
     references: [taskInstances.id],
     relationName: "cardActivitiesTaskInstance",
+  }),
+  taskInstanceExtension: one(taskInstanceExtensions, {
+    fields: [cardActivities.taskInstanceExtensionId],
+    references: [taskInstanceExtensions.id],
+    relationName: "cardActivitiesTaskInstanceExtension",
   }),
   fromList: one(lists, {
     fields: [cardActivities.fromListId],

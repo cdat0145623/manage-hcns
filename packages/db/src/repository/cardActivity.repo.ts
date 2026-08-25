@@ -356,6 +356,15 @@ export const getPaginatedActivitiesForTaskInstance = async (
           newFileUrl: true,
         },
       },
+      taskInstanceExtension: {
+        columns: {
+          publicId: true,
+          previousEndDate: true,
+          newEndDate: true,
+          reason: true,
+          createdAt: true,
+        },
+      },
     },
     orderBy: asc(cardActivities.createdAt), // required for merging and pagination
     limit: limit + 1, // fetch one extra to check if there are more

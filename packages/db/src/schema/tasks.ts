@@ -8,7 +8,6 @@ import {
   text,
   timestamp,
   unique,
-  uniqueIndex,
   uuid,
   varchar,
 } from "drizzle-orm/pg-core";
@@ -81,6 +80,7 @@ export const taskInstances = pgTable(
     description: text("description"),
     targetDate: timestamp("targetDate", { withTimezone: true }),
     actualDate: timestamp("actualDate", { withTimezone: true }),
+    originalEndDate: timestamp("originalEndDate", { withTimezone: true }),
     endDate: timestamp("endDate", { withTimezone: true }),
     status: statusTypeEnum("status").notNull().default("pending"),
     isDeleted: boolean("isDeleted").notNull().default(false),
@@ -99,6 +99,36 @@ export const taskInstances = pgTable(
       t.status,
       t.isDeleted,
       t.endDate,
+    ),
+  ],
+);
+
+export const taskInstanceExtensions = pgTable(
+  "task_instance_extensions",
+  {
+    id: uuid("id")
+      .primaryKey()
+      .default(sql`uuid_generate_v4()`),
+    publicId: varchar("publicId", { length: 12 }).notNull().unique(),
+    taskInstanceId: uuid("taskInstanceId")
+      .notNull()
+      .references(() => taskInstances.id, { onDelete: "restrict" }),
+    previousEndDate: timestamp("previousEndDate", {
+      withTimezone: true,
+    }).notNull(),
+    newEndDate: timestamp("newEndDate", { withTimezone: true }).notNull(),
+    reason: text("reason").notNull(),
+    extendedBy: uuid("extendedBy")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    createdAt: timestamp("createdAt", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    index("task_instance_extensions_instance_created_idx").on(
+      t.taskInstanceId,
+      t.createdAt,
     ),
   ],
 );
@@ -174,6 +204,21 @@ export const taskInstanceRelations = relations(
     }),
     fileActivities: many(fileActivityLog),
     checklists: many(checklists),
+    extensions: many(taskInstanceExtensions),
+  }),
+);
+
+export const taskInstanceExtensionRelations = relations(
+  taskInstanceExtensions,
+  ({ one }) => ({
+    taskInstance: one(taskInstances, {
+      fields: [taskInstanceExtensions.taskInstanceId],
+      references: [taskInstances.id],
+    }),
+    extendedByUser: one(users, {
+      fields: [taskInstanceExtensions.extendedBy],
+      references: [users.id],
+    }),
   }),
 );
 

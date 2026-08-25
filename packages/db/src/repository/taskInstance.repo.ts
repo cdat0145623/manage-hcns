@@ -1,10 +1,15 @@
 /* eslint-disable @typescript-eslint/no-unnecessary-condition */
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import * as rruleModule from "rrule";
 
 import type { dbClient } from "@kan/db/client";
 // eslint-disable-next-line @typescript-eslint/consistent-type-imports
-import { cardActivities, statusTypeEnum, taskInstances } from "@kan/db/schema";
+import {
+  cardActivities,
+  statusTypeEnum,
+  taskInstanceExtensions,
+  taskInstances,
+} from "@kan/db/schema";
 import { generateUID } from "@kan/shared/utils";
 
 import { buildScheduleOnAnchorDay } from "./task-master-schedule";
@@ -46,6 +51,7 @@ export const create = async (
         taskMasterId: taskInstanceInput.taskMasterId,
         targetDate: taskInstanceInput.targetDate,
         actualDate: taskInstanceInput.actualDate,
+        originalEndDate: taskInstanceInput.endDate,
         endDate: taskInstanceInput.endDate,
         status: taskInstanceInput.status,
       })
@@ -55,6 +61,7 @@ export const create = async (
         taskMasterId: taskInstances.taskMasterId,
         targetDate: taskInstances.targetDate,
         actualDate: taskInstances.actualDate,
+        originalEndDate: taskInstances.originalEndDate,
         endDate: taskInstances.endDate,
         status: taskInstances.status,
       });
@@ -177,6 +184,7 @@ export const update = async (
   db: dbClient,
   taskInstanceInput: {
     id: string;
+    expectedStatus: TaskStatus;
     userId: string;
     taskMasterId: string;
     name?: string;
@@ -189,9 +197,27 @@ export const update = async (
   },
 ) => {
   return db.transaction(async (tx) => {
-    const oldTaskInstance = await tx.query.taskInstances.findFirst({
-      where: (t, { eq }) => eq(t.id, taskInstanceInput.id),
+    const currentInstance = await tx.query.taskInstances.findFirst({
+      where: (table, { eq }) => eq(table.id, taskInstanceInput.id),
     });
+    if (!currentInstance) return null;
+
+    const targetDateChanged =
+      taskInstanceInput.targetDate !== undefined &&
+      currentInstance.targetDate?.getTime() !==
+        taskInstanceInput.targetDate.getTime();
+    const endDateChanged =
+      taskInstanceInput.endDate !== undefined &&
+      currentInstance.endDate?.getTime() !==
+        taskInstanceInput.endDate.getTime();
+
+    if (targetDateChanged || endDateChanged) {
+      const extension = await tx.query.taskInstanceExtensions.findFirst({
+        columns: { id: true },
+        where: eq(taskInstanceExtensions.taskInstanceId, taskInstanceInput.id),
+      });
+      if (extension) return null;
+    }
 
     const [taskInstance] = await tx
       .update(taskInstances)
@@ -209,30 +235,38 @@ export const update = async (
           ? { actualDate: taskInstanceInput.actualDate }
           : {}),
         ...(taskInstanceInput.endDate !== undefined
-          ? { endDate: taskInstanceInput.endDate }
+          ? {
+              endDate: taskInstanceInput.endDate,
+              originalEndDate: taskInstanceInput.endDate,
+            }
           : {}),
       })
-      .where(eq(taskInstances.id, taskInstanceInput.id))
+      .where(
+        and(
+          eq(taskInstances.id, taskInstanceInput.id),
+          eq(taskInstances.status, taskInstanceInput.expectedStatus),
+          eq(taskInstances.isDeleted, false),
+        ),
+      )
       .returning({
         id: taskInstances.id,
         userId: taskInstances.userId,
         taskMasterId: taskInstances.taskMasterId,
         targetDate: taskInstances.targetDate,
         actualDate: taskInstances.actualDate,
+        originalEndDate: taskInstances.originalEndDate,
         endDate: taskInstances.endDate,
         status: taskInstances.status,
       });
 
-    if (!taskInstance) {
-      throw new Error("Failed to update task instance");
-    }
+    if (!taskInstance) return null;
 
-    if (oldTaskInstance?.status !== taskInstance.status) {
+    if (taskInstanceInput.expectedStatus !== taskInstance.status) {
       await tx.insert(cardActivities).values({
         publicId: generateUID(),
         taskInstanceId: taskInstance.id,
         type: "status_changed",
-        oldValue: oldTaskInstance?.status,
+        oldValue: taskInstanceInput.expectedStatus,
         newValue: taskInstance.status,
         createdBy: taskInstanceInput.actorUserId,
       });

@@ -1,4 +1,25 @@
 import type { TaskStatus } from "@kan/db/repository/taskInstance.repo";
+import { applyMasterWallTimeToAnchorDay } from "@kan/shared/utils";
+
+export function resolveTaskInstanceEndDate(params: {
+  storedEndDate: Date | null;
+  storedTargetDate: Date;
+  requestedTargetDate: Date | undefined;
+  masterEndDate: Date;
+}): Date {
+  const targetDateIsUnchanged =
+    params.requestedTargetDate === undefined ||
+    params.requestedTargetDate.getTime() === params.storedTargetDate.getTime();
+
+  if (targetDateIsUnchanged && params.storedEndDate) {
+    return params.storedEndDate;
+  }
+
+  return applyMasterWallTimeToAnchorDay(
+    params.requestedTargetDate ?? params.storedTargetDate,
+    params.masterEndDate,
+  );
+}
 
 export function resolveTaskInstanceStatusTransition(params: {
   oldStatus: TaskStatus;
@@ -12,6 +33,10 @@ export function resolveTaskInstanceStatusTransition(params: {
       status: params.oldStatus,
       actualDate: params.currentActualDate,
     };
+  }
+
+  if (params.oldStatus === "missed") {
+    return null;
   }
 
   if (params.requestedStatus === "done") {

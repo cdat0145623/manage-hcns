@@ -40,6 +40,13 @@ type ActivityWithMergedLabels =
       filename: string;
       originalFilename: string;
     } | null;
+    taskInstanceExtension?: {
+      publicId: string;
+      previousEndDate: Date;
+      newEndDate: Date;
+      reason: string;
+      createdAt: Date;
+    } | null;
   };
 
 const truncate = (value: string | null, maxLength = 50) => {
@@ -77,6 +84,7 @@ export const getActivityText = ({
   dateLocale,
   mergedLabels,
   attachmentName,
+  extension,
 }: {
   type: ActivityType;
   toTitle: string | null;
@@ -94,6 +102,7 @@ export const getActivityText = ({
   dateLocale: DateFnsLocale;
   mergedLabels?: string[];
   attachmentName?: string | null;
+  extension?: ActivityWithMergedLabels["taskInstanceExtension"];
 }) => {
   const displayName = memberName ?? memberEmail ?? t`Member`;
   const TextHighlight = ({ children }: { children: React.ReactNode }) => (
@@ -162,10 +171,33 @@ export const getActivityText = ({
     start_date_added: t`added a start date`,
     start_date_changed: t`changed a start date`,
     start_date_removed: t`removed a start date`,
+    deadline_extended: t`gia hạn deadline`,
   } as const;
 
   if (!(type in ACTIVITY_TYPE_MAP)) return null;
   const baseText = ACTIVITY_TYPE_MAP[type as keyof typeof ACTIVITY_TYPE_MAP];
+
+  if (type === "deadline_extended" && extension) {
+    const previousDeadline = formatInAppCalendarZone(
+      extension.previousEndDate,
+      "HH:mm dd/MM/yyyy",
+      { locale: dateLocale },
+    );
+    const newDeadline = formatInAppCalendarZone(
+      extension.newEndDate,
+      "HH:mm dd/MM/yyyy",
+      { locale: dateLocale },
+    );
+
+    return (
+      <>
+        {t`gia hạn deadline từ`}{" "}
+        <TextHighlight>{previousDeadline}</TextHighlight> {t`đến`}{" "}
+        <TextHighlight>{newDeadline}</TextHighlight>. {t`Lý do`}:{" "}
+        <TextHighlight>{extension.reason}</TextHighlight>
+      </>
+    );
+  }
 
   if (type === "updated_title" && toTitle) {
     return (
@@ -396,6 +428,7 @@ const ACTIVITY_ICON_MAP: Partial<Record<ActivityType, React.ReactNode | null>> =
     deadline_changed: <HiOutlineClock />,
     deadline_added: <HiOutlineClock />,
     deadline_removed: <HiOutlineClock />,
+    deadline_extended: <HiOutlineClock />,
     start_date_changed: <HiOutlineClock />,
     start_date_added: <HiOutlineClock />,
     start_date_removed: <HiOutlineClock />,
@@ -694,6 +727,7 @@ const ActivityList = ({
           )
           .map((activity, index) => {
             const createdAt = toValidDate(activity.createdAt);
+            const extendedActivity = activity as ActivityWithMergedLabels;
             const activityText = getActivityText({
               type: activity.type,
               toTitle: activity.toTitle,
@@ -709,10 +743,10 @@ const ActivityList = ({
               oldValue: activity.oldValue ?? null,
               newValue: activity.newValue ?? null,
               dateLocale: dateLocale,
-              mergedLabels: (activity as ActivityWithMergedLabels).mergedLabels,
+              mergedLabels: extendedActivity.mergedLabels,
               attachmentName:
-                (activity as ActivityWithMergedLabels).attachment
-                  ?.originalFilename ?? null,
+                extendedActivity.attachment?.originalFilename ?? null,
+              extension: extendedActivity.taskInstanceExtension,
             });
 
             if (

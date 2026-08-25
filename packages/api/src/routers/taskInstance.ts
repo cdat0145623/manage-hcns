@@ -8,6 +8,7 @@ import * as cardActivityRepo from "@kan/db/repository/cardActivity.repo";
 import * as cardCommentRepo from "@kan/db/repository/cardComment.repo";
 import * as rewardRepo from "@kan/db/repository/reward.repo";
 import * as taskInstanceRepo from "@kan/db/repository/taskInstance.repo";
+import * as taskInstanceStatusRepo from "@kan/db/repository/taskInstanceStatus.repo";
 import * as taskMasterRepo from "@kan/db/repository/taskMaster.repo";
 import * as userRepo from "@kan/db/repository/user.repo";
 import { statusTypeEnum } from "@kan/db/schema";
@@ -21,7 +22,10 @@ import {
 } from "../utils/rewardViolation";
 import { getTaskInstanceUpdateAuthorization } from "../utils/task-instance-authorization";
 import { mergeStoredAndVirtualTaskInstances } from "../utils/task-instance-calendar";
-import { resolveTaskInstanceStatusTransition } from "../utils/taskInstanceStatusTransition";
+import {
+  resolveTaskInstanceEndDate,
+  resolveTaskInstanceStatusTransition,
+} from "../utils/taskInstanceStatusTransition";
 
 const { RRule } = rrule;
 
@@ -174,6 +178,22 @@ export const taskInstanceRouter = createTRPCRouter({
         throw new TRPCError({
           message: "Task instance not found",
           code: "NOT_FOUND",
+        });
+      }
+
+      const currentUser = await userRepo.getById(ctx.db, userId);
+      const taskMaster = await ctx.db.query.taskMasters.findFirst({
+        columns: { createdBy: true },
+        where: (table, { eq }) => eq(table.id, taskInstance.taskMasterId),
+      });
+      const canView =
+        currentUser?.role === "ADMIN" ||
+        taskInstance.userId === userId ||
+        taskMaster?.createdBy === userId;
+      if (!canView) {
+        throw new TRPCError({
+          message: "User not authorized to view this task instance",
+          code: "FORBIDDEN",
         });
       }
 
@@ -424,6 +444,106 @@ export const taskInstanceRouter = createTRPCRouter({
         virtualInstances,
       });
     }),
+  extendMissed: protectedProcedure
+    .meta({
+      openapi: {
+        summary: "Extend and reopen a missed task instance",
+        method: "POST",
+        path: "/task-instance/{id}/extend-missed",
+        description: "Allows an administrator to extend a missed task",
+        tags: ["taskInstance"],
+        protect: true,
+      },
+    })
+    .input(
+      z.object({
+        id: z.string().uuid(),
+        newEndDate: z.date(),
+        reason: z.string().trim().min(1).max(500),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const userId = ctx.user?.id;
+      if (!userId) {
+        throw new TRPCError({
+          message: "User not authenticated",
+          code: "UNAUTHORIZED",
+        });
+      }
+
+      const currentUser = await userRepo.getById(ctx.db, userId);
+      if (!currentUser) {
+        throw new TRPCError({
+          message: "User not found",
+          code: "NOT_FOUND",
+        });
+      }
+      if (currentUser.role !== "ADMIN") {
+        throw new TRPCError({
+          message: "Only administrators can extend missed tasks",
+          code: "FORBIDDEN",
+        });
+      }
+
+      const now = new Date();
+      if (input.newEndDate.getTime() <= now.getTime()) {
+        throw new TRPCError({
+          message: "The new deadline must be in the future",
+          code: "BAD_REQUEST",
+        });
+      }
+
+      const currentInstance = await ctx.db.query.taskInstances.findFirst({
+        where: (table, { eq }) => eq(table.id, input.id),
+      });
+      if (!currentInstance || currentInstance.isDeleted) {
+        throw new TRPCError({
+          message: "Task instance not found",
+          code: "NOT_FOUND",
+        });
+      }
+      if (currentInstance.status !== "missed") {
+        throw new TRPCError({
+          message: "Task instance is no longer missed",
+          code: "CONFLICT",
+        });
+      }
+
+      const extensionResult =
+        await taskInstanceStatusRepo.extendMissedTaskInstance(ctx.db, {
+          taskInstanceId: input.id,
+          newEndDate: input.newEndDate,
+          reason: input.reason,
+          actorUserId: userId,
+          now,
+        });
+
+      if (!extensionResult) {
+        throw new TRPCError({
+          message: "Task instance was updated elsewhere",
+          code: "CONFLICT",
+        });
+      }
+
+      await trackTaskInstanceRewardViolations({
+        db: ctx.db,
+        taskInstanceId: input.id,
+        newDueDate: extensionResult.instance.endDate,
+      });
+
+      return {
+        status: extensionResult.instance.status,
+        endDate: extensionResult.instance.endDate,
+        actualDate: extensionResult.instance.actualDate,
+        extension: {
+          publicId: extensionResult.extension.publicId,
+          previousEndDate: extensionResult.extension.previousEndDate,
+          newEndDate: extensionResult.extension.newEndDate,
+          reason: extensionResult.extension.reason,
+          extendedAt: extensionResult.extension.createdAt,
+        },
+      };
+    }),
   update: protectedProcedure
     .meta({
       openapi: {
@@ -525,21 +645,25 @@ export const taskInstanceRouter = createTRPCRouter({
         });
       }
 
-      const anchor = targetDate ?? oldTaskInstance.targetDate;
-      if (!anchor) {
+      const storedTargetDate = targetDate ?? oldTaskInstance.targetDate;
+      if (!storedTargetDate) {
         throw new TRPCError({
-          message: `Task instance start date is required`,
+          message: "Task instance start date is required",
           code: "BAD_REQUEST",
         });
       }
-      const instanceEndDate = applyMasterWallTimeToAnchorDay(
-        anchor,
-        taskMaster.endDate,
-      );
+
+      const instanceEndDate = resolveTaskInstanceEndDate({
+        storedEndDate: oldTaskInstance.endDate,
+        storedTargetDate,
+        requestedTargetDate: targetDate,
+        masterEndDate: taskMaster.endDate,
+      });
       // Giữ nguyên userId gắn với instance (slot / assignee theo unique index),
       // không ghi đè bằng ctx.user — tránh false "assignee_changed" và sai reward.
       const newTaskInstance = await taskInstanceRepo.update(ctx.db, {
         id,
+        expectedStatus: oldTaskInstance.status,
         userId: oldTaskInstance.userId,
         taskMasterId,
         name,
@@ -550,6 +674,13 @@ export const taskInstanceRouter = createTRPCRouter({
         status: resolvedTransition.status,
         actorUserId: userId,
       });
+
+      if (!newTaskInstance) {
+        throw new TRPCError({
+          message: "Task instance was updated elsewhere",
+          code: "CONFLICT",
+        });
+      }
 
       // ---- Reward Triggers ----
       // 1. Violation Check (End Date, Target Date, or Assignee changed)
@@ -753,6 +884,24 @@ export const taskInstanceRouter = createTRPCRouter({
     .query(async ({ ctx, input }) => {
       const userId = ctx.user?.id;
       if (!userId) throw new TRPCError({ code: "UNAUTHORIZED" });
+
+      const [currentUser, taskInstance] = await Promise.all([
+        userRepo.getById(ctx.db, userId),
+        ctx.db.query.taskInstances.findFirst({
+          columns: { userId: true, taskMasterId: true },
+          where: (table, { eq }) => eq(table.id, input.id),
+          with: {
+            taskMaster: { columns: { createdBy: true } },
+          },
+        }),
+      ]);
+
+      if (!taskInstance) throw new TRPCError({ code: "NOT_FOUND" });
+      const canView =
+        currentUser?.role === "ADMIN" ||
+        taskInstance.userId === userId ||
+        taskInstance.taskMaster.createdBy === userId;
+      if (!canView) throw new TRPCError({ code: "FORBIDDEN" });
 
       return await cardActivityRepo.getPaginatedActivitiesForTaskInstance(
         ctx.db,

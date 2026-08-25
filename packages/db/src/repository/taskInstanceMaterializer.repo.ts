@@ -1,8 +1,8 @@
 import { and, eq } from "drizzle-orm";
 
 import type { dbClient } from "@kan/db/client";
-import { cardActivities, taskInstances } from "@kan/db/schema";
 import type { taskMasters } from "@kan/db/schema";
+import { cardActivities, taskInstances } from "@kan/db/schema";
 import { createLogger } from "@kan/logger";
 import {
   calendarDateKeyInAppZone,
@@ -147,6 +147,7 @@ export async function materializeTaskInstances(
               description: master.description,
               targetDate: occurrence.targetDate,
               actualDate: null,
+              originalEndDate: occurrence.endDate,
               endDate: occurrence.endDate,
               status: "pending" as TaskStatus,
             })

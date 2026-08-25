@@ -11,7 +11,11 @@ import {
 } from "drizzle-orm";
 
 import type { dbClient } from "@kan/db/client";
-import { cardActivities, taskInstances } from "@kan/db/schema";
+import {
+  cardActivities,
+  taskInstanceExtensions,
+  taskInstances,
+} from "@kan/db/schema";
 import { generateUID } from "@kan/shared/utils";
 
 export interface MarkOverdueTaskInstancesOptions {
@@ -38,6 +42,96 @@ export interface BackfillTaskInstanceActualDatesResult {
   matched: number;
   updated: number;
   skippedNoActivity: number;
+}
+
+export interface ExtendMissedTaskInstanceOptions {
+  taskInstanceId: string;
+  newEndDate: Date;
+  reason: string;
+  actorUserId: string;
+  now: Date;
+}
+
+export async function extendMissedTaskInstance(
+  db: dbClient,
+  options: ExtendMissedTaskInstanceOptions,
+) {
+  return db.transaction(async (tx) => {
+    const currentInstance = await tx.query.taskInstances.findFirst({
+      where: (table, { eq }) => eq(table.id, options.taskInstanceId),
+    });
+
+    if (!currentInstance) return null;
+
+    const [updatedInstance] = await tx
+      .update(taskInstances)
+      .set({
+        status: "pending",
+        endDate: options.newEndDate,
+        actualDate: null,
+        updatedAt: options.now,
+      })
+      .where(
+        and(
+          eq(taskInstances.id, options.taskInstanceId),
+          eq(taskInstances.status, "missed"),
+          eq(taskInstances.isDeleted, false),
+        ),
+      )
+      .returning({
+        id: taskInstances.id,
+        actualDate: taskInstances.actualDate,
+        endDate: taskInstances.endDate,
+        status: taskInstances.status,
+      });
+
+    if (!updatedInstance) return null;
+
+    if (!currentInstance.endDate) {
+      throw new Error("Cannot extend a task instance without a deadline");
+    }
+
+    const [extension] = await tx
+      .insert(taskInstanceExtensions)
+      .values({
+        publicId: generateUID(),
+        taskInstanceId: updatedInstance.id,
+        previousEndDate: currentInstance.endDate,
+        newEndDate: options.newEndDate,
+        reason: options.reason,
+        extendedBy: options.actorUserId,
+        createdAt: options.now,
+      })
+      .returning();
+
+    if (!extension) {
+      throw new Error("Failed to create task instance extension history");
+    }
+
+    await tx.insert(cardActivities).values([
+      {
+        publicId: generateUID(),
+        taskInstanceId: updatedInstance.id,
+        taskInstanceExtensionId: extension.id,
+        type: "deadline_extended",
+        fromDueDate: currentInstance.endDate,
+        toDueDate: options.newEndDate,
+        createdBy: options.actorUserId,
+        createdAt: options.now,
+      },
+      {
+        publicId: generateUID(),
+        taskInstanceId: updatedInstance.id,
+        type: "status_changed",
+        oldValue: "missed",
+        newValue: "pending",
+        createdBy: options.actorUserId,
+        createdAt: options.now,
+      },
+    ]);
+
+    return { instance: updatedInstance, extension };
+  });
 }
 
 export async function markOverdueTaskInstancesMissed(

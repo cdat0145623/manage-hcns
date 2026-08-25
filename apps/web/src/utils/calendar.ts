@@ -98,6 +98,32 @@ export const isSameAppCalendarMonth = (
   formatInAppCalendarZone(first, "yyyy-MM") ===
   formatInAppCalendarZone(second, "yyyy-MM");
 
+export function formatCalendarDeadline(deadline: Date, taskDate: Date): string {
+  if (!isSameAppCalendarDay(deadline, taskDate)) {
+    const sameYear =
+      formatInAppCalendarZone(deadline, "yyyy") ===
+      formatInAppCalendarZone(taskDate, "yyyy");
+    return formatInAppCalendarZone(
+      deadline,
+      sameYear ? "dd/MM, HH:mm" : "dd/MM/yyyy, HH:mm",
+    );
+  }
+
+  return formatInAppCalendarZone(deadline, "HH:mm");
+}
+
+export function getCalendarTaskDuration(
+  startDate: Date,
+  currentEndDate: Date,
+  originalEndDate?: Date,
+): number {
+  const displayEndDate = originalEndDate ?? currentEndDate;
+  const duration = Math.floor(
+    (displayEndDate.getTime() - startDate.getTime()) / 60_000,
+  );
+  return Number.isFinite(duration) && duration >= 0 ? duration : 60;
+}
+
 export interface OverlapInfo {
   totalOverlap: number;
   overlapIndex: number;

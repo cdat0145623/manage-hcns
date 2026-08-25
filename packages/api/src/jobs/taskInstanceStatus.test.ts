@@ -11,9 +11,12 @@ import {
 } from "vitest";
 
 import type { dbClient } from "@kan/db/client";
+import { getPaginatedActivitiesForTaskInstance } from "@kan/db/repository/cardActivity.repo";
 import { getCalendarMetrics } from "@kan/db/repository/dashboard.repo";
+import { update as updateTaskInstance } from "@kan/db/repository/taskInstance.repo";
 import {
   backfillTaskInstanceActualDates,
+  extendMissedTaskInstance,
   markOverdueTaskInstancesMissed,
 } from "@kan/db/repository/taskInstanceStatus.repo";
 import {
@@ -97,14 +100,286 @@ async function seedTaskInstance(params: {
     taskMasterId,
     name: "Phase 2 test task",
     targetDate: params.targetDate,
+    originalEndDate: params.endDate,
     endDate: params.endDate,
     actualDate: params.actualDate,
     status: params.status,
     isDeleted: params.isDeleted ?? false,
   });
 
-  return { taskInstanceId };
+  return { taskInstanceId, taskMasterId, userId };
 }
+
+describe("extendMissedTaskInstance", () => {
+  it("reopens a missed instance and records the admin extension audit", async () => {
+    const originalEndDate = new Date("2026-08-17T02:00:00.000Z");
+    const extendedEndDate = new Date("2026-08-18T02:00:00.000Z");
+    const now = new Date("2026-08-17T03:00:00.000Z");
+    const { taskInstanceId, userId } = await seedTaskInstance({
+      status: "missed",
+      targetDate: new Date("2026-08-17T01:00:00.000Z"),
+      endDate: originalEndDate,
+    });
+
+    const result = await extendMissedTaskInstance(db, {
+      taskInstanceId,
+      newEndDate: extendedEndDate,
+      reason: "Nhân viên nghỉ phép",
+      actorUserId: userId,
+      now,
+    });
+
+    const activities = await db.query.cardActivities.findMany({
+      where: (table, { eq }) => eq(table.taskInstanceId, taskInstanceId),
+    });
+    const extensions = await db.query.taskInstanceExtensions.findMany({
+      where: (table, { eq }) => eq(table.taskInstanceId, taskInstanceId),
+    });
+    const activityPage = await getPaginatedActivitiesForTaskInstance(
+      db,
+      taskInstanceId,
+    );
+
+    expect(result).toMatchObject({
+      instance: {
+        status: "pending",
+        endDate: extendedEndDate,
+        actualDate: null,
+      },
+      extension: {
+        previousEndDate: originalEndDate,
+        newEndDate: extendedEndDate,
+        reason: "Nhân viên nghỉ phép",
+        extendedBy: userId,
+        createdAt: now,
+      },
+    });
+    expect(result?.extension.publicId).toHaveLength(12);
+    expect(activities).toHaveLength(2);
+    expect(extensions).toHaveLength(1);
+
+    const deadlineExtendedActivity = activities.find(
+      (activity) => String(activity.type) === "deadline_extended",
+    );
+    const statusChangedActivity = activities.find(
+      (activity) => activity.type === "status_changed",
+    );
+
+    expect(deadlineExtendedActivity).toMatchObject({
+      fromDueDate: originalEndDate,
+      toDueDate: extendedEndDate,
+      createdBy: userId,
+      metadata: null,
+    });
+    expect(statusChangedActivity).toMatchObject({
+      type: "status_changed",
+      oldValue: "missed",
+      newValue: "pending",
+      createdBy: userId,
+      metadata: null,
+    });
+    const extensionActivity = activityPage.activities.find(
+      (activity) => String(activity.type) === "deadline_extended",
+    );
+    expect(extensionActivity?.taskInstanceExtension).toMatchObject({
+      previousEndDate: originalEndDate,
+      newEndDate: extendedEndDate,
+      reason: "Nhân viên nghỉ phép",
+      createdAt: now,
+    });
+    expect(extensionActivity?.taskInstanceExtension?.publicId).toHaveLength(12);
+    expect(extensionActivity?.taskInstanceExtension).not.toHaveProperty("id");
+  });
+
+  it("allows only one extension when two requests target the same missed instance", async () => {
+    const { taskInstanceId, userId } = await seedTaskInstance({
+      status: "missed",
+      targetDate: new Date("2026-08-17T01:00:00.000Z"),
+      endDate: new Date("2026-08-17T02:00:00.000Z"),
+    });
+
+    const options = {
+      taskInstanceId,
+      newEndDate: new Date("2026-08-18T02:00:00.000Z"),
+      reason: "Nhân viên nghỉ phép",
+      actorUserId: userId,
+      now: new Date("2026-08-17T03:00:00.000Z"),
+    };
+
+    const firstResult = await extendMissedTaskInstance(db, options);
+    const secondResult = await extendMissedTaskInstance(db, options);
+
+    const activities = await db.query.cardActivities.findMany({
+      where: (table, { eq }) => eq(table.taskInstanceId, taskInstanceId),
+    });
+
+    expect(firstResult?.instance.status).toBe("pending");
+    expect(secondResult).toBeNull();
+    expect(activities).toHaveLength(2);
+  });
+
+  it("records a second extension after the reopened instance becomes missed again", async () => {
+    const firstDeadline = new Date("2026-08-17T02:00:00.000Z");
+    const secondDeadline = new Date("2026-08-18T02:00:00.000Z");
+    const thirdDeadline = new Date("2026-08-19T02:00:00.000Z");
+    const { taskInstanceId, userId } = await seedTaskInstance({
+      status: "missed",
+      targetDate: new Date("2026-08-17T01:00:00.000Z"),
+      endDate: firstDeadline,
+    });
+
+    await extendMissedTaskInstance(db, {
+      taskInstanceId,
+      newEndDate: secondDeadline,
+      reason: "Gia hạn lần một",
+      actorUserId: userId,
+      now: new Date("2026-08-17T03:00:00.000Z"),
+    });
+    await markOverdueTaskInstancesMissed(db, {
+      taskInstanceId,
+      now: new Date("2026-08-18T03:00:00.000Z"),
+    });
+    const secondExtension = await extendMissedTaskInstance(db, {
+      taskInstanceId,
+      newEndDate: thirdDeadline,
+      reason: "Gia hạn lần hai",
+      actorUserId: userId,
+      now: new Date("2026-08-18T04:00:00.000Z"),
+    });
+
+    const extensions = await db.query.taskInstanceExtensions.findMany({
+      where: (table, { eq }) => eq(table.taskInstanceId, taskInstanceId),
+      orderBy: (table, { asc }) => asc(table.createdAt),
+    });
+
+    expect(secondExtension?.instance).toMatchObject({
+      status: "pending",
+      endDate: thirdDeadline,
+    });
+    expect(extensions).toMatchObject([
+      {
+        previousEndDate: firstDeadline,
+        newEndDate: secondDeadline,
+        reason: "Gia hạn lần một",
+      },
+      {
+        previousEndDate: secondDeadline,
+        newEndDate: thirdDeadline,
+        reason: "Gia hạn lần hai",
+      },
+    ]);
+  });
+
+  it("rejects a stale generic edit after an admin extension wins the race", async () => {
+    const originalEndDate = new Date("2026-08-17T02:00:00.000Z");
+    const extendedEndDate = new Date("2026-08-18T02:00:00.000Z");
+    const { taskInstanceId, taskMasterId, userId } = await seedTaskInstance({
+      status: "missed",
+      targetDate: new Date("2026-08-17T01:00:00.000Z"),
+      endDate: originalEndDate,
+    });
+
+    await extendMissedTaskInstance(db, {
+      taskInstanceId,
+      newEndDate: extendedEndDate,
+      reason: "Nhân viên nghỉ phép",
+      actorUserId: userId,
+      now: new Date("2026-08-17T03:00:00.000Z"),
+    });
+
+    const staleUpdate = await updateTaskInstance(db, {
+      id: taskInstanceId,
+      expectedStatus: "missed",
+      userId,
+      taskMasterId,
+      description: "Stale description edit",
+      endDate: originalEndDate,
+      status: "missed",
+      actorUserId: userId,
+    });
+    const currentInstance = await db.query.taskInstances.findFirst({
+      where: (table, { eq }) => eq(table.id, taskInstanceId),
+    });
+
+    expect(staleUpdate).toBeNull();
+    expect(currentInstance).toMatchObject({
+      status: "pending",
+      endDate: extendedEndDate,
+    });
+  });
+
+  it("does not let a generic edit replace an established extension deadline", async () => {
+    const originalTargetDate = new Date("2026-08-17T01:00:00.000Z");
+    const originalEndDate = new Date("2026-08-17T02:00:00.000Z");
+    const extendedEndDate = new Date("2026-08-18T02:00:00.000Z");
+    const { taskInstanceId, taskMasterId, userId } = await seedTaskInstance({
+      status: "missed",
+      targetDate: originalTargetDate,
+      endDate: originalEndDate,
+    });
+
+    await extendMissedTaskInstance(db, {
+      taskInstanceId,
+      newEndDate: extendedEndDate,
+      reason: "Nghỉ phép",
+      actorUserId: userId,
+      now: new Date("2026-08-17T03:00:00.000Z"),
+    });
+    const genericUpdate = await updateTaskInstance(db, {
+      id: taskInstanceId,
+      expectedStatus: "pending",
+      userId,
+      taskMasterId,
+      targetDate: new Date("2026-08-17T04:00:00.000Z"),
+      endDate: new Date("2026-08-17T05:00:00.000Z"),
+      status: "pending",
+      actorUserId: userId,
+    });
+    const currentInstance = await db.query.taskInstances.findFirst({
+      where: (table, { eq }) => eq(table.id, taskInstanceId),
+    });
+
+    expect(genericUpdate).toBeNull();
+    expect(currentInstance).toMatchObject({
+      targetDate: originalTargetDate,
+      originalEndDate,
+      endDate: extendedEndDate,
+    });
+  });
+
+  it("marks an extended instance missed only after its new deadline", async () => {
+    const extendedEndDate = new Date("2026-08-18T02:00:00.000Z");
+    const { taskInstanceId, userId } = await seedTaskInstance({
+      status: "missed",
+      targetDate: new Date("2026-08-17T01:00:00.000Z"),
+      endDate: new Date("2026-08-17T02:00:00.000Z"),
+    });
+
+    await extendMissedTaskInstance(db, {
+      taskInstanceId,
+      newEndDate: extendedEndDate,
+      reason: "Nhân viên nghỉ phép",
+      actorUserId: userId,
+      now: new Date("2026-08-17T03:00:00.000Z"),
+    });
+
+    const atDeadline = await markOverdueTaskInstancesMissed(db, {
+      taskInstanceId,
+      now: extendedEndDate,
+    });
+    const afterDeadline = await markOverdueTaskInstancesMissed(db, {
+      taskInstanceId,
+      now: new Date("2026-08-18T02:00:01.000Z"),
+    });
+    const currentInstance = await db.query.taskInstances.findFirst({
+      where: (table, { eq }) => eq(table.id, taskInstanceId),
+    });
+
+    expect(atDeadline).toEqual({ matched: 0, updated: 0 });
+    expect(afterDeadline).toEqual({ matched: 1, updated: 1 });
+    expect(currentInstance?.status).toBe("missed");
+  });
+});
 
 describe("markOverdueTaskInstancesMissed", () => {
   it("marks a pending instance missed only after endDate and logs one scheduler activity", async () => {

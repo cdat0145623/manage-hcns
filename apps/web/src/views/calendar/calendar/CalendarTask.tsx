@@ -1,10 +1,12 @@
 import type { DraggableProvided } from "react-beautiful-dnd";
+import { t } from "@lingui/macro";
 import { motion } from "framer-motion";
 import { Draggable } from "react-beautiful-dnd";
 
 import { formatInAppCalendarZone } from "@kan/shared/utils";
 
 import type { CalendarEntry } from "~/hooks/useRecurrence";
+import { formatCalendarDeadline } from "~/utils/calendar";
 import LoadingSpinner from "~/components/LoadingSpinner";
 
 interface CalendarTaskProps {
@@ -110,6 +112,12 @@ export function CalendarTask({
   const isVirtual = entry.type === "VIRTUAL";
   const status = entry.status ?? "pending";
   const colors = isVirtual ? VIRTUAL_COLORS[status] : STATUS_COLORS[status];
+  const isExtended =
+    !isVirtual &&
+    entry.originalEndDate.getTime() !== new Date(entry.endDate).getTime();
+  const currentDeadlineLabel = isExtended
+    ? formatCalendarDeadline(new Date(entry.endDate), new Date(entry.date))
+    : null;
 
   // Calculate position if needed
   const getPositionStyle = () => {
@@ -215,6 +223,11 @@ export function CalendarTask({
             <span className="shrink-0 text-[10px] font-black opacity-50">
               {formatInAppCalendarZone(entry.date, "H:mm")}
             </span>
+            {isExtended && currentDeadlineLabel ? (
+              <span className="shrink-0 rounded-full bg-amber-100 px-1.5 py-0.5 text-[9px] font-bold text-amber-800 dark:bg-amber-900/40 dark:text-amber-200">
+                {t`Đã gia hạn · Hạn mới:`} {currentDeadlineLabel}
+              </span>
+            ) : null}
           </div>
         ) : (
           <div
@@ -227,8 +240,13 @@ export function CalendarTask({
               <span className="block whitespace-nowrap text-[10px] font-bold">
                 {entry.isCreating ? <LoadingSpinner size="sm" /> : null}
                 {formatInAppCalendarZone(entry.date, "H:mm")} -{" "}
-                {formatInAppCalendarZone(entry.endDate, "H:mm")}
+                {formatInAppCalendarZone(entry.originalEndDate, "H:mm")}
               </span>
+              {isExtended && currentDeadlineLabel ? (
+                <span className="whitespace-nowrap text-[10px] font-bold text-amber-800 dark:text-amber-200">
+                  {t`Đã gia hạn · Hạn mới:`} {currentDeadlineLabel}
+                </span>
+              ) : null}
             </div>
           </div>
         )}

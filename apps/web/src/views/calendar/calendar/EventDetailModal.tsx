@@ -3,8 +3,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useMemo, useState } from "react";
 import { HiMiniPlus, HiXMark } from "react-icons/hi2";
 
-import { buildInstantFromAppCalendarDayAndTime } from "@kan/shared/utils";
-
+import { formatInAppCalendarZone } from "@kan/shared/utils";
 import type { EditableEntry } from "./CreateEventModal";
 import type { WorkspaceMember } from "~/components/Editor";
 import Editor from "~/components/Editor";
@@ -25,7 +24,11 @@ import { NewChecklistForm } from "../../card/components/NewChecklistForm";
 import NewCommentForm from "../../card/components/NewCommentForm";
 import { getOptimisticTaskStatus } from "./task-instance-optimistic-status";
 import { classifyTaskInstanceUpdateError } from "./task-instance-update-error";
-import { canUpdateTaskStatus } from "./task-status-availability";
+import {
+  canExtendMissedTask,
+  canUpdateTaskStatus,
+} from "./task-status-availability";
+import { TaskInstanceExtensionModal } from "./TaskInstanceExtensionModal";
 
 interface EventDetailModalProps {
   isVisible: boolean;
@@ -177,6 +180,7 @@ export function EventDetailModal({
     openModal,
   } = useModal();
   const [isUpdating, setIsUpdating] = useState(false);
+  const [isExtensionModalOpen, setIsExtensionModalOpen] = useState(false);
   const [optimisticStatus, setOptimisticStatus] = useState<TaskStatus | null>(
     null,
   );
@@ -244,16 +248,17 @@ export function EventDetailModal({
   }, [entry?.type, entry?.id, activeTab]);
 
   const { data: currentUser } = api.user.getUser.useQuery();
+  const isAdmin = currentUser?.role === "ADMIN";
 
   const canEdit =
     entry?.createdBy === session?.user?.id ||
     entry?.selectedUserId === session?.user?.id ||
-    currentUser?.role === "ADMIN";
+    isAdmin;
 
   const canComment =
     entry?.createdBy === session?.user?.id ||
     entry?.selectedUserId === session?.user?.id ||
-    currentUser?.role === "ADMIN";
+    isAdmin;
 
   const updateInstance = api.taskInstance.update.useMutation({
     onMutate: async (variables) => {
@@ -360,6 +365,66 @@ export function EventDetailModal({
     },
   });
 
+  const extendMissedInstance = api.taskInstance.extendMissed.useMutation({
+    onSuccess: async (_data, variables) => {
+      setIsExtensionModalOpen(false);
+      void utils.taskInstance.getVirtual.invalidate();
+      await Promise.all([
+        utils.taskInstance.byId.refetch({ id: variables.id }),
+        utils.taskInstance.getActivities.invalidate(),
+        utils.reward.getByTaskInstanceId.refetch({
+          taskInstanceId: variables.id,
+        }),
+      ]);
+      showPopup({
+        header: t`Đã gia hạn công việc`,
+        message: t`Công việc đã được mở khóa và chuyển về trạng thái đang chờ.`,
+        icon: "success",
+      });
+    },
+    onError: (error, variables) => {
+      const errorKind = classifyTaskInstanceUpdateError(error);
+      if (errorKind === "conflict" || errorKind === "invalid-transition") {
+        void utils.taskInstance.getVirtual.invalidate();
+        void utils.taskInstance.byId.refetch({ id: variables.id });
+      }
+
+      if (errorKind === "forbidden") {
+        showPopup({
+          header: t`Không thể gia hạn công việc`,
+          message: t`Chỉ Admin mới có quyền gia hạn công việc đã quá hạn.`,
+          icon: "error",
+        });
+        return;
+      }
+
+      if (errorKind === "conflict") {
+        setIsExtensionModalOpen(false);
+        showPopup({
+          header: t`Công việc đã được cập nhật`,
+          message: t`Công việc không còn ở trạng thái quá hạn. Dữ liệu mới nhất đang được tải lại.`,
+          icon: "info",
+        });
+        return;
+      }
+
+      if (errorKind === "invalid-transition") {
+        showPopup({
+          header: t`Deadline không hợp lệ`,
+          message: t`Vui lòng chọn deadline mới ở trong tương lai.`,
+          icon: "error",
+        });
+        return;
+      }
+
+      showPopup({
+        header: t`Không thể gia hạn công việc`,
+        message: t`Đã xảy ra lỗi. Vui lòng thử lại.`,
+        icon: "error",
+      });
+    },
+  });
+
   const handleDescriptionBlur = () => {
     if (description === entry?.description) return;
     if (!canEdit || !entry?.instanceId || !entry?.masterId) return;
@@ -372,9 +437,15 @@ export function EventDetailModal({
     });
   };
 
-  const isBusy = updateInstance.isPending || isUpdating;
+  const isBusy =
+    updateInstance.isPending || extendMissedInstance.isPending || isUpdating;
   const isStatusUpdateAllowed = canUpdateTaskStatus({
     canEdit,
+    isBusy,
+    sessionStatus,
+  });
+  const isMissedExtensionAllowed = canExtendMissedTask({
+    isAdmin,
     isBusy,
     sessionStatus,
   });
@@ -423,13 +494,41 @@ export function EventDetailModal({
   const statusConfig = STATUS_CONFIG[currentStatus];
   const displayChecklists = latestInstance?.checklists ?? entry?.checklists;
 
-  const entryDay = entry?.date ? new Date(entry.date) : new Date();
-  const startDate = entry?.startTime
-    ? buildInstantFromAppCalendarDayAndTime(entryDay, entry.startTime)
-    : entryDay;
-  const endDate = entry?.endTime
-    ? buildInstantFromAppCalendarDayAndTime(entryDay, entry.endTime)
-    : entryDay;
+  const startDate = useMemo(() => {
+    if (latestInstance?.targetDate) {
+      return new Date(latestInstance.targetDate);
+    }
+
+    const date = entry?.date ? new Date(entry.date) : new Date();
+    if (entry?.startTime) {
+      const [hours, minutes] = entry.startTime.split(":");
+      if (hours && minutes) {
+        date.setHours(parseInt(hours, 10), parseInt(minutes, 10), 0, 0);
+      }
+    }
+    return date;
+  }, [entry?.date, entry?.startTime, latestInstance?.targetDate]);
+
+  const endDate = useMemo(() => {
+    if (latestInstance?.endDate) {
+      return new Date(latestInstance.endDate);
+    }
+
+    const date = entry?.date ? new Date(entry.date) : new Date();
+    if (entry?.endTime) {
+      const [hours, minutes] = entry.endTime.split(":");
+      if (hours && minutes) {
+        date.setHours(parseInt(hours, 10), parseInt(minutes, 10), 0, 0);
+      }
+    }
+    return date;
+  }, [entry?.date, entry?.endTime, latestInstance?.endDate]);
+  const originalEndDate = latestInstance?.originalEndDate
+    ? new Date(latestInstance.originalEndDate)
+    : null;
+  const wasExtended =
+    originalEndDate !== null &&
+    originalEndDate.getTime() !== endDate.getTime();
 
   const isInstanceEvent =
     entry?.type === "INSTANCE" && Boolean(entry?.instanceId);
@@ -467,6 +566,8 @@ export function EventDetailModal({
   );
 
   if (!entry) return null;
+  const extensionTaskInstanceId = entry.instanceId;
+  const isMissedStatus = currentStatus === "missed";
 
   return (
     <Modal
@@ -590,7 +691,9 @@ export function EventDetailModal({
 
           <div className="flex flex-1 flex-col overflow-y-auto scrollbar-thin scrollbar-thumb-light-400 dark:scrollbar-thumb-dark-300">
             <div className="grid grid-cols-2 gap-x-6 gap-y-4 px-8 pb-2 pt-1 text-left">
-              <div className="col-span-1 min-w-0 space-y-1.5">
+              <div
+                className={`${isMissedStatus ? "col-span-2" : "col-span-1"} min-w-0 space-y-1.5`}
+              >
                 <div>
                   {entry.assigneeName ? (
                     <div className="flex w-fit items-center gap-1.5 rounded-lg border border-amber-300 bg-amber-100 px-2.5 py-1.5 text-[10px] font-black uppercase tracking-widest text-amber-900 shadow-sm dark:border-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
@@ -617,25 +720,48 @@ export function EventDetailModal({
                 </div>
               </div>
 
-              <div className="col-span-1 min-w-0 space-y-1.5">
+              <div
+                className={`${isMissedStatus ? "col-span-2" : "col-span-1"} min-w-0 space-y-1.5`}
+              >
                 <div>
-                  <button
-                    disabled={!isStatusUpdateAllowed}
-                    aria-busy={isBusy}
-                    onClick={() =>
-                      handleStatusChange(
-                        currentStatus === "done" ? "pending" : "done",
-                      )
-                    }
-                    className={`flex min-h-[34px] w-full items-center gap-2 rounded-xl px-3 text-left text-[13px] font-medium shadow-sm transition-all ${!isStatusUpdateAllowed ? "cursor-not-allowed opacity-50" : statusConfig.activeBg + " " + statusConfig.activeText + " " + statusConfig.activeBorder + " hover:opacity-80"} `}
-                  >
-                    {statusConfig.icon}
-                    {isBusy
-                      ? t`Đang lưu...`
-                      : statusConfig.label === "Done"
-                        ? "Đánh dấu chưa xong"
-                        : "Đánh dấu đã xong"}
-                  </button>
+                  {isMissedStatus ? (
+                    <button
+                      type="button"
+                      disabled={!isMissedExtensionAllowed}
+                      aria-busy={extendMissedInstance.isPending}
+                      onClick={() => setIsExtensionModalOpen(true)}
+                      className={`flex min-h-[34px] w-full items-center gap-2 rounded-xl px-2.5 text-left text-xs font-medium shadow-sm transition-all sm:px-3 sm:text-[13px] ${
+                        isMissedExtensionAllowed
+                          ? `${statusConfig.activeBg} ${statusConfig.activeText} ${statusConfig.activeBorder} hover:opacity-80`
+                          : "cursor-not-allowed border border-rose-200 bg-rose-50 text-rose-700 opacity-70 dark:border-rose-900 dark:bg-rose-950/30 dark:text-rose-300"
+                      }`}
+                    >
+                      <span className="shrink-0">{statusConfig.icon}</span>
+                      <span className="whitespace-nowrap">
+                        {isAdmin
+                          ? t`Gia hạn và mở khóa`
+                          : t`Đã quá hạn — cần Admin gia hạn`}
+                      </span>
+                    </button>
+                  ) : (
+                    <button
+                      disabled={!isStatusUpdateAllowed}
+                      aria-busy={isBusy}
+                      onClick={() =>
+                        handleStatusChange(
+                          currentStatus === "done" ? "pending" : "done",
+                        )
+                      }
+                      className={`flex min-h-[34px] w-full items-center gap-2 rounded-xl px-3 text-left text-[13px] font-medium shadow-sm transition-all ${!isStatusUpdateAllowed ? "cursor-not-allowed opacity-50" : statusConfig.activeBg + " " + statusConfig.activeText + " " + statusConfig.activeBorder + " hover:opacity-80"} `}
+                    >
+                      {statusConfig.icon}
+                      {isBusy
+                        ? t`Đang lưu...`
+                        : statusConfig.label === "Done"
+                          ? "Đánh dấu chưa xong"
+                          : "Đánh dấu đã xong"}
+                    </button>
+                  )}
                 </div>
               </div>
 
@@ -657,6 +783,16 @@ export function EventDetailModal({
                 />
               </div>
             </div>
+
+            {wasExtended && originalEndDate ? (
+              <div className="mx-6 mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200">
+                {t`Deadline gốc`}:{" "}
+                {formatInAppCalendarZone(originalEndDate, "dd/MM/yyyy HH:mm")}
+                {" · "}
+                {t`Deadline hiện hành`}:{" "}
+                {formatInAppCalendarZone(endDate, "dd/MM/yyyy HH:mm")}
+              </div>
+            ) : null}
 
             <div className="mx-6 shrink-0 border-t border-light-200 dark:border-dark-300" />
             <div className="sticky top-0 z-10 shrink-0 bg-light-50/80 px-6 py-2 backdrop-blur-md dark:bg-dark-50/80">
@@ -871,6 +1007,33 @@ export function EventDetailModal({
           checklistPublicId={entityId}
         />
       </Modal>
+
+      {extensionTaskInstanceId ? (
+        <TaskInstanceExtensionModal
+          isVisible={isExtensionModalOpen}
+          taskInstanceId={extensionTaskInstanceId}
+          isSubmitting={extendMissedInstance.isPending}
+          onClose={() => setIsExtensionModalOpen(false)}
+          onSubmit={(newEndDate, reason) => {
+            if (!isMissedExtensionAllowed) {
+              if (sessionStatus === "unavailable") {
+                showPopup({
+                  header: t`Không thể gia hạn công việc`,
+                  message: t`Đang mất kết nối tới máy chủ. Vui lòng thử lại khi kết nối được khôi phục.`,
+                  icon: "info",
+                });
+              }
+              return;
+            }
+
+            extendMissedInstance.mutate({
+              id: extensionTaskInstanceId,
+              newEndDate,
+              reason,
+            });
+          }}
+        />
+      ) : null}
     </Modal>
   );
 }

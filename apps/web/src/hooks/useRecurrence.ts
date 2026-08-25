@@ -1,10 +1,12 @@
-import { differenceInMinutes } from "date-fns";
 import { useMemo } from "react";
 
 import { applyMasterWallTimeToAnchorDay } from "@kan/shared/utils";
 
 import { api } from "~/utils/api";
-import { getAppCalendarMonthRange } from "~/utils/calendar";
+import {
+  getAppCalendarMonthRange,
+  getCalendarTaskDuration,
+} from "~/utils/calendar";
 import { inferCalendarRecurrenceType } from "~/utils/calendarEventSchedule";
 
 export type RecurrenceType =
@@ -45,6 +47,7 @@ export interface CalendarEntry {
   selectedUserId?: string;
   date: Date;
   startDate: Date;
+  originalEndDate: Date;
   endDate: Date;
   status?: "pending" | "done" | "missed";
   color: string;
@@ -100,10 +103,13 @@ export function useRecurrence(
 
       const start = new Date(task.targetDate);
       const end = new Date(task.endDate);
+      const originalEnd = task.originalEndDate
+        ? new Date(task.originalEndDate)
+        : end;
 
       const duration =
         start && end && !isNaN(start.getTime()) && !isNaN(end.getTime())
-          ? differenceInMinutes(end, start)
+          ? getCalendarTaskDuration(start, end, originalEnd)
           : (task.duration ?? 60);
 
       return {
@@ -116,6 +122,7 @@ export function useRecurrence(
         selectedUserId: task.assignee?.id || "",
         date: new Date(task.targetDate),
         startDate: new Date(task.targetDate),
+        originalEndDate: originalEnd,
         endDate: new Date(task.endDate),
         status: currentStatus,
         type: isVirtual ? "VIRTUAL" : "INSTANCE",

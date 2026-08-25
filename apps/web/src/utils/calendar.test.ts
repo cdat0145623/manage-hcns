@@ -5,10 +5,12 @@ import {
   calculateDayHourLayout,
   calculateWeekHourLayout,
   compareCalendarEntriesByTime,
+  formatCalendarDeadline,
   getAppCalendarMonthGridDays,
   getAppCalendarMonthRange,
   getAppCalendarWeekDays,
   getCalendarHour,
+  getCalendarTaskDuration,
   getCurrentTimeTop,
   isSameAppCalendarDay,
 } from "./calendar";
@@ -66,6 +68,7 @@ const createEntry = ({
     date,
     startDate: date,
     endDate: new Date(date.getTime() + duration * 60_000),
+    originalEndDate: new Date(date.getTime() + duration * 60_000),
     color: "#2563eb",
     duration,
     type: "INSTANCE",
@@ -117,6 +120,38 @@ describe("compareCalendarEntriesByTime", () => {
         .sort(compareCalendarEntriesByTime)
         .map((entry) => entry.id),
     ).toEqual(["zero-duration", "thirty-minutes"]);
+  });
+});
+
+describe("extended calendar deadlines", () => {
+  const taskDate = new Date("2026-08-24T10:30:00+07:00");
+
+  it("formats a same-day deadline as time only in the app calendar zone", () => {
+    expect(
+      formatCalendarDeadline(new Date("2026-08-24T17:30:00+07:00"), taskDate),
+    ).toBe("17:30");
+  });
+
+  it("includes the date when an extension crosses into another day", () => {
+    expect(
+      formatCalendarDeadline(new Date("2026-08-25T09:30:00+07:00"), taskDate),
+    ).toBe("25/08, 09:30");
+  });
+
+  it("includes the year when an extension crosses into another year", () => {
+    expect(
+      formatCalendarDeadline(new Date("2027-01-02T09:30:00+07:00"), taskDate),
+    ).toBe("02/01/2027, 09:30");
+  });
+
+  it("uses the original deadline to keep calendar duration bounded", () => {
+    expect(
+      getCalendarTaskDuration(
+        taskDate,
+        new Date("2026-08-25T09:30:00+07:00"),
+        new Date("2026-08-24T11:30:00+07:00"),
+      ),
+    ).toBe(60);
   });
 });
 

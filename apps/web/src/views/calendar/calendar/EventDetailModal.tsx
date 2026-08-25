@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { HiMiniPlus, HiXMark } from "react-icons/hi2";
 
 import { formatInAppCalendarZone } from "@kan/shared/utils";
+
 import type { EditableEntry } from "./CreateEventModal";
 import type { WorkspaceMember } from "~/components/Editor";
 import Editor from "~/components/Editor";
@@ -430,8 +431,8 @@ export function EventDetailModal({
     if (!canEdit || !entry?.instanceId || !entry?.masterId) return;
 
     updateInstance.mutate({
-      id: entry?.instanceId!,
-      taskMasterId: entry?.masterId!,
+      id: entry?.instanceId,
+      taskMasterId: entry?.masterId,
       description: description,
       status: currentStatus,
     });
@@ -527,8 +528,7 @@ export function EventDetailModal({
     ? new Date(latestInstance.originalEndDate)
     : null;
   const wasExtended =
-    originalEndDate !== null &&
-    originalEndDate.getTime() !== endDate.getTime();
+    originalEndDate !== null && originalEndDate.getTime() !== endDate.getTime();
 
   const isInstanceEvent =
     entry?.type === "INSTANCE" && Boolean(entry?.instanceId);
@@ -690,7 +690,9 @@ export function EventDetailModal({
           </div>
 
           <div className="flex flex-1 flex-col overflow-y-auto scrollbar-thin scrollbar-thumb-light-400 dark:scrollbar-thumb-dark-300">
-            <div className="grid grid-cols-2 gap-x-6 gap-y-4 px-8 pb-2 pt-1 text-left">
+            <div
+              className={`grid ${isMissedStatus ? "grid-cols-[minmax(0,1fr)_max-content]" : "grid-cols-2"} gap-x-6 gap-y-4 px-8 pb-2 pt-1 text-left`}
+            >
               <div
                 className={`${isMissedStatus ? "col-span-2" : "col-span-1"} min-w-0 space-y-1.5`}
               >
@@ -720,9 +722,7 @@ export function EventDetailModal({
                 </div>
               </div>
 
-              <div
-                className={`${isMissedStatus ? "col-span-2" : "col-span-1"} min-w-0 space-y-1.5`}
-              >
+              <div className="col-span-1 min-w-0 space-y-1.5">
                 <div>
                   {isMissedStatus ? (
                     <button

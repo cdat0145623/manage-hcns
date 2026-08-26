@@ -13,6 +13,7 @@ import {
 import type { TaskStatus } from "./taskInstance.repo";
 import { cloneMasterRewardTemplateToInstance } from "./reward.repo";
 import { generateVirtualTaskInstances } from "./taskInstance.repo";
+import { loadPenaltySnapshotsForMasters } from "./taskPenaltyPolicy.repo";
 
 const logger = createLogger("task-instance-materializer");
 
@@ -91,6 +92,15 @@ export async function materializeTaskInstances(
     failed: 0,
     errors: [],
   };
+  const penaltySnapshots = await loadPenaltySnapshotsForMasters(
+    db,
+    masters.map((master) => ({
+      id: master.id,
+      priority: master.priority,
+      overrideAmountVnd: master.penaltyOverrideAmountVnd,
+    })),
+    dayStart,
+  );
 
   for (const master of masters) {
     try {
@@ -150,6 +160,14 @@ export async function materializeTaskInstances(
               originalEndDate: occurrence.endDate,
               endDate: occurrence.endDate,
               status: "pending" as TaskStatus,
+              penaltyPriority: penaltySnapshots.get(master.id)?.priority,
+              penaltyAmountVnd: penaltySnapshots.get(master.id)?.amountVnd,
+              penaltySource: penaltySnapshots.get(master.id)?.source,
+              penaltyPolicyPublicId: penaltySnapshots.get(master.id)
+                ?.policyPublicId,
+              penaltySnapshottedAt: penaltySnapshots.get(master.id)
+                ? new Date()
+                : null,
             })
             .onConflictDoNothing({
               target: [

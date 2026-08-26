@@ -2,7 +2,9 @@ import { relations, sql } from "drizzle-orm";
 import {
   bigint,
   boolean,
+  check,
   index,
+  integer,
   pgEnum,
   pgTable,
   text,
@@ -21,6 +23,20 @@ export const statusTypeEnum = pgEnum("statusType", [
   "done",
   "missed",
 ]);
+export const taskPenaltyPriorityEnum = pgEnum("task_penalty_priority", [
+  "high",
+  "medium",
+  "low",
+]);
+export const taskPenaltySourceEnum = pgEnum("task_penalty_source", [
+  "system_default",
+  "global_policy",
+  "master_override",
+]);
+export const taskPenaltyAssessmentStatusEnum = pgEnum(
+  "task_penalty_assessment_status",
+  ["active", "voided"],
+);
 export const fileActivityTypeEnum = pgEnum("file_activity_type", [
   "file_uploaded",
   "file_deleted",
@@ -62,6 +78,11 @@ export const taskMasters = pgTable("taskMasters", {
   deletedBy: uuid("deletedBy").references(() => users.id, {
     onDelete: "restrict",
   }),
+  priority: taskPenaltyPriorityEnum("priority"),
+  publicId: varchar("publicId", { length: 12 }).unique(),
+  penaltyOverrideAmountVnd: bigint("penaltyOverrideAmountVnd", {
+    mode: "number",
+  }),
 });
 
 export const taskInstances = pgTable(
@@ -83,6 +104,13 @@ export const taskInstances = pgTable(
     originalEndDate: timestamp("originalEndDate", { withTimezone: true }),
     endDate: timestamp("endDate", { withTimezone: true }),
     status: statusTypeEnum("status").notNull().default("pending"),
+    penaltyPriority: taskPenaltyPriorityEnum("penaltyPriority"),
+    penaltyAmountVnd: bigint("penaltyAmountVnd", { mode: "number" }),
+    penaltySource: taskPenaltySourceEnum("penaltySource"),
+    penaltyPolicyPublicId: varchar("penaltyPolicyPublicId", { length: 12 }),
+    penaltySnapshottedAt: timestamp("penaltySnapshottedAt", {
+      withTimezone: true,
+    }),
     isDeleted: boolean("isDeleted").notNull().default(false),
     createdAt: timestamp("createdAt").notNull().defaultNow(),
     updatedAt: timestamp("updatedAt").notNull().defaultNow(),
@@ -99,6 +127,122 @@ export const taskInstances = pgTable(
       t.status,
       t.isDeleted,
       t.endDate,
+    ),
+    check(
+      "task_instances_penalty_amount_safe_check",
+      sql`${t.penaltyAmountVnd} IS NULL OR (${t.penaltyAmountVnd} >= 0 AND ${t.penaltyAmountVnd} <= 9007199254740991)`,
+    ),
+  ],
+);
+
+export const taskPenaltyPolicies = pgTable(
+  "task_penalty_policies",
+  {
+    id: uuid("id")
+      .primaryKey()
+      .default(sql`uuid_generate_v4()`),
+    publicId: varchar("publicId", { length: 12 }).notNull().unique(),
+    priority: taskPenaltyPriorityEnum("priority").notNull(),
+    amountVnd: bigint("amountVnd", { mode: "number" }).notNull(),
+    source: taskPenaltySourceEnum("source").notNull().default("global_policy"),
+    effectiveFrom: timestamp("effectiveFrom", { withTimezone: true }).notNull(),
+    effectiveTo: timestamp("effectiveTo", { withTimezone: true }),
+    revision: integer("revision").notNull().default(1),
+    supersededAt: timestamp("supersededAt", { withTimezone: true }),
+    supersededBy: uuid("supersededBy").references(() => users.id, {
+      onDelete: "restrict",
+    }),
+    createdBy: uuid("createdBy").references(() => users.id, {
+      onDelete: "restrict",
+    }),
+    createdAt: timestamp("createdAt", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    index("task_penalty_policy_priority_effective_idx").on(
+      t.priority,
+      t.effectiveFrom,
+    ),
+    index("task_penalty_policy_priority_revision_idx").on(
+      t.priority,
+      t.revision,
+    ),
+    check(
+      "task_penalty_policy_amount_safe_check",
+      sql`${t.amountVnd} >= 0 AND ${t.amountVnd} <= 9007199254740991`,
+    ),
+    check(
+      "task_penalty_policy_active_requires_end_check",
+      sql`${t.supersededAt} IS NOT NULL OR ${t.effectiveTo} IS NOT NULL`,
+    ),
+  ],
+);
+
+export const taskMasterPenaltyPolicies = pgTable(
+  "task_master_penalty_policies",
+  {
+    id: uuid("id")
+      .primaryKey()
+      .default(sql`uuid_generate_v4()`),
+    publicId: varchar("publicId", { length: 12 }).notNull().unique(),
+    taskMasterId: uuid("taskMasterId")
+      .notNull()
+      .references(() => taskMasters.id, { onDelete: "restrict" }),
+    priority: taskPenaltyPriorityEnum("priority"),
+    overrideAmountVnd: bigint("overrideAmountVnd", { mode: "number" }),
+    effectiveFrom: timestamp("effectiveFrom", { withTimezone: true }).notNull(),
+    effectiveTo: timestamp("effectiveTo", { withTimezone: true }),
+    createdBy: uuid("createdBy").references(() => users.id, {
+      onDelete: "restrict",
+    }),
+    createdAt: timestamp("createdAt", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    index("task_master_penalty_policy_master_effective_idx").on(
+      t.taskMasterId,
+      t.effectiveFrom,
+    ),
+    check(
+      "task_master_penalty_policy_override_safe_check",
+      sql`${t.overrideAmountVnd} IS NULL OR (${t.overrideAmountVnd} >= 0 AND ${t.overrideAmountVnd} <= 9007199254740991)`,
+    ),
+  ],
+);
+
+export const taskPenaltyAssessments = pgTable(
+  "task_penalty_assessments",
+  {
+    id: uuid("id")
+      .primaryKey()
+      .default(sql`uuid_generate_v4()`),
+    publicId: varchar("publicId", { length: 12 }).notNull().unique(),
+    taskInstanceId: uuid("taskInstanceId")
+      .notNull()
+      .references(() => taskInstances.id, { onDelete: "restrict" })
+      .unique(),
+    amountVnd: bigint("amountVnd", { mode: "number" }).notNull(),
+    currency: varchar("currency", { length: 3 }).notNull().default("VND"),
+    source: taskPenaltySourceEnum("source").notNull(),
+    policyPublicId: varchar("policyPublicId", { length: 12 }),
+    assessedAt: timestamp("assessedAt", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    status: taskPenaltyAssessmentStatusEnum("status")
+      .notNull()
+      .default("active"),
+    voidedAt: timestamp("voidedAt", { withTimezone: true }),
+    updatedAt: timestamp("updatedAt", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    index("task_penalty_assessment_instance_idx").on(t.taskInstanceId),
+    check(
+      "task_penalty_assessment_amount_safe_check",
+      sql`${t.amountVnd} >= 0 AND ${t.amountVnd} <= 9007199254740991`,
     ),
   ],
 );
@@ -189,6 +333,7 @@ export const taskMasterRelations = relations(taskMasters, ({ one, many }) => ({
     relationName: "taskMastersCreatedByUser",
   }),
   instances: many(taskInstances),
+  penaltyPolicies: many(taskMasterPenaltyPolicies),
 }));
 
 export const taskInstanceRelations = relations(
@@ -205,6 +350,37 @@ export const taskInstanceRelations = relations(
     fileActivities: many(fileActivityLog),
     checklists: many(checklists),
     extensions: many(taskInstanceExtensions),
+    penaltyAssessment: one(taskPenaltyAssessments),
+  }),
+);
+
+export const taskPenaltyPolicyRelations = relations(
+  taskPenaltyPolicies,
+  ({ one }) => ({
+    createdByUser: one(users, {
+      fields: [taskPenaltyPolicies.createdBy],
+      references: [users.id],
+    }),
+  }),
+);
+
+export const taskMasterPenaltyPolicyRelations = relations(
+  taskMasterPenaltyPolicies,
+  ({ one }) => ({
+    taskMaster: one(taskMasters, {
+      fields: [taskMasterPenaltyPolicies.taskMasterId],
+      references: [taskMasters.id],
+    }),
+  }),
+);
+
+export const taskPenaltyAssessmentRelations = relations(
+  taskPenaltyAssessments,
+  ({ one }) => ({
+    taskInstance: one(taskInstances, {
+      fields: [taskPenaltyAssessments.taskInstanceId],
+      references: [taskInstances.id],
+    }),
   }),
 );
 

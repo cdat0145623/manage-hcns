@@ -12,16 +12,7 @@ import {
 
 import type { dbClient } from "@kan/db/client";
 import type { ActivityType } from "@kan/db/schema";
-import {
-  cardActivities,
-  cards,
-  checklistItems,
-  checklists,
-  comments,
-  fileActivityLog,
-  labels,
-  lists,
-} from "@kan/db/schema";
+import { cardActivities, cards, comments, lists } from "@kan/db/schema";
 import { generateUID } from "@kan/shared/utils";
 
 export const getCount = async (db: dbClient) => {
@@ -150,7 +141,6 @@ export const bulkCreateForTaskInstance = async (
     commentId?: number;
     fromComment?: string;
     toComment?: string;
-    metadata?: Record<string, unknown>;
   }[],
 ) => {
   const activitiesWithPublicIds = activityInputs.map((activity) => ({
@@ -199,6 +189,7 @@ export const getPaginatedActivities = async (
       toDueDate: true,
       oldValue: true,
       newValue: true,
+      metadata: true,
     },
     where: and(
       eq(cardActivities.cardId, cardId),
@@ -322,6 +313,7 @@ export const getPaginatedActivitiesForTaskInstance = async (
       toDueDate: true,
       oldValue: true,
       newValue: true,
+      metadata: true,
     },
     where: and(
       eq(cardActivities.taskInstanceId, taskInstanceId),

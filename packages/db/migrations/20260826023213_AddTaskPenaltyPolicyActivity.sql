@@ -1,0 +1,1 @@
+ALTER TYPE "public"."card_activity_type" ADD VALUE 'penalty_policy_applied';

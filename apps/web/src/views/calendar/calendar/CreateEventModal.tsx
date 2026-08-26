@@ -2,27 +2,19 @@
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
 /* eslint-disable @typescript-eslint/no-unnecessary-condition */
+import { t } from "@lingui/core/macro";
+import { endOfMonth, format, getDate, getDay, startOfMonth } from "date-fns";
 import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { authClient } from "@kan/auth/client";
-import {
-  formatInAppCalendarZone,
-  generateRRuleString,
-  parseCalendarDayInZone,
-} from "@kan/shared/utils";
+import { generateRRuleString } from "@kan/shared/utils";
 
 import type { WorkspaceMember } from "~/components/Editor";
-import type { RecurrenceType } from "~/hooks/useRecurrence";
+import type { CalendarEntry, RecurrenceType } from "~/hooks/useRecurrence";
 import Editor from "~/components/Editor";
-import LoadingSpinner from "~/components/LoadingSpinner";
 import { usePopup } from "~/providers/popup";
 import { api } from "~/utils/api";
-import { addAppCalendarDays, getAppCalendarMonthRange } from "~/utils/calendar";
-import {
-  buildCalendarEventSchedule,
-  getCalendarEffectiveDate,
-} from "~/utils/calendarEventSchedule";
 import Modal from "../../../components/modal";
 import CardRewardConfigForm from "../../card/components/CardRewardConfigForm";
 
@@ -37,6 +29,7 @@ export interface Attendee {
 export interface EditableEntry {
   id: string;
   masterId?: string;
+  masterPublicId?: string;
   instanceId?: string | null;
   type?: "VIRTUAL" | "INSTANCE";
   status?: "pending" | "done" | "missed";
@@ -56,6 +49,7 @@ export interface EditableEntry {
   attendees?: Attendee[];
   checklists?: any[];
   createdBy?: string;
+  penalty?: CalendarEntry["penalty"];
 }
 
 export interface CreateEventInput {
@@ -69,12 +63,25 @@ export interface CreateEventInput {
   attendees: Attendee[];
 }
 
+type TaskPenaltyPriority = "high" | "medium" | "low";
+type PenaltyAmountMode = "default" | "override";
+
+const parseAppDay = (value: string) => new Date(`${value}T00:00:00+07:00`);
+
+const formatVnd = (amount: number) =>
+  new Intl.NumberFormat("vi-VN", {
+    style: "currency",
+    currency: "VND",
+    maximumFractionDigits: 0,
+  }).format(amount);
+
 interface CreateEventModalProps {
   isVisible: boolean;
   onClose: () => void;
   onSave: (event: CreateEventInput) => void;
   onUpdate?: (id: string, event: CreateEventInput) => void;
   onSuccess?: () => void;
+  onUpdateSuccess?: () => void;
   selectedDate: Date;
   editEntry?: EditableEntry | null;
 }
@@ -105,11 +112,14 @@ const DAY_NAMES = [
 ];
 const NTH_LABELS = ["đầu tiên", "thứ hai", "thứ ba", "thứ tư", "thứ năm"];
 
+function ordinalSuffix(n: number) {
+  if (n >= 11 && n <= 13) return "th";
+  return ["th", "st", "nd", "rd"][n % 10] ?? "th";
+}
+
 function getNthWeekdayLabel(date: Date) {
-  const dayOfMonth = Number(formatInAppCalendarZone(date, "d"));
-  const sundayFirstWeekday = Number(formatInAppCalendarZone(date, "i")) % 7;
-  const nth = Math.ceil(dayOfMonth / 7);
-  return `${NTH_LABELS[nth - 1] ?? "last"} ${DAY_NAMES[sundayFirstWeekday] ?? ""}`;
+  const nth = Math.ceil(getDate(date) / 7);
+  return `${NTH_LABELS[nth - 1] ?? "last"} ${DAY_NAMES[getDay(date)] ?? ""}`;
 }
 
 const AVATAR_COLORS = [
@@ -171,6 +181,7 @@ export function CreateEventModal({
   onSave,
   onUpdate,
   onSuccess: onSuccessProp,
+  onUpdateSuccess,
   selectedDate,
   editEntry,
 }: CreateEventModalProps) {
@@ -180,8 +191,11 @@ export function CreateEventModal({
   const { data: users = [] } = api.user.getAll.useQuery();
   const utils = api.useUtils();
   const { showPopup } = usePopup();
-  const submittedEventRef = useRef<CreateEventInput | null>(null);
-  const submissionInFlightRef = useRef(false);
+  const isAdmin = currentUser?.role === "ADMIN";
+  const { data: penaltySettings } = api.taskPenalty.settings.useQuery(
+    undefined,
+    { enabled: isAdmin && isVisible },
+  );
 
   const filteredUsers = useMemo(() => {
     if (!currentUser) return [];
@@ -202,18 +216,13 @@ export function CreateEventModal({
   }, [users]);
 
   const createTask = api.taskMaster.create.useMutation({
-    onSuccess: async () => {
-      try {
-        await utils.taskInstance.getVirtual.refetch();
-        if (submittedEventRef.current) onSave(submittedEventRef.current);
-        onSuccessProp?.();
-        onClose();
-      } finally {
-        submittedEventRef.current = null;
-        submissionInFlightRef.current = false;
-      }
+    onSuccess: () => {
+      void utils.taskInstance.getVirtual.invalidate();
+      onSuccessProp?.();
+      onClose();
     },
     onError: (error: any) => {
+      console.error("Create failed:", error);
       const isDuplicate =
         error.message?.toLowerCase().includes("unique constraint") ||
         error.message?.toLowerCase().includes("duplicate") ||
@@ -233,37 +242,67 @@ export function CreateEventModal({
           icon: "error",
         });
       }
-      submittedEventRef.current = null;
-      submissionInFlightRef.current = false;
+      void utils.taskInstance.getVirtual.invalidate();
     },
   });
 
+  // const updateTaskInstance = api.taskInstance.update.useMutation({
+  //   onSuccess: () => {
+  //     void utils.taskInstance.getVirtual.invalidate();
+  //     onSuccessProp?.();
+  //     onClose();
+  //   },
+  //   onError: (error: any) => {
+  //     console.error("Update failed:", error);
+  //     showPopup({
+  //       header: "Error",
+  //       message: error.message || "Unable to update task.",
+  //       icon: "error",
+  //     });
+  //     void utils.taskInstance.getVirtual.invalidate();
+  //   },
+  // });
+
   const updateTask = api.taskMaster.update.useMutation({
     onSuccess: async () => {
-      try {
-        await utils.taskInstance.getVirtual.refetch();
-        if (submittedEventRef.current && editEntry) {
-          onUpdate?.(editEntry.id, submittedEventRef.current);
-        }
-        setShowUpdateConfirm(false);
-        onSuccessProp?.();
-        onClose();
-      } finally {
-        submittedEventRef.current = null;
-        submissionInFlightRef.current = false;
-      }
+      await Promise.all([
+        utils.taskInstance.getVirtual.invalidate(),
+        utils.taskInstance.byId.invalidate(),
+        utils.taskInstance.getActivities.invalidate(),
+      ]);
+      onUpdateSuccess?.();
+      onClose();
     },
     onError: (error: any) => {
+      console.error("Update failed:", error);
       showPopup({
         header: "Error",
         message: error.message || "Unable to update task.",
         icon: "error",
       });
-      submittedEventRef.current = null;
-      submissionInFlightRef.current = false;
+      void utils.taskInstance.getVirtual.invalidate();
     },
   });
-  const isSaving = createTask.isPending || updateTask.isPending;
+
+  const updateAdminTask = api.taskMaster.updateAdmin.useMutation({
+    onSuccess: async () => {
+      await Promise.all([
+        utils.taskInstance.getVirtual.invalidate(),
+        utils.taskInstance.byId.invalidate(),
+        utils.taskInstance.getActivities.invalidate(),
+        utils.taskMaster.listAdmin.invalidate(),
+      ]);
+      onUpdateSuccess?.();
+      onClose();
+    },
+    onError: (error) => {
+      showPopup({
+        header: t`Không thể cập nhật công việc`,
+        message: error.message,
+        icon: "error",
+      });
+    },
+  });
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -275,6 +314,14 @@ export function CreateEventModal({
   const [attendees, setAttendees] = useState<Attendee[]>([]);
   const [hasAttemptedSave, setHasAttemptedSave] = useState(false);
   const [showUpdateConfirm, setShowUpdateConfirm] = useState(false);
+  const [penaltyPriority, setPenaltyPriority] =
+    useState<TaskPenaltyPriority | null>(null);
+  const [penaltyAmountMode, setPenaltyAmountMode] =
+    useState<PenaltyAmountMode>("default");
+  const [penaltyOverrideAmount, setPenaltyOverrideAmount] = useState("");
+  const [penaltyPriorityChangeAction, setPenaltyPriorityChangeAction] =
+    useState<"keep_override" | "use_new_default" | null>(null);
+  const [penaltyTouched, setPenaltyTouched] = useState(false);
 
   const [selectedWeekdays, setSelectedWeekdays] = useState<number[]>([]);
   const [selectedUserId, setSelectedUserId] = useState<string>("");
@@ -362,6 +409,19 @@ export function CreateEventModal({
       setRecurrence(editEntry.recurrence ?? "NONE");
       setSelectedUserId(editEntry.selectedUserId ?? "");
       setAttendees(editEntry.attendees ?? []);
+      setPenaltyPriority(editEntry.penalty?.priority ?? null);
+      setPenaltyAmountMode(
+        editEntry.penalty?.source === "master_override"
+          ? "override"
+          : "default",
+      );
+      setPenaltyOverrideAmount(
+        editEntry.penalty?.source === "master_override"
+          ? String(editEntry.penalty.amountVnd)
+          : "",
+      );
+      setPenaltyPriorityChangeAction(null);
+      setPenaltyTouched(false);
 
       // RESTORE CUSTOM WEEKDAYS IF EDITING
       if (editEntry.recurrence === "CUSTOM" && editEntry.rruleString) {
@@ -385,20 +445,16 @@ export function CreateEventModal({
       let startMins: number;
       if (
         !isAlldayMonthClick &&
-        (Number(formatInAppCalendarZone(d, "H")) !== 0 ||
-          Number(formatInAppCalendarZone(d, "m")) !== 0 ||
+        (d.getHours() !== 0 ||
+          d.getMinutes() !== 0 ||
           d.getMilliseconds() === 0)
       ) {
         // Slot click: specific time given
-        startMins =
-          Number(formatInAppCalendarZone(d, "H")) * 60 +
-          Number(formatInAppCalendarZone(d, "m"));
+        startMins = d.getHours() * 60 + d.getMinutes();
       } else {
         // Month view (all-day): round real time
         const now = new Date();
-        const currentMins =
-          Number(formatInAppCalendarZone(now, "H")) * 60 +
-          Number(formatInAppCalendarZone(now, "m"));
+        const currentMins = now.getHours() * 60 + now.getMinutes();
         startMins = Math.ceil(currentMins / 30) * 30;
         if (startMins >= 24 * 60) startMins = 23 * 60 + 30;
       }
@@ -407,26 +463,25 @@ export function CreateEventModal({
       setEndTime(minutesToTime(Math.min(24 * 60 - 1, startMins + 60)));
       setRecurrence("UNSELECTED");
       setSelectedUserId(
-        currentUser?.role !== "ADMIN" ? (currentUser?.id ?? "") : "",
+        currentUser?.role !== "ADMIN" ? currentUser?.id || "" : "",
       );
       setSelectedWeekdays([0, 1, 2, 3, 4, 5]);
       setAttendees([]);
       setHasAttemptedSave(false);
       setShowUpdateConfirm(false);
+      setPenaltyPriority(null);
+      setPenaltyAmountMode("default");
+      setPenaltyOverrideAmount("");
+      setPenaltyPriorityChangeAction(null);
+      setPenaltyTouched(false);
     }
   }, [isVisible, editEntry, selectedDate, currentUser]);
 
   const recurrenceOptions = useMemo(() => {
-    const sundayFirstWeekday =
-      Number(formatInAppCalendarZone(currentDate, "i")) % 7;
-    const dayName = DAY_NAMES[sundayFirstWeekday] ?? "";
-    const dateNum = Number(formatInAppCalendarZone(currentDate, "d"));
+    const dayName = DAY_NAMES[getDay(currentDate)] ?? "";
+    const dateNum = getDate(currentDate);
     const nthLabel = getNthWeekdayLabel(currentDate);
     return [
-      {
-        value: "DAILY" as RecurrenceType,
-        label: "Hàng ngày",
-      },
       {
         value: "WEEKLY" as RecurrenceType,
         label: `Hàng tuần vào ${dayName}`,
@@ -447,6 +502,13 @@ export function CreateEventModal({
   }, [currentDate]);
 
   const selectedOpt = recurrenceOptions.find((o) => o.value === recurrence);
+  const selectedDefaultPenalty = penaltySettings?.priorities.find(
+    (item) => item.priority === penaltyPriority,
+  )?.current;
+  const requiresPriorityChangeAction =
+    isEditMode &&
+    editEntry?.penalty?.source === "master_override" &&
+    editEntry.penalty.priority !== penaltyPriority;
 
   const isEndNextDay = useMemo(() => {
     return timeToMinutes(endTime) < timeToMinutes(startTime);
@@ -456,23 +518,26 @@ export function CreateEventModal({
 
   // Sync end date if it falls behind start date or if we revert to single day
   useEffect(() => {
-    const startDay = formatInAppCalendarZone(currentDate, "yyyy-MM-dd");
-    const endDay = formatInAppCalendarZone(endDateVal, "yyyy-MM-dd");
+    const start = new Date(currentDate);
+    start.setHours(0, 0, 0, 0);
+    const end = new Date(currentDate);
+    end.setHours(0, 0, 0, 0);
 
     if (isEndNextDay) {
-      if (endDay <= startDay) {
-        setEndDateVal(addAppCalendarDays(currentDate, 1));
+      if (end <= start) {
+        const nextDay = new Date(start);
+        nextDay.setDate(nextDay.getDate() + 1);
+        setEndDateVal(nextDay);
       }
     } else {
       // Allow independent end date selection, just ensure it's not before start date
-      if (endDay < startDay) {
-        setEndDateVal(currentDate);
+      if (end < start) {
+        setEndDateVal(start);
       }
     }
   }, [currentDate, endDateVal, isEndNextDay]);
 
-  const handleSave = (updateType?: "all") => {
-    if (isSaving || submissionInFlightRef.current) return;
+  const handleSave = (updateType?: "single" | "all") => {
     setHasAttemptedSave(true);
     if (!title.trim()) return alert("Thiếu tiêu đề.");
     if (recurrence === "UNSELECTED") {
@@ -481,17 +546,42 @@ export function CreateEventModal({
     if (!selectedUserId) {
       return alert("Chọn người thực hiện.");
     }
+    const overrideAmount = Number(penaltyOverrideAmount);
+    if (
+      penaltyPriority &&
+      penaltyAmountMode === "override" &&
+      (!Number.isSafeInteger(overrideAmount) || overrideAmount < 0)
+    ) {
+      return alert(
+        t`Mức phạt riêng phải là số nguyên VND lớn hơn hoặc bằng 0.`,
+      );
+    }
+    const priorityChangedWithOverride =
+      isEditMode &&
+      editEntry?.penalty?.source === "master_override" &&
+      editEntry.penalty.priority !== penaltyPriority;
+    if (priorityChangedWithOverride && !penaltyPriorityChangeAction) {
+      return alert(t`Chọn cách xử lý mức phạt riêng khi đổi mức độ.`);
+    }
 
-    if (isEditMode && editEntry?.masterId && !updateType) {
+    if (
+      isEditMode &&
+      editEntry?.masterId &&
+      !editEntry.masterPublicId &&
+      !updateType
+    ) {
       setShowUpdateConfirm(true);
       return;
     }
 
-    const { startDate: startDT, endDate: endDT } = buildCalendarEventSchedule(
-      currentDate,
-      startTime,
-      endTime,
-    );
+    // Setup precise dates
+    const startDT = new Date(currentDate);
+    const { hours: sh, minutes: sm } = parseTime(startTime);
+    startDT.setHours(sh, sm, 0, 0);
+
+    const endDT = new Date(currentDate);
+    const { hours: eh, minutes: em } = parseTime(endTime);
+    endDT.setHours(eh, em, 0, 0);
 
     // Call external/previous handler just in case
     const payload: CreateEventInput = {
@@ -505,63 +595,89 @@ export function CreateEventModal({
       attendees,
     };
 
-    submittedEventRef.current = payload;
+    if (isEditMode && onUpdate && editEntry) {
+      onUpdate(editEntry.id, payload);
+    } else {
+      onSave(payload);
+    }
 
     // Connect to Backend API
     let rruleString = "";
-    const finalEndDate = endDT;
-    const appDayOfWeek = Number(formatInAppCalendarZone(startDT, "i")) - 1;
-    const appDayOfMonth = Number(formatInAppCalendarZone(startDT, "d"));
+    let finalEndDate = endDT;
 
     if (recurrence !== "NONE") {
       // 100% Frontend Workaround: Extend endDate to 1 year for recurring tasks
       // so the backend generates future virtual instances.
+      finalEndDate = new Date(endDT);
+      // finalEndDate.setFullYear(finalEndDate.getFullYear() + 1);
+
       try {
         rruleString = generateRRuleString({
           type:
-            recurrence === "DAILY"
-              ? "daily"
-              : recurrence === "WEEKLY" || recurrence === "CUSTOM"
-                ? "dayOfWeek"
-                : recurrence === "MONTHLY_DATE"
-                  ? "monthlyDate"
-                  : "monthlyDayRank",
+            recurrence === "WEEKLY" || recurrence === "CUSTOM"
+              ? "dayOfWeek"
+              : recurrence === "MONTHLY_DATE"
+                ? "monthlyDate"
+                : "monthlyDayRank",
           days:
             recurrence === "WEEKLY"
-              ? [appDayOfWeek]
+              ? [(startDT.getDay() + 6) % 7]
               : recurrence === "CUSTOM"
                 ? selectedWeekdays
                 : undefined,
-          dates: recurrence === "MONTHLY_DATE" ? [appDayOfMonth] : undefined,
-          rankDay: recurrence === "MONTHLY_DAY" ? appDayOfWeek : undefined,
+          dates:
+            recurrence === "MONTHLY_DATE" ? [startDT.getDate()] : undefined,
+          rankDay:
+            recurrence === "MONTHLY_DAY"
+              ? (startDT.getDay() + 6) % 7
+              : undefined,
           rank:
             recurrence === "MONTHLY_DAY"
-              ? Math.ceil(appDayOfMonth / 7)
+              ? Math.ceil(startDT.getDate() / 7)
               : undefined,
           startTime,
           startDate: startDT,
         });
-      } catch {
-        showPopup({
-          header: "Lỗi",
-          message: "Không thể tạo quy tắc lặp lại từ lịch đã chọn.",
-          icon: "error",
-        });
-        submittedEventRef.current = null;
-        return;
+      } catch (e) {
+        console.error("Failed to parse recurrence:", e);
       }
     }
 
     const currentUserId = session?.user?.id;
     if (!currentUserId) {
-      submittedEventRef.current = null;
       alert("You must be logged in to save events.");
       return;
     }
 
     if (isEditMode && editEntry) {
-      if (updateType === "all") {
-        submissionInFlightRef.current = true;
+      if (editEntry.masterPublicId) {
+        updateAdminTask.mutate({
+          publicId: editEntry.masterPublicId,
+          name: title,
+          description,
+          startDate: startDT,
+          endDate: finalEndDate,
+          selectedUserId,
+          rruleString,
+          penaltyPolicy: penaltyTouched
+            ? {
+                policy: penaltyPriority
+                  ? penaltyAmountMode === "override"
+                    ? {
+                        priority: penaltyPriority,
+                        amountMode: "override" as const,
+                        overrideAmountVnd: overrideAmount,
+                      }
+                    : {
+                        priority: penaltyPriority,
+                        amountMode: "default" as const,
+                      }
+                  : { priority: null },
+                priorityChangeAction: penaltyPriorityChangeAction ?? undefined,
+              }
+            : undefined,
+        });
+      } else if (updateType === "all") {
         updateTask.mutate({
           id: editEntry.masterId!,
           name: title,
@@ -570,12 +686,47 @@ export function CreateEventModal({
           endDate: finalEndDate,
           selectedUserId: selectedUserId,
           rruleString,
-          effectiveFrom: getCalendarEffectiveDate(editEntry.startDate),
+          penaltyPolicy: penaltyTouched
+            ? {
+                policy: penaltyPriority
+                  ? penaltyAmountMode === "override"
+                    ? {
+                        priority: penaltyPriority,
+                        amountMode: "override" as const,
+                        overrideAmountVnd: overrideAmount,
+                      }
+                    : {
+                        priority: penaltyPriority,
+                        amountMode: "default" as const,
+                      }
+                  : { priority: null },
+                priorityChangeAction: penaltyPriorityChangeAction ?? undefined,
+              }
+            : undefined,
         });
       }
+      // else if (updateType === "single") {
+      // if (editEntry.type === "VIRTUAL") {
+      //   showPopup({
+      //     header: "Cannot edit virtual occurrence",
+      //     message:
+      //       "You must mark this scheduled occurrence as Pending or Done to instantiate it before you can edit its details.",
+      //     icon: "info",
+      //   });
+      //   setShowUpdateConfirm(false);
+      //   setHasAttemptedSave(false);
+      //   return;
+      // }
+
+      // updateTaskInstance.mutate({
+      //   id: editEntry.id,
+      //   taskMasterId: editEntry.masterId!,
+      //   name: title,
+      //   description,
+      //   status: editEntry.status!,
+      // });
+      // }
     } else {
-      submissionInFlightRef.current = true;
-      const monthRange = getAppCalendarMonthRange(startDT);
       createTask.mutate({
         name: title,
         description,
@@ -583,8 +734,17 @@ export function CreateEventModal({
         endDate: finalEndDate,
         selectedUserId: selectedUserId,
         rruleString,
-        from: monthRange.from,
-        to: monthRange.to,
+        from: startOfMonth(startDT),
+        to: endOfMonth(startDT),
+        penaltyPolicy: penaltyPriority
+          ? penaltyAmountMode === "override"
+            ? {
+                priority: penaltyPriority,
+                amountMode: "override",
+                overrideAmountVnd: overrideAmount,
+              }
+            : { priority: penaltyPriority, amountMode: "default" }
+          : { priority: null },
       });
     }
   };
@@ -596,12 +756,9 @@ export function CreateEventModal({
         centered
         modalSize={showEndDate ? "lg" : "md"}
         hideDefaultStyles
-        onClose={() => {
-          if (!isSaving) onClose();
-        }}
+        onClose={onClose}
       >
         <motion.div
-          aria-busy={isSaving}
           initial={{ opacity: 0, scale: 0.96, y: 16 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.96, y: 16 }}
@@ -631,7 +788,6 @@ export function CreateEventModal({
               </div>
               <button
                 onClick={onClose}
-                disabled={isSaving}
                 className="flex h-8 w-8 items-center justify-center rounded-full text-neutral-400 transition-all hover:bg-white/80 hover:text-neutral-700 dark:hover:bg-dark-300"
               >
                 <svg
@@ -651,11 +807,7 @@ export function CreateEventModal({
             </div>
           </div>
 
-          <div
-            className={`flex-1 space-y-4 overflow-y-auto px-5 py-4 ${
-              isSaving ? "pointer-events-none opacity-70" : ""
-            }`}
-          >
+          <div className="flex-1 space-y-4 overflow-y-auto px-5 py-4">
             <div className="space-y-1.5">
               <Label>Tiêu đề sự kiện</Label>
               <input
@@ -703,9 +855,9 @@ export function CreateEventModal({
                 <div className="relative">
                   <input
                     type="date"
-                    value={formatInAppCalendarZone(currentDate, "yyyy-MM-dd")}
+                    value={format(currentDate, "yyyy-MM-dd")}
                     onChange={(e) => {
-                      const d = parseCalendarDayInZone(e.target.value);
+                      const d = new Date(e.target.value);
                       if (!isNaN(d.getTime())) setCurrentDate(d);
                     }}
                     onKeyDown={(e) => e.preventDefault()}
@@ -1145,6 +1297,181 @@ export function CreateEventModal({
               </div>
             </div>
 
+            {isAdmin && (
+              <div className="space-y-3 rounded-2xl border border-neutral-200/70 bg-neutral-50/60 p-4 dark:border-dark-400/50 dark:bg-dark-300/40">
+                <div>
+                  <Label>{t`Mức độ và phạt`}</Label>
+                  <p className="mt-1 text-xs leading-5 text-neutral-500 dark:text-neutral-400">
+                    {t`Không chọn mức độ thì task vẫn hoạt động bình thường và không phát sinh phạt.`}
+                  </p>
+                </div>
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                  {(
+                    [
+                      { value: null, label: t`Không áp dụng` },
+                      { value: "high", label: t`Cao` },
+                      { value: "medium", label: t`Trung bình` },
+                      { value: "low", label: t`Thấp` },
+                    ] as const
+                  ).map((option) => (
+                    <button
+                      key={option.value ?? "none"}
+                      type="button"
+                      aria-pressed={penaltyPriority === option.value}
+                      onClick={() => {
+                        setPenaltyPriority(option.value);
+                        setPenaltyPriorityChangeAction(null);
+                        setPenaltyTouched(true);
+                      }}
+                      className={`rounded-lg border px-3 py-2 text-xs font-semibold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
+                        penaltyPriority === option.value
+                          ? option.value === "high"
+                            ? "border-red-500 bg-red-50 text-red-700 dark:bg-red-950/40 dark:text-red-300"
+                            : option.value === "medium"
+                              ? "border-amber-500 bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300"
+                              : option.value === "low"
+                                ? "border-emerald-500 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
+                                : "border-neutral-500 bg-white text-neutral-800 dark:bg-dark-200 dark:text-neutral-200"
+                          : "border-neutral-200 bg-white text-neutral-500 hover:border-neutral-400 dark:border-dark-400 dark:bg-dark-200 dark:text-neutral-400"
+                      }`}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+
+                {penaltyPriority && (
+                  <div className="space-y-3 border-t border-neutral-200 pt-3 dark:border-dark-400">
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      <button
+                        type="button"
+                        aria-pressed={penaltyAmountMode === "default"}
+                        onClick={() => {
+                          setPenaltyAmountMode("default");
+                          setPenaltyTouched(true);
+                        }}
+                        className={`rounded-lg border p-3 text-left text-xs transition-colors ${
+                          penaltyAmountMode === "default"
+                            ? "border-blue-500 bg-blue-50 text-blue-800 dark:bg-blue-950/30 dark:text-blue-300"
+                            : "border-neutral-200 bg-white text-neutral-600 dark:border-dark-400 dark:bg-dark-200 dark:text-neutral-400"
+                        }`}
+                      >
+                        <span className="block font-semibold">
+                          {t`Dùng mức mặc định`}
+                        </span>
+                        <span className="mt-1 block tabular-nums">
+                          {selectedDefaultPenalty
+                            ? formatVnd(selectedDefaultPenalty.amountVnd)
+                            : t`Chưa có mức hiệu lực`}
+                        </span>
+                      </button>
+                      <button
+                        type="button"
+                        aria-pressed={penaltyAmountMode === "override"}
+                        onClick={() => {
+                          setPenaltyAmountMode("override");
+                          setPenaltyTouched(true);
+                        }}
+                        className={`rounded-lg border p-3 text-left text-xs transition-colors ${
+                          penaltyAmountMode === "override"
+                            ? "border-blue-500 bg-blue-50 text-blue-800 dark:bg-blue-950/30 dark:text-blue-300"
+                            : "border-neutral-200 bg-white text-neutral-600 dark:border-dark-400 dark:bg-dark-200 dark:text-neutral-400"
+                        }`}
+                      >
+                        <span className="block font-semibold">
+                          {t`Nhập mức riêng`}
+                        </span>
+                        <span className="mt-1 block">
+                          {t`Chỉ áp dụng cho master này`}
+                        </span>
+                      </button>
+                    </div>
+
+                    {penaltyAmountMode === "override" && (
+                      <label className="block space-y-1.5 text-xs font-semibold text-neutral-700 dark:text-neutral-300">
+                        <span>{t`Mức phạt riêng (VND)`}</span>
+                        <input
+                          type="number"
+                          min={0}
+                          step={1}
+                          inputMode="numeric"
+                          value={penaltyOverrideAmount}
+                          onChange={(event) => {
+                            setPenaltyOverrideAmount(event.target.value);
+                            setPenaltyTouched(true);
+                          }}
+                          className="w-full rounded-lg border border-neutral-200 bg-white px-3 py-2 text-sm font-medium text-neutral-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:border-dark-400 dark:bg-dark-200 dark:text-neutral-100"
+                        />
+                      </label>
+                    )}
+
+                    {requiresPriorityChangeAction && (
+                      <fieldset className="space-y-2 rounded-lg border border-amber-300 bg-amber-50 p-3 dark:border-amber-900 dark:bg-amber-950/30">
+                        <legend className="px-1 text-xs font-semibold text-amber-900 dark:text-amber-200">
+                          {t`Mức phạt riêng hiện tại sẽ được xử lý thế nào?`}
+                        </legend>
+                        {(
+                          [
+                            {
+                              value: "keep_override",
+                              label: t`Giữ số tiền riêng hiện tại`,
+                            },
+                            {
+                              value: "use_new_default",
+                              label: t`Dùng mức mặc định của priority mới`,
+                            },
+                          ] as const
+                        ).map((option) => (
+                          <label
+                            key={option.value}
+                            className="flex cursor-pointer items-center gap-2 text-xs text-amber-900 dark:text-amber-200"
+                          >
+                            <input
+                              type="radio"
+                              name="penalty-priority-change"
+                              checked={
+                                penaltyPriorityChangeAction === option.value
+                              }
+                              onChange={() => {
+                                setPenaltyPriorityChangeAction(option.value);
+                                setPenaltyTouched(true);
+                              }}
+                            />
+                            {option.label}
+                          </label>
+                        ))}
+                      </fieldset>
+                    )}
+                  </div>
+                )}
+                {!penaltyPriority && isEditMode && (
+                  <div className="space-y-3 border-t border-neutral-200 pt-3 dark:border-dark-400">
+                    {requiresPriorityChangeAction && (
+                      <fieldset className="space-y-2 rounded-lg border border-amber-300 bg-amber-50 p-3 dark:border-amber-900 dark:bg-amber-950/30">
+                        <legend className="px-1 text-xs font-semibold text-amber-900 dark:text-amber-200">
+                          {t`Xác nhận bỏ mức phạt riêng hiện tại`}
+                        </legend>
+                        <label className="flex cursor-pointer items-center gap-2 text-xs text-amber-900 dark:text-amber-200">
+                          <input
+                            type="radio"
+                            name="penalty-priority-change"
+                            checked={
+                              penaltyPriorityChangeAction === "use_new_default"
+                            }
+                            onChange={() => {
+                              setPenaltyPriorityChangeAction("use_new_default");
+                              setPenaltyTouched(true);
+                            }}
+                          />
+                          {t`Bỏ override và không áp dụng phạt`}
+                        </label>
+                      </fieldset>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
             <div className="rounded-xl bg-neutral-50 p-4 dark:bg-dark-200">
               <p className="mb-2 text-[10px] font-black uppercase tracking-[0.15em] text-neutral-400">
                 Tóm tắt
@@ -1157,9 +1484,9 @@ export function CreateEventModal({
                 )}
               </p>
               <p className="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">
-                {formatInAppCalendarZone(currentDate, "MMM d, yyyy")}{" "}
+                {format(currentDate, "MMM d, yyyy")}{" "}
                 {currentDate.getTime() !== endDateVal.getTime() &&
-                  `– ${formatInAppCalendarZone(endDateVal, "MMM d, yyyy")}`}{" "}
+                  `– ${format(endDateVal, "MMM d, yyyy")}`}{" "}
                 · {startTime} – {endTime}
               </p>
               {recurrence !== "NONE" && selectedOpt && (
@@ -1191,31 +1518,19 @@ export function CreateEventModal({
           <div className="flex flex-shrink-0 gap-3 border-t border-light-200 bg-light-50 px-5 py-3 dark:border-dark-300 dark:bg-dark-200">
             <button
               onClick={onClose}
-              disabled={isSaving}
               className="flex-1 rounded-xl bg-neutral-100 px-4 py-2.5 text-sm font-bold text-neutral-600 transition-all hover:bg-neutral-200 dark:bg-dark-300 dark:text-dark-200 dark:hover:bg-dark-400"
             >
               Hủy
             </button>
             <button
               onClick={() => handleSave()}
-              disabled={isSaving}
-              aria-busy={isSaving}
               className={`flex-1 rounded-xl px-4 py-2.5 text-sm font-bold text-white shadow-md transition-all hover:shadow-lg active:scale-[0.98] ${
                 isEditMode
                   ? "bg-violet-500 hover:bg-violet-600"
                   : "bg-blue-500 hover:bg-blue-600"
-              } disabled:cursor-not-allowed disabled:opacity-60`}
+              }`}
             >
-              <span className="flex items-center justify-center gap-2">
-                {isSaving ? <LoadingSpinner size="sm" /> : null}
-                {isSaving
-                  ? isEditMode
-                    ? "Đang cập nhật..."
-                    : "Đang tạo..."
-                  : isEditMode
-                    ? "Cập nhật"
-                    : "Lưu"}
-              </span>
+              {isEditMode ? "Cập nhật" : "Lưu"}
             </button>
           </div>
         </motion.div>
@@ -1227,9 +1542,7 @@ export function CreateEventModal({
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              onClick={() => {
-                if (!isSaving) setShowUpdateConfirm(false);
-              }}
+              onClick={() => setShowUpdateConfirm(false)}
               className="absolute inset-0 bg-black/30 backdrop-blur-[3px]"
             />
             <motion.div
@@ -1266,50 +1579,76 @@ export function CreateEventModal({
               </div>
 
               <div className="flex flex-col gap-2 px-6 pb-6">
+                {/* <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.97 }}
+                  onClick={() => {
+                    setShowUpdateConfirm(false);
+                    handleSave("single");
+                  }}
+                  className="flex items-center gap-3 rounded-2xl border border-neutral-100 bg-neutral-50 px-5 py-3.5 text-left transition-all hover:border-neutral-200 hover:bg-neutral-100 dark:border-neutral-800 dark:bg-neutral-800/50 dark:hover:bg-neutral-800"
+                >
+                  <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-orange-100 dark:bg-orange-900/30">
+                    <svg
+                      className="h-4.5 w-4.5 text-orange-500"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      strokeWidth={2}
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+                      />
+                    </svg>
+                  </div>
+                  <div>
+                    <p className="text-sm font-black text-neutral-900 dark:text-white">
+                      This occurrence only
+                    </p>
+                    <p className="text-xs text-neutral-400">
+                      Update only the selected date
+                    </p>
+                  </div>
+                </motion.button> */}
+
                 <motion.button
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.97 }}
                   onClick={() => {
+                    setShowUpdateConfirm(false);
                     handleSave("all");
                   }}
-                  disabled={isSaving}
-                  aria-busy={isSaving}
-                  className="flex items-center gap-3 rounded-2xl border border-blue-100 bg-blue-50 px-5 py-3.5 text-left transition-all hover:border-blue-200 hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-blue-900/40 dark:bg-blue-900/20 dark:hover:bg-blue-900/30"
+                  className="flex items-center gap-3 rounded-2xl border border-blue-100 bg-blue-50 px-5 py-3.5 text-left transition-all hover:border-blue-200 hover:bg-blue-100 dark:border-blue-900/40 dark:bg-blue-900/20 dark:hover:bg-blue-900/30"
                 >
                   <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-blue-100 dark:bg-blue-900/40">
-                    {isSaving ? (
-                      <LoadingSpinner size="sm" />
-                    ) : (
-                      <svg
-                        className="h-4.5 w-4.5 text-blue-500"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                        strokeWidth={2}
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-                        />
-                      </svg>
-                    )}
+                    <svg
+                      className="h-4.5 w-4.5 text-blue-500"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      strokeWidth={2}
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                      />
+                    </svg>
                   </div>
                   <div>
                     <p className="text-sm font-black text-blue-700 dark:text-blue-400">
-                      {isSaving
-                        ? "Đang cập nhật..."
-                        : "Cập nhật từ ngày này trở đi"}
+                      Tất cả các lần
                     </p>
                     <p className="text-xs text-blue-400/80">
-                      Giữ nguyên các công việc đã hoàn thành hoặc đã quá hạn
+                      Cập nhật tất cả ngày trong lịch lặp lại
                     </p>
                   </div>
                 </motion.button>
 
                 <button
                   onClick={() => setShowUpdateConfirm(false)}
-                  disabled={isSaving}
                   className="mt-1 rounded-xl py-2 text-sm font-bold text-neutral-400 transition-all hover:text-neutral-600 dark:hover:text-neutral-200"
                 >
                   Hủy

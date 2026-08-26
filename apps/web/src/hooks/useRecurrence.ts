@@ -1,13 +1,10 @@
+import { endOfMonth, startOfMonth } from "date-fns";
 import { useMemo } from "react";
 
 import { applyMasterWallTimeToAnchorDay } from "@kan/shared/utils";
 
 import { api } from "~/utils/api";
-import {
-  getAppCalendarMonthRange,
-  getCalendarTaskDuration,
-} from "~/utils/calendar";
-import { inferCalendarRecurrenceType } from "~/utils/calendarEventSchedule";
+import { getCalendarTaskDuration } from "~/utils/calendar";
 
 export type RecurrenceType =
   | "DAILY"
@@ -56,20 +53,35 @@ export interface CalendarEntry {
   recurrence: RecurrenceType;
   rruleString: string;
   rruleStringToText?: string;
-  checklists: any[];
+  checklists: unknown[];
   createdBy?: string;
-  isCreating?: boolean;
+  penalty?: {
+    priority: "high" | "medium" | "low";
+    amountVnd: number;
+    source: "system_default" | "global_policy" | "master_override";
+    policyPublicId: string;
+    snapshottedAt: Date | null;
+    assessment: {
+      publicId: string;
+      amountVnd: number;
+      currency: string;
+      source: "system_default" | "global_policy" | "master_override";
+      policyPublicId: string | null;
+      assessedAt: Date;
+      status: "active" | "voided";
+    } | null;
+  } | null;
 }
 
 export function useRecurrence(
   currentDate: Date,
   selectedUserId: string | undefined,
 ) {
-  const { from: monthStart, to: monthEnd } =
-    getAppCalendarMonthRange(currentDate);
+  const monthStart = startOfMonth(currentDate);
+  const monthEnd = endOfMonth(currentDate); // Buffer
 
   // Lấy dữ liệu thực tế từ backend
-  const virtualTaskQuery = api.taskInstance.getVirtual.useQuery(
+  const { data: virtualTasks } = api.taskInstance.getVirtual.useQuery(
     {
       from: monthStart,
       to: monthEnd,
@@ -79,7 +91,6 @@ export function useRecurrence(
       staleTime: 1000 * 60 * 5, // 5 minutes
     },
   );
-  const { data: virtualTasks } = virtualTaskQuery;
 
   const utils = api.useUtils();
   const updateTask = api.taskInstance.update.useMutation({
@@ -88,53 +99,65 @@ export function useRecurrence(
     },
   });
 
-  const calendarEntries = useMemo<CalendarEntry[]>(() => {
+  const calendarEntries = useMemo(() => {
     if (!virtualTasks) return [];
 
-    return virtualTasks.map((task: any) => {
-      const isVirtual = task.id?.startsWith("virtual_");
+    return virtualTasks.map((task) => {
+      const isVirtual = task.id.startsWith("virtual_");
 
       // Chuyển status về chữ thường để tránh lỗi khi hiển thị màu giao diện (bắt buộc phải là "pending" | "done" | "missed")
-      let currentStatus =
-        typeof task.status === "string" ? task.status.toLowerCase() : "pending";
+      let currentStatus = task.status.toLowerCase();
       if (!["pending", "done", "missed"].includes(currentStatus)) {
         currentStatus = "pending";
       }
 
-      const start = new Date(task.targetDate);
-      const end = new Date(task.endDate);
+      const targetDate = task.targetDate;
+      const start = new Date(targetDate);
+      const end = new Date(task.endDate ?? task.targetDate);
+
       const originalEnd = task.originalEndDate
         ? new Date(task.originalEndDate)
         : end;
-
       const duration =
-        start && end && !isNaN(start.getTime()) && !isNaN(end.getTime())
+        !isNaN(start.getTime()) && !isNaN(end.getTime())
           ? getCalendarTaskDuration(start, end, originalEnd)
-          : (task.duration ?? 60);
+          : 60;
 
       return {
         id: task.id,
-        masterId: task.taskMasterId || task.masterId,
+        masterId: task.taskMasterId,
         instanceId: isVirtual ? undefined : task.id,
-        title: task.name || task.taskMaster?.name,
-        description: task.description || task.taskMaster?.description,
-        assigneeName: task.assignee?.name || "",
-        selectedUserId: task.assignee?.id || "",
-        date: new Date(task.targetDate),
-        startDate: new Date(task.targetDate),
+        title: task.name ?? task.taskMaster.name,
+        description: task.description ?? task.taskMaster.description,
+        assigneeName: task.assignee.name ?? "",
+        selectedUserId: task.assignee.id,
+        date: new Date(targetDate),
+        startDate: new Date(targetDate),
         originalEndDate: originalEnd,
-        endDate: new Date(task.endDate),
+        endDate: end,
         status: currentStatus,
         type: isVirtual ? "VIRTUAL" : "INSTANCE",
-        color: task.color ?? "bg-blue-500",
+        color: "bg-blue-500",
         duration: duration,
-        recurrence: inferCalendarRecurrenceType(
-          task.taskMaster?.rruleString || task.rruleString || "",
-        ),
-        rruleString: task.taskMaster?.rruleString || task.rruleString || "",
-        rruleStringToText: task.taskMaster?.rruleStringToText || "",
-        checklists: task.checklists || [],
+        recurrence: task.taskMaster.recurrence as RecurrenceType,
+        rruleString: task.taskMaster.rruleString,
+        rruleStringToText: task.taskMaster.rruleStringToText,
+        checklists: task.checklists,
         createdBy: task.taskMaster.createdBy,
+        penalty:
+          task.penalty?.priority &&
+          task.penalty.amountVnd !== null &&
+          task.penalty.source &&
+          task.penalty.policyPublicId
+            ? {
+                priority: task.penalty.priority,
+                amountVnd: task.penalty.amountVnd,
+                source: task.penalty.source,
+                policyPublicId: task.penalty.policyPublicId,
+                snapshottedAt: task.penalty.snapshottedAt,
+                assessment: task.penalty.assessment,
+              }
+            : null,
       } as CalendarEntry;
     });
   }, [virtualTasks]);
@@ -170,13 +193,5 @@ export function useRecurrence(
     cards: data.data?.filterCards,
     formattedResult: data.data?.formattedResult,
     moveTask,
-    isInitialLoading:
-      virtualTaskQuery.isLoading && virtualTaskQuery.data === undefined,
-    isRefreshing:
-      virtualTaskQuery.isFetching && virtualTaskQuery.data !== undefined,
-    error: virtualTaskQuery.error,
-    refetch: async () => {
-      await Promise.all([virtualTaskQuery.refetch(), data.refetch()]);
-    },
   };
 }

@@ -15,6 +15,7 @@ import {
   cardActivities,
   taskInstanceExtensions,
   taskInstances,
+  taskPenaltyAssessments,
 } from "@kan/db/schema";
 import { generateUID } from "@kan/shared/utils";
 
@@ -163,7 +164,12 @@ export async function markOverdueTaskInstancesMissed(
       .update(taskInstances)
       .set({ status: "missed", updatedAt: options.now })
       .where(overdueConditions)
-      .returning({ id: taskInstances.id });
+      .returning({
+        id: taskInstances.id,
+        penaltyAmountVnd: taskInstances.penaltyAmountVnd,
+        penaltySource: taskInstances.penaltySource,
+        penaltyPolicyPublicId: taskInstances.penaltyPolicyPublicId,
+      });
 
     if (updatedInstances.length > 0) {
       await tx.insert(cardActivities).values(
@@ -178,6 +184,53 @@ export async function markOverdueTaskInstancesMissed(
           metadata: { source: "scheduler" },
         })),
       );
+
+      const assessable = updatedInstances.filter(
+        (instance) =>
+          instance.penaltyAmountVnd !== null && instance.penaltySource !== null,
+      );
+
+      if (assessable.length > 0) {
+        const assessments = await tx
+          .insert(taskPenaltyAssessments)
+          .values(
+            assessable.map((instance) => ({
+              publicId: generateUID(),
+              taskInstanceId: instance.id,
+              amountVnd: instance.penaltyAmountVnd!,
+              source: instance.penaltySource!,
+              policyPublicId: instance.penaltyPolicyPublicId,
+              assessedAt: options.now,
+            })),
+          )
+          .onConflictDoNothing({
+            target: taskPenaltyAssessments.taskInstanceId,
+          })
+          .returning({
+            taskInstanceId: taskPenaltyAssessments.taskInstanceId,
+            amountVnd: taskPenaltyAssessments.amountVnd,
+            source: taskPenaltyAssessments.source,
+            policyPublicId: taskPenaltyAssessments.policyPublicId,
+          });
+
+        if (assessments.length > 0) {
+          await tx.insert(cardActivities).values(
+            assessments.map((assessment) => ({
+              publicId: generateUID(),
+              taskInstanceId: assessment.taskInstanceId,
+              type: "penalty_assessed" as const,
+              createdBy: null,
+              createdAt: options.now,
+              metadata: {
+                amountVnd: assessment.amountVnd,
+                currency: "VND",
+                source: assessment.source,
+                policyPublicId: assessment.policyPublicId,
+              },
+            })),
+          );
+        }
+      }
     }
 
     return {

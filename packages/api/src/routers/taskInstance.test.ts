@@ -13,11 +13,11 @@ describe("taskInstance.getVirtual", () => {
     vi.clearAllMocks();
   });
 
-  it("returns a missed stored instance that no longer matches the current master rule", async () => {
+  it("returns a missed stored instance after its master changes recurrence and assignee", async () => {
     const taskMaster = {
       id: masterId,
-      name: "test task 2",
-      description: "Recurring task",
+      name: "Recurring task",
+      description: "Historical task instance regression",
       targetUser: userBId,
       createdBy: userBId,
       startDate: monday,
@@ -33,12 +33,12 @@ describe("taskInstance.getVirtual", () => {
       id: "44444444-4444-4444-8444-444444444444",
       userId: userAId,
       taskMasterId: masterId,
-      name: "test task 2",
-      description: "Recurring task",
+      name: "Recurring task",
+      description: "Historical task instance regression",
       targetDate: saturday,
       actualDate: null,
       endDate: new Date("2026-08-22T02:00:00.000Z"),
-      status: "missed",
+      status: "missed" as const,
       isDeleted: false,
       createdAt: saturday,
       updatedAt: saturday,
@@ -49,8 +49,6 @@ describe("taskInstance.getVirtual", () => {
       taskMaster,
     };
 
-    const findTaskMasters = vi.fn().mockResolvedValue([]);
-    const findTaskInstances = vi.fn().mockResolvedValue([missedStoredInstance]);
     const caller = taskInstanceRouter.createCaller({
       user: {
         id: userAId,
@@ -62,8 +60,10 @@ describe("taskInstance.getVirtual", () => {
       },
       db: {
         query: {
-          taskMasters: { findMany: findTaskMasters },
-          taskInstances: { findMany: findTaskInstances },
+          taskMasters: { findMany: vi.fn().mockResolvedValue([]) },
+          taskInstances: {
+            findMany: vi.fn().mockResolvedValue([missedStoredInstance]),
+          },
         },
       },
       headers: new Headers(),
@@ -88,8 +88,8 @@ describe("taskInstance.getVirtual", () => {
   it("does not return a virtual occurrence when a deleted stored instance is its tombstone", async () => {
     const taskMaster = {
       id: masterId,
-      name: "test task 2",
-      description: "Recurring task",
+      name: "Recurring task",
+      description: "Deleted occurrence regression",
       targetUser: userAId,
       createdBy: userAId,
       startDate: monday,
@@ -105,12 +105,12 @@ describe("taskInstance.getVirtual", () => {
       id: "44444444-4444-4444-8444-444444444444",
       userId: userAId,
       taskMasterId: masterId,
-      name: "test task 2",
-      description: "Recurring task",
+      name: "Recurring task",
+      description: "Deleted occurrence regression",
       targetDate: monday,
       actualDate: null,
       endDate: new Date("2026-08-24T02:00:00.000Z"),
-      status: "pending",
+      status: "pending" as const,
       isDeleted: true,
       createdAt: monday,
       updatedAt: monday,
@@ -136,17 +136,21 @@ describe("taskInstance.getVirtual", () => {
           taskInstances: {
             findMany: vi.fn().mockResolvedValue([deletedStoredInstance]),
           },
+          taskMasterPenaltyPolicies: {
+            findMany: vi.fn().mockResolvedValue([]),
+          },
+          taskPenaltyPolicies: { findMany: vi.fn().mockResolvedValue([]) },
         },
       },
       headers: new Headers(),
     } as never);
 
-    const result = (await caller.getVirtual({
-      from: new Date("2026-08-24T00:00:00.000Z"),
-      to: new Date("2026-08-24T23:59:59.999Z"),
-      targetUser: userAId,
-    })) as unknown[];
-
-    expect(result).toEqual([]);
+    await expect(
+      caller.getVirtual({
+        from: new Date("2026-08-24T00:00:00.000Z"),
+        to: new Date("2026-08-24T23:59:59.999Z"),
+        targetUser: userAId,
+      }),
+    ).resolves.toEqual([]);
   });
 });

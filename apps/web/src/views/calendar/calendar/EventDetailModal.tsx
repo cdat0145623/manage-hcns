@@ -1,14 +1,14 @@
 import { t } from "@lingui/macro";
+import { format } from "date-fns";
 import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useMemo, useState } from "react";
 import { HiMiniPlus, HiXMark } from "react-icons/hi2";
 
-import { formatInAppCalendarZone } from "@kan/shared/utils";
+import { authClient } from "@kan/auth/client";
 
 import type { EditableEntry } from "./CreateEventModal";
 import type { WorkspaceMember } from "~/components/Editor";
 import Editor from "~/components/Editor";
-import { useAuthSession } from "~/providers/auth-session";
 import { useModal } from "~/providers/modal";
 import { usePopup } from "~/providers/popup";
 import { api } from "~/utils/api";
@@ -23,12 +23,7 @@ import { DeleteCommentConfirmation } from "../../card/components/DeleteCommentCo
 import { DueDateSelector } from "../../card/components/DueDateSelector";
 import { NewChecklistForm } from "../../card/components/NewChecklistForm";
 import NewCommentForm from "../../card/components/NewCommentForm";
-import { getOptimisticTaskStatus } from "./task-instance-optimistic-status";
 import { classifyTaskInstanceUpdateError } from "./task-instance-update-error";
-import {
-  canExtendMissedTask,
-  canUpdateTaskStatus,
-} from "./task-status-availability";
 import { TaskInstanceExtensionModal } from "./TaskInstanceExtensionModal";
 
 interface EventDetailModalProps {
@@ -47,6 +42,27 @@ function normalizeTaskStatus(s: string | undefined | null): TaskStatus {
   if (v === "done" || v === "missed" || v === "pending") return v;
   return "pending";
 }
+
+const formatVnd = (amount: number) =>
+  new Intl.NumberFormat("vi-VN", {
+    style: "currency",
+    currency: "VND",
+    maximumFractionDigits: 0,
+  }).format(amount);
+
+const penaltyPriorityLabel = (priority: "high" | "medium" | "low") => {
+  if (priority === "high") return t`Cao`;
+  if (priority === "medium") return t`Trung bình`;
+  return t`Thấp`;
+};
+
+const penaltySourceLabel = (
+  source: "system_default" | "global_policy" | "master_override",
+) => {
+  if (source === "master_override") return t`Mức riêng của task`;
+  if (source === "system_default") return t`Mặc định hệ thống`;
+  return t`Chính sách chung`;
+};
 
 const STATUS_CONFIG: Record<
   TaskStatus,
@@ -158,7 +174,7 @@ export function EventDetailModal({
   onDelete,
   isDeleting,
 }: EventDetailModalProps) {
-  const { session, status: sessionStatus } = useAuthSession();
+  const { data: session } = authClient.useSession();
   const { data: users = [] } = api.user.getAll.useQuery();
   const utils = api.useUtils();
 
@@ -182,9 +198,6 @@ export function EventDetailModal({
   } = useModal();
   const [isUpdating, setIsUpdating] = useState(false);
   const [isExtensionModalOpen, setIsExtensionModalOpen] = useState(false);
-  const [optimisticStatus, setOptimisticStatus] = useState<TaskStatus | null>(
-    null,
-  );
   const [activeChecklistForm, setActiveChecklistForm] = useState<string | null>(
     null,
   );
@@ -224,23 +237,33 @@ export function EventDetailModal({
   );
 
   /** Ưu tiên dữ liệu từ API — entry từ lịch có thể stale sau khi đánh dấu hoàn thành */
-  const serverStatus: TaskStatus = useMemo(() => {
+  const currentStatus: TaskStatus = useMemo(() => {
     if (latestInstance?.status != null) {
       return normalizeTaskStatus(latestInstance.status);
     }
     return normalizeTaskStatus(entry?.status);
   }, [latestInstance?.status, entry?.status]);
-  const currentStatus = optimisticStatus ?? serverStatus;
 
   const [description, setDescription] = useState(entry?.description ?? "");
+  const penaltyDetails = useMemo(() => {
+    if (
+      latestInstance?.penaltyPriority &&
+      latestInstance.penaltyAmountVnd !== null &&
+      latestInstance.penaltySource
+    ) {
+      return {
+        priority: latestInstance.penaltyPriority,
+        amountVnd: latestInstance.penaltyAmountVnd,
+        source: latestInstance.penaltySource,
+        assessment: latestInstance.penaltyAssessment,
+      };
+    }
+    return entry?.penalty ?? null;
+  }, [entry?.penalty, latestInstance]);
 
   useEffect(() => {
     setDescription(entry?.description ?? "");
   }, [entry?.description, isVisible]);
-
-  useEffect(() => {
-    setOptimisticStatus(null);
-  }, [entry?.instanceId, isVisible]);
 
   useEffect(() => {
     if (entry?.type !== "INSTANCE" && activeTab === "rewards") {
@@ -262,66 +285,18 @@ export function EventDetailModal({
     isAdmin;
 
   const updateInstance = api.taskInstance.update.useMutation({
-    onMutate: async (variables) => {
-      const nextOptimisticStatus = getOptimisticTaskStatus(
-        currentStatus,
-        normalizeTaskStatus(variables.status),
-      );
-
-      if (nextOptimisticStatus == null) {
-        return { didOptimisticallyUpdateStatus: false };
-      }
-
-      await utils.taskInstance.byId.cancel({ id: variables.id });
-      const previousInstance = utils.taskInstance.byId.getData({
-        id: variables.id,
-      });
-      const completedAt = new Date();
-
-      setOptimisticStatus(nextOptimisticStatus);
-      utils.taskInstance.byId.setData({ id: variables.id }, (instance) =>
-        instance
-          ? {
-              ...instance,
-              status: nextOptimisticStatus,
-              actualDate: completedAt,
-            }
-          : instance,
-      );
-
-      return {
-        didOptimisticallyUpdateStatus: true,
-        previousInstance,
-      };
-    },
-    onSuccess: async (data, variables, context) => {
-      utils.taskInstance.byId.setData({ id: variables.id }, (instance) =>
-        instance ? { ...instance, ...data } : instance,
-      );
-
-      try {
+    onSuccess: async (_data, variables) => {
+      void utils.taskInstance.getVirtual.invalidate();
+      if (variables.id) {
         await Promise.all([
-          utils.taskInstance.getVirtual.invalidate(),
           utils.taskInstance.byId.invalidate({ id: variables.id }),
           utils.reward.getByTaskInstanceId.invalidate({
             taskInstanceId: variables.id,
           }),
         ]);
-      } finally {
-        if (context.didOptimisticallyUpdateStatus) {
-          setOptimisticStatus(null);
-        }
       }
     },
-    onError: (error, variables, context) => {
-      if (context?.didOptimisticallyUpdateStatus) {
-        utils.taskInstance.byId.setData(
-          { id: variables.id },
-          context.previousInstance,
-        );
-        setOptimisticStatus(null);
-      }
-
+    onError: (error, variables) => {
       const errorKind = classifyTaskInstanceUpdateError(error);
 
       if (errorKind === "invalid-transition" || errorKind === "conflict") {
@@ -431,8 +406,8 @@ export function EventDetailModal({
     if (!canEdit || !entry?.instanceId || !entry?.masterId) return;
 
     updateInstance.mutate({
-      id: entry?.instanceId,
-      taskMasterId: entry?.masterId,
+      id: entry?.instanceId!,
+      taskMasterId: entry?.masterId!,
       description: description,
       status: currentStatus,
     });
@@ -440,34 +415,13 @@ export function EventDetailModal({
 
   const isBusy =
     updateInstance.isPending || extendMissedInstance.isPending || isUpdating;
-  const isStatusUpdateAllowed = canUpdateTaskStatus({
-    canEdit,
-    isBusy,
-    sessionStatus,
-  });
-  const isMissedExtensionAllowed = canExtendMissedTask({
-    isAdmin,
-    isBusy,
-    sessionStatus,
-  });
 
   const handleStatusChange = async (newStatus: TaskStatus) => {
     if (!entry) return;
     if (newStatus === currentStatus || isBusy) return;
     if (!entry.masterId) return;
 
-    if (sessionStatus === "unavailable") {
-      showPopup({
-        header: t`Không thể cập nhật công việc`,
-        message: t`Đang mất kết nối tới máy chủ. Vui lòng thử lại khi kết nối được khôi phục.`,
-        icon: "info",
-      });
-      return;
-    }
-
-    if (!isStatusUpdateAllowed) return;
-
-    const userId = session?.user.id;
+    const userId = session?.user?.id;
     if (!userId) {
       showPopup({
         header: "Yêu cầu xác thực",
@@ -524,11 +478,14 @@ export function EventDetailModal({
     }
     return date;
   }, [entry?.date, entry?.endTime, latestInstance?.endDate]);
+
   const originalEndDate = latestInstance?.originalEndDate
     ? new Date(latestInstance.originalEndDate)
     : null;
   const wasExtended =
-    originalEndDate !== null && originalEndDate.getTime() !== endDate.getTime();
+    originalEndDate !== null &&
+    endDate !== null &&
+    originalEndDate.getTime() !== endDate.getTime();
 
   const isInstanceEvent =
     entry?.type === "INSTANCE" && Boolean(entry?.instanceId);
@@ -567,7 +524,6 @@ export function EventDetailModal({
 
   if (!entry) return null;
   const extensionTaskInstanceId = entry.instanceId;
-  const isMissedStatus = currentStatus === "missed";
 
   return (
     <Modal
@@ -690,9 +646,7 @@ export function EventDetailModal({
           </div>
 
           <div className="flex flex-1 flex-col overflow-y-auto scrollbar-thin scrollbar-thumb-light-400 dark:scrollbar-thumb-dark-300">
-            <div
-              className={`grid ${isMissedStatus ? "grid-cols-[minmax(0,1fr)_max-content]" : "grid-cols-2"} gap-x-6 gap-y-4 px-8 pb-2 pt-1 text-left`}
-            >
+            <div className="grid grid-cols-2 gap-x-6 gap-y-4 px-8 pb-2 pt-1 text-left">
               <div className="col-span-1 min-w-0 space-y-1.5">
                 <div>
                   {entry.assigneeName ? (
@@ -722,42 +676,36 @@ export function EventDetailModal({
 
               <div className="col-span-1 min-w-0 space-y-1.5">
                 <div>
-                  {isMissedStatus ? (
+                  {currentStatus === "missed" ? (
                     <button
                       type="button"
-                      disabled={!isMissedExtensionAllowed}
-                      aria-busy={extendMissedInstance.isPending}
+                      disabled={isBusy || !isAdmin}
                       onClick={() => setIsExtensionModalOpen(true)}
-                      className={`flex min-h-[34px] w-max items-center gap-2 rounded-xl px-2.5 text-left text-xs font-medium shadow-sm transition-all sm:px-3 sm:text-[13px] ${
-                        isMissedExtensionAllowed
-                          ? `${statusConfig.activeBg} ${statusConfig.activeText} ${statusConfig.activeBorder} hover:opacity-80`
-                          : "cursor-not-allowed border border-rose-200 bg-rose-50 text-rose-700 opacity-70 dark:border-rose-900 dark:bg-rose-950/30 dark:text-rose-300"
-                      }`}
+                      className={
+                        isAdmin
+                          ? `flex min-h-[34px] w-full items-center gap-2 rounded-xl px-3 text-left text-[13px] font-medium shadow-sm transition-all ${statusConfig.activeBg} ${statusConfig.activeText} ${statusConfig.activeBorder} hover:opacity-80`
+                          : "flex min-h-[34px] w-full cursor-not-allowed items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-3 text-left text-[13px] font-medium text-rose-700 opacity-70 shadow-sm dark:border-rose-900 dark:bg-rose-950/30 dark:text-rose-300"
+                      }
                     >
-                      <span className="shrink-0">{statusConfig.icon}</span>
-                      <span className="whitespace-nowrap">
-                        {isAdmin
-                          ? t`Gia hạn và mở khóa`
-                          : t`Đã quá hạn — cần Admin gia hạn`}
-                      </span>
+                      {statusConfig.icon}
+                      {isAdmin
+                        ? t`Gia hạn và mở khóa`
+                        : t`Đã quá hạn — cần Admin gia hạn`}
                     </button>
                   ) : (
                     <button
-                      disabled={!isStatusUpdateAllowed}
-                      aria-busy={isBusy}
+                      disabled={isBusy || !canEdit}
                       onClick={() =>
                         handleStatusChange(
                           currentStatus === "done" ? "pending" : "done",
                         )
                       }
-                      className={`flex min-h-[34px] w-full items-center gap-2 rounded-xl px-3 text-left text-[13px] font-medium shadow-sm transition-all ${!isStatusUpdateAllowed ? "cursor-not-allowed opacity-50" : statusConfig.activeBg + " " + statusConfig.activeText + " " + statusConfig.activeBorder + " hover:opacity-80"} `}
+                      className={`flex min-h-[34px] w-full items-center gap-2 rounded-xl px-3 text-left text-[13px] font-medium shadow-sm transition-all ${!canEdit ? "cursor-not-allowed opacity-50" : statusConfig.activeBg + " " + statusConfig.activeText + " " + statusConfig.activeBorder + " hover:opacity-80"} `}
                     >
                       {statusConfig.icon}
-                      {isBusy
-                        ? t`Đang lưu...`
-                        : statusConfig.label === "Done"
-                          ? "Đánh dấu chưa xong"
-                          : "Đánh dấu đã xong"}
+                      {statusConfig.label === "Done"
+                        ? "Đánh dấu chưa xong"
+                        : "Đánh dấu đã xong"}
                     </button>
                   )}
                 </div>
@@ -784,13 +732,52 @@ export function EventDetailModal({
 
             {wasExtended && originalEndDate ? (
               <div className="mx-6 mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200">
-                {t`Deadline gốc`}:{" "}
-                {formatInAppCalendarZone(originalEndDate, "dd/MM/yyyy HH:mm")}
+                {t`Deadline gốc`}: {format(originalEndDate, "dd/MM/yyyy HH:mm")}
                 {" · "}
-                {t`Deadline hiện hành`}:{" "}
-                {formatInAppCalendarZone(endDate, "dd/MM/yyyy HH:mm")}
+                {t`Deadline hiện hành`}: {format(endDate, "dd/MM/yyyy HH:mm")}
               </div>
             ) : null}
+
+            {penaltyDetails ? (
+              <div className="mx-6 mt-3 grid gap-3 rounded-xl border border-light-300 bg-light-100 p-4 dark:border-dark-400 dark:bg-dark-200 sm:grid-cols-[1fr_1fr_auto] sm:items-center">
+                <div>
+                  <p className="text-xs text-light-900 dark:text-dark-900">
+                    {t`Mức độ`}
+                  </p>
+                  <p className="mt-1 text-sm font-semibold text-light-1000 dark:text-dark-1000">
+                    {penaltyPriorityLabel(penaltyDetails.priority)}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-light-900 dark:text-dark-900">
+                    {t`Mức phạt đã chốt`}
+                  </p>
+                  <p className="mt-1 text-sm font-semibold tabular-nums text-light-1000 dark:text-dark-1000">
+                    {formatVnd(penaltyDetails.amountVnd)}
+                  </p>
+                  <p className="mt-0.5 text-xs text-light-800 dark:text-dark-800">
+                    {penaltySourceLabel(penaltyDetails.source)}
+                  </p>
+                </div>
+                {penaltyDetails.assessment?.status === "voided" ? (
+                  <span className="rounded-md bg-amber-100 px-2.5 py-1.5 text-xs font-semibold text-amber-800 dark:bg-amber-950/50 dark:text-amber-300">
+                    {t`Khoản phạt đã hủy`}
+                  </span>
+                ) : penaltyDetails.assessment ? (
+                  <span className="rounded-md bg-red-100 px-2.5 py-1.5 text-xs font-semibold text-red-700 dark:bg-red-950/50 dark:text-red-300">
+                    {t`Đã ghi nhận phạt`}
+                  </span>
+                ) : (
+                  <span className="rounded-md bg-light-300 px-2.5 py-1.5 text-xs font-medium text-light-900 dark:bg-dark-300 dark:text-dark-900">
+                    {t`Chưa ghi nhận phạt`}
+                  </span>
+                )}
+              </div>
+            ) : (
+              <div className="mx-6 mt-3 rounded-xl border border-dashed border-light-400 px-4 py-3 text-xs text-light-900 dark:border-dark-500 dark:text-dark-900">
+                {t`Task này không có mức độ ưu tiên và không phát sinh phạt.`}
+              </div>
+            )}
 
             <div className="mx-6 shrink-0 border-t border-light-200 dark:border-dark-300" />
             <div className="sticky top-0 z-10 shrink-0 bg-light-50/80 px-6 py-2 backdrop-blur-md dark:bg-dark-50/80">
@@ -1013,17 +1000,6 @@ export function EventDetailModal({
           isSubmitting={extendMissedInstance.isPending}
           onClose={() => setIsExtensionModalOpen(false)}
           onSubmit={(newEndDate, reason) => {
-            if (!isMissedExtensionAllowed) {
-              if (sessionStatus === "unavailable") {
-                showPopup({
-                  header: t`Không thể gia hạn công việc`,
-                  message: t`Đang mất kết nối tới máy chủ. Vui lòng thử lại khi kết nối được khôi phục.`,
-                  icon: "info",
-                });
-              }
-              return;
-            }
-
             extendMissedInstance.mutate({
               id: extensionTaskInstanceId,
               newEndDate,

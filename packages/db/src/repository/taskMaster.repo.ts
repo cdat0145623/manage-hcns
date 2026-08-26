@@ -1,28 +1,13 @@
-import { and, eq, gte } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 
 import type { dbClient } from "@kan/db/client";
-import {
-  cardActivities,
-  frequences,
-  taskInstances,
-  taskMasters,
-  users,
-} from "@kan/db/schema";
-import {
-  calendarDateKeyInAppZone,
-  generateUID,
-  parseCalendarDayInZone,
-} from "@kan/shared/utils";
+import { cardActivities, frequences, taskMasters } from "@kan/db/schema";
+import { generateUID } from "@kan/shared/utils";
 
+import type { MasterPenaltyPolicyInput } from "./taskPenaltyPolicy.repo";
 import * as cardActivitesRepo from "./cardActivity.repo";
 import * as frequenceRepo from "./frequence.repo";
-import { cloneMasterRewardTemplateToInstanceInTransaction } from "./reward.repo";
-import {
-  buildPendingInstanceReconciliation,
-  getArchivedPendingInstanceIdsBlockingSchedules,
-  hasSameRecurrenceCadence,
-} from "./task-master-schedule";
-import * as taskInstanceRepo from "./taskInstance.repo";
+import { reconcilePendingPenaltySnapshots } from "./taskPenaltyPolicy.repo";
 
 export const create = async (
   db: dbClient,
@@ -34,6 +19,14 @@ export const create = async (
     endDate: Date;
     selectedUserId: string;
     rruleString: string;
+    penaltyPolicy?:
+      | { priority: null }
+      | { priority: "high" | "medium" | "low"; amountMode: "default" }
+      | {
+          priority: "high" | "medium" | "low";
+          amountMode: "override";
+          overrideAmountVnd: number;
+        };
   },
 ) => {
   return await db.transaction(async (tx) => {
@@ -42,6 +35,10 @@ export const create = async (
       rrule: taskMasterInput.rruleString,
       dtStart: taskMasterInput.startDate,
     });
+
+    if (!frequence) {
+      throw new Error("Failed to create frequency");
+    }
 
     // 2. Tạo task master
     const [taskMaster] = await tx
@@ -54,9 +51,17 @@ export const create = async (
         endDate: taskMasterInput.endDate,
         createdBy: taskMasterInput.userId,
         freqId: frequence.id,
+        priority: taskMasterInput.penaltyPolicy?.priority ?? null,
+        publicId: generateUID(),
+        penaltyOverrideAmountVnd:
+          taskMasterInput.penaltyPolicy?.priority &&
+          taskMasterInput.penaltyPolicy.amountMode === "override"
+            ? taskMasterInput.penaltyPolicy.overrideAmountVnd
+            : null,
       })
       .returning({
         id: taskMasters.id,
+        publicId: taskMasters.publicId,
         name: taskMasters.name,
         description: taskMasters.description,
         startDate: taskMasters.startDate,
@@ -98,33 +103,19 @@ export const update = async (
     selectedUserId?: string;
     rruleString?: string;
     userId: string;
-    effectiveFrom: string;
+    penaltyPolicy?: {
+      policy: MasterPenaltyPolicyInput;
+      priorityChangeAction?: "keep_override" | "use_new_default";
+    };
   },
 ) => {
   return await db.transaction(async (tx) => {
-    const [existingTaskMaster] = await tx
-      .select()
-      .from(taskMasters)
-      .where(eq(taskMasters.id, taskMasterInput.id))
-      .for("update");
+    const existingTaskMaster = await tx.query.taskMasters.findFirst({
+      where: eq(taskMasters.id, taskMasterInput.id),
+    });
 
     if (!existingTaskMaster) {
       throw new Error("Task master not found");
-    }
-    const [actor] = await tx
-      .select({ role: users.role })
-      .from(users)
-      .where(eq(users.id, taskMasterInput.userId))
-      .for("share");
-    if (!actor) {
-      throw new Error("TASK_MASTER_FORBIDDEN");
-    }
-    if (
-      actor.role !== "ADMIN" &&
-      taskMasterInput.userId !== existingTaskMaster.createdBy &&
-      taskMasterInput.userId !== existingTaskMaster.targetUser
-    ) {
-      throw new Error("TASK_MASTER_FORBIDDEN");
     }
 
     const oldFreq = await tx.query.frequences.findFirst({
@@ -135,44 +126,74 @@ export const update = async (
       throw new Error("Frequency not found");
     }
 
-    const nextStartDate =
-      taskMasterInput.startDate ?? existingTaskMaster.startDate;
-    const nextEndDate = taskMasterInput.endDate ?? existingTaskMaster.endDate;
-    const nextTargetUser =
-      taskMasterInput.selectedUserId ?? existingTaskMaster.targetUser;
-    const nextName = taskMasterInput.name ?? existingTaskMaster.name;
-    const nextDescription =
-      taskMasterInput.description ?? existingTaskMaster.description;
-    const nextRruleString = taskMasterInput.rruleString ?? oldFreq.rruleString;
+    let nextPenaltyPolicy = taskMasterInput.penaltyPolicy?.policy;
+    if (taskMasterInput.penaltyPolicy) {
+      const priorityChanged =
+        existingTaskMaster.priority !== nextPenaltyPolicy?.priority;
+      if (
+        priorityChanged &&
+        existingTaskMaster.penaltyOverrideAmountVnd !== null &&
+        existingTaskMaster.penaltyOverrideAmountVnd !== undefined
+      ) {
+        if (!taskMasterInput.penaltyPolicy.priorityChangeAction) {
+          throw new Error(
+            "priorityChangeAction is required when changing a priority with an override",
+          );
+        }
+        if (
+          taskMasterInput.penaltyPolicy.priorityChangeAction ===
+            "keep_override" &&
+          nextPenaltyPolicy?.priority
+        ) {
+          nextPenaltyPolicy = {
+            priority: nextPenaltyPolicy.priority,
+            amountMode: "override",
+            overrideAmountVnd: existingTaskMaster.penaltyOverrideAmountVnd,
+          };
+        }
+      }
+    }
 
     let frequence;
-    if (
-      taskMasterInput.rruleString !== undefined ||
-      taskMasterInput.startDate !== undefined
-    ) {
+    if (taskMasterInput.rruleString) {
       frequence = await frequenceRepo.update(tx, {
         id: existingTaskMaster.freqId,
-        name: nextRruleString,
-        rrule: nextRruleString,
-        dtStart: nextStartDate,
+        name: taskMasterInput.rruleString,
+        rrule: taskMasterInput.rruleString,
+        dtStart: taskMasterInput.startDate,
       });
+
+      if (!frequence) {
+        throw new Error("Failed to update frequency");
+      }
     }
 
     // 2. Tạo task master
     const [taskMaster] = await tx
       .update(taskMasters)
       .set({
-        targetUser: nextTargetUser,
-        name: nextName,
-        description: nextDescription,
-        startDate: nextStartDate,
-        endDate: nextEndDate,
-        freqId: frequence?.id ?? oldFreq.id,
+        targetUser: taskMasterInput.selectedUserId,
+        name: taskMasterInput.name,
+        description: taskMasterInput.description,
+        startDate: taskMasterInput.startDate,
+        endDate: taskMasterInput.endDate,
+        freqId: frequence?.id || oldFreq.id,
+        ...(taskMasterInput.penaltyPolicy
+          ? {
+              priority: nextPenaltyPolicy?.priority ?? null,
+              penaltyOverrideAmountVnd:
+                nextPenaltyPolicy?.priority &&
+                nextPenaltyPolicy.amountMode === "override"
+                  ? nextPenaltyPolicy.overrideAmountVnd
+                  : null,
+            }
+          : {}),
         updatedAt: new Date(),
       })
       .where(eq(taskMasters.id, taskMasterInput.id))
       .returning({
         id: taskMasters.id,
+        publicId: taskMasters.publicId,
         name: taskMasters.name,
         description: taskMasters.description,
         startDate: taskMasters.startDate,
@@ -185,252 +206,36 @@ export const update = async (
       throw new Error("Failed to update task master");
     }
 
-    const effectiveDayStart = parseCalendarDayInZone(
-      taskMasterInput.effectiveFrom,
-    );
-    const materializedInstances = await tx.query.taskInstances.findMany({
-      where: and(
-        eq(taskInstances.taskMasterId, taskMaster.id),
-        gte(taskInstances.targetDate, effectiveDayStart),
-      ),
-      columns: {
-        id: true,
-        targetDate: true,
-        endDate: true,
-        status: true,
-        isDeleted: true,
-      },
-    });
-    const activeMaterialized = materializedInstances.filter(
-      (instance) => !instance.isDeleted && instance.targetDate,
-    );
-    const existingPending = activeMaterialized.flatMap((instance) =>
-      instance.status === "pending" && instance.targetDate
-        ? [
-            {
-              id: instance.id,
-              targetDate: instance.targetDate,
-              endDate: instance.endDate,
-            },
-          ]
-        : [],
-    );
-    const occupiedTargetDates = activeMaterialized.flatMap((instance) =>
-      instance.status !== "pending" && instance.targetDate
-        ? [instance.targetDate]
-        : [],
-    );
-    const existingPendingTargetDateById = new Map(
-      existingPending.map((instance) => [instance.id, instance.targetDate]),
-    );
-    const horizonTargetDate = activeMaterialized.reduce<Date | undefined>(
-      (latest, instance) =>
-        instance.targetDate && (!latest || instance.targetDate > latest)
-          ? instance.targetDate
-          : latest,
-      undefined,
-    );
-    const cadenceChanged = !hasSameRecurrenceCadence(
-      oldFreq.rruleString,
-      nextRruleString,
-    );
-    const desired =
-      cadenceChanged && horizonTargetDate
-        ? await taskInstanceRepo.generateVirtualTaskInstances({
-            userId: nextTargetUser,
-            taskMasterId: taskMaster.id,
-            rruleString: nextRruleString,
-            startDate: nextStartDate,
-            masterEndDate: nextEndDate,
-            from: effectiveDayStart,
-            to: new Date(
-              parseCalendarDayInZone(
-                calendarDateKeyInAppZone(horizonTargetDate),
-              ).getTime() +
-                24 * 60 * 60 * 1000 -
-                1,
-            ),
-          })
-        : [];
-    const reconciliationPlan = buildPendingInstanceReconciliation({
-      cadenceChanged,
-      existing: existingPending,
-      desired,
-      occupiedTargetDates,
-      newMasterStartDate: nextStartDate,
-      newMasterEndDate: nextEndDate,
-    });
-    const now = new Date();
-    const archivedPendingIdsBlockingReconciliation =
-      getArchivedPendingInstanceIdsBlockingSchedules({
-        materialized: materializedInstances,
-        schedules: [
-          ...reconciliationPlan.updates,
-          ...reconciliationPlan.creates,
-        ],
-      });
-    for (const id of archivedPendingIdsBlockingReconciliation) {
-      await tx
-        .update(taskInstances)
-        .set({ targetDate: null, updatedAt: now })
-        .where(eq(taskInstances.id, id));
-    }
-
-    for (const update of reconciliationPlan.updates) {
-      await tx
-        .update(taskInstances)
-        .set({
-          userId: nextTargetUser,
-          name: nextName,
-          description: nextDescription,
-          targetDate: update.targetDate,
-          endDate: update.endDate,
-          updatedAt: now,
-        })
-        .where(eq(taskInstances.id, update.id));
-    }
-
-    if (reconciliationPlan.archives.length > 0) {
-      for (const id of reconciliationPlan.archives) {
-        await tx
-          .update(taskInstances)
-          .set({
-            isDeleted: true,
-            targetDate: null,
-            deleteAt: now,
-            deleteBy: taskMasterInput.userId,
-            updatedAt: now,
-          })
-          .where(eq(taskInstances.id, id));
-      }
-    }
-
-    const createdInstanceIds: string[] = [];
-    for (const schedule of reconciliationPlan.creates) {
-      const [created] = await tx
-        .insert(taskInstances)
-        .values({
-          userId: nextTargetUser,
-          taskMasterId: taskMaster.id,
-          name: nextName,
-          description: nextDescription,
-          targetDate: schedule.targetDate,
-          actualDate: null,
-          endDate: schedule.endDate,
-          status: "pending",
-        })
-        .onConflictDoNothing({
-          target: [
-            taskInstances.userId,
-            taskInstances.taskMasterId,
-            taskInstances.targetDate,
-          ],
-        })
-        .returning({ id: taskInstances.id });
-
-      if (!created) {
-        throw new Error(
-          "TASK_MASTER_SCHEDULE_CONFLICT: A task already exists at the requested time",
-        );
-      }
-
-      createdInstanceIds.push(created.id);
-      await cloneMasterRewardTemplateToInstanceInTransaction(tx, {
+    if (taskMasterInput.penaltyPolicy) {
+      await reconcilePendingPenaltySnapshots(tx, {
+        effectiveFrom: new Date(0),
         taskMasterId: taskMaster.id,
-        taskInstanceId: created.id,
-        createdBy: taskMasterInput.userId,
+        actorUserId: taskMasterInput.userId,
       });
-    }
-
-    const reconciliation = {
-      updatedPending: reconciliationPlan.updates.length,
-      archivedPending: reconciliationPlan.archives.length,
-      createdPending: createdInstanceIds.length,
-      retainedPending: reconciliationPlan.retainedPending,
-    };
-    const auditMetadata = {
-      effectiveFrom: taskMasterInput.effectiveFrom,
-      oldSchedule: {
-        startDate: existingTaskMaster.startDate.toISOString(),
-        endDate: existingTaskMaster.endDate.toISOString(),
-        rruleString: oldFreq.rruleString,
-      },
-      newSchedule: {
-        startDate: nextStartDate.toISOString(),
-        endDate: nextEndDate.toISOString(),
-        rruleString: nextRruleString,
-      },
-      reconciliation,
-    };
-
-    const scheduleActivities = [];
-    if (nextStartDate.getTime() !== existingTaskMaster.startDate.getTime()) {
-      scheduleActivities.push({
-        type: "start_date_changed" as const,
-        taskMasterId: taskMaster.id,
-        oldValue: existingTaskMaster.startDate.toISOString(),
-        newValue: nextStartDate.toISOString(),
-        createdBy: taskMasterInput.userId,
-        metadata: auditMetadata,
-      });
-    }
-    if (nextEndDate.getTime() !== existingTaskMaster.endDate.getTime()) {
-      scheduleActivities.push({
-        type: "deadline_changed" as const,
-        taskMasterId: taskMaster.id,
-        oldValue: existingTaskMaster.endDate.toISOString(),
-        newValue: nextEndDate.toISOString(),
-        createdBy: taskMasterInput.userId,
-        metadata: auditMetadata,
-      });
-    }
-    if (nextRruleString !== oldFreq.rruleString) {
-      scheduleActivities.push({
-        type: "updated_rruleString" as const,
-        taskMasterId: taskMaster.id,
-        oldValue: oldFreq.rruleString,
-        newValue: nextRruleString,
-        createdBy: taskMasterInput.userId,
-        metadata: auditMetadata,
-      });
-    }
-    scheduleActivities.push(
-      ...reconciliationPlan.archives.map((id) => ({
-        type: "archived" as const,
-        taskInstanceId: id,
-        oldValue: existingPendingTargetDateById.get(id)?.toISOString(),
-        createdBy: taskMasterInput.userId,
-        metadata: auditMetadata,
-      })),
-      ...createdInstanceIds.map((id) => ({
-        type: "created" as const,
-        taskInstanceId: id,
-        createdBy: taskMasterInput.userId,
-        metadata: auditMetadata,
-      })),
-    );
-    if (scheduleActivities.length > 0) {
-      await cardActivitesRepo.bulkCreateForTaskInstance(tx, scheduleActivities);
     }
 
     if (
-      taskMasterInput.name !== undefined &&
-      taskMasterInput.name !== existingTaskMaster.name
+      taskMasterInput.rruleString &&
+      taskMasterInput.rruleString !== oldFreq.rruleString
     ) {
-      await cardActivitesRepo.bulkCreateForTaskInstance(tx, [
+      const cardActivitesInsert = [
         {
-          type: "updated_title",
+          type: "updated_rruleString" as const,
           taskMasterId: taskMaster.id,
-          oldValue: existingTaskMaster.name ?? undefined,
-          newValue: taskMasterInput.name,
+          oldValue: oldFreq.rruleString ?? undefined,
+          newValue: taskMasterInput.rruleString ?? undefined,
           createdBy: taskMasterInput.userId,
-          metadata: auditMetadata,
         },
-      ]);
+      ];
+
+      await cardActivitesRepo.bulkCreateForTaskInstance(
+        tx,
+        cardActivitesInsert,
+      );
     }
 
     if (
-      taskMasterInput.description !== undefined &&
+      taskMasterInput.description &&
       taskMasterInput.description !== existingTaskMaster.description
     ) {
       const cardActivitesInsert = [
@@ -440,7 +245,6 @@ export const update = async (
           oldValue: existingTaskMaster.description ?? undefined,
           newValue: taskMasterInput.description ?? undefined,
           createdBy: taskMasterInput.userId,
-          metadata: auditMetadata,
         },
       ];
 
@@ -461,7 +265,6 @@ export const update = async (
           oldValue: existingTaskMaster.targetUser,
           newValue: taskMasterInput.selectedUserId,
           createdBy: taskMasterInput.userId,
-          metadata: auditMetadata,
         },
       ];
 
@@ -471,7 +274,7 @@ export const update = async (
       );
     }
 
-    return { taskMaster, reconciliation };
+    return taskMaster;
   });
 };
 

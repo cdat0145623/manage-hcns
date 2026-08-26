@@ -4,12 +4,14 @@ import { TRPCError } from "@trpc/server";
 import * as rrule from "rrule";
 import { z } from "zod";
 
+import type { PenaltySnapshot } from "@kan/db/repository/taskPenaltyPolicy.repo";
 import * as cardActivityRepo from "@kan/db/repository/cardActivity.repo";
 import * as cardCommentRepo from "@kan/db/repository/cardComment.repo";
 import * as rewardRepo from "@kan/db/repository/reward.repo";
 import * as taskInstanceRepo from "@kan/db/repository/taskInstance.repo";
 import * as taskInstanceStatusRepo from "@kan/db/repository/taskInstanceStatus.repo";
 import * as taskMasterRepo from "@kan/db/repository/taskMaster.repo";
+import { loadPenaltySnapshotsForMasters } from "@kan/db/repository/taskPenaltyPolicy.repo";
 import * as userRepo from "@kan/db/repository/user.repo";
 import { statusTypeEnum } from "@kan/db/schema";
 import { applyMasterWallTimeToAnchorDay } from "@kan/shared/utils";
@@ -171,6 +173,17 @@ export const taskInstanceRouter = createTRPCRouter({
             },
             where: (t, { isNull }) => isNull(t.deletedAt),
           },
+          penaltyAssessment: {
+            columns: {
+              publicId: true,
+              amountVnd: true,
+              currency: true,
+              source: true,
+              policyPublicId: true,
+              assessedAt: true,
+              status: true,
+            },
+          },
         },
       });
 
@@ -293,7 +306,6 @@ export const taskInstanceRouter = createTRPCRouter({
         to: z.coerce.date(),
       }),
     )
-    .output(z.any())
     .query(async ({ ctx, input }) => {
       // const taskMaster = await ctx.db.query.taskMasters.findFirst({
       //     where: (t, { eq }) => eq(t.id, input.taskMasterId),
@@ -342,6 +354,17 @@ export const taskInstanceRouter = createTRPCRouter({
             },
             where: (t, { isNull }) => isNull(t.deletedAt),
           },
+          penaltyAssessment: {
+            columns: {
+              publicId: true,
+              amountVnd: true,
+              currency: true,
+              source: true,
+              policyPublicId: true,
+              assessedAt: true,
+              status: true,
+            },
+          },
         },
       });
 
@@ -349,6 +372,7 @@ export const taskInstanceRouter = createTRPCRouter({
         const taskMaster = taskInstance.taskMaster;
         if (
           !taskInstance.targetDate ||
+          !taskInstance.endDate ||
           taskMaster.isDeleted ||
           (input.createdBy && taskMaster.createdBy !== input.createdBy)
         ) {
@@ -378,10 +402,24 @@ export const taskInstanceRouter = createTRPCRouter({
               startDate: taskMaster.startDate,
               endDate: taskMaster.endDate,
               createdBy: taskMaster.createdBy,
-              rruleString,
+              priority: taskInstance.penaltyPriority,
+              recurrence: "CUSTOM" as const,
+              rruleString: rruleString ?? "",
               rruleStringToText: ruleText,
             },
             assignee: taskInstance.user,
+            color: null,
+            duration: undefined,
+            recurrence: "CUSTOM" as const,
+            rruleString: rruleString ?? "",
+            penalty: {
+              priority: taskInstance.penaltyPriority,
+              amountVnd: taskInstance.penaltyAmountVnd,
+              source: taskInstance.penaltySource,
+              policyPublicId: taskInstance.penaltyPolicyPublicId,
+              snapshottedAt: taskInstance.penaltySnapshottedAt,
+              assessment: taskInstance.penaltyAssessment,
+            },
           },
         ];
       });
@@ -404,9 +442,6 @@ export const taskInstanceRouter = createTRPCRouter({
               const rule = RRule.fromString(normalizedRrule);
               const ruleText = rule.toText(vietnameseGettext, VIETNAMESE);
 
-              const from = input.from;
-              const to = input.to;
-
               const virtualTaskInstances =
                 await taskInstanceRepo.generateVirtualTaskInstances({
                   userId: taskMaster.targetUser,
@@ -414,12 +449,20 @@ export const taskInstanceRouter = createTRPCRouter({
                   rruleString: taskMaster.frequence.rruleString,
                   startDate: taskMaster.startDate,
                   masterEndDate: taskMaster.endDate,
-                  from,
-                  to,
+                  from: input.from,
+                  to: input.to,
                 });
 
               return virtualTaskInstances.map((virtualInstance) => ({
                 ...virtualInstance,
+                name: taskMaster.name,
+                description: taskMaster.description,
+                originalEndDate: virtualInstance.endDate,
+                color: null,
+                duration: undefined,
+                recurrence: "CUSTOM" as const,
+                rruleString: taskMaster.frequence.rruleString ?? "",
+                checklists: [],
                 taskMaster: {
                   name: taskMaster.name,
                   description: taskMaster.description,
@@ -427,7 +470,11 @@ export const taskInstanceRouter = createTRPCRouter({
                   startDate: taskMaster.startDate,
                   endDate: taskMaster.endDate,
                   createdBy: taskMaster.createdBy,
-                  rruleString: taskMaster.frequence.rruleString,
+                  priority: taskMaster.priority,
+                  penaltyOverrideAmountVnd:
+                    taskMaster.penaltyOverrideAmountVnd,
+                  recurrence: "CUSTOM" as const,
+                  rruleString: taskMaster.frequence.rruleString ?? "",
                   rruleStringToText: ruleText,
                 },
                 assignee: taskMaster.assignee,
@@ -439,9 +486,63 @@ export const taskInstanceRouter = createTRPCRouter({
         )
       ).flat();
 
+      const virtualSnapshots = new Map<string, PenaltySnapshot | null>();
+      const occurrencesByDate = new Map<string, typeof virtualInstances>();
+      for (const instance of virtualInstances) {
+        const key = instance.targetDate.toISOString();
+        const occurrences = occurrencesByDate.get(key) ?? [];
+        occurrences.push(instance);
+        occurrencesByDate.set(key, occurrences);
+      }
+      await Promise.all(
+        Array.from(occurrencesByDate.entries()).map(
+          async ([dateKey, occurrences]) => {
+            const mastersById = new Map(
+              occurrences.map((occurrence) => [
+                occurrence.taskMasterId,
+                {
+                  id: occurrence.taskMasterId,
+                  priority: occurrence.taskMaster.priority,
+                  overrideAmountVnd:
+                    occurrence.taskMaster.penaltyOverrideAmountVnd,
+                },
+              ]),
+            );
+            const snapshots = await loadPenaltySnapshotsForMasters(
+              ctx.db,
+              Array.from(mastersById.values()),
+              new Date(dateKey),
+            );
+            for (const occurrence of occurrences) {
+              virtualSnapshots.set(
+                occurrence.id,
+                snapshots.get(occurrence.taskMasterId) ?? null,
+              );
+            }
+          },
+        ),
+      );
+
+      const enrichedVirtualInstances = virtualInstances.map((instance) => {
+        const snapshot = virtualSnapshots.get(instance.id) ?? null;
+        return {
+          ...instance,
+          penalty: snapshot
+            ? {
+                priority: snapshot.priority,
+                amountVnd: snapshot.amountVnd,
+                policyPublicId: snapshot.policyPublicId,
+                source: snapshot.source,
+                snapshottedAt: null,
+                assessment: null,
+              }
+            : null,
+        };
+      });
+
       return mergeStoredAndVirtualTaskInstances({
         storedInstances,
-        virtualInstances,
+        virtualInstances: enrichedVirtualInstances,
       });
     }),
   extendMissed: protectedProcedure

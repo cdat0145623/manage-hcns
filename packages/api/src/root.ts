@@ -18,6 +18,7 @@ import { rewardConfigRouter } from "./routers/reward";
 import { rewardPublicRouter } from "./routers/rewardPublic";
 import { taskInstanceRouter } from "./routers/taskInstance";
 import { taskMasterRouter } from "./routers/taskMaster";
+import { taskPenaltyRouter } from "./routers/taskPenalty";
 import { userRouter } from "./routers/user";
 import { webhookRouter } from "./routers/webhook";
 import { workspaceRouter } from "./routers/workspace";
@@ -44,6 +45,7 @@ export const appRouter = createTRPCRouter({
   workspace: workspaceRouter,
   integration: integrationRouter,
   taskMaster: taskMasterRouter,
+  taskPenalty: taskPenaltyRouter,
   taskInstance: taskInstanceRouter,
   reward: rewardConfigRouter,
   rewardPublic: rewardPublicRouter,

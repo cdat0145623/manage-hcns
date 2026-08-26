@@ -9,10 +9,12 @@ import {
   statusTypeEnum,
   taskInstanceExtensions,
   taskInstances,
+  taskPenaltyAssessments,
 } from "@kan/db/schema";
-import { generateUID } from "@kan/shared/utils";
+import { applyMasterWallTimeToAnchorDay, generateUID } from "@kan/shared/utils";
 
-import { buildScheduleOnAnchorDay } from "./task-master-schedule";
+import type { PenaltyPolicyActivityMetadata } from "./taskPenaltyPolicy.repo";
+import { loadPenaltySnapshotsForMasters } from "./taskPenaltyPolicy.repo";
 
 type RRuleExports = Pick<typeof rruleModule, "RRule">;
 const rruleCandidate = rruleModule as RRuleExports & {
@@ -30,6 +32,56 @@ const { RRule } = rruleExports;
 
 export type TaskStatus = (typeof statusTypeEnum.enumValues)[number];
 
+async function assessTaskInstancePenalty(
+  db: dbClient,
+  instance: {
+    id: string;
+    penaltyAmountVnd: number | null;
+    penaltySource:
+      | "system_default"
+      | "global_policy"
+      | "master_override"
+      | null;
+    penaltyPolicyPublicId: string | null;
+  },
+  options: { actorUserId: string | null; assessedAt: Date },
+) {
+  if (instance.penaltyAmountVnd === null || instance.penaltySource === null) {
+    return null;
+  }
+
+  const [assessment] = await db
+    .insert(taskPenaltyAssessments)
+    .values({
+      publicId: generateUID(),
+      taskInstanceId: instance.id,
+      amountVnd: instance.penaltyAmountVnd,
+      source: instance.penaltySource,
+      policyPublicId: instance.penaltyPolicyPublicId,
+      assessedAt: options.assessedAt,
+    })
+    .onConflictDoNothing({ target: taskPenaltyAssessments.taskInstanceId })
+    .returning({ publicId: taskPenaltyAssessments.publicId });
+
+  if (assessment) {
+    await db.insert(cardActivities).values({
+      publicId: generateUID(),
+      taskInstanceId: instance.id,
+      type: "penalty_assessed",
+      createdBy: options.actorUserId,
+      createdAt: options.assessedAt,
+      metadata: {
+        amountVnd: instance.penaltyAmountVnd,
+        currency: "VND",
+        source: instance.penaltySource,
+        policyPublicId: instance.penaltyPolicyPublicId,
+      },
+    });
+  }
+
+  return assessment ?? null;
+}
+
 export const create = async (
   db: dbClient,
   taskInstanceInput: {
@@ -43,17 +95,53 @@ export const create = async (
     status: TaskStatus;
   },
 ) => {
+  const master = await db.query.taskMasters.findFirst({
+    where: (table, { eq }) => eq(table.id, taskInstanceInput.taskMasterId),
+    columns: {
+      id: true,
+      priority: true,
+      penaltyOverrideAmountVnd: true,
+    },
+  });
+  if (!master) throw new Error("Task master not found");
+  const penaltySnapshots = await loadPenaltySnapshotsForMasters(
+    db,
+    [
+      {
+        id: master.id,
+        priority: master.priority,
+        overrideAmountVnd: master.penaltyOverrideAmountVnd,
+      },
+    ],
+    taskInstanceInput.targetDate,
+  );
+  const penaltySnapshot = penaltySnapshots.get(master.id) ?? null;
+
   return db.transaction(async (tx) => {
-    const [taskInstance] = await tx
+    const [insertedTaskInstance] = await tx
       .insert(taskInstances)
       .values({
         userId: taskInstanceInput.userId,
         taskMasterId: taskInstanceInput.taskMasterId,
+        name: taskInstanceInput.name,
+        description: taskInstanceInput.description,
         targetDate: taskInstanceInput.targetDate,
         actualDate: taskInstanceInput.actualDate,
         originalEndDate: taskInstanceInput.endDate,
         endDate: taskInstanceInput.endDate,
         status: taskInstanceInput.status,
+        penaltyPriority: penaltySnapshot?.priority,
+        penaltyAmountVnd: penaltySnapshot?.amountVnd,
+        penaltySource: penaltySnapshot?.source,
+        penaltyPolicyPublicId: penaltySnapshot?.policyPublicId,
+        penaltySnapshottedAt: penaltySnapshot ? new Date() : null,
+      })
+      .onConflictDoNothing({
+        target: [
+          taskInstances.userId,
+          taskInstances.taskMasterId,
+          taskInstances.targetDate,
+        ],
       })
       .returning({
         id: taskInstances.id,
@@ -64,10 +152,40 @@ export const create = async (
         originalEndDate: taskInstances.originalEndDate,
         endDate: taskInstances.endDate,
         status: taskInstances.status,
+        penaltyAmountVnd: taskInstances.penaltyAmountVnd,
+        penaltySource: taskInstances.penaltySource,
+        penaltyPolicyPublicId: taskInstances.penaltyPolicyPublicId,
       });
+
+    const taskInstance =
+      insertedTaskInstance ??
+      (await tx.query.taskInstances.findFirst({
+        where: and(
+          eq(taskInstances.userId, taskInstanceInput.userId),
+          eq(taskInstances.taskMasterId, taskInstanceInput.taskMasterId),
+          eq(taskInstances.targetDate, taskInstanceInput.targetDate),
+        ),
+        columns: {
+          id: true,
+          userId: true,
+          taskMasterId: true,
+          targetDate: true,
+          actualDate: true,
+          originalEndDate: true,
+          endDate: true,
+          status: true,
+          penaltyAmountVnd: true,
+          penaltySource: true,
+          penaltyPolicyPublicId: true,
+        },
+      }));
 
     if (!taskInstance) {
       throw new Error("Failed to create task instance");
+    }
+
+    if (!insertedTaskInstance) {
+      return taskInstance;
     }
 
     await tx.insert(cardActivities).values({
@@ -76,6 +194,32 @@ export const create = async (
       type: "created",
       createdBy: taskInstance.userId,
     });
+
+    if (penaltySnapshot) {
+      const metadata: PenaltyPolicyActivityMetadata = {
+        version: 1,
+        effectiveFrom: penaltySnapshot.effectiveFrom.toISOString(),
+        priority: penaltySnapshot.priority,
+        amountVnd: penaltySnapshot.amountVnd,
+        source: penaltySnapshot.source,
+        globalDefaultAmountVnd: penaltySnapshot.globalDefaultAmountVnd,
+        policyPublicId: penaltySnapshot.policyPublicId,
+      };
+      await tx.insert(cardActivities).values({
+        publicId: generateUID(),
+        taskInstanceId: taskInstance.id,
+        type: "penalty_policy_applied",
+        createdBy: null,
+        metadata,
+      });
+    }
+
+    if (taskInstance.status === "missed") {
+      await assessTaskInstancePenalty(tx, taskInstance, {
+        actorUserId: taskInstance.userId,
+        assessedAt: new Date(),
+      });
+    }
 
     return taskInstance;
   });
@@ -94,7 +238,7 @@ export const generateVirtualTaskInstances = async (params: {
 
   // Phân tách TZID từ chuỗi RRULE (ví dụ: Asia/Ho_Chi_Minh)
   const tzidMatch = /TZID=([^;:]+)/.exec(normalizedRrule);
-  const tzid = tzidMatch?.[1] ?? "Asia/Ho_Chi_Minh";
+  const tzid = tzidMatch?.[1] ?? "UTC";
 
   // Hàm lấy offset (ms) của múi giờ tại một thời điểm cụ thể
   const getOffset = (date: Date, timeZone: string) => {
@@ -137,14 +281,9 @@ export const generateVirtualTaskInstances = async (params: {
 
   const rule = RRule.fromString(normalizedRrule);
 
-  // The evaluation rule uses floating UTC values whose fields represent
-  // calendar wall-clock values in `tzid`. Keeping RRule's original tzid here
-  // makes it apply the timezone conversion a second time on UTC runtimes.
-  const { tzid: _tzid, ...floatingRuleOptions } = rule.options;
-
   // Ghi đè dtstart và các thành phần thời gian để RRule evaluation chuẩn xác
   const evaluationRule = new RRule({
-    ...floatingRuleOptions,
+    ...rule.options,
     dtstart: floatingStart,
     // Đảm bảo RRule sử dụng đúng giờ/phút của floatingStart
     byhour: [floatingStart.getUTCHours()],
@@ -162,9 +301,8 @@ export const generateVirtualTaskInstances = async (params: {
     // Chuyển đổi ngược lại từ Floating Time về UTC thật sự
     const target = new Date(date.getTime() - offset);
 
-    const { endDate: instanceEndDate } = buildScheduleOnAnchorDay(
+    const instanceEndDate = applyMasterWallTimeToAnchorDay(
       target,
-      params.startDate,
       params.masterEndDate,
     );
 
@@ -211,13 +349,11 @@ export const update = async (
       currentInstance.endDate?.getTime() !==
         taskInstanceInput.endDate.getTime();
 
-    if (targetDateChanged || endDateChanged) {
-      const extension = await tx.query.taskInstanceExtensions.findFirst({
-        columns: { id: true },
-        where: eq(taskInstanceExtensions.taskInstanceId, taskInstanceInput.id),
-      });
-      if (extension) return null;
-    }
+    const extension = await tx.query.taskInstanceExtensions.findFirst({
+      columns: { id: true },
+      where: eq(taskInstanceExtensions.taskInstanceId, taskInstanceInput.id),
+    });
+    if ((targetDateChanged || endDateChanged) && extension) return null;
 
     const [taskInstance] = await tx
       .update(taskInstances)
@@ -237,7 +373,9 @@ export const update = async (
         ...(taskInstanceInput.endDate !== undefined
           ? {
               endDate: taskInstanceInput.endDate,
-              originalEndDate: taskInstanceInput.endDate,
+              ...(extension
+                ? {}
+                : { originalEndDate: taskInstanceInput.endDate }),
             }
           : {}),
       })
@@ -257,6 +395,9 @@ export const update = async (
         originalEndDate: taskInstances.originalEndDate,
         endDate: taskInstances.endDate,
         status: taskInstances.status,
+        penaltyAmountVnd: taskInstances.penaltyAmountVnd,
+        penaltySource: taskInstances.penaltySource,
+        penaltyPolicyPublicId: taskInstances.penaltyPolicyPublicId,
       });
 
     if (!taskInstance) return null;
@@ -270,6 +411,13 @@ export const update = async (
         newValue: taskInstance.status,
         createdBy: taskInstanceInput.actorUserId,
       });
+
+      if (taskInstance.status === "missed") {
+        await assessTaskInstancePenalty(tx, taskInstance, {
+          actorUserId: taskInstanceInput.actorUserId,
+          assessedAt: new Date(),
+        });
+      }
     }
 
     return taskInstance;

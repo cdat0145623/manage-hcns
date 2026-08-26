@@ -72,6 +72,10 @@ export const activityTypes = [
   "updated_reward_config",
   "updated_deduction",
   "created_finalization",
+  "penalty_assessed",
+  "penalty_policy_applied",
+  "penalty_recalculated",
+  "penalty_voided",
 ] as const;
 
 export type ActivityType = (typeof activityTypes)[number];

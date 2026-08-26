@@ -28,6 +28,7 @@ import { useModal } from "~/providers/modal";
 import { usePopup } from "~/providers/popup";
 import { api } from "~/utils/api";
 import CardDetailsModalContent from "../card/components/CardDetailsModalContent";
+import { DailyTaskKpiPanel } from "../daily-task-kpi/DailyTaskKpiPanel";
 import { CalendarHeader } from "./calendar/CalendarHeader";
 import { CreateEventModal } from "./calendar/CreateEventModal";
 import { DayView } from "./calendar/DayView";
@@ -151,6 +152,7 @@ export function Calendar() {
   const [isSuccessOpen, setIsSuccessOpen] = useState(false);
   const [isRecurringTaskManagerOpen, setIsRecurringTaskManagerOpen] =
     useState(false);
+  const [isDailyTaskKpiOpen, setIsDailyTaskKpiOpen] = useState(false);
   const [successData, setSuccessData] = useState({ title: "", message: "" });
 
   // Custom delete confirmation (replaces window.confirm)
@@ -165,6 +167,10 @@ export function Calendar() {
     setIsCardModalOpen(true);
   };
 
+  const handleOpenDailyTaskKpi = () => {
+    setIsRecurringTaskManagerOpen(false);
+    setIsDailyTaskKpiOpen(true);
+  };
 
   const deleteMutation = api.taskInstance.delete.useMutation({
     onSuccess: () => {
@@ -622,8 +628,22 @@ export function Calendar() {
         isVisible={isRecurringTaskManagerOpen}
         onClose={() => setIsRecurringTaskManagerOpen(false)}
         selectedUserId={selectedUserId}
+        onOpenKpi={handleOpenDailyTaskKpi}
         onEditMaster={handleEditMasterFromManager}
       />
+
+      <Modal
+        modalSize="xl"
+        centered
+        isVisible={isDailyTaskKpiOpen}
+        onClose={() => setIsDailyTaskKpiOpen(false)}
+      >
+        <DailyTaskKpiPanel
+          embedded
+          targetUserId={selectedUserId}
+          onClose={() => setIsDailyTaskKpiOpen(false)}
+        />
+      </Modal>
 
       {/* Custom Delete Confirmation Modal */}
       <AnimatePresence>

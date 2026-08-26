@@ -1,0 +1,1 @@
+export { DailyTaskKpiPanel } from "./DailyTaskKpiView";

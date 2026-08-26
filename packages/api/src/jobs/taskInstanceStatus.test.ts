@@ -64,6 +64,9 @@ async function seedTaskInstance(params: {
   endDate: Date | null;
   actualDate?: Date | null;
   isDeleted?: boolean;
+  penaltyAmountVnd?: number | null;
+  penaltySource?: "system_default" | "global_policy" | "master_override" | null;
+  penaltyPolicyPublicId?: string | null;
 }) {
   const userId = randomUUID();
   const frequencyId = randomUUID();
@@ -105,6 +108,9 @@ async function seedTaskInstance(params: {
     actualDate: params.actualDate,
     status: params.status,
     isDeleted: params.isDeleted ?? false,
+    penaltyAmountVnd: params.penaltyAmountVnd,
+    penaltySource: params.penaltySource,
+    penaltyPolicyPublicId: params.penaltyPolicyPublicId,
   });
 
   return { taskInstanceId, taskMasterId, userId };
@@ -347,6 +353,47 @@ describe("extendMissedTaskInstance", () => {
     });
   });
 
+  it("preserves the original deadline on a generic update after extension", async () => {
+    const originalEndDate = new Date("2026-08-17T02:00:00.000Z");
+    const extendedEndDate = new Date("2026-08-18T02:00:00.000Z");
+    const { taskInstanceId, taskMasterId, userId } = await seedTaskInstance({
+      status: "missed",
+      targetDate: new Date("2026-08-17T01:00:00.000Z"),
+      endDate: originalEndDate,
+    });
+
+    await extendMissedTaskInstance(db, {
+      taskInstanceId,
+      newEndDate: extendedEndDate,
+      reason: "Nghỉ phép",
+      actorUserId: userId,
+      now: new Date("2026-08-17T03:00:00.000Z"),
+    });
+
+    const updatedInstance = await updateTaskInstance(db, {
+      id: taskInstanceId,
+      expectedStatus: "pending",
+      userId,
+      taskMasterId,
+      description: "Cập nhật sau khi gia hạn",
+      endDate: extendedEndDate,
+      status: "pending",
+      actorUserId: userId,
+    });
+    const currentInstance = await db.query.taskInstances.findFirst({
+      where: (table, { eq }) => eq(table.id, taskInstanceId),
+    });
+
+    expect(updatedInstance).toMatchObject({
+      originalEndDate,
+      endDate: extendedEndDate,
+    });
+    expect(currentInstance).toMatchObject({
+      originalEndDate,
+      endDate: extendedEndDate,
+    });
+  });
+
   it("marks an extended instance missed only after its new deadline", async () => {
     const extendedEndDate = new Date("2026-08-18T02:00:00.000Z");
     const { taskInstanceId, userId } = await seedTaskInstance({
@@ -477,6 +524,79 @@ describe("markOverdueTaskInstancesMissed", () => {
 
     expect(secondResult).toEqual({ matched: 0, updated: 0 });
     expect(activities).toHaveLength(1);
+  });
+
+  it("assesses exactly one snapshot penalty when an overdue task becomes missed", async () => {
+    const now = new Date("2026-08-17T03:00:00.000Z");
+    const { taskInstanceId } = await seedTaskInstance({
+      status: "pending",
+      targetDate: new Date("2026-08-17T01:00:00.000Z"),
+      endDate: new Date("2026-08-17T02:00:00.000Z"),
+      penaltyAmountVnd: 200_000,
+      penaltySource: "global_policy",
+      penaltyPolicyPublicId: "globalhigh01",
+    });
+
+    await markOverdueTaskInstancesMissed(db, { now, taskInstanceId });
+    await markOverdueTaskInstancesMissed(db, { now, taskInstanceId });
+
+    const assessments = await db.query.taskPenaltyAssessments.findMany({
+      where: (table, { eq }) => eq(table.taskInstanceId, taskInstanceId),
+    });
+    const activities = await db.query.cardActivities.findMany({
+      where: (table, { eq }) => eq(table.taskInstanceId, taskInstanceId),
+    });
+
+    expect(assessments).toHaveLength(1);
+    expect(assessments[0]).toMatchObject({
+      amountVnd: 200_000,
+      currency: "VND",
+      source: "global_policy",
+      policyPublicId: "globalhigh01",
+      assessedAt: now,
+    });
+    expect(
+      activities.filter((activity) => activity.type === "penalty_assessed"),
+    ).toHaveLength(1);
+  });
+
+  it("assesses a snapshot penalty on a direct done to missed transition", async () => {
+    const targetDate = new Date("2026-08-17T01:00:00.000Z");
+    const { taskInstanceId, taskMasterId, userId } = await seedTaskInstance({
+      status: "done",
+      targetDate,
+      endDate: new Date("2026-08-17T02:00:00.000Z"),
+      penaltyAmountVnd: 100_000,
+      penaltySource: "master_override",
+      penaltyPolicyPublicId: "mastermed001",
+    });
+
+    const updated = await updateTaskInstance(db, {
+      id: taskInstanceId,
+      expectedStatus: "done",
+      userId,
+      taskMasterId,
+      status: "missed",
+      actorUserId: userId,
+    });
+
+    const assessments = await db.query.taskPenaltyAssessments.findMany({
+      where: (table, { eq }) => eq(table.taskInstanceId, taskInstanceId),
+    });
+    const activities = await db.query.cardActivities.findMany({
+      where: (table, { eq }) => eq(table.taskInstanceId, taskInstanceId),
+    });
+
+    expect(updated?.status).toBe("missed");
+    expect(assessments).toHaveLength(1);
+    expect(assessments[0]).toMatchObject({
+      amountVnd: 100_000,
+      source: "master_override",
+      policyPublicId: "mastermed001",
+    });
+    expect(
+      activities.filter((activity) => activity.type === "penalty_assessed"),
+    ).toHaveLength(1);
   });
 });
 

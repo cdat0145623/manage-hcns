@@ -145,7 +145,7 @@ export function compareCalendarEntriesByTime(
 }
 
 const HOUR_MIN_HEIGHT = 128;
-const STACKED_TASK_HEIGHT = 56;
+const STACKED_TASK_HEIGHT = 80;
 const STACKED_TASK_GAP = 4;
 const HOUR_PADDING = 8;
 

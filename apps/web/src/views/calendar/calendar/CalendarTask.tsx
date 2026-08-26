@@ -1,13 +1,11 @@
 import type { DraggableProvided } from "react-beautiful-dnd";
 import { t } from "@lingui/macro";
+import { format } from "date-fns";
 import { motion } from "framer-motion";
 import { Draggable } from "react-beautiful-dnd";
 
-import { formatInAppCalendarZone } from "@kan/shared/utils";
-
 import type { CalendarEntry } from "~/hooks/useRecurrence";
 import { formatCalendarDeadline } from "~/utils/calendar";
-import LoadingSpinner from "~/components/LoadingSpinner";
 
 interface CalendarTaskProps {
   entry: CalendarEntry;
@@ -96,6 +94,22 @@ const VIRTUAL_COLORS: Record<
   },
 };
 
+const PRIORITY_BADGE = {
+  high: {
+    label: t`Cao`,
+    className: "bg-red-700 text-white dark:bg-red-300 dark:text-red-950",
+  },
+  medium: {
+    label: t`Trung bình`,
+    className: "bg-amber-700 text-white dark:bg-amber-300 dark:text-amber-950",
+  },
+  low: {
+    label: t`Thấp`,
+    className:
+      "bg-emerald-700 text-white dark:bg-emerald-300 dark:text-emerald-950",
+  },
+} as const;
+
 export function CalendarTask({
   entry,
   onClick,
@@ -118,14 +132,18 @@ export function CalendarTask({
   const currentDeadlineLabel = isExtended
     ? formatCalendarDeadline(new Date(entry.endDate), new Date(entry.date))
     : null;
+  const priorityBadge = entry.penalty
+    ? PRIORITY_BADGE[entry.penalty.priority]
+    : null;
 
   // Calculate position if needed
   const getPositionStyle = () => {
     if (!isPositioned) return {};
 
     const hourHeight = 128; // Matching h-32
-    const hours = Number(formatInAppCalendarZone(entry.date, "H"));
-    const minutes = Number(formatInAppCalendarZone(entry.date, "m"));
+    const date = new Date(entry.date);
+    const hours = date.getHours();
+    const minutes = date.getMinutes();
     const top = (hours - startHour) * hourHeight + (minutes * hourHeight) / 60;
 
     // Google Calendar style midnight cutoff
@@ -183,18 +201,15 @@ export function CalendarTask({
         }}
         onClick={(e) => {
           e.stopPropagation();
-          if (entry.isCreating) return;
           onClick(entry);
         }}
-        disabled={entry.isCreating}
-        aria-busy={entry.isCreating}
         ref={provided?.innerRef}
         {...safeDraggableProps}
         {...safeDragHandleProps}
         className={`${
           variant === "SUMMARY"
             ? `relative ${overlapIndex > 0 ? "ml-0.5" : ""} mb-1 flex h-[10vh] max-h-[50px] min-h-[40px] w-[calc(100%-4px)] items-center overflow-hidden rounded-xl border border-l-[3px] px-2.5 py-1.5 text-[10px] font-black transition-all ${colors.bg} ${colors.border} ${colors.text}`
-            : `relative flex w-full flex-col overflow-hidden rounded-2xl border border-l-[6px] px-3 py-2.5 shadow-sm backdrop-blur-md transition-all ${isStacked ? "pointer-events-auto h-14 shrink-0" : ""} ${colors.bg} ${colors.border} ${colors.text}`
+            : `relative flex w-full flex-col overflow-hidden rounded-2xl border border-l-[6px] px-3 py-2.5 shadow-sm backdrop-blur-md transition-all ${isStacked ? "pointer-events-auto h-20 shrink-0" : ""} ${colors.bg} ${colors.border} ${colors.text}`
         }`}
         style={{
           ...draggableProps?.style,
@@ -216,14 +231,20 @@ export function CalendarTask({
           <div
             className={`pointer-events-none ml-1 flex h-full w-full flex-row items-center justify-start gap-2 overflow-hidden ${colors.text}`}
           >
-            {entry.isCreating ? <LoadingSpinner size="sm" /> : null}
             <span className="truncate text-left text-[10px] font-black leading-none">
               {entry.title || "(No title)"}
             </span>
             <span className="shrink-0 text-[10px] font-black opacity-50">
-              {formatInAppCalendarZone(entry.date, "H:mm")}
+              {format(new Date(entry.date), "H:mm")}
             </span>
-            {isExtended && currentDeadlineLabel ? (
+            {priorityBadge && (
+              <span
+                className={`shrink-0 rounded px-1.5 py-0.5 text-[9px] font-bold ${priorityBadge.className}`}
+              >
+                {priorityBadge.label}
+              </span>
+            )}
+            {isExtended ? (
               <span className="shrink-0 rounded-full bg-amber-100 px-1.5 py-0.5 text-[9px] font-bold text-amber-800 dark:bg-amber-900/40 dark:text-amber-200">
                 {t`Đã gia hạn · Hạn mới:`} {currentDeadlineLabel}
               </span>
@@ -238,9 +259,8 @@ export function CalendarTask({
             </span>
             <div className="flex w-full items-center gap-1.5 overflow-hidden opacity-60">
               <span className="block whitespace-nowrap text-[10px] font-bold">
-                {entry.isCreating ? <LoadingSpinner size="sm" /> : null}
-                {formatInAppCalendarZone(entry.date, "H:mm")} -{" "}
-                {formatInAppCalendarZone(entry.originalEndDate, "H:mm")}
+                {format(new Date(entry.date), "H:mm")} -{" "}
+                {format(new Date(entry.originalEndDate), "H:mm")}
               </span>
               {isExtended && currentDeadlineLabel ? (
                 <span className="whitespace-nowrap text-[10px] font-bold text-amber-800 dark:text-amber-200">
@@ -248,6 +268,13 @@ export function CalendarTask({
                 </span>
               ) : null}
             </div>
+            {priorityBadge && (
+              <span
+                className={`mt-1 rounded px-1.5 py-0.5 text-[9px] font-bold ${priorityBadge.className}`}
+              >
+                {priorityBadge.label}
+              </span>
+            )}
           </div>
         )}
       </motion.button>

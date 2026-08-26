@@ -13,13 +13,16 @@ import {
   HiChevronDown,
   HiOutlineBanknotes,
   HiOutlineBolt,
+  HiOutlineClipboardDocumentCheck,
   HiOutlineCodeBracketSquare,
   HiOutlineRectangleGroup,
   HiOutlineShieldCheck,
   HiOutlineUser,
 } from "react-icons/hi2";
+
 import { usePermissions } from "~/hooks/usePermissions";
 import { useWorkspace } from "~/providers/workspace";
+import { api } from "~/utils/api";
 
 interface SettingsLayoutProps {
   children: React.ReactNode;
@@ -30,6 +33,7 @@ export function SettingsLayout({ children, currentTab }: SettingsLayoutProps) {
   const router = useRouter();
   const { workspace } = useWorkspace();
   const { canViewWorkspace, canEditWorkspace } = usePermissions();
+  const { data: currentUser } = api.user.getUser.useQuery();
   const [selectedTabIndex, setSelectedTabIndex] = useState(0);
 
   const isAdmin = workspace.role === "ADMIN";
@@ -58,6 +62,12 @@ export function SettingsLayout({ children, currentTab }: SettingsLayoutProps) {
       label: t`Thanh toán`,
       icon: <HiOutlineBanknotes />,
       condition: env("NEXT_PUBLIC_KAN_ENV") === "cloud" && isAdmin,
+    },
+    {
+      key: "daily-tasks",
+      icon: <HiOutlineClipboardDocumentCheck />,
+      label: t`Daily Task`,
+      condition: currentUser?.role === "ADMIN",
     },
     {
       key: "api",

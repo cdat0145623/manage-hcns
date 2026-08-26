@@ -8,6 +8,7 @@ import {
   HiChevronDoubleUp,
   HiOutlineArrowLeft,
   HiOutlineArrowRight,
+  HiOutlineBanknotes,
   HiOutlineCheckCircle,
   HiOutlineClock,
   HiOutlinePaperClip,
@@ -26,11 +27,13 @@ import {
   isSameCalendarYearInAppZone,
 } from "@kan/shared/utils";
 
+import type { PenaltyPolicyActivityMetadata } from "./task-penalty-activity";
 import Avatar from "~/components/Avatar";
 import { useLocalisation } from "~/hooks/useLocalisation";
 import { api } from "~/utils/api";
 import { fixServerDate, getAvatarUrl } from "~/utils/helpers";
 import Comment from "./Comment";
+import { parsePenaltyPolicyActivityMetadata } from "./task-penalty-activity";
 
 type ActivityWithMergedLabels =
   GetCardActivitiesOutput["activities"][number] & {
@@ -85,6 +88,8 @@ export const getActivityText = ({
   mergedLabels,
   attachmentName,
   extension,
+  penaltyAmountVnd,
+  penaltyPolicyActivity,
 }: {
   type: ActivityType;
   toTitle: string | null;
@@ -103,6 +108,8 @@ export const getActivityText = ({
   mergedLabels?: string[];
   attachmentName?: string | null;
   extension?: ActivityWithMergedLabels["taskInstanceExtension"];
+  penaltyAmountVnd?: number | null;
+  penaltyPolicyActivity?: PenaltyPolicyActivityMetadata | null;
 }) => {
   const displayName = memberName ?? memberEmail ?? t`Member`;
   const TextHighlight = ({ children }: { children: React.ReactNode }) => (
@@ -172,6 +179,10 @@ export const getActivityText = ({
     start_date_changed: t`changed a start date`,
     start_date_removed: t`removed a start date`,
     deadline_extended: t`gia hạn deadline`,
+    penalty_assessed: t`đã ghi nhận phạt`,
+    penalty_policy_applied: t`đã áp dụng mức phạt`,
+    penalty_recalculated: t`đã tính lại khoản phạt`,
+    penalty_voided: t`đã hủy khoản phạt`,
   } as const;
 
   if (!(type in ACTIVITY_TYPE_MAP)) return null;
@@ -195,6 +206,79 @@ export const getActivityText = ({
         <TextHighlight>{previousDeadline}</TextHighlight> {t`đến`}{" "}
         <TextHighlight>{newDeadline}</TextHighlight>. {t`Lý do`}:{" "}
         <TextHighlight>{extension.reason}</TextHighlight>
+      </>
+    );
+  }
+
+  if (type === "penalty_assessed" && penaltyAmountVnd != null) {
+    const formattedAmount = new Intl.NumberFormat("vi-VN", {
+      style: "currency",
+      currency: "VND",
+      maximumFractionDigits: 0,
+    }).format(penaltyAmountVnd ?? 0);
+    return (
+      <>
+        {t`đã ghi nhận phạt`} <TextHighlight>{formattedAmount}</TextHighlight>
+      </>
+    );
+  }
+
+  if (type === "penalty_recalculated" && penaltyAmountVnd != null) {
+    const formattedAmount = new Intl.NumberFormat("vi-VN", {
+      style: "currency",
+      currency: "VND",
+      maximumFractionDigits: 0,
+    }).format(penaltyAmountVnd);
+    return <>{t`đã tính lại khoản phạt thành`} <TextHighlight>{formattedAmount}</TextHighlight></>;
+  }
+
+  if (type === "penalty_voided") {
+    return <>{t`đã hủy khoản phạt vì ngày thực hiện không còn nằm trong giai đoạn áp dụng.`}</>;
+  }
+
+  if (type === "penalty_policy_applied" && penaltyPolicyActivity) {
+    const priorityLabel = {
+      high: t`Cao`,
+      medium: t`Trung bình`,
+      low: t`Thấp`,
+    }[penaltyPolicyActivity.priority];
+    const formatVnd = (amountVnd: number) =>
+      new Intl.NumberFormat("vi-VN", {
+        style: "currency",
+        currency: "VND",
+        maximumFractionDigits: 0,
+      }).format(amountVnd);
+    const effectiveFrom = formatInAppCalendarZone(
+      new Date(penaltyPolicyActivity.effectiveFrom),
+      "dd/MM/yyyy",
+      { locale: dateLocale },
+    );
+
+    if (penaltyPolicyActivity.source === "master_override") {
+      return (
+        <>
+          {t`đã áp dụng cho công việc này từ`} {effectiveFrom}:{" "}
+          <TextHighlight>
+            {priorityLabel} — {formatVnd(penaltyPolicyActivity.amountVnd)}
+          </TextHighlight>
+          . {t`Đây là mức riêng của công việc này; các công việc khác ở mức`}{" "}
+          <TextHighlight>{priorityLabel}</TextHighlight>{" "}
+          {t`vẫn áp dụng mức chung`}{" "}
+          <TextHighlight>
+            {formatVnd(penaltyPolicyActivity.globalDefaultAmountVnd)}
+          </TextHighlight>
+          .
+        </>
+      );
+    }
+
+    return (
+      <>
+        {t`đã áp dụng cho công việc này từ`} {effectiveFrom}:{" "}
+        <TextHighlight>
+          {priorityLabel} — {formatVnd(penaltyPolicyActivity.amountVnd)}
+        </TextHighlight>{" "}
+        {t`theo mức chung`}.
       </>
     );
   }
@@ -429,6 +513,10 @@ const ACTIVITY_ICON_MAP: Partial<Record<ActivityType, React.ReactNode | null>> =
     deadline_added: <HiOutlineClock />,
     deadline_removed: <HiOutlineClock />,
     deadline_extended: <HiOutlineClock />,
+    penalty_assessed: <HiOutlineBanknotes />,
+    penalty_policy_applied: <HiOutlineBanknotes />,
+    penalty_recalculated: <HiOutlineBanknotes />,
+    penalty_voided: <HiOutlineBanknotes />,
     start_date_changed: <HiOutlineClock />,
     start_date_added: <HiOutlineClock />,
     start_date_removed: <HiOutlineClock />,
@@ -728,6 +816,16 @@ const ActivityList = ({
           .map((activity, index) => {
             const createdAt = toValidDate(activity.createdAt);
             const extendedActivity = activity as ActivityWithMergedLabels;
+            const activityMetadata = activity.metadata as Record<
+              string,
+              unknown
+            > | null;
+            const penaltyAmountVnd =
+              typeof activityMetadata?.amountVnd === "number"
+                ? activityMetadata.amountVnd
+                : null;
+            const penaltyPolicyActivity =
+              parsePenaltyPolicyActivityMetadata(activityMetadata);
             const activityText = getActivityText({
               type: activity.type,
               toTitle: activity.toTitle,
@@ -743,10 +841,12 @@ const ActivityList = ({
               oldValue: activity.oldValue ?? null,
               newValue: activity.newValue ?? null,
               dateLocale: dateLocale,
-              mergedLabels: extendedActivity.mergedLabels,
+              mergedLabels: (activity as ActivityWithMergedLabels).mergedLabels,
               attachmentName:
                 extendedActivity.attachment?.originalFilename ?? null,
               extension: extendedActivity.taskInstanceExtension,
+              penaltyAmountVnd,
+              penaltyPolicyActivity,
             });
 
             if (
@@ -803,7 +903,11 @@ const ActivityList = ({
                   )}
                 </div>
                 <p className="text-sm">
-                  <span className="font-medium dark:text-dark-1000">{`${getUserDisplayName(activity.user)} `}</span>
+                  <span className="font-medium dark:text-dark-1000">{`${
+                    !activity.user && ["penalty_policy_applied", "penalty_recalculated", "penalty_voided"].includes(activity.type)
+                      ? t`Hệ thống`
+                      : getUserDisplayName(activity.user)
+                  } `}</span>
                   <span className="space-x-1 text-light-900 dark:text-dark-800">
                     {activityText}
                   </span>

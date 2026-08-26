@@ -693,9 +693,7 @@ export function EventDetailModal({
             <div
               className={`grid ${isMissedStatus ? "grid-cols-[minmax(0,1fr)_max-content]" : "grid-cols-2"} gap-x-6 gap-y-4 px-8 pb-2 pt-1 text-left`}
             >
-              <div
-                className={`${isMissedStatus ? "col-span-2" : "col-span-1"} min-w-0 space-y-1.5`}
-              >
+              <div className="col-span-1 min-w-0 space-y-1.5">
                 <div>
                   {entry.assigneeName ? (
                     <div className="flex w-fit items-center gap-1.5 rounded-lg border border-amber-300 bg-amber-100 px-2.5 py-1.5 text-[10px] font-black uppercase tracking-widest text-amber-900 shadow-sm dark:border-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
@@ -730,7 +728,7 @@ export function EventDetailModal({
                       disabled={!isMissedExtensionAllowed}
                       aria-busy={extendMissedInstance.isPending}
                       onClick={() => setIsExtensionModalOpen(true)}
-                      className={`flex min-h-[34px] w-full items-center gap-2 rounded-xl px-2.5 text-left text-xs font-medium shadow-sm transition-all sm:px-3 sm:text-[13px] ${
+                      className={`flex min-h-[34px] w-max items-center gap-2 rounded-xl px-2.5 text-left text-xs font-medium shadow-sm transition-all sm:px-3 sm:text-[13px] ${
                         isMissedExtensionAllowed
                           ? `${statusConfig.activeBg} ${statusConfig.activeText} ${statusConfig.activeBorder} hover:opacity-80`
                           : "cursor-not-allowed border border-rose-200 bg-rose-50 text-rose-700 opacity-70 dark:border-rose-900 dark:bg-rose-950/30 dark:text-rose-300"

@@ -1,6 +1,6 @@
 import { t } from "@lingui/macro";
 import { useDeferredValue, useMemo, useState } from "react";
-import { HiOutlineArrowPath } from "react-icons/hi2";
+import { HiChartBar, HiOutlineArrowPath } from "react-icons/hi2";
 
 import Button from "~/components/Button";
 import Input from "~/components/Input";
@@ -60,6 +60,7 @@ interface RecurringTaskManagerModalProps {
   isVisible: boolean;
   selectedUserId?: string;
   onClose: () => void;
+  onOpenKpi: () => void;
   onEditMaster: (master: RecurringTaskMaster) => void;
 }
 
@@ -67,6 +68,7 @@ export function RecurringTaskManagerModal({
   isVisible,
   selectedUserId,
   onClose,
+  onOpenKpi,
   onEditMaster,
 }: RecurringTaskManagerModalProps) {
   const [search, setSearch] = useState("");
@@ -102,6 +104,10 @@ export function RecurringTaskManagerModal({
             </p>
           </div>
           <div className="flex items-center gap-2">
+            <Button size="sm" variant="secondary" onClick={onOpenKpi}>
+              <HiChartBar className="mr-1.5 h-4 w-4" />
+              {t`Tính KPI`}
+            </Button>
             <Button
               size="sm"
               variant="ghost"

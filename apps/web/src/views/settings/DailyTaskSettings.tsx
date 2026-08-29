@@ -1,8 +1,7 @@
 import { DialogTitle } from "@headlessui/react";
 import { t } from "@lingui/core/macro";
-import { format } from "date-fns";
 import { useMemo, useState } from "react";
-import { HiOutlineCalendarDays, HiOutlinePencilSquare } from "react-icons/hi2";
+import { HiOutlinePencilSquare } from "react-icons/hi2";
 
 import Button from "~/components/Button";
 import Input from "~/components/Input";
@@ -44,13 +43,6 @@ const formatVnd = (amount: number) =>
     maximumFractionDigits: 0,
   }).format(amount);
 
-const dateInputValue = (date: Date) => format(date, "yyyy-MM-dd");
-
-const todayInputValue = () => dateInputValue(new Date());
-
-const parseAppDay = (value: string, endOfDay = false) =>
-  new Date(`${value}T${endOfDay ? "23:59:59.999" : "00:00:00"}+07:00`);
-
 interface PolicyEditorProps {
   priority: Priority;
   currentAmount: number;
@@ -61,15 +53,12 @@ function PolicyEditor({ priority, currentAmount }: PolicyEditorProps) {
   const { showPopup } = usePopup();
   const utils = api.useUtils();
   const [amount, setAmount] = useState(String(currentAmount));
-  const [effectiveFrom, setEffectiveFrom] = useState(todayInputValue);
-  const [effectiveTo, setEffectiveTo] = useState(todayInputValue);
   const [isConfirming, setIsConfirming] = useState(false);
   const parsedAmount = Number(amount);
   const amountIsValid =
     amount.trim() !== "" &&
     Number.isSafeInteger(parsedAmount) &&
     parsedAmount >= 0;
-  const dateIsValid = effectiveTo !== "" && effectiveTo >= effectiveFrom;
 
   const mutation = api.taskPenalty.saveGlobalPolicy.useMutation({
     onSuccess: async () => {
@@ -91,12 +80,10 @@ function PolicyEditor({ priority, currentAmount }: PolicyEditorProps) {
   });
 
   const submit = () => {
-    if (!amountIsValid || !dateIsValid) return;
+    if (!amountIsValid) return;
     mutation.mutate({
       priority,
       amountVnd: parsedAmount,
-      effectiveFrom: parseAppDay(effectiveFrom),
-      effectiveTo: parseAppDay(effectiveTo, true),
     });
   };
 
@@ -128,36 +115,12 @@ function PolicyEditor({ priority, currentAmount }: PolicyEditorProps) {
               </span>
             )}
           </label>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <label className="space-y-2 text-sm font-medium text-light-1000 dark:text-dark-1000">
-              <span>{t`Bắt đầu áp dụng`}</span>
-              <Input
-                type="date"
-                value={effectiveFrom}
-                onChange={(event) => setEffectiveFrom(event.target.value)}
-              />
-            </label>
-            <label className="space-y-2 text-sm font-medium text-light-1000 dark:text-dark-1000">
-              <span>{t`Kết thúc`}</span>
-              <Input
-                type="date"
-                min={effectiveFrom}
-                value={effectiveTo}
-                onChange={(event) => setEffectiveTo(event.target.value)}
-              />
-            </label>
-          </div>
-          {!dateIsValid && (
-            <p className="text-xs text-red-600 dark:text-red-400">
-              {t`Ngày kết thúc không được sớm hơn ngày bắt đầu.`}
-            </p>
-          )}
           <div className="flex justify-end gap-2 pt-2">
             <Button variant="secondary" onClick={closeModal}>
               {t`Hủy`}
             </Button>
             <Button
-              disabled={!amountIsValid || !dateIsValid}
+              disabled={!amountIsValid}
               onClick={() => setIsConfirming(true)}
             >
               {t`Tiếp tục`}
@@ -167,15 +130,13 @@ function PolicyEditor({ priority, currentAmount }: PolicyEditorProps) {
       ) : (
         <div className="mt-5 space-y-5">
           <div className="rounded-lg border border-light-400 bg-light-100 p-4 text-sm text-light-1000 dark:border-dark-500 dark:bg-dark-200 dark:text-dark-1000">
-            <p className="font-semibold">{t`Xác nhận phạm vi hiệu lực`}</p>
+            <p className="font-semibold">{t`Xác nhận cập nhật mức phạt`}</p>
             <p className="mt-2 leading-6">
               {t`Mức phạt`} {priorityLabel(priority)} {t`sẽ là`}{" "}
-              <strong>{formatVnd(parsedAmount)}</strong> {t`từ ngày`}{" "}
-              <strong>{effectiveFrom}</strong> {t`đến hết ngày`}{" "}
-              <strong>{effectiveTo}</strong>.
+              <strong>{formatVnd(parsedAmount)}</strong>.
             </p>
             <p className="mt-2 text-xs text-light-900 dark:text-dark-900">
-              {t`Các khoản phạt đã ghi nhận trong giai đoạn này sẽ được tính lại theo chính sách mới.`}
+              {t`Thay đổi này áp dụng lại cho toàn bộ Daily Task đang dùng mức mặc định, gồm cả các task trong quá khứ.`}
             </p>
           </div>
           <div className="flex justify-end gap-2">
@@ -214,7 +175,7 @@ export default function DailyTaskSettings() {
             {t`Mức phạt Daily Task`}
           </h2>
           <p className="mt-2 text-sm leading-6 text-light-900 dark:text-dark-900">
-            {t`Cấu hình số tiền phạt theo ba mức độ ưu tiên và giai đoạn áp dụng cụ thể.`}
+            {t`Cấu hình số tiền phạt hiện hành theo ba mức độ ưu tiên.`}
           </p>
         </div>
 
@@ -246,11 +207,10 @@ export default function DailyTaskSettings() {
         ) : (
           <div className="mt-7 overflow-hidden rounded-lg border border-light-400 dark:border-dark-400">
             {settings.data?.priorities.map((item) => {
-              const current = item.current;
               return (
                 <div
                   key={item.priority}
-                  className="relative grid gap-4 border-b border-light-300 p-4 last:border-b-0 dark:border-dark-300 sm:grid-cols-[1.1fr_1fr_1.4fr_auto] sm:items-center"
+                  className="relative grid gap-4 border-b border-light-300 p-4 last:border-b-0 dark:border-dark-300 sm:grid-cols-[1fr_1fr_auto] sm:items-center"
                 >
                   <span
                     aria-hidden="true"
@@ -268,25 +228,10 @@ export default function DailyTaskSettings() {
                       {t`Hiện tại`}
                     </p>
                     <p className="mt-1 text-sm font-semibold tabular-nums text-light-1000 dark:text-dark-1000">
-                      {current
-                        ? formatVnd(current.amountVnd)
-                        : t`Chưa cấu hình`}
+                      {item.amountVnd === null
+                        ? t`Chưa cấu hình`
+                        : formatVnd(item.amountVnd)}
                     </p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-light-900 dark:text-dark-900">
-                      {t`Hiệu lực`}
-                    </p>
-                    <p className="mt-1 text-sm text-light-1000 dark:text-dark-1000">
-                      {current
-                        ? `${dateInputValue(current.effectiveFrom)} - ${current.effectiveTo ? dateInputValue(current.effectiveTo) : t`đến khi thay đổi`}`
-                        : t`Không có phiên bản hiệu lực`}
-                    </p>
-                    {item.history.length > 0 && (
-                      <p className="mt-1 text-xs text-light-800 dark:text-dark-800">
-                        {item.history.length} {t`phiên bản trong lịch sử`}
-                      </p>
-                    )}
                   </div>
                   <Button
                     size="sm"
@@ -298,62 +243,15 @@ export default function DailyTaskSettings() {
                   >
                     {t`Cập nhật`}
                   </Button>
-                  {item.history.length > 0 && (
-                    <details className="sm:col-span-4">
-                      <summary className="cursor-pointer text-xs font-medium text-light-900 hover:text-light-1000 dark:text-dark-900 dark:hover:text-dark-1000">
-                        {t`Xem lịch sử`}
-                      </summary>
-                      <div className="mt-3 overflow-x-auto border-t border-light-300 pt-3">
-                        <div>
-                          <p className="text-xs font-semibold text-light-1000 dark:text-dark-1000">
-                            {t`Lịch sử`}
-                          </p>
-                          <table className="w-full min-w-[560px] text-left text-xs">
-                            <thead className="text-light-900 dark:text-dark-900">
-                              <tr>
-                                <th className="px-2 py-2 font-semibold">{t`Khoảng áp dụng`}</th>
-                                <th className="px-2 py-2 font-semibold">{t`Mức phạt`}</th>
-                                <th className="px-2 py-2 font-semibold">{t`Cập nhật lúc`}</th>
-                              </tr>
-                            </thead>
-                            <tbody className="divide-y divide-light-300 dark:divide-dark-400">
-                              {item.history.map((policy) => (
-                                <tr key={policy.publicId}>
-                                  <td className="px-2 py-2 text-light-1000 dark:text-dark-1000">
-                                    {dateInputValue(policy.effectiveFrom)} –{" "}
-                                    {policy.effectiveTo
-                                      ? dateInputValue(policy.effectiveTo)
-                                      : t`Không có ngày kết thúc`}
-                                  </td>
-                                  <td className="px-2 py-2 font-medium text-light-1000 dark:text-dark-1000">
-                                    {formatVnd(policy.amountVnd)}
-                                  </td>
-                                  <td className="px-2 py-2 text-light-900 dark:text-dark-900">
-                                    {policy.createdAt
-                                      ? format(
-                                          policy.createdAt,
-                                          "HH:mm, dd/MM/yyyy",
-                                        )
-                                      : t`Không xác định`}
-                                  </td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-                      </div>
-                    </details>
-                  )}
                 </div>
               );
             })}
           </div>
         )}
 
-        <div className="mt-5 flex items-start gap-3 text-xs leading-5 text-light-900 dark:text-dark-900">
-          <HiOutlineCalendarDays className="mt-0.5 h-4 w-4 shrink-0" />
-          <p>{t`Khoảng ngày kết thúc bao gồm cả ngày đó. Ngoài khoảng đã cấu hình, mức phạt không được áp dụng.`}</p>
-        </div>
+        <p className="mt-5 text-xs leading-5 text-light-900 dark:text-dark-900">
+          {t`Mức mặc định được áp dụng cho tất cả Daily Task không có mức phạt riêng.`}
+        </p>
       </section>
 
       <Modal
@@ -368,7 +266,7 @@ export default function DailyTaskSettings() {
           <PolicyEditor
             key={selected.priority}
             priority={selected.priority}
-            currentAmount={selected.current?.amountVnd ?? 0}
+            currentAmount={selected.amountVnd ?? 0}
           />
         )}
       </Modal>

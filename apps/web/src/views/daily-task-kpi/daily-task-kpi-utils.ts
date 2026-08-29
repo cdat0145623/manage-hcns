@@ -1,6 +1,9 @@
 import { endOfMonth, startOfMonth } from "date-fns";
 
+import { calendarDateKeyInAppZone } from "@kan/shared/utils";
+
 export type DailyTaskKpiStatus = "pending" | "done" | "missed";
+export type DailyTaskPenaltyPriority = "high" | "medium" | "low";
 
 export interface DailyTaskKpiEntry {
   id: string;
@@ -8,6 +11,7 @@ export interface DailyTaskKpiEntry {
   name: string;
   targetDate: Date;
   status: DailyTaskKpiStatus;
+  penaltyPriority: DailyTaskPenaltyPriority | null;
 }
 
 export interface DailyTaskKpiSummary {
@@ -55,6 +59,20 @@ export function normalizeDailyTaskKpiEntries(
       taskMaster && typeof taskMaster === "object"
         ? (taskMaster as Record<string, unknown>)
         : undefined;
+    const penalty = value.penalty;
+    const penaltyValue =
+      penalty && typeof penalty === "object"
+        ? (penalty as Record<string, unknown>)
+        : undefined;
+    const rawPenaltyPriority =
+      getString(penaltyValue?.priority) ??
+      getString(taskMasterValue?.priority);
+    const penaltyPriority: DailyTaskPenaltyPriority | null =
+      rawPenaltyPriority === "high" ||
+      rawPenaltyPriority === "medium" ||
+      rawPenaltyPriority === "low"
+        ? rawPenaltyPriority
+        : null;
     const targetDate = getDate(value.targetDate);
     const rawStatus = (getString(value.status) ?? "pending").toLowerCase();
     const status: DailyTaskKpiStatus =
@@ -67,14 +85,39 @@ export function normalizeDailyTaskKpiEntries(
 
     if (!taskMasterId || !entryId || !targetDate) return [];
 
-    return [{ id: entryId, taskMasterId, name: entryName, targetDate, status }];
+    return [
+      {
+        id: entryId,
+        taskMasterId,
+        name: entryName,
+        targetDate,
+        status,
+        penaltyPriority,
+      },
+    ];
   });
 }
 
 export function getDailyTaskOccurrenceKey(
   entry: Pick<DailyTaskKpiEntry, "taskMasterId" | "targetDate">,
 ) {
-  return `${entry.taskMasterId}:${entry.targetDate.toISOString()}`;
+  return `${entry.taskMasterId}:${calendarDateKeyInAppZone(entry.targetDate)}`;
+}
+
+export function getVisibleDailyTaskSelectionState(
+  entries: readonly DailyTaskKpiEntry[],
+  excludedKeys: ReadonlySet<string>,
+) {
+  const includedCount = entries.reduce(
+    (count, entry) =>
+      excludedKeys.has(getDailyTaskOccurrenceKey(entry)) ? count : count + 1,
+    0,
+  );
+
+  return {
+    allIncluded: entries.length > 0 && includedCount === entries.length,
+    someIncluded: includedCount > 0,
+  };
 }
 
 export function filterDailyTaskEntries(
@@ -108,6 +151,7 @@ export function calculateDailyTaskKpi(
     (entry) => entry.status === "missed",
   ).length;
   const total = includedEntries.length;
+  const kpiEligibleTotal = done + missed;
 
   return {
     total,
@@ -115,6 +159,9 @@ export function calculateDailyTaskKpi(
     pending,
     missed,
     excluded: entries.length - total,
-    completionRate: total === 0 ? 0 : Math.round((done / total) * 1000) / 10,
+    completionRate:
+      kpiEligibleTotal === 0
+        ? 0
+        : Math.round((done / kpiEligibleTotal) * 1000) / 10,
   };
 }

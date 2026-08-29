@@ -13,6 +13,7 @@ export interface RecurringTaskMaster {
   publicId: string;
   name: string | null;
   description: string | null;
+  createdAt: Date;
   startDate: Date;
   endDate: Date;
   priority: Priority | null;
@@ -20,6 +21,7 @@ export interface RecurringTaskMaster {
   rruleString: string | null;
   recurrenceText: string;
   assignee: { id: string; name: string | null; email: string | null };
+  creator: { id: string; name: string | null; email: string | null };
 }
 
 const PRIORITIES: Array<{
@@ -55,6 +57,13 @@ const formatVnd = (amount: number) =>
     currency: "VND",
     maximumFractionDigits: 0,
   }).format(amount);
+
+const formatCreatedAt = (date: Date) =>
+  new Intl.DateTimeFormat("vi-VN", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  }).format(new Date(date));
 
 interface RecurringTaskManagerModalProps {
   isVisible: boolean;
@@ -184,13 +193,15 @@ export function RecurringTaskManagerModal({
               {t`Không tìm thấy công việc lặp lại.`}
             </p>
           ) : (
-            <table className="w-full min-w-[920px] table-fixed text-left text-sm">
+            <table className="w-full min-w-[1100px] table-fixed text-left text-sm">
               <thead className="sticky top-0 z-10 bg-light-100 text-xs text-light-900 dark:bg-dark-200 dark:text-dark-900">
                 <tr>
-                  <th className="w-[24%] px-4 py-3 font-semibold">{t`Tên công việc`}</th>
-                  <th className="w-[17%] px-4 py-3 font-semibold">{t`Giao cho`}</th>
-                  <th className="w-[23%] px-4 py-3 font-semibold">{t`Lặp lại`}</th>
-                  <th className="w-[15%] px-4 py-3 font-semibold">{t`Nhãn phạt`}</th>
+                  <th className="w-[22%] px-4 py-3 font-semibold">{t`Tên công việc`}</th>
+                  <th className="w-[14%] px-4 py-3 font-semibold">{t`Người tạo`}</th>
+                  <th className="w-[14%] px-4 py-3 font-semibold">{t`Giao cho`}</th>
+                  <th className="w-[11%] px-4 py-3 font-semibold">{t`Ngày tạo`}</th>
+                  <th className="w-[19%] px-4 py-3 font-semibold">{t`Lặp lại`}</th>
+                  <th className="w-[13%] px-4 py-3 font-semibold">{t`Nhãn phạt`}</th>
                   <th className="w-[7%] px-4 py-3 text-right font-semibold">{t`Thao tác`}</th>
                 </tr>
               </thead>
@@ -204,9 +215,17 @@ export function RecurringTaskManagerModal({
                       {master.name ?? t`Không có tên`}
                     </td>
                     <td className="px-4 py-4 text-light-900 dark:text-dark-900">
+                      {master.creator.name ??
+                        master.creator.email ??
+                        t`Không xác định`}
+                    </td>
+                    <td className="px-4 py-4 text-light-900 dark:text-dark-900">
                       {master.assignee.name ??
                         master.assignee.email ??
                         t`Chưa phân công`}
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-4 text-light-900 dark:text-dark-900">
+                      {formatCreatedAt(master.createdAt)}
                     </td>
                     <td className="px-4 py-4 text-light-900 dark:text-dark-900">
                       {master.recurrenceText}

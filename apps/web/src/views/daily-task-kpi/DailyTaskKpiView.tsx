@@ -9,64 +9,71 @@ import {
   startOfMonth,
   subMonths,
 } from "date-fns";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   HiCheckCircle,
   HiChevronLeft,
   HiChevronRight,
   HiExclamationTriangle,
-  HiOutlineCalendarDays,
+  HiOutlineChartBar,
   HiOutlineClipboardDocumentList,
   HiOutlineClock,
   HiOutlineXCircle,
   HiXMark,
 } from "react-icons/hi2";
 
+import { calendarDateKeyInAppZone } from "@kan/shared/utils";
+
 import type {
   DailyTaskKpiEntry,
   DailyTaskKpiStatus,
+  DailyTaskPenaltyPriority,
 } from "./daily-task-kpi-utils";
+import { usePopup } from "~/providers/popup";
 import { api } from "~/utils/api";
 import {
   calculateDailyTaskKpi,
   filterDailyTaskEntries,
   getDailyTaskOccurrenceKey,
   getDailyTaskPeriodBounds,
+  getVisibleDailyTaskSelectionState,
   normalizeDailyTaskKpiEntries,
 } from "./daily-task-kpi-utils";
 
 type StatusFilter = "all" | DailyTaskKpiStatus | "excluded";
 
-const STORAGE_VERSION = "v1";
+const penaltyLabel: Record<DailyTaskPenaltyPriority, string> = {
+  high: t`Cao`,
+  medium: t`Trung bình`,
+  low: t`Thấp`,
+};
 
-function getStorageKey(userId: string, from: Date, to: Date) {
-  return `daily-task-kpi:${STORAGE_VERSION}:${userId}:${format(from, "yyyy-MM-dd")}:${format(to, "yyyy-MM-dd")}`;
-}
+const penaltyClassName: Record<DailyTaskPenaltyPriority, string> = {
+  high: "bg-rose-100 text-rose-700",
+  medium: "bg-amber-100 text-amber-800",
+  low: "bg-emerald-100 text-emerald-700",
+};
 
-function SummaryCard({
+function SummaryItem({
   label,
   value,
-  tone,
+  valueClassName = "text-neutral-900 dark:text-white",
   icon,
 }: {
   label: string;
   value: string | number;
-  tone: string;
+  valueClassName?: string;
   icon: React.ReactNode;
 }) {
   return (
-    <div className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm dark:border-neutral-700 dark:bg-neutral-800">
-      <div
-        className={`mb-3 flex h-9 w-9 items-center justify-center rounded-xl ${tone}`}
-      >
-        {icon}
-      </div>
-      <p className="text-xs font-semibold uppercase tracking-wider text-neutral-500 dark:text-neutral-400">
+    <div className="flex items-center gap-1.5 whitespace-nowrap px-3 py-2.5">
+      <span className="shrink-0">{icon}</span>
+      <span className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">
         {label}
-      </p>
-      <p className="mt-1 text-2xl font-bold text-neutral-900 dark:text-white">
+      </span>
+      <span className={`text-base font-bold leading-none ${valueClassName}`}>
         {value}
-      </p>
+      </span>
     </div>
   );
 }
@@ -74,12 +81,15 @@ function SummaryCard({
 export function DailyTaskKpiPanel({
   embedded = false,
   onClose,
+  onBack,
   targetUserId,
 }: {
   embedded?: boolean;
   onClose?: () => void;
+  onBack?: () => void;
   targetUserId?: string;
 }) {
+  const { showPopup } = usePopup();
   const { data: currentUser, isLoading: isUserLoading } =
     api.user.getUser.useQuery();
   const [periodMonth, setPeriodMonth] = useState(() =>
@@ -94,10 +104,26 @@ export function DailyTaskKpiPanel({
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [excludedKeys, setExcludedKeys] = useState<Set<string>>(new Set());
   const [reasons, setReasons] = useState<Record<string, string>>({});
-  const [isLoadedFromStorage, setIsLoadedFromStorage] = useState(false);
+  const [savedExcludedKeys, setSavedExcludedKeys] = useState<Set<string>>(
+    new Set(),
+  );
+  const [savedReasons, setSavedReasons] = useState<Record<string, string>>({});
   const [isSelectionDirty, setIsSelectionDirty] = useState(false);
+  const selectVisibleEntriesRef = useRef<HTMLInputElement>(null);
   const effectiveTargetUserId = targetUserId ?? currentUser?.id;
+  const canManageKpi = currentUser?.role === "ADMIN";
+  const periodFrom = calendarDateKeyInAppZone(startOfMonth(periodMonth));
+  const periodTo = calendarDateKeyInAppZone(endOfMonth(periodMonth));
 
+  const exclusionsQuery = api.dailyTaskKpi.exclusions.useQuery(
+    {
+      targetUserId:
+        effectiveTargetUserId ?? "00000000-0000-0000-0000-000000000000",
+      from: periodFrom,
+      to: periodTo,
+    },
+    { enabled: !!effectiveTargetUserId },
+  );
   const virtualTaskQuery = api.taskInstance.getVirtual.useQuery(
     {
       from: startOfDay(fromDate),
@@ -112,6 +138,24 @@ export function DailyTaskKpiPanel({
     refetch: () => Promise<unknown>;
   };
   const { data, isLoading, isError, refetch } = virtualTaskQuery;
+
+  useEffect(() => {
+    if (!exclusionsQuery.data) return;
+
+    const nextReasons: Record<string, string> = {};
+    const nextKeys = new Set(
+      exclusionsQuery.data.map((exclusion) => {
+        const key = `${exclusion.taskMasterId}:${exclusion.occurrenceDate}`;
+        nextReasons[key] = exclusion.reason;
+        return key;
+      }),
+    );
+    setExcludedKeys(nextKeys);
+    setReasons(nextReasons);
+    setSavedExcludedKeys(nextKeys);
+    setSavedReasons(nextReasons);
+    setIsSelectionDirty(false);
+  }, [exclusionsQuery.data]);
 
   const entries = useMemo(() => normalizeDailyTaskKpiEntries(data), [data]);
   const rangedEntries = useMemo(
@@ -135,47 +179,16 @@ export function DailyTaskKpiPanel({
       }),
     [excludedKeys, rangedEntries, statusFilter],
   );
-
-  const storageKey = effectiveTargetUserId
-    ? getStorageKey(effectiveTargetUserId, periodMonth, endOfMonth(periodMonth))
-    : null;
+  const visibleSelectionState = useMemo(
+    () => getVisibleDailyTaskSelectionState(visibleEntries, excludedKeys),
+    [excludedKeys, visibleEntries],
+  );
 
   useEffect(() => {
-    if (!storageKey || typeof window === "undefined") return;
-
-    try {
-      const saved: unknown = JSON.parse(
-        window.localStorage.getItem(storageKey) ?? "{}",
-      );
-      const savedValue =
-        saved && typeof saved === "object"
-          ? (saved as Record<string, unknown>)
-          : {};
-      const excludedValues = savedValue.excludedKeys;
-      const savedKeys = Array.isArray(excludedValues)
-        ? excludedValues.filter(
-            (key: unknown): key is string => typeof key === "string",
-          )
-        : [];
-      const savedReasonValues = savedValue.reasons;
-      const savedReasons =
-        savedReasonValues && typeof savedReasonValues === "object"
-          ? Object.fromEntries(
-              Object.entries(savedReasonValues).flatMap(([key, value]) =>
-                typeof value === "string" ? [[key, value]] : [],
-              ),
-            )
-          : {};
-      setExcludedKeys(new Set(savedKeys));
-      setReasons(savedReasons);
-    } catch {
-      setExcludedKeys(new Set());
-      setReasons({});
-    } finally {
-      setIsLoadedFromStorage(true);
-      setIsSelectionDirty(false);
-    }
-  }, [storageKey]);
+    if (!selectVisibleEntriesRef.current) return;
+    selectVisibleEntriesRef.current.indeterminate =
+      visibleSelectionState.someIncluded && !visibleSelectionState.allIncluded;
+  }, [visibleSelectionState]);
 
   const changeMonth = (offset: number) => {
     const nextMonth =
@@ -216,6 +229,7 @@ export function DailyTaskKpiPanel({
   };
 
   const toggleEntry = (entry: DailyTaskKpiEntry) => {
+    if (!canManageKpi || saveMutation.isPending) return;
     const key = getDailyTaskOccurrenceKey(entry);
     const next = new Set(excludedKeys);
     if (next.has(key)) {
@@ -228,6 +242,7 @@ export function DailyTaskKpiPanel({
   };
 
   const toggleVisibleEntries = (exclude: boolean) => {
+    if (!canManageKpi || saveMutation.isPending) return;
     const next = new Set(excludedKeys);
     visibleEntries.forEach((entry) => {
       const key = getDailyTaskOccurrenceKey(entry);
@@ -238,22 +253,74 @@ export function DailyTaskKpiPanel({
     setIsSelectionDirty(true);
   };
 
+  const saveMutation = api.dailyTaskKpi.saveChanges.useMutation({
+    onSuccess: async () => {
+      setSavedExcludedKeys(new Set(excludedKeys));
+      setSavedReasons({ ...reasons });
+      setIsSelectionDirty(false);
+      await exclusionsQuery.refetch();
+      showPopup({
+        header: t`Đã lưu lựa chọn KPI`,
+        message: t`Các task được chọn đã cập nhật cho kỳ KPI này.`,
+        icon: "success",
+      });
+    },
+    onError: (error) => {
+      showPopup({
+        header: t`Không thể lưu lựa chọn KPI`,
+        message: error.message,
+        icon: "error",
+      });
+    },
+  });
+
   const saveSelections = () => {
-    if (!storageKey || typeof window === "undefined") return;
-    window.localStorage.setItem(
-      storageKey,
-      JSON.stringify({ excludedKeys: [...excludedKeys], reasons }),
+    if (!effectiveTargetUserId || !canManageKpi) return;
+
+    const entriesByKey = new Map(
+      entries.map((entry) => [getDailyTaskOccurrenceKey(entry), entry]),
     );
-    setIsSelectionDirty(false);
+    const exclude = [...excludedKeys].flatMap((key) => {
+      const entry = entriesByKey.get(key);
+      if (!entry) return [];
+      const reasonChanged = reasons[key] !== savedReasons[key];
+      if (savedExcludedKeys.has(key) && !reasonChanged) return [];
+      return [
+        {
+          taskMasterId: entry.taskMasterId,
+          occurrenceDate: calendarDateKeyInAppZone(entry.targetDate),
+          reason: reasons[key],
+        },
+      ];
+    });
+    const include = [...savedExcludedKeys].flatMap((key) => {
+      if (excludedKeys.has(key)) return [];
+      const entry = entriesByKey.get(key);
+      return entry
+        ? [
+            {
+              taskMasterId: entry.taskMasterId,
+              occurrenceDate: calendarDateKeyInAppZone(entry.targetDate),
+            },
+          ]
+        : [];
+    });
+
+    saveMutation.mutate({
+      targetUserId: effectiveTargetUserId,
+      exclude,
+      include,
+    });
   };
 
   const resetSelections = () => {
-    setExcludedKeys(new Set());
-    setReasons({});
-    setIsSelectionDirty(true);
+    setExcludedKeys(new Set(savedExcludedKeys));
+    setReasons(savedReasons);
+    setIsSelectionDirty(false);
   };
 
-  const hasPendingChanges = isLoadedFromStorage && isSelectionDirty;
+  const hasPendingChanges =
+    !exclusionsQuery.isLoading && canManageKpi && isSelectionDirty;
 
   if (isUserLoading) {
     return (
@@ -265,20 +332,29 @@ export function DailyTaskKpiPanel({
     <div
       className={
         embedded
-          ? "flex h-full min-h-0 flex-col bg-neutral-50 p-4 dark:bg-neutral-900 sm:p-6"
+          ? "flex h-full min-h-0 flex-col overflow-hidden bg-neutral-50 p-4 dark:bg-neutral-900 sm:p-6"
           : "min-h-full bg-neutral-50 p-4 dark:bg-neutral-900 sm:p-6 lg:p-8"
       }
     >
       <div
         className={
           embedded
-            ? "mx-auto flex min-h-0 w-full max-w-7xl flex-1 flex-col"
+            ? "mx-auto flex min-h-0 w-full max-w-7xl flex-1 flex-col overflow-hidden"
             : "mx-auto max-w-7xl"
         }
       >
-        <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <div className="mb-2 flex items-center gap-2">
+        <div className="mb-4 flex shrink-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0">
+            {embedded && onBack && (
+              <button
+                type="button"
+                onClick={onBack}
+                className="mb-1 rounded-md px-1.5 py-1 text-xs font-semibold text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-indigo-600 dark:hover:bg-neutral-800 dark:hover:text-indigo-300"
+              >
+                ← {t`Quản lý công việc`}
+              </button>
+            )}
+            <div className="mb-1 flex flex-wrap items-center gap-2">
               <h1 className="text-2xl font-bold text-neutral-900 dark:text-white">
                 {t`KPI Daily Task`}
               </h1>
@@ -325,48 +401,56 @@ export function DailyTaskKpiPanel({
           </div>
         </div>
 
-        <div className="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-          <SummaryCard
-            label={t`Tổng task`}
-            value={summary.total}
-            tone="bg-indigo-50 text-indigo-600"
-            icon={<HiOutlineClipboardDocumentList className="h-5 w-5" />}
-          />
-          <SummaryCard
-            label={t`Hoàn thành`}
-            value={summary.done}
-            tone="bg-emerald-50 text-emerald-600"
-            icon={<HiCheckCircle className="h-5 w-5" />}
-          />
-          <SummaryCard
-            label={t`Đang chờ`}
-            value={summary.pending}
-            tone="bg-sky-50 text-sky-600"
-            icon={<HiOutlineClock className="h-5 w-5" />}
-          />
-          <SummaryCard
-            label={t`Bỏ lỡ`}
-            value={summary.missed}
-            tone="bg-rose-50 text-rose-600"
-            icon={<HiExclamationTriangle className="h-5 w-5" />}
-          />
-          <SummaryCard
-            label={t`Không tính`}
-            value={summary.excluded}
-            tone="bg-neutral-100 text-neutral-600"
-            icon={<HiOutlineXCircle className="h-5 w-5" />}
-          />
-          <SummaryCard
-            label={t`Tỷ lệ`}
-            value={`${summary.completionRate}%`}
-            tone="bg-violet-50 text-violet-600"
-            icon={<HiOutlineCalendarDays className="h-5 w-5" />}
-          />
+        <div className="mb-4 shrink-0 overflow-x-auto">
+          <div className="flex min-w-max items-center divide-x divide-neutral-200 rounded-xl border border-neutral-200 bg-white shadow-sm dark:divide-neutral-700 dark:border-neutral-700 dark:bg-neutral-800">
+            <SummaryItem
+              label={t`Tổng task`}
+              value={summary.total}
+              icon={
+                <HiOutlineClipboardDocumentList className="h-3.5 w-3.5 text-neutral-400" />
+              }
+            />
+            <SummaryItem
+              label={t`Hoàn thành`}
+              value={summary.done}
+              icon={<HiCheckCircle className="h-3.5 w-3.5 text-emerald-500" />}
+              valueClassName="text-emerald-700 dark:text-emerald-300"
+            />
+            <SummaryItem
+              label={t`Đang chờ`}
+              value={summary.pending}
+              icon={<HiOutlineClock className="h-3.5 w-3.5 text-sky-500" />}
+              valueClassName="text-sky-700 dark:text-sky-300"
+            />
+            <SummaryItem
+              label={t`Bỏ lỡ`}
+              value={summary.missed}
+              icon={
+                <HiExclamationTriangle className="h-3.5 w-3.5 text-rose-500" />
+              }
+              valueClassName="text-rose-700 dark:text-rose-300"
+            />
+            <SummaryItem
+              label={t`Không tính`}
+              value={summary.excluded}
+              icon={
+                <HiOutlineXCircle className="h-3.5 w-3.5 text-neutral-400" />
+              }
+            />
+            <SummaryItem
+              label={t`Tỷ lệ`}
+              value={`${summary.completionRate}%`}
+              icon={
+                <HiOutlineChartBar className="h-3.5 w-3.5 text-indigo-500" />
+              }
+              valueClassName="text-indigo-700 dark:text-indigo-200"
+            />
+          </div>
         </div>
 
-        <div className="mb-5 rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm dark:border-neutral-700 dark:bg-neutral-800">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+        <div className="mb-4 shrink-0 rounded-xl border border-neutral-200 bg-white p-3 shadow-sm dark:border-neutral-700 dark:bg-neutral-800 sm:p-3.5">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:gap-3">
               <label className="text-xs font-bold uppercase tracking-wider text-neutral-500">
                 {t`Từ ngày`}
                 <input
@@ -375,7 +459,7 @@ export function DailyTaskKpiPanel({
                   max={format(toDate, "yyyy-MM-dd")}
                   value={format(fromDate, "yyyy-MM-dd")}
                   onChange={(event) => updateFromDate(event.target.value)}
-                  className="mt-1 block rounded-lg border border-neutral-200 px-3 py-2 text-sm dark:border-neutral-600 dark:bg-neutral-700 dark:text-white"
+                  className="mt-1 block rounded-lg border border-neutral-200 px-3 py-1.5 text-sm dark:border-neutral-600 dark:bg-neutral-700 dark:text-white"
                 />
               </label>
               <label className="text-xs font-bold uppercase tracking-wider text-neutral-500">
@@ -386,13 +470,13 @@ export function DailyTaskKpiPanel({
                   max={format(endOfMonth(periodMonth), "yyyy-MM-dd")}
                   value={format(toDate, "yyyy-MM-dd")}
                   onChange={(event) => updateToDate(event.target.value)}
-                  className="mt-1 block rounded-lg border border-neutral-200 px-3 py-2 text-sm dark:border-neutral-600 dark:bg-neutral-700 dark:text-white"
+                  className="mt-1 block rounded-lg border border-neutral-200 px-3 py-1.5 text-sm dark:border-neutral-600 dark:bg-neutral-700 dark:text-white"
                 />
               </label>
               <button
                 type="button"
                 onClick={resetDateRange}
-                className="rounded-lg border border-neutral-200 px-3 py-2 text-xs font-semibold text-neutral-600 hover:bg-neutral-50 dark:border-neutral-600 dark:text-neutral-300 dark:hover:bg-neutral-700"
+                className="rounded-lg border border-neutral-200 px-3 py-1.5 text-xs font-semibold text-neutral-600 hover:bg-neutral-50 dark:border-neutral-600 dark:text-neutral-300 dark:hover:bg-neutral-700"
               >
                 {t`Đặt lại thời gian`}
               </button>
@@ -429,12 +513,13 @@ export function DailyTaskKpiPanel({
         </div>
 
         {hasPendingChanges && (
-          <div className="mb-4 flex flex-col gap-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 sm:flex-row sm:items-center sm:justify-between">
+          <div className="mb-4 flex shrink-0 flex-col gap-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 sm:flex-row sm:items-center sm:justify-between">
             <span>{t`Bạn có thay đổi chưa lưu cho kỳ KPI này.`}</span>
             <div className="flex gap-2">
               <button
                 type="button"
                 onClick={resetSelections}
+                disabled={saveMutation.isPending}
                 className="rounded-lg px-3 py-1.5 font-semibold hover:bg-amber-100"
               >
                 {t`Đặt lại`}
@@ -442,40 +527,16 @@ export function DailyTaskKpiPanel({
               <button
                 type="button"
                 onClick={saveSelections}
+                disabled={saveMutation.isPending}
                 className="rounded-lg bg-amber-600 px-3 py-1.5 font-semibold text-white hover:bg-amber-700"
               >
-                {t`Lưu lựa chọn KPI`}
+                {saveMutation.isPending ? t`Đang lưu...` : t`Lưu lựa chọn KPI`}
               </button>
             </div>
           </div>
         )}
 
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-neutral-200 bg-white shadow-sm dark:border-neutral-700 dark:bg-neutral-800">
-          <div className="flex flex-col gap-3 border-b border-neutral-200 p-4 dark:border-neutral-700 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h2 className="font-bold text-neutral-900 dark:text-white">{t`Task trong kỳ`}</h2>
-              <p className="text-xs text-neutral-500">
-                {visibleEntries.length} {t`task đang hiển thị`}
-              </p>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={() => toggleVisibleEntries(false)}
-                className="rounded-lg border border-neutral-200 px-3 py-1.5 text-xs font-semibold text-neutral-600 hover:bg-neutral-50 dark:border-neutral-600 dark:text-neutral-300 dark:hover:bg-neutral-700"
-              >
-                {t`Tính tất cả đang xem`}
-              </button>
-              <button
-                type="button"
-                onClick={() => toggleVisibleEntries(true)}
-                className="rounded-lg border border-neutral-200 px-3 py-1.5 text-xs font-semibold text-neutral-600 hover:bg-neutral-50 dark:border-neutral-600 dark:text-neutral-300 dark:hover:bg-neutral-700"
-              >
-                {t`Bỏ tất cả đang xem`}
-              </button>
-            </div>
-          </div>
-
           {isLoading ? (
             <div className="p-8 text-center text-sm text-neutral-500">{t`Loading tasks...`}</div>
           ) : isError ? (
@@ -491,14 +552,31 @@ export function DailyTaskKpiPanel({
             <div className="p-8 text-center text-sm text-neutral-500">{t`Không có task trong bộ lọc này.`}</div>
           ) : (
             <div className="min-h-0 flex-1 overflow-auto">
-              <table className="w-full min-w-[680px] text-left text-sm">
+              <table className="w-full min-w-[760px] text-left text-sm">
                 <thead className="bg-neutral-50 text-xs uppercase tracking-wider text-neutral-500 dark:bg-neutral-900/40">
                   <tr>
-                    <th className="w-28 px-4 py-3">{t`Tính KPI`}</th>
+                    <th className="w-20 px-4 py-3">
+                      <label className="inline-flex cursor-pointer items-center gap-2 normal-case">
+                        <input
+                          ref={selectVisibleEntriesRef}
+                          type="checkbox"
+                          checked={visibleSelectionState.allIncluded}
+                          disabled={!canManageKpi || saveMutation.isPending}
+                          onChange={(event) =>
+                            toggleVisibleEntries(!event.target.checked)
+                          }
+                          aria-label={t`Chọn tất cả task đang hiển thị`}
+                          className="h-4 w-4 rounded border-neutral-300 text-indigo-600 focus:ring-indigo-500"
+                        />
+                        <span>{t`Chọn`}</span>
+                      </label>
+                    </th>
                     <th className="px-4 py-3">{t`Task`}</th>
-                    <th className="px-4 py-3">{t`Ngày được giao`}</th>
-                    <th className="px-4 py-3">{t`Trạng thái`}</th>
-                    <th className="px-4 py-3">{t`Lý do loại`}</th>
+                    <th className="w-32 px-4 py-3">{t`Nhãn phạt`}</th>
+                    <th className="w-32 px-4 py-3">{t`Ngày giao`}</th>
+                    <th className="w-24 px-4 py-3">{t`Thời gian`}</th>
+                    <th className="w-32 px-4 py-3">{t`Trạng thái`}</th>
+                    <th className="w-48 px-4 py-3">{t`Lý do loại`}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-neutral-100 dark:divide-neutral-700">
@@ -515,16 +593,19 @@ export function DailyTaskKpiPanel({
                         }
                       >
                         <td className="px-4 py-3">
-                          <label className="inline-flex cursor-pointer items-center gap-2">
+                          <label className="inline-flex cursor-pointer items-center">
                             <input
                               type="checkbox"
                               checked={!excluded}
                               onChange={() => toggleEntry(entry)}
+                              disabled={!canManageKpi || saveMutation.isPending}
+                              aria-label={
+                                excluded
+                                  ? t`Tính KPI cho ${entry.name}`
+                                  : t`Không tính KPI cho ${entry.name}`
+                              }
                               className="h-4 w-4 rounded border-neutral-300 text-indigo-600 focus:ring-indigo-500"
                             />
-                            <span className="text-xs font-semibold text-neutral-600 dark:text-neutral-300">
-                              {excluded ? t`Không tính` : t`Tính KPI`}
-                            </span>
                           </label>
                         </td>
                         <td
@@ -532,8 +613,24 @@ export function DailyTaskKpiPanel({
                         >
                           {entry.name}
                         </td>
+                        <td className="px-4 py-3">
+                          {entry.penaltyPriority ? (
+                            <span
+                              className={`rounded-full px-2.5 py-1 text-xs font-semibold ${penaltyClassName[entry.penaltyPriority]}`}
+                            >
+                              {penaltyLabel[entry.penaltyPriority]}
+                            </span>
+                          ) : (
+                            <span className="text-xs text-neutral-500">
+                              {t`Không gán nhãn`}
+                            </span>
+                          )}
+                        </td>
                         <td className="px-4 py-3 text-neutral-500">
-                          {format(entry.targetDate, "dd/MM/yyyy HH:mm")}
+                          {format(entry.targetDate, "dd/MM/yyyy")}
+                        </td>
+                        <td className="px-4 py-3 text-neutral-500">
+                          {format(entry.targetDate, "HH:mm")}
                         </td>
                         <td className="px-4 py-3">
                           <span
@@ -550,7 +647,10 @@ export function DailyTaskKpiPanel({
                           {excluded && (
                             <input
                               value={reasons[key] ?? ""}
+                              disabled={!canManageKpi || saveMutation.isPending}
                               onChange={(event) => {
+                                if (!canManageKpi || saveMutation.isPending)
+                                  return;
                                 setReasons((current) => ({
                                   ...current,
                                   [key]: event.target.value,

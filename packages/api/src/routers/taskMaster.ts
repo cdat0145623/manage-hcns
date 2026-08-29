@@ -118,7 +118,7 @@ export const taskMasterRouter = createTRPCRouter({
             ? [eq(taskMasters.targetUser, input.selectedUserId)]
             : []),
         ),
-        with: { frequence: true, assignee: true },
+        with: { frequence: true, assignee: true, creator: true },
       });
 
       return masters.flatMap((master) =>
@@ -128,6 +128,7 @@ export const taskMasterRouter = createTRPCRouter({
                 publicId: master.publicId,
                 name: master.name,
                 description: master.description,
+                createdAt: master.createdAt,
                 startDate: master.startDate,
                 endDate: master.endDate,
                 priority: master.priority,
@@ -141,6 +142,11 @@ export const taskMasterRouter = createTRPCRouter({
                   id: master.assignee.id,
                   name: master.assignee.name,
                   email: master.assignee.email,
+                },
+                creator: {
+                  id: master.creator.id,
+                  name: master.creator.name,
+                  email: master.creator.email,
                 },
               },
             ]

@@ -3,6 +3,7 @@ import { boardRouter } from "./routers/board";
 import { cardRouter } from "./routers/card";
 import { checklistRouter } from "./routers/checklist";
 import { cronRouter } from "./routers/cron";
+import { dailyTaskKpiRouter } from "./routers/dailyTaskKpi";
 import { dashboardRouter } from "./routers/dashboard";
 import { feedbackRouter } from "./routers/feedback";
 import { healthRouter } from "./routers/health";
@@ -31,6 +32,7 @@ export const appRouter = createTRPCRouter({
   card: cardRouter,
   checklist: checklistRouter,
   cron: cronRouter,
+  dailyTaskKpi: dailyTaskKpiRouter,
   dashboard: dashboardRouter,
   feedback: feedbackRouter,
   health: healthRouter,

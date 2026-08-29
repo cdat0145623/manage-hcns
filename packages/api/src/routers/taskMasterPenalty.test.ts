@@ -5,6 +5,8 @@ import * as userRepo from "@kan/db/repository/user.repo";
 
 import { taskMasterRouter } from "./taskMaster";
 
+vi.mock("next-runtime-env", () => ({ env: vi.fn() }));
+vi.mock("@kan/auth/server", () => ({ initAuth: vi.fn() }));
 vi.mock("@kan/db/repository/taskMaster.repo");
 vi.mock("@kan/db/repository/taskInstance.repo", () => ({
   generateVirtualTaskInstances: vi.fn().mockResolvedValue([]),
@@ -12,6 +14,7 @@ vi.mock("@kan/db/repository/taskInstance.repo", () => ({
 vi.mock("@kan/db/repository/user.repo");
 
 const actorId = "11111111-1111-4111-8111-111111111111";
+const creatorId = "33333333-3333-4333-8333-333333333333";
 const masterId = "22222222-2222-4222-8222-222222222222";
 
 function caller() {
@@ -30,6 +33,46 @@ function caller() {
 }
 
 describe("taskMaster penalty authorization and validation", () => {
+  it("returns the master creator and creation date when listing tasks", async () => {
+    vi.mocked(userRepo.getById).mockResolvedValue({ role: "ADMIN" } as never);
+    const createdAt = new Date("2026-08-27T03:00:00.000Z");
+    const findMany = vi.fn().mockResolvedValue([
+      {
+        publicId: "masterpublic1",
+        name: "Daily task",
+        description: null,
+        startDate: new Date("2026-08-27T01:00:00.000Z"),
+        endDate: new Date("2026-08-27T02:00:00.000Z"),
+        priority: null,
+        penaltyOverrideAmountVnd: null,
+        createdAt,
+        frequence: { rruleString: "FREQ=DAILY" },
+        assignee: { id: actorId, name: "Actor", email: "actor@example.com" },
+        creator: {
+          id: creatorId,
+          name: "Creator",
+          email: "creator@example.com",
+        },
+      },
+    ]);
+    const adminCaller = taskMasterRouter.createCaller({
+      user: { id: actorId },
+      db: { query: { taskMasters: { findMany } } },
+      headers: new Headers(),
+    } as never);
+
+    await expect(adminCaller.listAdmin({})).resolves.toMatchObject([
+      {
+        createdAt,
+        creator: {
+          id: creatorId,
+          name: "Creator",
+          email: "creator@example.com",
+        },
+      },
+    ]);
+  });
+
   it("forbids a non-admin from listing recurring master tasks", async () => {
     vi.mocked(userRepo.getById).mockResolvedValue({ role: "NVVP" } as never);
 

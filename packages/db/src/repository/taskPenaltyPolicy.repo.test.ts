@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   groupPenaltyPolicies,
+  resolveCurrentGlobalPenaltyPolicy,
   resolveGlobalPenaltyPolicyAtDate,
   selectPenaltyPolicy,
 } from "./taskPenaltyPolicy.repo";
@@ -182,5 +183,37 @@ describe("resolveGlobalPenaltyPolicyAtDate", () => {
         new Date("2026-08-18T12:00:00.000Z"),
       ),
     ).toMatchObject({ publicId: "high-overlap", amountVnd: 250_000 });
+  });
+});
+
+describe("resolveCurrentGlobalPenaltyPolicy", () => {
+  it("uses the newest active admin policy regardless of former date ranges", () => {
+    expect(
+      resolveCurrentGlobalPenaltyPolicy(
+        [
+          {
+            publicId: "older",
+            priority: "high",
+            amountVnd: 100_000,
+            source: "global_policy",
+            effectiveFrom: new Date("2026-08-01T00:00:00.000Z"),
+            effectiveTo: new Date("2026-08-02T00:00:00.000Z"),
+            revision: 1,
+            supersededAt: new Date("2026-08-03T00:00:00.000Z"),
+          },
+          {
+            publicId: "current",
+            priority: "high",
+            amountVnd: 250_000,
+            source: "global_policy",
+            effectiveFrom: new Date("2026-08-15T00:00:00.000Z"),
+            effectiveTo: null,
+            revision: 2,
+            supersededAt: null,
+          },
+        ],
+        "high",
+      ),
+    ).toMatchObject({ publicId: "current", amountVnd: 250_000 });
   });
 });

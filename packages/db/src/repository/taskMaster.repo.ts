@@ -208,7 +208,6 @@ export const update = async (
 
     if (taskMasterInput.penaltyPolicy) {
       await reconcilePendingPenaltySnapshots(tx, {
-        effectiveFrom: new Date(0),
         taskMasterId: taskMaster.id,
         actorUserId: taskMasterInput.userId,
       });

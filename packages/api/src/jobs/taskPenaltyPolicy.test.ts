@@ -71,43 +71,34 @@ async function seedMaster(
   return { actorId, masterId };
 }
 
-describe("daily task penalty effective periods", () => {
-  it("uses the last saved policy only inside an overlapping period", async () => {
+describe("daily task penalty current policy", () => {
+  it("uses the last saved policy regardless of occurrence date", async () => {
     const { actorId, masterId } = await seedMaster("high");
     await saveGlobalPenaltyPolicy(db, {
       priority: "high",
       amountVnd: 200_000,
-      effectiveFrom: new Date("2031-08-01T00:00:00.000Z"),
-      effectiveTo: new Date("2031-08-30T23:59:59.999Z"),
       createdBy: actorId,
     });
     await saveGlobalPenaltyPolicy(db, {
       priority: "high",
       amountVnd: 250_000,
-      effectiveFrom: new Date("2031-08-15T00:00:00.000Z"),
-      effectiveTo: new Date("2031-08-20T23:59:59.999Z"),
       createdBy: actorId,
     });
 
-    const overlap = await loadPenaltySnapshotsForMasters(
+    const pastOccurrence = await loadPenaltySnapshotsForMasters(
       db,
       [{ id: masterId, priority: "high" }],
       new Date("2031-08-18T12:00:00.000Z"),
     );
-    const outsideOverlap = await loadPenaltySnapshotsForMasters(
+    const futureOccurrence = await loadPenaltySnapshotsForMasters(
       db,
       [{ id: masterId, priority: "high" }],
       new Date("2031-08-25T12:00:00.000Z"),
     );
-    const outsidePeriod = await loadPenaltySnapshotsForMasters(
-      db,
-      [{ id: masterId, priority: "high" }],
-      new Date("2031-08-31T00:00:00.000Z"),
-    );
-
-    expect(overlap.get(masterId)).toMatchObject({ amountVnd: 250_000 });
-    expect(outsideOverlap.get(masterId)).toMatchObject({ amountVnd: 200_000 });
-    expect(outsidePeriod.get(masterId)).toBeNull();
+    expect(pastOccurrence.get(masterId)).toMatchObject({ amountVnd: 250_000 });
+    expect(futureOccurrence.get(masterId)).toMatchObject({
+      amountVnd: 250_000,
+    });
   });
 
   it("applies a master override only to that master inside the global period", async () => {
@@ -116,8 +107,6 @@ describe("daily task penalty effective periods", () => {
     await saveGlobalPenaltyPolicy(db, {
       priority: "low",
       amountVnd: 50_000,
-      effectiveFrom: new Date("2031-09-01T00:00:00.000Z"),
-      effectiveTo: new Date("2031-09-30T23:59:59.999Z"),
       createdBy: override.actorId,
     });
 

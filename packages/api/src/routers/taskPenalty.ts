@@ -4,33 +4,23 @@ import { z } from "zod";
 
 import {
   groupPenaltyPolicies,
+  resolveCurrentGlobalPenaltyPolicy,
   saveGlobalPenaltyPolicy,
   TASK_PENALTY_PRIORITIES,
 } from "@kan/db/repository/taskPenaltyPolicy.repo";
+import { getDailyTaskPenaltyStatistics } from "@kan/db/repository/taskPenaltyStatistics.repo";
 import {
   taskMasterPenaltyPolicies,
   taskPenaltyPolicies,
   users,
 } from "@kan/db/schema";
-import {
-  calendarDateKeyInAppZone,
-  parseCalendarDayInZone,
-} from "@kan/shared/utils";
+import { parseCalendarDayInZone } from "@kan/shared/utils";
 
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 const prioritySchema = z.enum(TASK_PENALTY_PRIORITIES);
 const amountSchema = z.number().int().min(0).max(Number.MAX_SAFE_INTEGER);
-
-const startOfCalendarDayInAppZone = (date: Date) =>
-  parseCalendarDayInZone(calendarDateKeyInAppZone(date));
-
-const endOfCalendarDayInAppZone = (date: Date) => {
-  const end = startOfCalendarDayInAppZone(date);
-  end.setUTCDate(end.getUTCDate() + 1);
-  end.setUTCMilliseconds(end.getUTCMilliseconds() - 1);
-  return end;
-};
+const monthSchema = z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/);
 
 const assertSystemAdmin = async (
   db: Parameters<typeof saveGlobalPenaltyPolicy>[0],
@@ -49,6 +39,50 @@ const assertSystemAdmin = async (
 };
 
 export const taskPenaltyRouter = createTRPCRouter({
+  statistics: protectedProcedure
+    .meta({
+      openapi: {
+        summary: "Get daily task penalty statistics",
+        method: "GET",
+        path: "/task-penalty/statistics",
+        tags: ["taskPenalty"],
+        protect: true,
+      },
+    })
+    .input(
+      z.object({
+        month: monthSchema,
+        targetUserId: z.string().uuid().optional(),
+      }),
+    )
+    .query(async ({ ctx, input }) => {
+      const userId = ctx.user?.id;
+      if (!userId) throw new TRPCError({ code: "UNAUTHORIZED" });
+
+      const requestedUserId = input.targetUserId ?? userId;
+      if (requestedUserId !== userId) {
+        const currentUser = await ctx.db.query.users.findFirst({
+          where: eq(users.id, userId),
+          columns: { role: true },
+        });
+        if (currentUser?.role !== "ADMIN") {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: "User not authorized to view another user's penalties",
+          });
+        }
+      }
+
+      const from = parseCalendarDayInZone(`${input.month}-01`);
+      const to = new Date(from);
+      to.setUTCMonth(to.getUTCMonth() + 1);
+
+      return getDailyTaskPenaltyStatistics(ctx.db, {
+        from,
+        to,
+        targetUserId: input.targetUserId ?? undefined,
+      });
+    }),
   settings: protectedProcedure
     .meta({
       openapi: {
@@ -62,8 +96,6 @@ export const taskPenaltyRouter = createTRPCRouter({
     .query(async ({ ctx }) => {
       const userId = ctx.user?.id;
       if (!userId) throw new TRPCError({ code: "UNAUTHORIZED" });
-      await assertSystemAdmin(ctx.db, userId);
-      const asOf = new Date();
       const policies = await ctx.db.query.taskPenaltyPolicies.findMany({
         columns: {
           publicId: true,
@@ -82,8 +114,10 @@ export const taskPenaltyRouter = createTRPCRouter({
         ],
       });
       return {
-        asOf,
-        priorities: groupPenaltyPolicies(policies, asOf),
+        priorities: TASK_PENALTY_PRIORITIES.map((priority) => {
+          const current = resolveCurrentGlobalPenaltyPolicy(policies, priority);
+          return { priority, amountVnd: current?.amountVnd ?? null };
+        }),
       };
     }),
   saveGlobalPolicy: protectedProcedure
@@ -96,36 +130,13 @@ export const taskPenaltyRouter = createTRPCRouter({
         protect: true,
       },
     })
-    .input(
-      z
-        .object({
-          priority: prioritySchema,
-          amountVnd: amountSchema,
-          effectiveFrom: z.coerce.date(),
-          effectiveTo: z.coerce.date(),
-          policyPublicId: z.string().length(12).optional(),
-        })
-        .superRefine((input, context) => {
-          if (
-            startOfCalendarDayInAppZone(input.effectiveTo) <
-            startOfCalendarDayInAppZone(input.effectiveFrom)
-          ) {
-            context.addIssue({
-              code: "custom",
-              path: ["effectiveTo"],
-              message: "End date must not precede start date",
-            });
-          }
-        }),
-    )
+    .input(z.object({ priority: prioritySchema, amountVnd: amountSchema }))
     .mutation(async ({ ctx, input }) => {
       const userId = ctx.user?.id;
       if (!userId) throw new TRPCError({ code: "UNAUTHORIZED" });
       await assertSystemAdmin(ctx.db, userId);
       return saveGlobalPenaltyPolicy(ctx.db, {
         ...input,
-        effectiveFrom: startOfCalendarDayInAppZone(input.effectiveFrom),
-        effectiveTo: endOfCalendarDayInAppZone(input.effectiveTo),
         createdBy: userId,
       });
     }),

@@ -38,6 +38,8 @@ import { useWorkspace } from "~/providers/workspace";
 import { api } from "~/utils/api";
 import { detectRewardMismatch } from "~/utils/reward";
 import { RewardBreachListPopup } from "../card/components/RewardBreachListPopup";
+import { DailyTaskKpiChart } from "./components/daily-task-kpi-chart";
+import { DailyTaskPenaltyStatistics } from "./components/daily-task-penalty-statistics";
 import { TaskProgressChart } from "./components/task-progress-chart";
 
 const CHART_COLORS = [
@@ -146,7 +148,7 @@ function FilterSelector<T>({
   const selected = options.find((o) => o.value === value) || options[0];
 
   return (
-    <div className="flex flex-col gap-1.5">
+    <div className="flex w-full shrink-0 flex-col gap-1.5 sm:w-56">
       <label className="pl-1 text-[9px] font-black uppercase tracking-[0.25em] text-neutral-500 dark:text-neutral-400">
         {label}
       </label>
@@ -207,12 +209,14 @@ const DashboardCard = ({
   icon,
   className,
   delay = 0,
+  headerAction,
 }: {
   title: string;
   children: React.ReactNode;
   icon?: React.ReactNode;
   className?: string;
   delay?: number;
+  headerAction?: React.ReactNode;
 }) => {
   const [isVisible, setIsVisible] = useState(false);
 
@@ -229,7 +233,7 @@ const DashboardCard = ({
         className,
       )}
     >
-      <div className="mb-6 flex items-center justify-between">
+      <div className="mb-6 flex items-center justify-between gap-4">
         <div className="flex items-center gap-3.5">
           <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-indigo-50/80 text-indigo-500 shadow-inner transition-transform duration-500 group-hover:rotate-3 group-hover:scale-110 dark:bg-indigo-500/10 dark:text-indigo-400">
             {icon}
@@ -238,6 +242,7 @@ const DashboardCard = ({
             {title}
           </h3>
         </div>
+        {headerAction}
       </div>
       <div className="min-h-[300px] flex-1">{children}</div>
     </div>
@@ -519,6 +524,9 @@ export default function ReportsView() {
   const [week, setWeek] = useState<number>(1);
   const [year, setYear] = useState<number>(now.getFullYear());
   const [activeIndex, setActiveIndex] = useState(-1);
+  const [performanceView, setPerformanceView] = useState<
+    "status" | "kpi" | "trend"
+  >("status");
 
   const { modalContentType, openModal, closeModal, isOpen } = useModal();
 
@@ -583,6 +591,16 @@ export default function ReportsView() {
   const { data: metrics, isLoading } = api.dashboard.get.useQuery(
     { selectedUserId, boardPublicId, viewMode, month, week, year },
     { enabled: !!selectedUserId && boardsData !== undefined },
+  );
+
+  const penaltyStatisticsQuery = api.taskPenalty.statistics.useQuery(
+    {
+      month: `${year}-${String(month).padStart(2, "0")}`,
+      targetUserId: selectedUserId,
+    },
+    {
+      enabled: !!currentUser && !!selectedUserId,
+    },
   );
 
   // --- REWARD BREACH DETECTION ---
@@ -666,6 +684,7 @@ export default function ReportsView() {
   const rawPieData = metrics?.kanban?.cardDistributionByList?.data || [];
   const pieData = rawPieData.filter((d: any) => d.cardCount > 0);
   const taskProgressData = calendarMetrics?.taskProgressBreakdown?.data || [];
+  const dailyKpiData = calendarMetrics?.dailyKpiBreakdown?.data || [];
   const totalCards = metrics?.kanban?.cardDistributionByList?.totalCards || 0;
 
   return (
@@ -943,11 +962,37 @@ export default function ReportsView() {
               title="Chi tiết hiệu suất (công việc hằng ngày)"
               icon={<HiChartBar size={20} />}
               delay={600}
+              headerAction={
+                <FilterSelector
+                  label="Hiển thị"
+                  value={performanceView}
+                  onChange={setPerformanceView}
+                  options={[
+                    { label: "Trạng thái công việc", value: "status" as const },
+                    { label: "Tỷ lệ hoàn thành", value: "kpi" as const },
+                    { label: "Xu hướng theo ngày", value: "trend" as const },
+                  ]}
+                  icon={<HiChartBar className="h-4 w-4" />}
+                />
+              }
             >
               {isCalendarDataLoading ? (
                 <SkeletonPulse className="h-80 w-full" />
-              ) : taskProgressData.length > 0 ? (
+              ) : performanceView === "status" &&
+                taskProgressData.length > 0 ? (
                 <TaskProgressChart data={taskProgressData} />
+              ) : performanceView === "kpi" && taskProgressData.length > 0 ? (
+                <DailyTaskKpiChart
+                  mode="kpi"
+                  taskData={taskProgressData}
+                  dayData={dailyKpiData}
+                />
+              ) : performanceView === "trend" && dailyKpiData.length > 0 ? (
+                <DailyTaskKpiChart
+                  mode="trend"
+                  taskData={taskProgressData}
+                  dayData={dailyKpiData}
+                />
               ) : (
                 <div className="flex h-64 flex-col items-center justify-center gap-4 text-light-400">
                   <div className="rounded-full bg-light-100 p-6 dark:bg-dark-300">
@@ -955,6 +1000,32 @@ export default function ReportsView() {
                   </div>
                   <p className="text-xs font-bold uppercase tracking-widest">{t`No tasks found`}</p>
                 </div>
+              )}
+            </DashboardCard>
+          </div>
+
+          <div className="lg:col-span-2">
+            <DashboardCard
+              title="Thống kê khấu trừ Daily Task"
+              icon={<HiClipboardDocumentList size={20} />}
+              delay={700}
+            >
+              {penaltyStatisticsQuery.isLoading ? (
+                <SkeletonPulse className="h-80 w-full" />
+              ) : penaltyStatisticsQuery.isError ? (
+                <div className="flex h-64 items-center justify-center text-sm text-rose-600">
+                  {t`Không thể tải thống kê khấu trừ`}
+                </div>
+              ) : (
+                <DailyTaskPenaltyStatistics
+                  entries={penaltyStatisticsQuery.data?.entries ?? []}
+                  total={
+                    penaltyStatisticsQuery.data?.total ?? {
+                      count: 0,
+                      amountVnd: 0,
+                    }
+                  }
+                />
               )}
             </DashboardCard>
           </div>

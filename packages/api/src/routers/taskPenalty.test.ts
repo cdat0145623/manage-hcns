@@ -2,6 +2,16 @@ import { describe, expect, it, vi } from "vitest";
 
 import { taskPenaltyRouter } from "./taskPenalty";
 
+const { getDailyTaskPenaltyStatistics } = vi.hoisted(() => ({
+  getDailyTaskPenaltyStatistics: vi.fn(),
+}));
+
+vi.mock("next-runtime-env", () => ({ env: vi.fn() }));
+vi.mock("@kan/auth/server", () => ({ initAuth: vi.fn() }));
+vi.mock("@kan/db/repository/taskPenaltyStatistics.repo", () => ({
+  getDailyTaskPenaltyStatistics,
+}));
+
 const actorId = "11111111-1111-4111-8111-111111111111";
 
 function createCaller(role: "ADMIN" | "NVVP") {
@@ -52,34 +62,13 @@ function createCaller(role: "ADMIN" | "NVVP") {
 }
 
 describe("taskPenalty.settings", () => {
-  it("returns grouped public policy views to a system admin", async () => {
-    const result = await createCaller("ADMIN").settings();
-
-    expect(result.priorities.map((item) => item.priority)).toEqual([
-      "high",
-      "medium",
-      "low",
-    ]);
-    expect(result.priorities[0]?.current).toMatchObject({
-      publicId: "adminpolicy01",
-      amountVnd: 100_000,
-      effectiveFrom: new Date("2026-08-01T00:00:00.000Z"),
-      effectiveTo: new Date("2026-08-31T23:59:59.999Z"),
-      createdAt: new Date("2026-08-26T08:30:00.000Z"),
-      revision: 2,
-    });
-    expect(result.priorities[0]?.current).not.toHaveProperty("id");
-    expect(result.priorities[0]?.history).not.toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ publicId: "sysdefaulthi" }),
-      ]),
+  it("returns current defaults to every authenticated user", async () => {
+    const result = await createCaller("NVVP").settings();
+    expect(result.priorities).toContainEqual(
+      expect.objectContaining({ priority: "high", amountVnd: 100_000 }),
     );
-  });
-
-  it("forbids a non-admin", async () => {
-    await expect(createCaller("NVVP").settings()).rejects.toMatchObject({
-      code: "FORBIDDEN",
-    });
+    expect(result.priorities[0]).not.toHaveProperty("current");
+    expect(result.priorities[0]).not.toHaveProperty("history");
   });
 
   it("forbids a non-admin from saving a policy", async () => {
@@ -87,8 +76,6 @@ describe("taskPenalty.settings", () => {
       createCaller("NVVP").saveGlobalPolicy({
         priority: "high",
         amountVnd: 250_000,
-        effectiveFrom: new Date("2026-08-01T00:00:00.000Z"),
-        effectiveTo: new Date("2026-08-30T23:59:59.999Z"),
       }),
     ).rejects.toMatchObject({ code: "FORBIDDEN" });
   });
@@ -98,39 +85,39 @@ describe("taskPenalty.settings", () => {
       createCaller("ADMIN").saveGlobalPolicy({
         priority: "high",
         amountVnd: 12.5,
-        effectiveFrom: new Date("2026-08-01T00:00:00.000Z"),
-        effectiveTo: new Date("2026-08-30T23:59:59.999Z"),
       }),
     ).rejects.toMatchObject({ code: "BAD_REQUEST" });
     await expect(
       createCaller("ADMIN").saveGlobalPolicy({
         priority: "high",
         amountVnd: -1,
-        effectiveFrom: new Date("2026-08-01T00:00:00.000Z"),
-        effectiveTo: new Date("2026-08-30T23:59:59.999Z"),
       }),
     ).rejects.toMatchObject({ code: "BAD_REQUEST" });
   });
 
-  it("requires an explicit end date", async () => {
-    await expect(
-      // @ts-expect-error verifies runtime validation for malformed client input
-      createCaller("ADMIN").saveGlobalPolicy({
-        priority: "high",
-        amountVnd: 250_000,
-        effectiveFrom: new Date("2026-08-01T00:00:00.000Z"),
-      }),
-    ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+});
+
+describe("taskPenalty.statistics", () => {
+  it("returns all employees when an admin omits targetUserId", async () => {
+    getDailyTaskPenaltyStatistics.mockResolvedValue({
+      entries: [],
+      total: { count: 0, amountVnd: 0 },
+    });
+
+    await createCaller("ADMIN").statistics({ month: "2026-08" });
+
+    expect(getDailyTaskPenaltyStatistics).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ targetUserId: undefined }),
+    );
   });
 
-  it("rejects an end date before its start date", async () => {
+  it("rejects a regular user requesting another employee's statistics", async () => {
     await expect(
-      createCaller("ADMIN").saveGlobalPolicy({
-        priority: "high",
-        amountVnd: 250_000,
-        effectiveFrom: new Date("2026-08-30T00:00:00.000Z"),
-        effectiveTo: new Date("2026-08-01T23:59:59.999Z"),
+      createCaller("NVVP").statistics({
+        month: "2026-08",
+        targetUserId: "22222222-2222-4222-8222-222222222222",
       }),
-    ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    ).rejects.toMatchObject({ code: "FORBIDDEN" });
   });
 });

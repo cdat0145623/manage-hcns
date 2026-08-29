@@ -116,6 +116,41 @@ export interface GroupedPenaltyPolicy {
   history: PenaltyPolicyView[];
 }
 
+/**
+ * Returns the one policy currently governing a priority. Effective-period
+ * columns are retained for a future versioning feature but deliberately do
+ * not participate in the current Daily Task penalty model.
+ */
+export function resolveCurrentGlobalPenaltyPolicy(
+  policies: PenaltyPolicyView[],
+  priority: TaskPenaltyPriority,
+): PenaltyPolicyView | null {
+  const newestFirst = (left: PenaltyPolicyView, right: PenaltyPolicyView) =>
+    (right.revision ?? 0) - (left.revision ?? 0) ||
+    (right.createdAt?.getTime() ?? 0) - (left.createdAt?.getTime() ?? 0) ||
+    right.effectiveFrom.getTime() - left.effectiveFrom.getTime();
+
+  const currentAdminPolicy = policies
+    .filter(
+      (policy) =>
+        policy.priority === priority &&
+        policy.source === "global_policy" &&
+        policy.supersededAt === null,
+    )
+    .sort(newestFirst)[0];
+
+  if (currentAdminPolicy) return currentAdminPolicy;
+
+  return (
+    policies
+      .filter(
+        (policy) =>
+          policy.priority === priority && policy.source === "system_default",
+      )
+      .sort(newestFirst)[0] ?? null
+  );
+}
+
 export function groupPenaltyPolicies(
   policies: PenaltyPolicyView[],
   asOf: Date,
@@ -207,7 +242,7 @@ export type MasterPenaltyPolicyInput =
 export async function loadPenaltySnapshotsForMasters(
   db: dbClient,
   masters: PenaltyMaster[],
-  date: Date,
+  _date?: Date,
 ): Promise<Map<string, PenaltySnapshot | null>> {
   const snapshots = new Map<string, PenaltySnapshot | null>();
   if (masters.length === 0) return snapshots;
@@ -225,21 +260,14 @@ export async function loadPenaltySnapshotsForMasters(
     priorities.length === 0
       ? []
       : await db.query.taskPenaltyPolicies.findMany({
-          where: (policy) =>
-            and(
-              inArray(policy.priority, priorities),
-              lte(policy.effectiveFrom, date),
-              isNotNull(policy.effectiveTo),
-              gte(policy.effectiveTo, date),
-              isNull(policy.supersededAt),
-            ),
+          where: (policy) => inArray(policy.priority, priorities),
           orderBy: (policy) => [desc(policy.revision)],
         });
 
   for (const master of masters) {
     const priority = master.priority;
     const globalPolicy = priority
-      ? resolveGlobalPenaltyPolicyAtDate(globalPolicies, priority, date)
+      ? resolveCurrentGlobalPenaltyPolicy(globalPolicies, priority)
       : null;
     snapshots.set(
       master.id,
@@ -333,10 +361,10 @@ export async function scheduleMasterPenaltyPolicy(
 export async function reconcilePendingPenaltySnapshots(
   db: dbClient,
   input: {
-    effectiveFrom: Date;
     actorUserId: string | null;
     taskMasterId?: string;
     priority?: TaskPenaltyPriority;
+    defaultOnly?: boolean;
   },
 ) {
   const candidates = await db
@@ -366,27 +394,25 @@ export async function reconcilePendingPenaltySnapshots(
     .where(
       and(
         eq(taskInstances.isDeleted, false),
-        gte(taskInstances.targetDate, input.effectiveFrom),
         ...(input.taskMasterId
           ? [eq(taskInstances.taskMasterId, input.taskMasterId)]
           : []),
         ...(input.priority ? [eq(taskMasters.priority, input.priority)] : []),
+        ...(input.defaultOnly
+          ? [isNull(taskMasters.penaltyOverrideAmountVnd)]
+          : []),
       ),
     );
 
   for (const candidate of candidates) {
     if (!candidate.targetDate) continue;
-    const snapshots = await loadPenaltySnapshotsForMasters(
-      db,
-      [
-        {
-          id: candidate.taskMasterId,
-          priority: candidate.masterPriority,
-          overrideAmountVnd: candidate.masterOverrideAmountVnd,
-        },
-      ],
-      candidate.targetDate,
-    );
+    const snapshots = await loadPenaltySnapshotsForMasters(db, [
+      {
+        id: candidate.taskMasterId,
+        priority: candidate.masterPriority,
+        overrideAmountVnd: candidate.masterOverrideAmountVnd,
+      },
+    ]);
     const snapshot = snapshots.get(candidate.taskMasterId) ?? null;
     const hasChanged =
       candidate.penaltyPriority !== (snapshot?.priority ?? null) ||
@@ -631,9 +657,9 @@ export async function scheduleGlobalPenaltyPolicy(
     }
 
     await reconcilePendingPenaltySnapshots(tx, {
-      effectiveFrom: new Date(0),
       priority: input.priority,
       actorUserId: input.createdBy,
+      defaultOnly: true,
     });
 
     return scheduled;
@@ -649,9 +675,6 @@ export async function saveGlobalPenaltyPolicy(
   input: {
     priority: TaskPenaltyPriority;
     amountVnd: number;
-    effectiveFrom: Date;
-    effectiveTo: Date;
-    policyPublicId?: string;
     createdBy: string;
   },
 ) {
@@ -660,12 +683,16 @@ export async function saveGlobalPenaltyPolicy(
       sql`select pg_advisory_xact_lock(hashtext(${`global-task-penalty:${input.priority}`}))`,
     );
 
-    if (input.policyPublicId) {
-      await tx
-        .update(taskPenaltyPolicies)
-        .set({ supersededAt: new Date(), supersededBy: input.createdBy })
-        .where(eq(taskPenaltyPolicies.publicId, input.policyPublicId));
-    }
+    await tx
+      .update(taskPenaltyPolicies)
+      .set({ supersededAt: new Date(), supersededBy: input.createdBy })
+      .where(
+        and(
+          eq(taskPenaltyPolicies.priority, input.priority),
+          eq(taskPenaltyPolicies.source, "global_policy"),
+          isNull(taskPenaltyPolicies.supersededAt),
+        ),
+      );
 
     const [latestRevision] = await tx
       .select({
@@ -682,8 +709,8 @@ export async function saveGlobalPenaltyPolicy(
         priority: input.priority,
         amountVnd: input.amountVnd,
         source: "global_policy",
-        effectiveFrom: input.effectiveFrom,
-        effectiveTo: input.effectiveTo,
+        effectiveFrom: new Date(),
+        effectiveTo: null,
         revision,
         createdBy: input.createdBy,
       })
@@ -699,9 +726,9 @@ export async function saveGlobalPenaltyPolicy(
     if (!policy) throw new Error("Failed to save penalty policy");
 
     await reconcilePendingPenaltySnapshots(tx, {
-      effectiveFrom: input.effectiveFrom,
       priority: input.priority,
       actorUserId: input.createdBy,
+      defaultOnly: true,
     });
 
     return policy;

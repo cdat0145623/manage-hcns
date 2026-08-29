@@ -3,6 +3,7 @@ import {
   bigint,
   boolean,
   check,
+  date,
   index,
   integer,
   pgEnum,
@@ -135,6 +136,41 @@ export const taskInstances = pgTable(
   ],
 );
 
+export const dailyTaskKpiExclusions = pgTable(
+  "daily_task_kpi_exclusions",
+  {
+    id: uuid("id")
+      .primaryKey()
+      .default(sql`uuid_generate_v4()`),
+    publicId: varchar("publicId", { length: 12 }).notNull().unique(),
+    taskMasterId: uuid("taskMasterId")
+      .notNull()
+      .references(() => taskMasters.id, { onDelete: "restrict" }),
+    targetUserId: uuid("targetUserId")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    occurrenceDate: date("occurrenceDate", { mode: "string" }).notNull(),
+    reason: text("reason").notNull().default("Không áp dụng KPI cho task này."),
+    excludedByUserId: uuid("excludedByUserId")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    createdAt: timestamp("createdAt").notNull().defaultNow(),
+    updatedAt: timestamp("updatedAt").notNull().defaultNow(),
+    deletedAt: timestamp("deletedAt"),
+    deletedByUserId: uuid("deletedByUserId").references(() => users.id, {
+      onDelete: "restrict",
+    }),
+  },
+  (t) => [
+    unique().on(t.taskMasterId, t.targetUserId, t.occurrenceDate),
+    index("daily_task_kpi_exclusions_user_date_active_idx").on(
+      t.targetUserId,
+      t.occurrenceDate,
+      t.deletedAt,
+    ),
+  ],
+);
+
 export const taskPenaltyPolicies = pgTable(
   "task_penalty_policies",
   {
@@ -171,10 +207,6 @@ export const taskPenaltyPolicies = pgTable(
     check(
       "task_penalty_policy_amount_safe_check",
       sql`${t.amountVnd} >= 0 AND ${t.amountVnd} <= 9007199254740991`,
-    ),
-    check(
-      "task_penalty_policy_active_requires_end_check",
-      sql`${t.supersededAt} IS NOT NULL OR ${t.effectiveTo} IS NOT NULL`,
     ),
   ],
 );

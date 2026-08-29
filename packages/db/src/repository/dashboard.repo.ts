@@ -1,6 +1,8 @@
 import { and, eq, gte, inArray, isNull, lt } from "drizzle-orm";
 
 import type { dbClient } from "@kan/db/client";
+import { getDailyTaskKpiExclusions } from "@kan/db/repository/dailyTaskKpi.repo";
+import { generateVirtualTaskInstances } from "@kan/db/repository/taskInstance.repo";
 import {
   boards,
   cardActivities,
@@ -11,7 +13,10 @@ import {
   taskMasters,
   workspaceMembers,
 } from "@kan/db/schema";
-import { parseCalendarDayInZone } from "@kan/shared/utils";
+import {
+  calendarDateKeyInAppZone,
+  parseCalendarDayInZone,
+} from "@kan/shared/utils";
 
 // ================================================================
 // KANBAN METRICS
@@ -206,6 +211,7 @@ interface CalendarMetricInstance {
   actualDate: Date | null;
   endDate: Date | null;
   status: "pending" | "done" | "missed";
+  isDeleted: boolean;
 }
 
 const calendarMetricDateRange = (params: {
@@ -256,7 +262,7 @@ export const getCalendarMetrics = async (
   },
 ) => {
   const { from, to } = calendarMetricDateRange(params);
-  const allInstances: CalendarMetricInstance[] = await db
+  const storedInstances: CalendarMetricInstance[] = await db
     .select({
       id: taskInstances.id,
       taskMasterId: taskInstances.taskMasterId,
@@ -265,20 +271,98 @@ export const getCalendarMetrics = async (
       actualDate: taskInstances.actualDate,
       endDate: taskInstances.endDate,
       status: taskInstances.status,
+      isDeleted: taskInstances.isDeleted,
     })
     .from(taskInstances)
     .innerJoin(taskMasters, eq(taskInstances.taskMasterId, taskMasters.id))
     .where(
       and(
         eq(taskInstances.userId, params.selectedUserId),
-        eq(taskInstances.isDeleted, false),
         gte(taskInstances.targetDate, from),
         lt(taskInstances.targetDate, to),
       ),
     );
 
-  const totalCount = allInstances.length;
-  const doneInstances = allInstances.filter((i) => i.status === "done");
+  const taskMastersForUser = await db.query.taskMasters.findMany({
+    where: (table, { and, eq }) =>
+      and(
+        eq(table.targetUser, params.selectedUserId),
+        eq(table.isDeleted, false),
+      ),
+    with: { frequence: true },
+  });
+  const virtualInstances: CalendarMetricInstance[] = (
+    await Promise.all(
+      taskMastersForUser.map(async (taskMaster) => {
+        if (!taskMaster.frequence.rruleString) return [];
+        try {
+          const occurrences = await generateVirtualTaskInstances({
+            userId: params.selectedUserId,
+            taskMasterId: taskMaster.id,
+            rruleString: taskMaster.frequence.rruleString,
+            startDate: taskMaster.startDate,
+            masterEndDate: taskMaster.endDate,
+            from,
+            to: new Date(to.getTime() - 1),
+          });
+          return occurrences.map((occurrence: {
+            id: string;
+            taskMasterId: string;
+            targetDate: Date;
+            endDate: Date | null;
+          }) => ({
+            id: occurrence.id,
+            taskMasterId: occurrence.taskMasterId,
+            taskMasterName: taskMaster.name,
+            targetDate: occurrence.targetDate,
+            actualDate: null,
+            endDate: occurrence.endDate,
+            status: "pending" as const,
+            isDeleted: false,
+          }));
+        } catch {
+          return [];
+        }
+      }),
+    )
+  ).flat();
+  const storedOccurrenceKeys = new Set(
+    storedInstances.flatMap((instance) =>
+      instance.targetDate
+        ? [`${instance.taskMasterId}:${instance.targetDate.toISOString()}`]
+        : [],
+    ),
+  );
+  const allInstances = [
+    ...storedInstances.filter((instance) => !instance.isDeleted),
+    ...virtualInstances.filter(
+      (instance) =>
+        !!instance.targetDate &&
+        !storedOccurrenceKeys.has(
+          `${instance.taskMasterId}:${instance.targetDate.toISOString()}`,
+        ),
+    ),
+  ];
+  const exclusions = await getDailyTaskKpiExclusions(db, {
+    targetUserId: params.selectedUserId,
+    from: calendarDateKeyInAppZone(from),
+    to: calendarDateKeyInAppZone(new Date(to.getTime() - 1)),
+  });
+  const exclusionKeys = new Set(
+    exclusions.map(
+      (exclusion) => `${exclusion.taskMasterId}:${exclusion.occurrenceDate}`,
+    ),
+  );
+  const includedInstances = allInstances.filter(
+    (instance) =>
+      !!instance.targetDate &&
+      !exclusionKeys.has(
+        `${instance.taskMasterId}:${calendarDateKeyInAppZone(instance.targetDate)}`,
+      ),
+  );
+
+  const totalCount = includedInstances.length;
+  const doneInstances = includedInstances.filter((i) => i.status === "done");
   const doneCount = doneInstances.length;
 
   // ── taskCompletionRate ─────────────────────────────────────────
@@ -317,8 +401,12 @@ export const getCalendarMetrics = async (
       totalCount: number;
     }
   >();
+  const dayGroupMap = new Map<
+    string,
+    { doneCount: number; missedCount: number; pendingCount: number }
+  >();
 
-  for (const instance of allInstances) {
+  for (const instance of includedInstances) {
     const entry = taskGroupMap.get(instance.taskMasterId) ?? {
       taskName: instance.taskMasterName,
       doneCount: 0,
@@ -332,6 +420,18 @@ export const getCalendarMetrics = async (
     else entry.pendingCount++;
 
     taskGroupMap.set(instance.taskMasterId, entry);
+
+    if (!instance.targetDate) continue;
+    const dayKey = calendarDateKeyInAppZone(instance.targetDate);
+    const dayEntry = dayGroupMap.get(dayKey) ?? {
+      doneCount: 0,
+      missedCount: 0,
+      pendingCount: 0,
+    };
+    if (instance.status === "done") dayEntry.doneCount++;
+    else if (instance.status === "missed") dayEntry.missedCount++;
+    else dayEntry.pendingCount++;
+    dayGroupMap.set(dayKey, dayEntry);
   }
 
   const taskProgressBreakdown = {
@@ -359,13 +459,37 @@ export const getCalendarMetrics = async (
         completionRate,
         missedRate,
         pendingRate,
+        kpiRate:
+          group.doneCount + group.missedCount > 0
+            ? Math.round(
+                (group.doneCount / (group.doneCount + group.missedCount)) *
+                  10000,
+              ) / 100
+            : 0,
       };
     }),
+  };
+
+  const dailyKpiBreakdown = {
+    data: Array.from(dayGroupMap.entries())
+      .sort(([first], [second]) => first.localeCompare(second))
+      .map(([date, group]) => ({
+        date,
+        ...group,
+        kpiRate:
+          group.doneCount + group.missedCount > 0
+            ? Math.round(
+                (group.doneCount / (group.doneCount + group.missedCount)) *
+                  10000,
+              ) / 100
+            : null,
+      })),
   };
 
   return {
     taskCompletionRate,
     deadlineCompletionRate,
     taskProgressBreakdown,
+    dailyKpiBreakdown,
   };
 };

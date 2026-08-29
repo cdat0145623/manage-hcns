@@ -575,6 +575,20 @@
       "when": 1787722627570,
       "tag": "20260826053707_AddDailyTaskPenaltyEffectivePeriods",
       "breakpoints": true
+    },
+    {
+      "idx": 82,
+      "version": "7",
+      "when": 1787761546696,
+      "tag": "20260826162546_AddDailyTaskKpiExclusions",
+      "breakpoints": true
+    },
+    {
+      "idx": 83,
+      "version": "7",
+      "when": 1787830179646,
+      "tag": "20260827112939_UseCurrentDailyTaskPenaltyPolicy",
+      "breakpoints": true
     }
   ]
 }

@@ -1,10 +1,11 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import {
   groupPenaltyPolicies,
   resolveCurrentGlobalPenaltyPolicy,
   resolveGlobalPenaltyPolicyAtDate,
   selectPenaltyPolicy,
+  loadPenaltySnapshotsForMasters,
 } from "./taskPenaltyPolicy.repo";
 
 describe("selectPenaltyPolicy", () => {
@@ -215,5 +216,32 @@ describe("resolveCurrentGlobalPenaltyPolicy", () => {
         "high",
       ),
     ).toMatchObject({ publicId: "current", amountVnd: 250_000 });
+  });
+});
+
+describe("loadPenaltySnapshotsForMasters", () => {
+  it("loads the shared policy dataset once for multiple masters", async () => {
+    const findMany = vi.fn().mockResolvedValue([
+      {
+        publicId: "global-high",
+        priority: "high",
+        amountVnd: 200_000,
+        source: "global_policy",
+        effectiveFrom: new Date("2026-08-01T00:00:00.000Z"),
+        effectiveTo: null,
+        revision: 1,
+        supersededAt: null,
+      },
+    ]);
+    const db = { query: { taskPenaltyPolicies: { findMany } } } as never;
+
+    const snapshots = await loadPenaltySnapshotsForMasters(db, [
+      { id: "master-a", priority: "high" },
+      { id: "master-b", priority: "high" },
+    ]);
+
+    expect(findMany).toHaveBeenCalledTimes(1);
+    expect(snapshots.get("master-a")).toMatchObject({ amountVnd: 200_000 });
+    expect(snapshots.get("master-b")).toMatchObject({ amountVnd: 200_000 });
   });
 });

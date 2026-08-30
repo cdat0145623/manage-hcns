@@ -14,28 +14,13 @@ import {
 } from "@kan/shared/utils";
 
 import { createTRPCRouter, protectedProcedure } from "../trpc";
+import { assertSystemAdmin } from "../utils/assert-system-admin";
 
 const calendarDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 const occurrenceKeySchema = z.object({
   taskMasterId: z.string().uuid(),
   occurrenceDate: calendarDateSchema,
 });
-
-const assertAdmin = async (
-  db: Parameters<typeof getDailyTaskKpiExclusions>[0],
-  userId: string,
-) => {
-  const user = await db.query.users.findFirst({
-    columns: { role: true },
-    where: eq(users.id, userId),
-  });
-  if (user?.role !== "ADMIN") {
-    throw new TRPCError({
-      code: "FORBIDDEN",
-      message: "Admin access required",
-    });
-  }
-};
 
 const isValidTaskOccurrence = async (
   db: Parameters<typeof getDailyTaskKpiExclusions>[0],
@@ -107,7 +92,7 @@ export const dailyTaskKpiRouter = createTRPCRouter({
       if (!userId) throw new TRPCError({ code: "UNAUTHORIZED" });
 
       if (userId !== input.targetUserId) {
-        await assertAdmin(ctx.db, userId);
+        await assertSystemAdmin(ctx.db, userId);
       }
       return getDailyTaskKpiExclusions(ctx.db, input);
     }),
@@ -135,7 +120,7 @@ export const dailyTaskKpiRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const userId = ctx.user?.id;
       if (!userId) throw new TRPCError({ code: "UNAUTHORIZED" });
-      await assertAdmin(ctx.db, userId);
+      await assertSystemAdmin(ctx.db, userId);
 
       const uniqueOccurrences = Array.from(
         new Map(

@@ -10,6 +10,7 @@ import * as userRepo from "@kan/db/repository/user.repo";
 import { taskMasters } from "@kan/db/schema";
 
 import { createTRPCRouter, protectedProcedure } from "../trpc";
+import { assertSystemAdminRole } from "../utils/assert-system-admin";
 
 const amountVndSchema = z.number().int().min(0).max(Number.MAX_SAFE_INTEGER);
 
@@ -43,13 +44,7 @@ const assertSystemAdmin = async (ctx: {
 }) => {
   const userId = ctx.user?.id;
   if (!userId) throw new TRPCError({ code: "UNAUTHORIZED" });
-  const user = await userRepo.getById(ctx.db, userId);
-  if (user?.role !== "ADMIN") {
-    throw new TRPCError({
-      code: "FORBIDDEN",
-      message: "Admin access required",
-    });
-  }
+  assertSystemAdminRole(await userRepo.getById(ctx.db, userId));
   return userId;
 };
 

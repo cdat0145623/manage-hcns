@@ -22,6 +22,11 @@ import {
   taskPenaltyPolicies,
 } from "@kan/db/schema";
 import { generateUID } from "@kan/shared/utils";
+import {
+  resolveCurrentGlobalPenaltyPolicy as resolveCurrentGlobalPenaltyPolicyCore,
+  selectPenaltyPolicy as selectPenaltyPolicyCore,
+} from "./taskPenaltyPolicy.resolver";
+import type { PenaltyPolicyView, PenaltySnapshot } from "./taskPenaltyPolicy.resolver";
 
 export const TASK_PENALTY_PRIORITIES = ["high", "medium", "low"] as const;
 
@@ -46,14 +51,7 @@ interface SelectPenaltyPolicyInput {
   masterOverrideAmountVnd?: number | null;
 }
 
-export interface PenaltySnapshot {
-  priority: TaskPenaltyPriority;
-  amountVnd: number;
-  globalDefaultAmountVnd: number;
-  effectiveFrom: Date;
-  policyPublicId: string;
-  source: TaskPenaltySource;
-}
+export type { PenaltySnapshot } from "./taskPenaltyPolicy.resolver";
 
 export interface PenaltyPolicyActivityMetadata {
   version: 1;
@@ -70,155 +68,15 @@ export interface PenaltyPolicyActivityMetadata {
   };
 }
 
-export interface PenaltyPolicyView {
-  publicId: string;
-  priority: TaskPenaltyPriority;
-  amountVnd: number;
-  source: TaskPenaltySource;
-  effectiveFrom: Date;
-  effectiveTo: Date | null;
-  revision?: number;
-  supersededAt?: Date | null;
-  createdAt?: Date;
-}
+export type { PenaltyPolicyView } from "./taskPenaltyPolicy.resolver";
 
-/**
- * Resolves the policy that governs a calendar occurrence. Policies are never
- * inferred outside their explicit date range; when configured periods overlap,
- * the most recently saved revision wins.
- */
-export function resolveGlobalPenaltyPolicyAtDate(
-  policies: PenaltyPolicyView[],
-  priority: TaskPenaltyPriority,
-  date: Date,
-): PenaltyPolicyView | null {
-  return (
-    policies
-      .filter(
-        (policy) =>
-          policy.priority === priority &&
-          policy.supersededAt === null &&
-          policy.effectiveFrom <= date &&
-          policy.effectiveTo !== null &&
-          policy.effectiveTo >= date,
-      )
-      .sort(
-        (left, right) =>
-          (right.revision ?? 0) - (left.revision ?? 0) ||
-          right.effectiveFrom.getTime() - left.effectiveFrom.getTime(),
-      )[0] ?? null
-  );
-}
-
-export interface GroupedPenaltyPolicy {
-  priority: TaskPenaltyPriority;
-  current: PenaltyPolicyView | null;
-  history: PenaltyPolicyView[];
-}
-
-/**
- * Returns the one policy currently governing a priority. Effective-period
- * columns are retained for a future versioning feature but deliberately do
- * not participate in the current Daily Task penalty model.
- */
-export function resolveCurrentGlobalPenaltyPolicy(
-  policies: PenaltyPolicyView[],
-  priority: TaskPenaltyPriority,
-): PenaltyPolicyView | null {
-  const newestFirst = (left: PenaltyPolicyView, right: PenaltyPolicyView) =>
-    (right.revision ?? 0) - (left.revision ?? 0) ||
-    (right.createdAt?.getTime() ?? 0) - (left.createdAt?.getTime() ?? 0) ||
-    right.effectiveFrom.getTime() - left.effectiveFrom.getTime();
-
-  const currentAdminPolicy = policies
-    .filter(
-      (policy) =>
-        policy.priority === priority &&
-        policy.source === "global_policy" &&
-        policy.supersededAt === null,
-    )
-    .sort(newestFirst)[0];
-
-  if (currentAdminPolicy) return currentAdminPolicy;
-
-  return (
-    policies
-      .filter(
-        (policy) =>
-          policy.priority === priority && policy.source === "system_default",
-      )
-      .sort(newestFirst)[0] ?? null
-  );
-}
-
-export function groupPenaltyPolicies(
-  policies: PenaltyPolicyView[],
-  asOf: Date,
-): GroupedPenaltyPolicy[] {
-  return TASK_PENALTY_PRIORITIES.map((priority) => {
-    const versions = policies.filter(
-      (policy) =>
-        policy.priority === priority && policy.source !== "system_default",
-    );
-    const current = versions
-      .filter(
-        (policy) =>
-          policy.effectiveFrom <= asOf &&
-          policy.effectiveTo !== null &&
-          policy.effectiveTo >= asOf &&
-          policy.supersededAt == null,
-      )
-      .sort(
-        (left, right) =>
-          (right.revision ?? 0) - (left.revision ?? 0) ||
-          right.effectiveFrom.getTime() - left.effectiveFrom.getTime(),
-      )[0];
-
-    return {
-      priority,
-      current: current ?? null,
-      history: versions
-        .filter((policy) => policy.publicId !== current?.publicId)
-        .sort(
-          (left, right) =>
-            (right.createdAt?.getTime() ?? 0) -
-            (left.createdAt?.getTime() ?? 0),
-        ),
-    };
-  });
-}
-
-export function selectPenaltyPolicy(
-  input: SelectPenaltyPolicyInput,
-): PenaltySnapshot | null {
-  if (!input.priority) return null;
-
-  if (
-    input.globalPolicy &&
-    input.masterOverrideAmountVnd !== null &&
-    input.masterOverrideAmountVnd !== undefined
-  ) {
-    return {
-      priority: input.priority,
-      amountVnd: input.masterOverrideAmountVnd,
-      globalDefaultAmountVnd: input.globalPolicy.amountVnd,
-      effectiveFrom: input.globalPolicy.effectiveFrom,
-      policyPublicId: input.globalPolicy.publicId,
-      source: "master_override",
-    };
-  }
-
-  if (!input.globalPolicy) return null;
-
-  return {
-    priority: input.priority,
-    amountVnd: input.globalPolicy.amountVnd,
-    globalDefaultAmountVnd: input.globalPolicy.amountVnd,
-    effectiveFrom: input.globalPolicy.effectiveFrom,
-    policyPublicId: input.globalPolicy.publicId,
-    source: input.globalPolicy.source ?? "global_policy",
-  };
-}
+export {
+  groupPenaltyPolicies,
+  resolveCurrentGlobalPenaltyPolicy,
+  resolveGlobalPenaltyPolicyAtDate,
+  selectPenaltyPolicy,
+} from "./taskPenaltyPolicy.resolver";
+export type { GroupedPenaltyPolicy } from "./taskPenaltyPolicy.resolver";
 
 export interface PenaltyMaster {
   id: string;
@@ -267,11 +125,11 @@ export async function loadPenaltySnapshotsForMasters(
   for (const master of masters) {
     const priority = master.priority;
     const globalPolicy = priority
-      ? resolveCurrentGlobalPenaltyPolicy(globalPolicies, priority)
+      ? resolveCurrentGlobalPenaltyPolicyCore(globalPolicies, priority)
       : null;
     snapshots.set(
       master.id,
-      selectPenaltyPolicy({
+      selectPenaltyPolicyCore({
         priority,
         masterOverrideAmountVnd: master.overrideAmountVnd,
         globalPolicy: globalPolicy
@@ -358,7 +216,7 @@ export async function scheduleMasterPenaltyPolicy(
   return scheduled;
 }
 
-export async function reconcilePendingPenaltySnapshots(
+export async function reconcilePendingPenaltySnapshotsInternal(
   db: dbClient,
   input: {
     actorUserId: string | null;
@@ -404,16 +262,22 @@ export async function reconcilePendingPenaltySnapshots(
       ),
     );
 
-  for (const candidate of candidates) {
-    if (!candidate.targetDate) continue;
-    const snapshots = await loadPenaltySnapshotsForMasters(db, [
-      {
+  // Resolve all affected masters in one policy query. The previous per-instance
+  // lookup multiplied the same global-policy query by the number of instances.
+  const masters = Array.from(
+    new Map(
+      candidates.map((candidate) => [candidate.taskMasterId, {
         id: candidate.taskMasterId,
         priority: candidate.masterPriority,
         overrideAmountVnd: candidate.masterOverrideAmountVnd,
-      },
-    ]);
-    const snapshot = snapshots.get(candidate.taskMasterId) ?? null;
+      }]),
+    ).values(),
+  );
+  const snapshotsByMaster = await loadPenaltySnapshotsForMasters(db, masters);
+
+  for (const candidate of candidates) {
+    if (!candidate.targetDate) continue;
+    const snapshot = snapshotsByMaster.get(candidate.taskMasterId) ?? null;
     const hasChanged =
       candidate.penaltyPriority !== (snapshot?.priority ?? null) ||
       candidate.penaltyAmountVnd !== (snapshot?.amountVnd ?? null) ||
@@ -656,7 +520,7 @@ export async function scheduleGlobalPenaltyPolicy(
       }
     }
 
-    await reconcilePendingPenaltySnapshots(tx, {
+    await reconcilePendingPenaltySnapshotsInternal(tx, {
       priority: input.priority,
       actorUserId: input.createdBy,
       defaultOnly: true,
@@ -725,7 +589,7 @@ export async function saveGlobalPenaltyPolicy(
 
     if (!policy) throw new Error("Failed to save penalty policy");
 
-    await reconcilePendingPenaltySnapshots(tx, {
+    await reconcilePendingPenaltySnapshotsInternal(tx, {
       priority: input.priority,
       actorUserId: input.createdBy,
       defaultOnly: true,

@@ -15,8 +15,16 @@ import type { CalendarEntry, RecurrenceType } from "~/hooks/useRecurrence";
 import Editor from "~/components/Editor";
 import { usePopup } from "~/providers/popup";
 import { api } from "~/utils/api";
+import { useTaskMasterWorkflow } from "~/hooks/use-task-master-workflow";
 import Modal from "../../../components/modal";
 import CardRewardConfigForm from "../../card/components/CardRewardConfigForm";
+import type {
+  PenaltyAmountMode,
+  TaskPenaltyPriority,
+} from "~/views/daily-task-penalty/penalty-types";
+import { buildTaskMasterAdminUpdateInput, buildTaskMasterCreateInput, buildTaskMasterUpdateInput } from "./task-master-form-model";
+import { TaskPenaltyPolicyFields } from "~/views/daily-task-penalty/TaskPenaltyPolicyFields";
+import { formatPenaltyVnd } from "~/views/daily-task-penalty/penalty-formatters";
 
 export interface Attendee {
   id: string;
@@ -63,17 +71,7 @@ export interface CreateEventInput {
   attendees: Attendee[];
 }
 
-type TaskPenaltyPriority = "high" | "medium" | "low";
-type PenaltyAmountMode = "default" | "override";
-
 const parseAppDay = (value: string) => new Date(`${value}T00:00:00+07:00`);
-
-const formatVnd = (amount: number) =>
-  new Intl.NumberFormat("vi-VN", {
-    style: "currency",
-    currency: "VND",
-    maximumFractionDigits: 0,
-  }).format(amount);
 
 interface CreateEventModalProps {
   isVisible: boolean;
@@ -304,6 +302,12 @@ export function CreateEventModal({
     },
   });
 
+  const taskMasterWorkflow = useTaskMasterWorkflow({
+    create: (input) => createTask.mutate(input),
+    update: (input) => updateTask.mutate(input),
+    updateAdmin: (input) => updateAdminTask.mutate(input),
+  });
+
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [currentDate, setCurrentDate] = useState<Date>(selectedDate);
@@ -504,7 +508,7 @@ export function CreateEventModal({
   const selectedOpt = recurrenceOptions.find((o) => o.value === recurrence);
   const selectedDefaultPenalty = penaltySettings?.priorities.find(
     (item) => item.priority === penaltyPriority,
-  )?.current;
+  );
   const requiresPriorityChangeAction =
     isEditMode &&
     editEntry?.penalty?.source === "master_override" &&
@@ -651,7 +655,7 @@ export function CreateEventModal({
 
     if (isEditMode && editEntry) {
       if (editEntry.masterPublicId) {
-        updateAdminTask.mutate({
+        taskMasterWorkflow.updateAdmin(buildTaskMasterAdminUpdateInput({
           publicId: editEntry.masterPublicId,
           name: title,
           description,
@@ -659,26 +663,14 @@ export function CreateEventModal({
           endDate: finalEndDate,
           selectedUserId,
           rruleString,
-          penaltyPolicy: penaltyTouched
-            ? {
-                policy: penaltyPriority
-                  ? penaltyAmountMode === "override"
-                    ? {
-                        priority: penaltyPriority,
-                        amountMode: "override" as const,
-                        overrideAmountVnd: overrideAmount,
-                      }
-                    : {
-                        priority: penaltyPriority,
-                        amountMode: "default" as const,
-                      }
-                  : { priority: null },
-                priorityChangeAction: penaltyPriorityChangeAction ?? undefined,
-              }
-            : undefined,
-        });
+          priority: penaltyPriority,
+          amountMode: penaltyAmountMode,
+          overrideAmountVnd: overrideAmount,
+          priorityChangeAction: penaltyPriorityChangeAction ?? undefined,
+          penaltyTouched,
+        }));
       } else if (updateType === "all") {
-        updateTask.mutate({
+        taskMasterWorkflow.update(buildTaskMasterUpdateInput({
           id: editEntry.masterId!,
           name: title,
           description,
@@ -686,24 +678,12 @@ export function CreateEventModal({
           endDate: finalEndDate,
           selectedUserId: selectedUserId,
           rruleString,
-          penaltyPolicy: penaltyTouched
-            ? {
-                policy: penaltyPriority
-                  ? penaltyAmountMode === "override"
-                    ? {
-                        priority: penaltyPriority,
-                        amountMode: "override" as const,
-                        overrideAmountVnd: overrideAmount,
-                      }
-                    : {
-                        priority: penaltyPriority,
-                        amountMode: "default" as const,
-                      }
-                  : { priority: null },
-                priorityChangeAction: penaltyPriorityChangeAction ?? undefined,
-              }
-            : undefined,
-        });
+          priority: penaltyPriority,
+          amountMode: penaltyAmountMode,
+          overrideAmountVnd: overrideAmount,
+          priorityChangeAction: penaltyPriorityChangeAction ?? undefined,
+          penaltyTouched,
+        }));
       }
       // else if (updateType === "single") {
       // if (editEntry.type === "VIRTUAL") {
@@ -727,7 +707,7 @@ export function CreateEventModal({
       // });
       // }
     } else {
-      createTask.mutate({
+      taskMasterWorkflow.create(buildTaskMasterCreateInput({
         name: title,
         description,
         startDate: startDT,
@@ -736,16 +716,10 @@ export function CreateEventModal({
         rruleString,
         from: startOfMonth(startDT),
         to: endOfMonth(startDT),
-        penaltyPolicy: penaltyPriority
-          ? penaltyAmountMode === "override"
-            ? {
-                priority: penaltyPriority,
-                amountMode: "override",
-                overrideAmountVnd: overrideAmount,
-              }
-            : { priority: penaltyPriority, amountMode: "default" }
-          : { priority: null },
-      });
+        priority: penaltyPriority,
+        amountMode: penaltyAmountMode,
+        overrideAmountVnd: overrideAmount,
+      }));
     }
   };
 
@@ -1305,41 +1279,25 @@ export function CreateEventModal({
                     {t`Không chọn mức độ thì task vẫn hoạt động bình thường và không phát sinh phạt.`}
                   </p>
                 </div>
-                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                  {(
-                    [
-                      { value: null, label: t`Không áp dụng` },
-                      { value: "high", label: t`Cao` },
-                      { value: "medium", label: t`Trung bình` },
-                      { value: "low", label: t`Thấp` },
-                    ] as const
-                  ).map((option) => (
-                    <button
-                      key={option.value ?? "none"}
-                      type="button"
-                      aria-pressed={penaltyPriority === option.value}
-                      onClick={() => {
-                        setPenaltyPriority(option.value);
-                        setPenaltyPriorityChangeAction(null);
-                        setPenaltyTouched(true);
-                      }}
-                      className={`rounded-lg border px-3 py-2 text-xs font-semibold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
-                        penaltyPriority === option.value
-                          ? option.value === "high"
-                            ? "border-red-500 bg-red-50 text-red-700 dark:bg-red-950/40 dark:text-red-300"
-                            : option.value === "medium"
-                              ? "border-amber-500 bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300"
-                              : option.value === "low"
-                                ? "border-emerald-500 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
-                                : "border-neutral-500 bg-white text-neutral-800 dark:bg-dark-200 dark:text-neutral-200"
-                          : "border-neutral-200 bg-white text-neutral-500 hover:border-neutral-400 dark:border-dark-400 dark:bg-dark-200 dark:text-neutral-400"
-                      }`}
-                    >
-                      {option.label}
-                    </button>
-                  ))}
-                </div>
-
+                <TaskPenaltyPolicyFields
+                  priorityOnly
+                  priority={penaltyPriority}
+                  amountMode={penaltyAmountMode}
+                  overrideAmount={penaltyOverrideAmount}
+                  onPriorityChange={(value) => {
+                    setPenaltyPriority(value);
+                    setPenaltyPriorityChangeAction(null);
+                    setPenaltyTouched(true);
+                  }}
+                  onAmountModeChange={(value) => {
+                    setPenaltyAmountMode(value);
+                    setPenaltyTouched(true);
+                  }}
+                  onOverrideAmountChange={(value) => {
+                    setPenaltyOverrideAmount(value);
+                    setPenaltyTouched(true);
+                  }}
+                />
                 {penaltyPriority && (
                   <div className="space-y-3 border-t border-neutral-200 pt-3 dark:border-dark-400">
                     <div className="grid gap-2 sm:grid-cols-2">
@@ -1360,8 +1318,8 @@ export function CreateEventModal({
                           {t`Dùng mức mặc định`}
                         </span>
                         <span className="mt-1 block tabular-nums">
-                          {selectedDefaultPenalty
-                            ? formatVnd(selectedDefaultPenalty.amountVnd)
+                          {selectedDefaultPenalty?.amountVnd != null
+                            ? formatPenaltyVnd(selectedDefaultPenalty.amountVnd)
                             : t`Chưa có mức hiệu lực`}
                         </span>
                       </button>

@@ -31,6 +31,9 @@ import type {
 } from "./daily-task-kpi-utils";
 import { usePopup } from "~/providers/popup";
 import { api } from "~/utils/api";
+import { buildKpiSelectionChanges } from "./daily-task-kpi-selection";
+import { hydrateKpiSelection } from "./daily-task-kpi-selection";
+import { useDailyTaskKpiSelection } from "./use-daily-task-kpi-selection";
 import {
   calculateDailyTaskKpi,
   filterDailyTaskEntries,
@@ -102,13 +105,8 @@ export function DailyTaskKpiPanel({
     () => getDailyTaskPeriodBounds(new Date()).to,
   );
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
-  const [excludedKeys, setExcludedKeys] = useState<Set<string>>(new Set());
-  const [reasons, setReasons] = useState<Record<string, string>>({});
-  const [savedExcludedKeys, setSavedExcludedKeys] = useState<Set<string>>(
-    new Set(),
-  );
-  const [savedReasons, setSavedReasons] = useState<Record<string, string>>({});
-  const [isSelectionDirty, setIsSelectionDirty] = useState(false);
+  const selection = useDailyTaskKpiSelection(hydrateKpiSelection([]));
+  const { excludedKeys, reasons, savedExcludedKeys, savedReasons, setState } = selection;
   const selectVisibleEntriesRef = useRef<HTMLInputElement>(null);
   const effectiveTargetUserId = targetUserId ?? currentUser?.id;
   const canManageKpi = currentUser?.role === "ADMIN";
@@ -131,30 +129,18 @@ export function DailyTaskKpiPanel({
       targetUser: effectiveTargetUserId,
     },
     { enabled: !!effectiveTargetUserId },
-  ) as {
-    data: unknown;
-    isLoading: boolean;
-    isError: boolean;
-    refetch: () => Promise<unknown>;
-  };
+  );
   const { data, isLoading, isError, refetch } = virtualTaskQuery;
 
   useEffect(() => {
     if (!exclusionsQuery.data) return;
 
-    const nextReasons: Record<string, string> = {};
-    const nextKeys = new Set(
-      exclusionsQuery.data.map((exclusion) => {
-        const key = `${exclusion.taskMasterId}:${exclusion.occurrenceDate}`;
-        nextReasons[key] = exclusion.reason;
-        return key;
-      }),
-    );
-    setExcludedKeys(nextKeys);
-    setReasons(nextReasons);
-    setSavedExcludedKeys(nextKeys);
-    setSavedReasons(nextReasons);
-    setIsSelectionDirty(false);
+    setState(hydrateKpiSelection(exclusionsQuery.data.map((exclusion) => ({
+      key: `${exclusion.taskMasterId}:${exclusion.occurrenceDate}`,
+      taskMasterId: exclusion.taskMasterId,
+      occurrenceDate: exclusion.occurrenceDate,
+      reason: exclusion.reason,
+    }))));
   }, [exclusionsQuery.data]);
 
   const entries = useMemo(() => normalizeDailyTaskKpiEntries(data), [data]);
@@ -237,8 +223,7 @@ export function DailyTaskKpiPanel({
     } else {
       next.add(key);
     }
-    setExcludedKeys(next);
-    setIsSelectionDirty(true);
+    setState((current) => ({ ...current, excludedKeys: next }));
   };
 
   const toggleVisibleEntries = (exclude: boolean) => {
@@ -249,15 +234,12 @@ export function DailyTaskKpiPanel({
       if (exclude) next.add(key);
       else next.delete(key);
     });
-    setExcludedKeys(next);
-    setIsSelectionDirty(true);
+    setState((current) => ({ ...current, excludedKeys: next }));
   };
 
   const saveMutation = api.dailyTaskKpi.saveChanges.useMutation({
     onSuccess: async () => {
-      setSavedExcludedKeys(new Set(excludedKeys));
-      setSavedReasons({ ...reasons });
-      setIsSelectionDirty(false);
+      setState((current) => ({ ...current, savedExcludedKeys: new Set(current.excludedKeys), savedReasons: { ...current.reasons } }));
       await exclusionsQuery.refetch();
       showPopup({
         header: t`Đã lưu lựa chọn KPI`,
@@ -277,34 +259,10 @@ export function DailyTaskKpiPanel({
   const saveSelections = () => {
     if (!effectiveTargetUserId || !canManageKpi) return;
 
-    const entriesByKey = new Map(
-      entries.map((entry) => [getDailyTaskOccurrenceKey(entry), entry]),
+    const { exclude, include } = buildKpiSelectionChanges(
+      { excludedKeys, reasons, savedExcludedKeys, savedReasons },
+      entries.map((entry) => ({ key: getDailyTaskOccurrenceKey(entry), taskMasterId: entry.taskMasterId, occurrenceDate: calendarDateKeyInAppZone(entry.targetDate) })),
     );
-    const exclude = [...excludedKeys].flatMap((key) => {
-      const entry = entriesByKey.get(key);
-      if (!entry) return [];
-      const reasonChanged = reasons[key] !== savedReasons[key];
-      if (savedExcludedKeys.has(key) && !reasonChanged) return [];
-      return [
-        {
-          taskMasterId: entry.taskMasterId,
-          occurrenceDate: calendarDateKeyInAppZone(entry.targetDate),
-          reason: reasons[key],
-        },
-      ];
-    });
-    const include = [...savedExcludedKeys].flatMap((key) => {
-      if (excludedKeys.has(key)) return [];
-      const entry = entriesByKey.get(key);
-      return entry
-        ? [
-            {
-              taskMasterId: entry.taskMasterId,
-              occurrenceDate: calendarDateKeyInAppZone(entry.targetDate),
-            },
-          ]
-        : [];
-    });
 
     saveMutation.mutate({
       targetUserId: effectiveTargetUserId,
@@ -314,13 +272,13 @@ export function DailyTaskKpiPanel({
   };
 
   const resetSelections = () => {
-    setExcludedKeys(new Set(savedExcludedKeys));
-    setReasons(savedReasons);
-    setIsSelectionDirty(false);
+    setState((current) => ({ ...current, excludedKeys: new Set(current.savedExcludedKeys), reasons: { ...current.savedReasons } }));
   };
 
   const hasPendingChanges =
-    !exclusionsQuery.isLoading && canManageKpi && isSelectionDirty;
+    !exclusionsQuery.isLoading &&
+    canManageKpi &&
+    selection.isDirty;
 
   if (isUserLoading) {
     return (
@@ -651,11 +609,7 @@ export function DailyTaskKpiPanel({
                               onChange={(event) => {
                                 if (!canManageKpi || saveMutation.isPending)
                                   return;
-                                setReasons((current) => ({
-                                  ...current,
-                                  [key]: event.target.value,
-                                }));
-                                setIsSelectionDirty(true);
+                                setState((current) => ({ ...current, reasons: { ...current.reasons, [key]: event.target.value } }));
                               }}
                               placeholder={t`Task ngoài phạm vi KPI`}
                               className="w-full rounded-lg border border-neutral-200 px-2.5 py-1.5 text-xs dark:border-neutral-600 dark:bg-neutral-700 dark:text-white"

@@ -98,7 +98,7 @@ describe("taskPenalty.settings", () => {
 });
 
 describe("taskPenalty.statistics", () => {
-  it("returns all employees when an admin omits targetUserId", async () => {
+  it("scopes omitted targetUserId to the authenticated admin", async () => {
     getDailyTaskPenaltyStatistics.mockResolvedValue({
       entries: [],
       total: { count: 0, amountVnd: 0 },
@@ -108,7 +108,7 @@ describe("taskPenalty.statistics", () => {
 
     expect(getDailyTaskPenaltyStatistics).toHaveBeenCalledWith(
       expect.anything(),
-      expect.objectContaining({ targetUserId: undefined }),
+      expect.objectContaining({ targetUserId: actorId }),
     );
   });
 

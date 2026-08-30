@@ -17,6 +17,7 @@ import ActivityList from "../../card/components/ActivityList";
 import { AttachmentThumbnails } from "../../card/components/AttachmentThumbnails";
 import { AttachmentUpload } from "../../card/components/AttachmentUpload";
 import CardRewardConfigForm from "../../card/components/CardRewardConfigForm";
+import { formatPenaltyVnd } from "~/views/daily-task-penalty/penalty-formatters";
 import Checklists from "../../card/components/Checklists";
 import { DeleteChecklistConfirmation } from "../../card/components/DeleteChecklistConfirmation";
 import { DeleteCommentConfirmation } from "../../card/components/DeleteCommentConfirmation";
@@ -42,13 +43,6 @@ function normalizeTaskStatus(s: string | undefined | null): TaskStatus {
   if (v === "done" || v === "missed" || v === "pending") return v;
   return "pending";
 }
-
-const formatVnd = (amount: number) =>
-  new Intl.NumberFormat("vi-VN", {
-    style: "currency",
-    currency: "VND",
-    maximumFractionDigits: 0,
-  }).format(amount);
 
 const penaltyPriorityLabel = (priority: "high" | "medium" | "low") => {
   if (priority === "high") return t`Cao`;
@@ -753,7 +747,7 @@ export function EventDetailModal({
                     {t`Mức phạt đã chốt`}
                   </p>
                   <p className="mt-1 text-sm font-semibold tabular-nums text-light-1000 dark:text-dark-1000">
-                    {formatVnd(penaltyDetails.amountVnd)}
+                    {formatPenaltyVnd(penaltyDetails.amountVnd)}
                   </p>
                   <p className="mt-0.5 text-xs text-light-800 dark:text-dark-800">
                     {penaltySourceLabel(penaltyDetails.source)}

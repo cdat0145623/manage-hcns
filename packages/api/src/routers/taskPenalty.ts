@@ -9,34 +9,15 @@ import {
   TASK_PENALTY_PRIORITIES,
 } from "@kan/db/repository/taskPenaltyPolicy.repo";
 import { getDailyTaskPenaltyStatistics } from "@kan/db/repository/taskPenaltyStatistics.repo";
-import {
-  taskMasterPenaltyPolicies,
-  taskPenaltyPolicies,
-  users,
-} from "@kan/db/schema";
+import { taskMasterPenaltyPolicies, taskPenaltyPolicies, users } from "@kan/db/schema";
 import { parseCalendarDayInZone } from "@kan/shared/utils";
 
 import { createTRPCRouter, protectedProcedure } from "../trpc";
+import { assertSystemAdmin } from "../utils/assert-system-admin";
 
 const prioritySchema = z.enum(TASK_PENALTY_PRIORITIES);
 const amountSchema = z.number().int().min(0).max(Number.MAX_SAFE_INTEGER);
 const monthSchema = z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/);
-
-const assertSystemAdmin = async (
-  db: Parameters<typeof saveGlobalPenaltyPolicy>[0],
-  userId: string,
-) => {
-  const user = await db.query.users.findFirst({
-    where: eq(users.id, userId),
-    columns: { role: true },
-  });
-  if (user?.role !== "ADMIN") {
-    throw new TRPCError({
-      code: "FORBIDDEN",
-      message: "Admin access required",
-    });
-  }
-};
 
 export const taskPenaltyRouter = createTRPCRouter({
   statistics: protectedProcedure
@@ -80,7 +61,7 @@ export const taskPenaltyRouter = createTRPCRouter({
       return getDailyTaskPenaltyStatistics(ctx.db, {
         from,
         to,
-        targetUserId: input.targetUserId ?? undefined,
+        targetUserId: requestedUserId,
       });
     }),
   settings: protectedProcedure

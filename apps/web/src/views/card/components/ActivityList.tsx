@@ -1,5 +1,6 @@
 import type { Locale as DateFnsLocale } from "date-fns";
 import { t } from "@lingui/core/macro";
+import { formatPenaltyVnd } from "~/views/daily-task-penalty/penalty-formatters";
 import { Trans } from "@lingui/react/macro";
 import { formatDistanceToNow, isValid } from "date-fns";
 import { useEffect, useRef, useState } from "react";
@@ -211,11 +212,7 @@ export const getActivityText = ({
   }
 
   if (type === "penalty_assessed" && penaltyAmountVnd != null) {
-    const formattedAmount = new Intl.NumberFormat("vi-VN", {
-      style: "currency",
-      currency: "VND",
-      maximumFractionDigits: 0,
-    }).format(penaltyAmountVnd ?? 0);
+    const formattedAmount = formatPenaltyVnd(penaltyAmountVnd);
     return (
       <>
         {t`đã ghi nhận phạt`} <TextHighlight>{formattedAmount}</TextHighlight>
@@ -224,11 +221,7 @@ export const getActivityText = ({
   }
 
   if (type === "penalty_recalculated" && penaltyAmountVnd != null) {
-    const formattedAmount = new Intl.NumberFormat("vi-VN", {
-      style: "currency",
-      currency: "VND",
-      maximumFractionDigits: 0,
-    }).format(penaltyAmountVnd);
+    const formattedAmount = formatPenaltyVnd(penaltyAmountVnd);
     return <>{t`đã tính lại khoản phạt thành`} <TextHighlight>{formattedAmount}</TextHighlight></>;
   }
 
@@ -242,12 +235,6 @@ export const getActivityText = ({
       medium: t`Trung bình`,
       low: t`Thấp`,
     }[penaltyPolicyActivity.priority];
-    const formatVnd = (amountVnd: number) =>
-      new Intl.NumberFormat("vi-VN", {
-        style: "currency",
-        currency: "VND",
-        maximumFractionDigits: 0,
-      }).format(amountVnd);
     const effectiveFrom = formatInAppCalendarZone(
       new Date(penaltyPolicyActivity.effectiveFrom),
       "dd/MM/yyyy",
@@ -259,13 +246,13 @@ export const getActivityText = ({
         <>
           {t`đã áp dụng cho công việc này từ`} {effectiveFrom}:{" "}
           <TextHighlight>
-            {priorityLabel} — {formatVnd(penaltyPolicyActivity.amountVnd)}
+            {priorityLabel} — {formatPenaltyVnd(penaltyPolicyActivity.amountVnd)}
           </TextHighlight>
           . {t`Đây là mức riêng của công việc này; các công việc khác ở mức`}{" "}
           <TextHighlight>{priorityLabel}</TextHighlight>{" "}
           {t`vẫn áp dụng mức chung`}{" "}
           <TextHighlight>
-            {formatVnd(penaltyPolicyActivity.globalDefaultAmountVnd)}
+            {formatPenaltyVnd(penaltyPolicyActivity.globalDefaultAmountVnd)}
           </TextHighlight>
           .
         </>
@@ -276,7 +263,7 @@ export const getActivityText = ({
       <>
         {t`đã áp dụng cho công việc này từ`} {effectiveFrom}:{" "}
         <TextHighlight>
-          {priorityLabel} — {formatVnd(penaltyPolicyActivity.amountVnd)}
+          {priorityLabel} — {formatPenaltyVnd(penaltyPolicyActivity.amountVnd)}
         </TextHighlight>{" "}
         {t`theo mức chung`}.
       </>

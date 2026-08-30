@@ -1,6 +1,8 @@
 import { t } from "@lingui/core/macro";
 import { useMemo, useState } from "react";
 import { HiCurrencyDollar } from "react-icons/hi2";
+import { PenaltyPriorityBadge } from "~/views/daily-task-penalty/PenaltyPriorityBadge";
+import { formatPenaltyVnd, penaltyPriorityClass, penaltyPriorityLabel } from "~/views/daily-task-penalty/penalty-formatters";
 
 type Priority = "high" | "medium" | "low";
 type Source = "common" | "custom";
@@ -25,27 +27,7 @@ interface DailyTaskPenaltyStatisticsProps {
   total: PenaltyTotal;
 }
 
-const priorityLabels: Record<Priority, string> = {
-  high: t`Cao`,
-  medium: t`Trung bình`,
-  low: t`Thấp`,
-};
-
-const priorityClasses: Record<Priority, string> = {
-  high: "bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300",
-  medium:
-    "bg-amber-100 text-amber-800 dark:bg-amber-500/15 dark:text-amber-300",
-  low: "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300",
-};
-
 const priorityFilters: Priority[] = ["high", "medium", "low"];
-
-const formatVnd = (amount: number) =>
-  new Intl.NumberFormat("vi-VN", {
-    style: "currency",
-    currency: "VND",
-    maximumFractionDigits: 0,
-  }).format(amount);
 
 export function DailyTaskPenaltyStatistics({
   entries,
@@ -88,7 +70,7 @@ export function DailyTaskPenaltyStatistics({
                 className={`rounded-full px-3 py-1.5 text-xs font-bold uppercase tracking-wide transition-colors ${
                   isActive
                     ? "bg-indigo-600 text-white shadow-sm"
-                    : `${priorityClasses[priority]} hover:brightness-95`
+                    : `${penaltyPriorityClass(priority)} hover:brightness-95`
                 }`}
                 onClick={() =>
                   setActivePriority((current) =>
@@ -96,7 +78,7 @@ export function DailyTaskPenaltyStatistics({
                   )
                 }
               >
-                {priorityLabels[priority]}
+                {penaltyPriorityLabel(priority)}
               </button>
             );
           })}
@@ -136,14 +118,10 @@ export function DailyTaskPenaltyStatistics({
                   {entry.createdAt.toLocaleDateString("vi-VN")}
                 </td>
                 <td className="px-4 py-3">
-                  <span
-                    className={`inline-flex rounded-full px-2 py-1 text-xs font-bold ${priorityClasses[entry.priority]}`}
-                  >
-                    {priorityLabels[entry.priority]}
-                  </span>
+                  <PenaltyPriorityBadge priority={entry.priority} />
                 </td>
                 <td className="whitespace-nowrap px-4 py-3 text-right font-bold tabular-nums text-light-1000 dark:text-dark-1000">
-                  {formatVnd(entry.amountVnd)}
+                  {formatPenaltyVnd(entry.amountVnd)}
                 </td>
               </tr>
             ))}
@@ -170,7 +148,7 @@ export function DailyTaskPenaltyStatistics({
                 {visibleTotal.count} {t`task bị khấu trừ`}
               </td>
               <td className="whitespace-nowrap px-4 py-3 text-right font-bold tabular-nums text-light-1000 dark:text-dark-1000">
-                {formatVnd(visibleTotal.amountVnd)}
+                {formatPenaltyVnd(visibleTotal.amountVnd)}
               </td>
             </tr>
           </tfoot>

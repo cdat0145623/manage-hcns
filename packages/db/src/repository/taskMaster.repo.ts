@@ -7,7 +7,7 @@ import { generateUID } from "@kan/shared/utils";
 import type { MasterPenaltyPolicyInput } from "./taskPenaltyPolicy.repo";
 import * as cardActivitesRepo from "./cardActivity.repo";
 import * as frequenceRepo from "./frequence.repo";
-import { reconcilePendingPenaltySnapshots } from "./taskPenaltyPolicy.repo";
+import { reconcilePendingPenaltySnapshots } from "./taskPenaltyReconciliation.repo";
 
 export const create = async (
   db: dbClient,

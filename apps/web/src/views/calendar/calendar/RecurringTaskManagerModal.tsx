@@ -6,6 +6,8 @@ import Button from "~/components/Button";
 import Input from "~/components/Input";
 import Modal from "~/components/modal";
 import { api } from "~/utils/api";
+import { PenaltyPriorityBadge } from "~/views/daily-task-penalty/PenaltyPriorityBadge";
+import { formatPenaltyVnd } from "~/views/daily-task-penalty/penalty-formatters";
 
 type Priority = "high" | "medium" | "low";
 type PriorityFilter = Priority | "none";
@@ -50,13 +52,6 @@ const PRIORITIES: Array<{
     className: "border-neutral-200 bg-neutral-50 text-neutral-700",
   },
 ];
-
-const formatVnd = (amount: number) =>
-  new Intl.NumberFormat("vi-VN", {
-    style: "currency",
-    currency: "VND",
-    maximumFractionDigits: 0,
-  }).format(amount);
 
 const formatCreatedAt = (date: Date) =>
   new Intl.DateTimeFormat("vi-VN", {
@@ -232,18 +227,12 @@ export function RecurringTaskManagerModal({
                     </td>
                     <td className="px-4 py-4 text-light-900 dark:text-dark-900">
                       <div className="font-medium">
-                        {master.priority === "high"
-                          ? t`Cao`
-                          : master.priority === "medium"
-                            ? t`Trung bình`
-                            : master.priority === "low"
-                              ? t`Thấp`
-                              : t`Không áp dụng phạt`}
+                        {master.priority ? <PenaltyPriorityBadge priority={master.priority} /> : t`Không áp dụng phạt`}
                       </div>
                       <div className="mt-1 text-xs">
                         {master.overrideAmountVnd == null
                           ? t`Dùng mức chung`
-                          : t`Mức riêng ${formatVnd(master.overrideAmountVnd)}`}
+                          : t`Mức riêng ${formatPenaltyVnd(master.overrideAmountVnd)}`}
                       </div>
                     </td>
                     <td className="px-4 py-4 text-right">

@@ -10,6 +10,8 @@ import { PageHead } from "~/components/PageHead";
 import { useModal } from "~/providers/modal";
 import { usePopup } from "~/providers/popup";
 import { api } from "~/utils/api";
+import { PenaltyPriorityBadge } from "~/views/daily-task-penalty/PenaltyPriorityBadge";
+import { formatPenaltyVnd } from "~/views/daily-task-penalty/penalty-formatters";
 
 type Priority = "high" | "medium" | "low";
 
@@ -35,13 +37,6 @@ const priorityLabel = (priority: Priority) => {
   if (priority === "medium") return t`Trung bình`;
   return t`Thấp`;
 };
-
-const formatVnd = (amount: number) =>
-  new Intl.NumberFormat("vi-VN", {
-    style: "currency",
-    currency: "VND",
-    maximumFractionDigits: 0,
-  }).format(amount);
 
 interface PolicyEditorProps {
   priority: Priority;
@@ -111,7 +106,7 @@ function PolicyEditor({ priority, currentAmount }: PolicyEditorProps) {
             />
             {amountIsValid && (
               <span className="block text-xs font-normal text-light-900 dark:text-dark-900">
-                {formatVnd(parsedAmount)}
+                {formatPenaltyVnd(parsedAmount)}
               </span>
             )}
           </label>
@@ -133,7 +128,7 @@ function PolicyEditor({ priority, currentAmount }: PolicyEditorProps) {
             <p className="font-semibold">{t`Xác nhận cập nhật mức phạt`}</p>
             <p className="mt-2 leading-6">
               {t`Mức phạt`} {priorityLabel(priority)} {t`sẽ là`}{" "}
-              <strong>{formatVnd(parsedAmount)}</strong>.
+              <strong>{formatPenaltyVnd(parsedAmount)}</strong>.
             </p>
             <p className="mt-2 text-xs text-light-900 dark:text-dark-900">
               {t`Thay đổi này áp dụng lại cho toàn bộ Daily Task đang dùng mức mặc định, gồm cả các task trong quá khứ.`}
@@ -217,11 +212,7 @@ export default function DailyTaskSettings() {
                     className={`absolute inset-y-0 left-0 w-1 ${PRIORITY_STYLE[item.priority].bar}`}
                   />
                   <div>
-                    <span
-                      className={`inline-flex rounded-md px-2 py-1 text-xs font-semibold ${PRIORITY_STYLE[item.priority].badge}`}
-                    >
-                      {priorityLabel(item.priority)}
-                    </span>
+                    <PenaltyPriorityBadge priority={item.priority} />
                   </div>
                   <div>
                     <p className="text-xs text-light-900 dark:text-dark-900">
@@ -230,7 +221,7 @@ export default function DailyTaskSettings() {
                     <p className="mt-1 text-sm font-semibold tabular-nums text-light-1000 dark:text-dark-1000">
                       {item.amountVnd === null
                         ? t`Chưa cấu hình`
-                        : formatVnd(item.amountVnd)}
+                        : formatPenaltyVnd(item.amountVnd)}
                     </p>
                   </div>
                   <Button
